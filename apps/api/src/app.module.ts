@@ -34,6 +34,21 @@ import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { ConversationsController, MessagesController, SEND_MESSAGE_HANDLER } from './messaging/messaging.controller.js';
 import { MessagingRooms } from './messaging/rooms.js';
+import { ModerationRegistry } from './moderation/moderation-registry.js';
+import { RelationsService } from './social/relations.service.js';
+// Lot 4A (social), separate import block to limit merge conflicts with parallel work.
+import { CommentsService } from './social/comments.service.js';
+import { FollowsService } from './social/follows.service.js';
+import { PostsService } from './social/posts.service.js';
+import { SocialModerationTargets } from './social/social-moderation.js';
+import { SocialController } from './social/social.controller.js';
+// Lot 4B (stories, reports, moderation).
+import { MessageModerationTarget } from './moderation/message-moderation.target.js';
+import { CREATE_REPORT_HANDLER, ModerationController, ReportsController } from './moderation/moderation.controller.js';
+import { ModerationService } from './moderation/moderation.service.js';
+import { StoriesController } from './stories/stories.controller.js';
+import { StoriesService } from './stories/stories.service.js';
+import { StoryAccessService } from './stories/story-access.js';
 import { MaintenanceService } from './maintenance/maintenance.service.js';
 import { AvatarController } from './media/avatar.controller.js';
 import { MEDIA_THROTTLED_HANDLERS, MediaController } from './media/media.controller.js';
@@ -111,6 +126,16 @@ export class AppModule {
                 ctx.getClass() !== ConversationsController ||
                 ctx.getHandler().name !== SEND_MESSAGE_HANDLER,
             },
+            {
+              // Lot 4B: filing reports only.
+              name: 'reports',
+              ttl: 60_000,
+              limit: env.REPORTS_RATE_LIMIT_PER_MINUTE,
+              skipIf: (ctx) =>
+                ctx.getType() !== 'http' ||
+                ctx.getClass() !== ReportsController ||
+                ctx.getHandler().name !== CREATE_REPORT_HANDLER,
+            },
           ],
         }),
         DbModule,
@@ -135,6 +160,10 @@ export class AppModule {
         ConversationsController,
         MessagesController,
         NotificationsController,
+        SocialController,
+        StoriesController,
+        ReportsController,
+        ModerationController,
         ...extraControllers,
       ],
       providers: [
@@ -157,6 +186,17 @@ export class AppModule {
         { provide: MediaStorage, inject: [ENV], useFactory: (e: Env) => new LocalDiskStorage(e.MEDIA_STORAGE_DIR) },
         // Lot 3: realtime fan-out and notifications (ports shared by messaging and later lots).
         RealtimeService,
+        // Lot 4: follow graph (implemented by the social module) and moderation registry.
+        RelationsService,
+        ModerationRegistry,
+        FollowsService,
+        PostsService,
+        CommentsService,
+        SocialModerationTargets,
+        StoryAccessService,
+        StoriesService,
+        ModerationService,
+        MessageModerationTarget,
         RealtimeGateway,
         SessionVerifier,
         NotificationsService,

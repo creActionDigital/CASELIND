@@ -26,6 +26,7 @@ import { DB, type Db } from '../db/db.module.js';
 import { type MediaAssetRow, mediaAssets, users } from '../db/schema.js';
 import type { AuthUser } from '../security/auth.guard.js';
 import { UsersService } from '../users/users.service.js';
+import { StoryAccessService } from '../stories/story-access.js';
 import { canReadAsync } from './access.js';
 import { matchesDeclared, SNIFF_HEAD_BYTES, sniffMime } from './sniff.js';
 import { MediaStorage } from './storage.js';
@@ -110,6 +111,7 @@ export class MediaService {
     private readonly storage: MediaStorage,
     private readonly audit: AuditService,
     private readonly users: UsersService,
+    private readonly storyAccess: StoryAccessService,
   ) {
     this.stagingDir = join(env.MEDIA_STORAGE_DIR, 'tmp');
   }
@@ -310,7 +312,7 @@ export class MediaService {
     const row = await this.findById(id);
     if (!row) throw AppError.notFound('Media not found');
     if (row.ownerUserId === viewerId) return toDto(row);
-    if (row.status !== 'ready' || !(await canReadAsync(this.db, viewerId, row))) throw AppError.notFound('Media not found');
+    if (row.status !== 'ready' || !(await canReadAsync(this.db, viewerId, row, this.storyAccess))) throw AppError.notFound('Media not found');
     // Non-owners get a reduced view (no owner id, checksum, declared type or upload details).
     return toPublicDto(row);
   }
@@ -318,7 +320,7 @@ export class MediaService {
   /** The bytes of a ready asset the viewer may read (404 otherwise, owner included while unfinished). */
   async openContent(viewerId: string, id: string): Promise<{ asset: MediaAsset; stream: Readable; filename: string }> {
     const row = await this.findById(id);
-    if (!row || row.status !== 'ready' || !(await canReadAsync(this.db, viewerId, row))) throw AppError.notFound('Media not found');
+    if (!row || row.status !== 'ready' || !(await canReadAsync(this.db, viewerId, row, this.storyAccess))) throw AppError.notFound('Media not found');
     let stream: Readable;
     try {
       stream = await this.storage.openRead(row.storageKey);

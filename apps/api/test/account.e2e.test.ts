@@ -112,7 +112,7 @@ describe('data export', () => {
     const res = await ctx.http.get('/v1/me/export').set(bearer(a.token)).expect(200);
     const body = res.body;
     expect(Object.keys(body).sort()).toEqual(
-      ['blocks', 'conversations', 'exportedAt', 'media', 'messagesSent', 'messagesSentTruncated', 'orgMemberships', 'privacy', 'profile', 'securityEvents', 'sessions'].sort(),
+      ['blocks', 'comments', 'conversations', 'exportedAt', 'following', 'media', 'messagesSent', 'messagesSentTruncated', 'orgMemberships', 'posts', 'privacy', 'profile', 'reportsFiled', 'securityEvents', 'sessions', 'stories'].sort(),
     );
     expect(body.profile).toMatchObject({ id: a.id, handle: a.handle, email: a.identifier, status: 'active' });
     expect(body.privacy.readReceipts).toBe(false);

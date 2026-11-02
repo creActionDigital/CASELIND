@@ -56,6 +56,7 @@ function buildOperation(op: ApiOperation): Record<string, unknown> {
 
   const description = [
     op.auth === 'admin' ? 'Requires the `admin` platform role (403 otherwise).' : undefined,
+    op.auth === 'moderator' ? 'Requires the `admin` or `moderator` platform role (403 otherwise).' : undefined,
     op.auth !== 'public' ? 'Requires a bearer access token (401 otherwise).' : undefined,
   ]
     .filter(Boolean)

@@ -10,5 +10,7 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 120_000,
     pool: 'forks',
+    // Several embedded-PostgreSQL files at once crash workers on Windows (exit codes 3221225477 / 3221226505 / 3221225773).
+    maxWorkers: 2,
   },
 });

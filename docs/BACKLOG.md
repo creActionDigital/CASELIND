@@ -7,7 +7,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 ## Ordre imposé
 
 1. Reverse engineering et cartographie WeChat : **v1 faite** (sources publiques ; à enrichir module par module)
-2. **Backend** : en cours (lots 1, 1b, 2 et 3 testés)
+2. **Backend** : en cours (lots 1, 1b, 2, 3 et 4 testés)
 3. **Mobile** (React Native + Expo) : en cours. M1 (socle, auth, messagerie temps réel, notifications) codé et testé sur Expo web ; validation sur appareil à faire
 4. Intégration mobile ↔ backend, tests et validation
 5. **Web** (React + TS + Vite) : seulement après la validation du mobile
@@ -23,7 +23,8 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 2b — Reste médias et organisations | Adaptateur S3 + CDN (après Q6), Range/304 vidéo, ré-encodage et suppression EXIF, expiration et limite des invitations, slugs réservés en base, suspension et vérification des organisations par l'admin, suppression d'organisation | | planifié |
 | 3 — Messagerie et notifications | Conversations 1:1 et groupes, messages, pièces jointes, accusés, WebSocket, push Expo, centre de notifications | 223 tests (voir PROGRESS) | **testé** |
 | 3b — Reste messagerie | Transfert, favoris, brouillons serveur, messages éphémères et programmés, partage de position, messages vocaux (côté mobile), reçus différés Expo, déconnexion immédiate à la suspension admin, filtrage par `firstSeq` des événements `message.updated`/`message.reaction`, appels WebRTC (décision TURN/SFU, Q6), traduction (consentement), conversation commerciale (lot 5) | | planifié |
-| 4 — Social | Posts, visibilité, réactions, commentaires, abonnements, stories 24 h, vidéos courtes, signalements et modération | | planifié |
+| 4 — Social | Posts, visibilité, réactions, commentaires, abonnements, stories 24 h, vidéos courtes, signalements et modération | 273 tests (voir PROGRESS) | **testé** |
+| 4b — Reste social | Listes d’amis proches et audiences personnalisées, salons, live, favoris (C-08), stickers (C-11), tableau de bord créateur (C-12), classement du flux vidéo, limite de débit des publications, accès modérateur aux médias masqués | | planifié |
 | 5 — Commerce | Catalogue, variantes, stock, panier multi-vendeurs, commandes scindées, avis vérifiés, coupons | | planifié |
 | 6 — Ledger et wallet (sandbox) | Ledger en partie double append-only, wallet, transferts idempotents, QR marchand signé, KYC par niveaux, **aucun argent réel** | | planifié |
 | 7 — Lieux et recherche | Lieux, proximité (PostGIS en prod), recherche universelle | | planifié |

@@ -112,6 +112,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           // After purgeDueDeletions committed: also retries what a previous run could not delete.
           deletedUserMedia: await this.purgeDeletedUsersMedia(),
         };
+        // Lot 4B: not part of the result shape; logged only.
+        await this.purgeOldStoryViews(now);
         this.logger.log(
           `maintenance done: otpChallenges=${result.otpChallenges} refreshTokens=${result.refreshTokens} sessions=${result.sessions} deletedAccounts=${result.deletedAccounts} staleUploads=${result.staleUploads} deletedUserMedia=${result.deletedUserMedia}`,
         );
@@ -125,6 +127,16 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       // Destroy the connection if the unlock failed so the lock cannot leak back into the pool.
       lockClient.release(unlockFailed);
     }
+  }
+
+  /** Views of stories that expired more than 30 days ago (the stories stay in their author's archive). */
+  private async purgeOldStoryViews(now: Date): Promise<number> {
+    const cutoff = new Date(now.getTime() - 30 * DAY_MS);
+    const res = await this.db.execute(sql`
+      DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE expires_at < ${cutoff.toISOString()}::timestamptz)`);
+    const n = res.rowCount ?? 0;
+    if (n > 0) this.logger.log(`maintenance: ${n} expired story views removed`);
+    return n;
   }
 
   /** OTP challenges expired for more than 24 hours. */
@@ -268,6 +280,17 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         );
       }
 
+      // Stories (lot 4B): rows and views go (files follow through purgeDeletedUsersMedia); views they made too;
+      // reports they filed are kept, anonymised.
+      await tx.execute(sql`DELETE FROM stories WHERE author_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM story_views WHERE viewer_id = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE reports SET reporter_id = NULL, details = NULL WHERE reporter_id = ANY(${idArray})`);
+      // Social (lot 4A): follows and reactions are dropped, posts and comments are deleted.
+      await tx.execute(sql`DELETE FROM follows WHERE follower_id = ANY(${idArray}) OR followee_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM post_reactions WHERE user_id = ANY(${idArray})`);
+      // Posts and comments are erased for good (bodies included; reactions, media links and replies cascade).
+      await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM posts WHERE author_id = ANY(${idArray})`);
       await tx.delete(sessions).where(inArray(sessions.userId, ids));
       await tx.delete(otpChallenges).where(inArray(otpChallenges.userId, ids));
       await tx.delete(userBlocks).where(or(inArray(userBlocks.blockerId, ids), inArray(userBlocks.blockedId, ids)));

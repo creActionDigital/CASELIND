@@ -61,6 +61,10 @@ const envSchema = z
     MEDIA_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
     /** Per-client budget for sending messages (the send route only). */
     MESSAGING_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(60),
+    /** Lot 4B: lifetime of a story. */
+    STORY_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+    /** Lot 4B: per-client budget for filing reports (the create route only). */
+    REPORTS_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(10),
     /** Push provider: `log` only journals (nothing is delivered), `expo` calls the Expo Push API. */
     PUSH_PROVIDER: z.enum(['expo', 'log']).default('log'),
     EXPO_ACCESS_TOKEN: z.string().min(1).optional(),

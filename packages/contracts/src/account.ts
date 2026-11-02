@@ -4,6 +4,8 @@ import { mediaMimeSchema, mediaPurposeSchema, mediaStatusSchema } from './media.
 import { orgMemberStatusSchema, orgRoleSchema } from './orgs.js';
 import { blockedUserSchema, privacySettingsSchema } from './privacy.js';
 import { exportedConversationSchema, exportedMessageSchema } from './messaging.js';
+import { exportedCommentSchema, exportedFollowSchema, exportedPostSchema } from './social.js';
+import { exportedReportSchema, exportedStorySchema } from './stories.js';
 import { meSchema } from './users.js';
 
 /** A session as listed in the data export: every session, including revoked ones. */
@@ -66,6 +68,13 @@ export const accountExportSchema = z.object({
   messagesSent: z.array(exportedMessageSchema),
   /** True when older messages were left out of `messagesSent`. */
   messagesSentTruncated: z.boolean(),
+  /** Lot 4A: the user's (non-deleted) posts and comments, and the accounts they follow. */
+  posts: z.array(exportedPostSchema),
+  comments: z.array(exportedCommentSchema),
+  following: z.array(exportedFollowSchema),
+  /** Lot 4B: the user's stories (active and archived) and the reports they filed. */
+  stories: z.array(exportedStorySchema),
+  reportsFiled: z.array(exportedReportSchema),
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;
 

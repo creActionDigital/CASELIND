@@ -82,6 +82,7 @@ describe('OpenAPI document', () => {
         expect(operation.security, `${op.method} ${op.path}`).toEqual([{ bearer: [] }]);
       }
       if (op.auth === 'admin') expect(operation.description).toMatch(/admin/);
+      if (op.auth === 'moderator') expect(operation.description).toMatch(/`admin` or `moderator`/);
     }
     expect(doc.components.securitySchemes.bearer).toMatchObject({ type: 'http', scheme: 'bearer' });
   });

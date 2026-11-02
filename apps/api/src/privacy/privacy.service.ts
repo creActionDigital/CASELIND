@@ -12,7 +12,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
-import { userBlocks, users } from '../db/schema.js';
+import { follows, userBlocks, users } from '../db/schema.js';
 
 /** Any syntactically valid UUID (what Postgres accepts); anything else cannot name a user. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -94,6 +94,15 @@ export class PrivacyService {
       if (pgErr.code === '23503') throw AppError.notFound('User not found');
       throw err;
     }
+    // Blocking cuts the follow graph in both directions (also when the block already existed).
+    await this.db
+      .delete(follows)
+      .where(
+        or(
+          and(eq(follows.followerId, blockerId), eq(follows.followeeId, blockedId)),
+          and(eq(follows.followerId, blockedId), eq(follows.followeeId, blockerId)),
+        ),
+      );
     if (inserted.length === 0) return;
     await this.audit.record({ action: 'user.blocked', actorUserId: blockerId, meta, metadata: { blockedUserId: blockedId } });
   }

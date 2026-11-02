@@ -1,5 +1,20 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-02 — Lot backend 4 (social, stories, modération)
+
+### Réalisé
+- **4A, social** (migration 0009, `apps/api/src/social/*`, flag `social`) : abonnements (le blocage les coupe dans les deux sens), publications texte, médias et vidéo avec 4 visibilités (public, abonnés, amis = abonnement mutuel, privé), fil des comptes suivis, flux vidéo chronologique, réactions (une par utilisateur), commentaires à un niveau de réponse, notifications `social` sans contenu, export et purge. Implémente `RelationsService`.
+- **4B, stories et modération** (migration 0010, `src/stories/*`, `src/moderation/*`) : stories de 24 h (`STORY_TTL_HOURS`) visibles par abonnés ou amis, barre (non vues d'abord), vues et liste des spectateurs pour l'auteur, archive personnelle ; signalements (on ne signale que ce qu'on voit, un seul ouvert par cible, limite de débit dédiée) ; file de modération pour `admin` ou `moderator` (`hide`, `restore`, `dismiss`), auditée sans contenu, signaleur notifié. Registre `ModerationRegistry` : cibles `user`, `post`, `comment`, `story`, `message`.
+- **Revue** : 1 défaut élevé (les médias de publication étaient lisibles par tout utilisateur connecté, même pour une publication privée : ils suivent désormais la visibilité de la publication), 2 moyens (purge qui laissait les corps en base ; requêtes N+1 dans la barre de stories), 1 faible (OpenAPI : niveau d'accès `moderator`). Test d'intégration sans espion (`social-stories.e2e`).
+- Vitest de l'API limité à 2 workers : le PostgreSQL embarqué faisait planter des workers en parallèle sur cette machine.
+
+### Tests réellement exécutés (2026-11-02)
+- `npm run typecheck` : 0 erreur. `npm test -w @caselind/api` : **23 fichiers, 273 tests, 273 réussis** (≈ 111 s).
+
+### Limites
+- Points ouverts (lot 4b du backlog) : listes « amis proches », médias d'une publication masquée invisibles pour les modérateurs, spectateurs de story inactifs ou bloqués encore listés, rejeu du `clientId` d'une publication supprimée → 400 peu clair, pas de limite de débit sur les publications, flux vidéo sans classement.
+- Le mobile n'affiche pas encore le fil ni les stories (lot M2).
+
 ## 2026-11-02 — Mobile M1 (socle Expo et messagerie)
 
 ### Réalisé (`apps/mobile`, Expo SDK 58, React Native 0.88, expo-router)

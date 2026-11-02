@@ -209,3 +209,5 @@ export type MediaAssetRow = typeof mediaAssets.$inferSelect;
 // Lot 3, one file per module to avoid edits to this file by parallel work.
 export * from './schema-messaging.js';
 export * from './schema-notifications.js';
+export * from './schema-social.js';
+export * from './schema-stories.js';

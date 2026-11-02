@@ -82,9 +82,43 @@ import {
   updateMyConversationStateRequestSchema,
 } from '@caselind/contracts';
 
+// Lot 4B (stories, reports, moderation), separate import block to limit merge conflicts.
+import {
+  createReportRequestSchema,
+  createStoryRequestSchema,
+  moderationActionRequestSchema,
+  moderationActionResultSchema,
+  moderationReportGroupPageSchema,
+  moderationReportsQuerySchema,
+  pageQuerySchema,
+  reportPageSchema,
+  reportSchema,
+  storyFeedSchema,
+  storyListSchema,
+  storyPageQuerySchema,
+  storyPageSchema,
+  storySchema,
+  storyViewerListSchema,
+} from '@caselind/contracts';
+
+// Lot 4A (social), separate import block.
+import {
+  commentListSchema,
+  commentSchema,
+  createCommentRequestSchema,
+  createPostRequestSchema,
+  postListSchema,
+  postSchema,
+  setReactionRequestSchema,
+  socialPageQuerySchema,
+  socialStatsSchema,
+  socialUserListSchema,
+  updatePostRequestSchema,
+} from '@caselind/contracts';
+
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
-/** public: no token; user: any authenticated account; admin: requires the `admin` platform role. */
-export type AuthLevel = 'public' | 'user' | 'admin';
+/** public: no token; user: any authenticated account; admin: the `admin` platform role; moderator: the `admin` or `moderator` platform role. */
+export type AuthLevel = 'public' | 'user' | 'admin' | 'moderator';
 
 export interface ApiOperation {
   method: HttpMethod;
@@ -224,4 +258,33 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'delete', path: '/v1/conversations/{id}/members/{userId}', summary: 'Leave (own id) or remove a member (admin or owner; an admin cannot remove an owner); the last owner leaving hands ownership over; audited', tags: ['messaging'], auth: 'user', params: { id: z.string(), userId: z.string() }, status: 204 },
   { method: 'put', path: '/v1/messages/{id}/reaction', summary: 'Set, or remove with emoji null, the single reaction of the caller to a message', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: reactionRequestSchema, response: messageSchema, status: 200 },
   { method: 'delete', path: '/v1/messages/{id}', summary: 'scope=me (default): hide for the caller. scope=all: the author recalls it within the recall window (409 afterwards), wiping body and media; audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, query: recallQuerySchema, status: 204 },
+  // Lot 4B: stories, reports, moderation. A story the caller may not see (expired, hidden, blocked, other audience) is a 404.
+  { method: 'post', path: '/v1/stories', summary: 'Publish a story (ready "story" upload of the caller; followers or friends); idempotent per clientId (201 new, 200 replay); flag social.stories', tags: ['stories'], auth: 'user', body: createStoryRequestSchema, response: storySchema, status: 201 },
+  { method: 'get', path: '/v1/stories/feed', summary: 'Stories bar: the caller first, then followed authors, unseen first (max 100 authors)', tags: ['stories'], auth: 'user', response: storyFeedSchema, status: 200 },
+  { method: 'get', path: '/v1/users/{userId}/stories', summary: 'Active stories of a user that the caller may see (blocked or unknown user: 404)', tags: ['stories'], auth: 'user', params: { userId: z.string() }, response: storyListSchema, status: 200 },
+  { method: 'get', path: '/v1/me/stories/archive', summary: "The caller's personal archive: every story, expired included (cursor pagination)", tags: ['stories'], auth: 'user', query: storyPageQuerySchema, response: storyPageSchema, status: 200 },
+  { method: 'post', path: '/v1/stories/{id}/view', summary: 'Mark a story as seen (idempotent)', tags: ['stories'], auth: 'user', params: { id: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/stories/{id}/viewers', summary: 'Who saw the story (author only, newest first; cursor pagination)', tags: ['stories'], auth: 'user', params: { id: z.string() }, query: storyPageQuerySchema, response: storyViewerListSchema, status: 200 },
+  { method: 'delete', path: '/v1/stories/{id}', summary: 'Delete a story (author only)', tags: ['stories'], auth: 'user', params: { id: z.string() }, status: 204 },
+  { method: 'post', path: '/v1/reports', summary: 'Report a user, post, comment, story or message the caller can see (invisible or unknown target: 404; open duplicate: 409; dedicated rate limit)', tags: ['moderation'], auth: 'user', body: createReportRequestSchema, response: reportSchema, status: 201 },
+  { method: 'get', path: '/v1/me/reports', summary: "The caller's reports and whether they were handled (cursor pagination)", tags: ['moderation'], auth: 'user', query: pageQuerySchema, response: reportPageSchema, status: 200 },
+  { method: 'get', path: '/v1/admin/moderation/reports', summary: 'Moderation queue: reports grouped by target (roles admin or moderator)', tags: ['admin', 'moderation'], auth: 'moderator', query: moderationReportsQuerySchema, response: moderationReportGroupPageSchema, status: 200 },
+  { method: 'post', path: '/v1/admin/moderation/actions', summary: 'hide / restore / dismiss a reported item and resolve its open reports; audited without content (roles admin or moderator)', tags: ['admin', 'moderation'], auth: 'moderator', body: moderationActionRequestSchema, response: moderationActionResultSchema, status: 200 },
+  // Social (lot 4A). Invisible, blocked, unknown or malformed ids: 404. Behind the `social` flag.
+  { method: 'put', path: '/v1/users/{userId}/follow', summary: 'Follow a user (idempotent). Self: 400; unknown, inactive or blocked either way: 404; notifies the user once', tags: ['social'], auth: 'user', params: { userId: z.string() }, status: 204 },
+  { method: 'delete', path: '/v1/users/{userId}/follow', summary: 'Unfollow a user (idempotent)', tags: ['social'], auth: 'user', params: { userId: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/users/{userId}/social', summary: 'Follower/following counts and the relation with the caller (isFollowing, followsYou)', tags: ['social'], auth: 'user', params: { userId: z.string() }, response: socialStatsSchema, status: 200 },
+  { method: 'get', path: '/v1/users/{userId}/followers', summary: 'Followers, newest first (cursor pagination)', tags: ['social'], auth: 'user', params: { userId: z.string() }, query: socialPageQuerySchema, response: socialUserListSchema, status: 200 },
+  { method: 'get', path: '/v1/users/{userId}/following', summary: 'Accounts followed, newest first (cursor pagination)', tags: ['social'], auth: 'user', params: { userId: z.string() }, query: socialPageQuerySchema, response: socialUserListSchema, status: 200 },
+  { method: 'get', path: '/v1/users/{userId}/posts', summary: "A user's posts that the caller may see, newest first (cursor pagination)", tags: ['social'], auth: 'user', params: { userId: z.string() }, query: socialPageQuerySchema, response: postListSchema, status: 200 },
+  { method: 'get', path: '/v1/feed', summary: "Visible posts of followed accounts plus the caller's own, newest first (cursor pagination)", tags: ['social'], auth: 'user', query: socialPageQuerySchema, response: postListSchema, status: 200 },
+  { method: 'get', path: '/v1/feed/videos', summary: 'Short-video feed, simple version: recent public video posts in chronological order (no ranking)', tags: ['social'], auth: 'user', query: socialPageQuerySchema, response: postListSchema, status: 200 },
+  { method: 'post', path: '/v1/posts', summary: 'Publish text and/or 0-10 ready post media of the caller (at most one video); idempotent per clientId (201 new, 200 replay); bad media: 400', tags: ['social'], auth: 'user', body: createPostRequestSchema, response: postSchema, status: 201 },
+  { method: 'get', path: '/v1/posts/{id}', summary: 'One post with reaction counts and myReaction (visibility rules apply; invisible: 404)', tags: ['social'], auth: 'user', params: { id: z.string() }, response: postSchema, status: 200 },
+  { method: 'patch', path: '/v1/posts/{id}', summary: 'Edit text and visibility (author only; others who can see it: 403)', tags: ['social'], auth: 'user', params: { id: z.string() }, body: updatePostRequestSchema, response: postSchema, status: 200 },
+  { method: 'delete', path: '/v1/posts/{id}', summary: 'Soft-delete a post (author only)', tags: ['social'], auth: 'user', params: { id: z.string() }, status: 204 },
+  { method: 'put', path: '/v1/posts/{id}/reaction', summary: "Set, change or remove (type null) the caller's single reaction; notifies the author once per reactor", tags: ['social'], auth: 'user', params: { id: z.string() }, body: setReactionRequestSchema, response: postSchema, status: 200 },
+  { method: 'get', path: '/v1/posts/{id}/comments', summary: 'Comments of a visible post, oldest first (cursor pagination); comments of users blocked with the caller are left out', tags: ['social'], auth: 'user', params: { id: z.string() }, query: socialPageQuerySchema, response: commentListSchema, status: 200 },
+  { method: 'post', path: '/v1/posts/{id}/comments', summary: 'Comment a visible post (1-2000 chars); replyToId must be a top-level comment of the same post', tags: ['social'], auth: 'user', params: { id: z.string() }, body: createCommentRequestSchema, response: commentSchema, status: 201 },
+  { method: 'delete', path: '/v1/comments/{id}', summary: 'Delete a comment (its author or the post author)', tags: ['social'], auth: 'user', params: { id: z.string() }, status: 204 },
 ];

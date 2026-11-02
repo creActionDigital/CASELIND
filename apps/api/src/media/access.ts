@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm';
+import { postVisibleSql } from '../social/post-visibility.js';
+import { posts, postMedia, users } from '../db/schema.js';
 import type { Db } from '../db/db.module.js';
 import type { MediaAssetRow } from '../db/schema.js';
+import type { StoryAccessService } from '../stories/story-access.js';
 
 type Readable = Pick<MediaAssetRow, 'ownerUserId' | 'purpose'>;
 
@@ -8,9 +11,8 @@ type Readable = Pick<MediaAssetRow, 'ownerUserId' | 'purpose'>;
  * Static part of the media read policy (no query needed): who may read a READY asset's metadata
  * and content when the answer depends only on its owner and purpose.
  *
- * - Profile and catalogue images, posts and stories: any signed-in user (their visibility rules,
- *   e.g. blocks or private posts, belong to the lots that publish them).
- * - Message attachments: see canReadAsync. Documents: the owner only.
+ * - Profile and catalogue images: any signed-in user.
+ * - Post media, message attachments and stories: see canReadAsync. Documents: the owner only.
  */
 export function canRead(viewerId: string, asset: Readable): boolean {
   if (asset.ownerUserId === viewerId) return true;
@@ -19,9 +21,9 @@ export function canRead(viewerId: string, asset: Readable): boolean {
     case 'org_logo':
     case 'org_banner':
     case 'product':
-    case 'post':
-    case 'story':
       return true;
+    case 'story':
+    case 'post':
     case 'message':
     case 'document':
       return false;
@@ -33,8 +35,26 @@ export function canRead(viewerId: string, asset: Readable): boolean {
  * by an active member of a conversation where the asset was sent in a message that was not
  * recalled and that the member is allowed to see (sent after they joined).
  */
-export async function canReadAsync(db: Pick<Db, 'execute'>, viewerId: string, asset: Readable & { id: string }): Promise<boolean> {
+export async function canReadAsync(
+  db: Pick<Db, 'execute' | 'select'>,
+  viewerId: string,
+  asset: Readable & { id: string },
+  stories?: Pick<StoryAccessService, 'canViewMedia'>,
+): Promise<boolean> {
   if (canRead(viewerId, asset)) return true;
+  // Stories: same rule as the story itself (audience, expiry, moderation, blocks).
+  if (asset.purpose === 'story') return stories ? stories.canViewMedia(viewerId, asset.id) : false;
+  // Posts: readable only through a post the viewer may see (audience, deletion, moderation, blocks).
+  if (asset.purpose === 'post') {
+    const [row] = await db
+      .select({ one: sql<number>`1` })
+      .from(postMedia)
+      .innerJoin(posts, sql`${posts.id} = ${postMedia.postId}`)
+      .innerJoin(users, sql`${users.id} = ${posts.authorId}`)
+      .where(sql`${postMedia.mediaId} = ${asset.id} AND ${postVisibleSql(viewerId, [])}`)
+      .limit(1);
+    return row !== undefined;
+  }
   if (asset.purpose !== 'message') return false;
   const res = await db.execute(sql`
     SELECT 1 FROM messages m

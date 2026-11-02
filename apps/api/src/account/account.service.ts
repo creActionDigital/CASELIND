@@ -5,6 +5,7 @@ import {
   ErrorCodes,
   type LastOwnerConflictDetails,
   type MediaMime,
+  type ReportReason,
 } from '@caselind/contracts';
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
@@ -19,8 +20,13 @@ import {
   mediaAssets,
   messages,
   organizations,
+  follows,
   orgMembers,
+  postComments,
+  posts,
+  reports,
   sessions,
+  stories,
   users,
 } from '../db/schema.js';
 import { contentUrlOf } from '../media/media.service.js';
@@ -126,6 +132,36 @@ export class AccountService {
     // The most recent ones, returned oldest first.
     const sentKept = sentRows.slice(0, EXPORT_MESSAGES_MAX).reverse();
 
+    // Lot 4B: the user's stories (archive included) and the reports they filed.
+    const storyRows = await this.db
+      .select({ id: stories.id, caption: stories.caption, createdAt: stories.createdAt, expiresAt: stories.expiresAt })
+      .from(stories)
+      .where(eq(stories.authorId, auth.userId))
+      .orderBy(asc(stories.createdAt), asc(stories.id));
+    const reportRows = await this.db
+      .select()
+      .from(reports)
+      .where(eq(reports.reporterId, auth.userId))
+      .orderBy(asc(reports.createdAt), asc(reports.id));
+
+    // Lot 4A: own (non-deleted) posts and comments, and the accounts followed.
+    const postRows = await this.db
+      .select({ id: posts.id, body: posts.body, visibility: posts.visibility, createdAt: posts.createdAt })
+      .from(posts)
+      .where(and(eq(posts.authorId, auth.userId), isNull(posts.deletedAt)))
+      .orderBy(asc(posts.createdAt), asc(posts.id));
+    const commentRows = await this.db
+      .select({ id: postComments.id, postId: postComments.postId, body: postComments.body, createdAt: postComments.createdAt })
+      .from(postComments)
+      .where(and(eq(postComments.authorId, auth.userId), isNull(postComments.deletedAt)))
+      .orderBy(asc(postComments.createdAt), asc(postComments.id));
+    const followingRows = await this.db
+      .select({ userId: follows.followeeId, handle: sql<string>`${users.handle}::text`, followedAt: follows.createdAt })
+      .from(follows)
+      .innerJoin(users, eq(users.id, follows.followeeId))
+      .where(eq(follows.followerId, auth.userId))
+      .orderBy(asc(follows.createdAt), asc(follows.followeeId));
+
     const result: AccountExport = {
       exportedAt: new Date().toISOString(),
       profile,
@@ -172,6 +208,24 @@ export class AccountService {
         createdAt: m.createdAt.toISOString(),
       })),
       messagesSentTruncated,
+      posts: postRows.map((p) => ({ id: p.id, body: p.body, visibility: p.visibility, createdAt: p.createdAt.toISOString() })),
+      comments: commentRows.map((c) => ({ id: c.id, postId: c.postId, body: c.body, createdAt: c.createdAt.toISOString() })),
+      following: followingRows.map((f) => ({ userId: f.userId, handle: f.handle, followedAt: f.followedAt.toISOString() })),
+      stories: storyRows.map((s) => ({
+        id: s.id,
+        caption: s.caption,
+        createdAt: s.createdAt.toISOString(),
+        expiresAt: s.expiresAt.toISOString(),
+      })),
+      reportsFiled: reportRows.map((r) => ({
+        id: r.id,
+        targetType: r.targetType,
+        targetId: r.targetId,
+        reason: r.reason as ReportReason,
+        details: r.details,
+        status: r.status,
+        createdAt: r.createdAt.toISOString(),
+      })),
     };
     await this.audit.record({
       action: 'user.data_exported',

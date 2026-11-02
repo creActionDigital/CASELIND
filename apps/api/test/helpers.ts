@@ -94,6 +94,7 @@ export async function createTestContext(
     AUTH_RATE_LIMIT_PER_MINUTE: '10000',
     MEDIA_RATE_LIMIT_PER_MINUTE: '10000',
     MESSAGING_RATE_LIMIT_PER_MINUTE: '10000',
+    REPORTS_RATE_LIMIT_PER_MINUTE: '10000',
     MAINTENANCE_ENABLED: 'false',
     ...envOverrides,
   });

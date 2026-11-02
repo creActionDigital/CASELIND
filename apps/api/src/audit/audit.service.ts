@@ -43,7 +43,9 @@ export type AuditAction =
   | 'conversation.member_added'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
-  | 'message.recalled';
+  | 'message.recalled'
+  /** Moderation (lot 4B): metadata {targetType, targetId, action}. Never the content. */
+  | 'moderation.action';
 
 export interface AuditInput {
   action: AuditAction;

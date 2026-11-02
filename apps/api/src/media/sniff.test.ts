@@ -95,10 +95,10 @@ describe('upload token', () => {
 
 describe('canRead', () => {
   it('opens public-facing purposes to everyone and keeps messages and documents private', () => {
-    for (const purpose of ['avatar', 'org_logo', 'org_banner', 'product', 'post', 'story'] as const) {
+    for (const purpose of ['avatar', 'org_logo', 'org_banner', 'product'] as const) {
       expect(canRead('viewer', { ownerUserId: 'owner', purpose })).toBe(true);
     }
-    for (const purpose of ['message', 'document'] as const) {
+    for (const purpose of ['message', 'document', 'story', 'post'] as const) {
       expect(canRead('viewer', { ownerUserId: 'owner', purpose })).toBe(false);
       expect(canRead('owner', { ownerUserId: 'owner', purpose })).toBe(true);
     }
