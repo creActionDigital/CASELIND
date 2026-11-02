@@ -24,7 +24,7 @@ export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <View style={[styles.bar, { paddingTop: insets.top, backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+    <View style={[styles.bar, { paddingTop: insets.top, backgroundColor: colors.tabBar, borderBottomColor: colors.border }]}>
       <View style={styles.row}>
         <View style={styles.logo}>
           <Wordmark size={17} />
@@ -34,9 +34,9 @@ export function AppHeader() {
           accessibilityRole="button"
           accessibilityLabel={t('header.walletSoon')}
           onPress={() => router.push('/wallet')}
-          style={[styles.chip, { backgroundColor: colors.primarySoft }]}
+          style={({ pressed }) => [styles.chip, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
         >
-          <Text variant="caption" color={colors.primary} style={{ fontWeight: '700' }}>
+          <Text variant="caption" color={colors.text} style={{ fontWeight: '600' }}>
             {t('header.wallet')}
           </Text>
           <Badge tone="neutral" label={t('common.soon')} />

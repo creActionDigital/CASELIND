@@ -1,7 +1,7 @@
 /**
- * Identité visuelle CASELIND — originale, sans référence à une autre marque.
- * Idée : « lac au crépuscule » — indigo profond (confiance, finance) + soleil ambre (énergie, action centrale)
- * + corail pour les alertes. Contrastes vérifiés AA (texte ≥ 4.5:1, éléments d'interface ≥ 3:1).
+ * Identité visuelle CASELIND : langage inspiré des principes Apple (HIG) — base neutre, une seule couleur
+ * d'accent (l'indigo CASELIND), typographie système à l'échelle iOS, surfaces calmes et séparateurs fins.
+ * Le rouge est réservé aux pastilles et aux alertes. Contrastes vérifiés AA (texte ≥ 4.5:1, interface ≥ 3:1).
  */
 export interface Palette {
   background: string;
@@ -24,76 +24,79 @@ export interface Palette {
 }
 
 export const light: Palette = {
-  background: '#F6F5FB',
+  background: '#F2F2F7', // fond groupé
   surface: '#FFFFFF',
-  surfaceAlt: '#ECEAF6',
-  border: '#CFCBE3',
-  text: '#16142B', // 16:1 sur background
-  textMuted: '#55527A', // 6.9:1
-  primary: '#3730A3', // 9.4:1 avec blanc
+  surfaceAlt: '#E9E9EF',
+  border: '#D1D1D6',
+  text: '#1D1D1F', // 15.6:1 sur background
+  textMuted: '#636366', // 5.4:1 sur background, 5.9:1 sur surface
+  primary: '#4F46E5', // 6.3:1 avec blanc, 5.6:1 sur background
   onPrimary: '#FFFFFF',
-  primarySoft: '#E3E1F8',
-  accent: '#F5A524',
-  onAccent: '#1F1300', // 9.9:1
-  danger: '#B42318', // 6.5:1 avec blanc
+  primarySoft: '#E8E7FC',
+  accent: '#D70015', // pastilles de notification : 5.9:1 avec blanc
+  onAccent: '#FFFFFF',
+  danger: '#D70015',
   onDanger: '#FFFFFF',
-  dangerSoft: '#FDE8E6',
-  success: '#0B6B4B',
-  overlay: 'rgba(22,20,43,0.5)',
-  tabBar: '#FFFFFF',
+  dangerSoft: '#FDE7E9',
+  success: '#1B7F3B', // 5.2:1 avec blanc
+  overlay: 'rgba(0,0,0,0.4)',
+  tabBar: 'rgba(249,249,251,0.94)',
 };
 
 export const dark: Palette = {
-  background: '#0F0E1C',
-  surface: '#1A1930',
-  surfaceAlt: '#262445',
-  border: '#3D3A66',
-  text: '#F1F0FB', // 15:1
-  textMuted: '#B3B0D6', // 8:1
-  primary: '#A5A0FF', // 7.4:1 sur background
-  onPrimary: '#12104A', // 8:1 sur primary
-  primarySoft: '#2B2870',
-  accent: '#FFB840',
-  onAccent: '#1F1300',
-  danger: '#FF8A80', // 7.6:1
-  onDanger: '#3A0905',
-  dangerSoft: '#3D1614',
-  success: '#5FD3A5',
-  overlay: 'rgba(0,0,0,0.65)',
-  tabBar: '#1A1930',
+  background: '#000000',
+  surface: '#1C1C1E',
+  surfaceAlt: '#2C2C2E',
+  border: '#38383A',
+  text: '#F5F5F7', // 19:1
+  textMuted: '#A1A1A6', // 8:1 sur background, 6.6:1 sur surface
+  primary: '#8E8AFF', // 7.3:1 sur background
+  onPrimary: '#0B0A2E', // 7.5:1 sur primary
+  primarySoft: '#25233F',
+  accent: '#FF453A',
+  onAccent: '#1A0000', // 6.0:1
+  danger: '#FF6961', // 7.4:1 sur background
+  onDanger: '#1A0000',
+  dangerSoft: '#3A1513',
+  success: '#30D158',
+  overlay: 'rgba(0,0,0,0.6)',
+  tabBar: 'rgba(22,22,24,0.94)',
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
-export const radius = { sm: 8, md: 12, lg: 20, pill: 999 } as const;
+export const radius = { sm: 10, md: 14, lg: 22, xl: 28, pill: 999 } as const;
 
 /** Taille minimale d'une cible tactile (points). */
 export const TOUCH = 44;
 
+/** Durées d'animation : micro-interaction, transition standard. Les sorties sont plus rapides que les entrées. */
+export const motion = { fast: 150, base: 250 } as const;
+
 export const typography = {
-  // Polices système (aucun téléchargement, bon rendu sur Android bas de gamme).
+  // Polices système (SF Pro sur iOS, Roboto sur Android) : aucun téléchargement, rendu net partout.
   family: undefined as string | undefined,
-  display: { fontSize: 28, lineHeight: 34, fontWeight: '800' as const },
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '700' as const },
-  heading: { fontSize: 18, lineHeight: 24, fontWeight: '700' as const },
-  body: { fontSize: 16, lineHeight: 24, fontWeight: '400' as const },
-  bodyStrong: { fontSize: 16, lineHeight: 24, fontWeight: '600' as const },
-  small: { fontSize: 14, lineHeight: 20, fontWeight: '400' as const },
+  display: { fontSize: 34, lineHeight: 41, fontWeight: '700' as const, letterSpacing: -0.4 },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '700' as const, letterSpacing: -0.3 },
+  heading: { fontSize: 20, lineHeight: 25, fontWeight: '600' as const, letterSpacing: -0.2 },
+  body: { fontSize: 17, lineHeight: 22, fontWeight: '400' as const, letterSpacing: -0.2 },
+  bodyStrong: { fontSize: 17, lineHeight: 22, fontWeight: '600' as const, letterSpacing: -0.2 },
+  small: { fontSize: 15, lineHeight: 20, fontWeight: '400' as const, letterSpacing: -0.1 },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' as const },
 };
 
 export const shadow = {
   card: {
-    shadowColor: '#16142B',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowColor: '#000000',
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    elevation: 1,
   },
   raised: {
-    shadowColor: '#16142B',
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    shadowColor: '#000000',
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
 } as const;

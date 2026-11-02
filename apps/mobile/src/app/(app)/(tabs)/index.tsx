@@ -18,8 +18,8 @@ export default function Home() {
           <View accessible accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel={t('home.stories.addA11y')} style={styles.story}>
             <View style={[styles.ring, { borderColor: colors.border }]}>
               <Avatar name={me?.displayName ?? '?'} size={56} />
-              <View style={[styles.plus, { backgroundColor: colors.accent, borderColor: colors.background }]}>
-                <Ionicons name="add" size={14} color={colors.onAccent} />
+              <View style={[styles.plus, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+                <Ionicons name="add" size={14} color={colors.onPrimary} />
               </View>
             </View>
             <Text variant="caption" muted numberOfLines={1}>

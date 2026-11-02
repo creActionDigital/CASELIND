@@ -57,7 +57,7 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
           </Text>
         ) : null}
         {m.replyToId ? (
-          <View style={[styles.quote, { borderLeftColor: colors.accent, backgroundColor: colors.primarySoft }]}>
+          <View style={[styles.quote, { borderLeftColor: colors.primary, backgroundColor: colors.primarySoft }]}>
             <Text variant="caption" numberOfLines={2}>
               {replyTo ? messagePreview(replyTo, t, name) || t('chat.photo') : t('chat.replyUnavailable')}
             </Text>
@@ -114,7 +114,7 @@ function StatusIcon({ status, color }: { status: MessageStatus; color: string })
     failed: { name: 'alert-circle', color: colors.danger },
     sent: { name: 'checkmark', color },
     delivered: { name: 'checkmark-done', color },
-    read: { name: 'checkmark-done', color: colors.accent },
+    read: { name: 'checkmark-done', color: colors.primary },
   } as const;
   const s = map[status];
   return <Ionicons name={s.name} size={14} color={s.color} />;

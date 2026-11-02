@@ -46,10 +46,10 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
                 style={({ pressed }) => [
                   styles.publish,
                   shadow.raised,
-                  { backgroundColor: colors.accent, opacity: pressed ? 0.85 : 1 },
+                  { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.94 : 1 }] },
                 ]}
               >
-                <Ionicons name="add" size={32} color={colors.onAccent} />
+                <Ionicons name="add" size={30} color={colors.onPrimary} />
               </Pressable>
             </View>
           );
@@ -70,7 +70,7 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
             style={styles.cell}
           >
             <Ionicons name={focused ? tab.iconOn : tab.icon} size={24} color={color} />
-            <Text variant="caption" color={color} numberOfLines={1} style={focused ? { fontWeight: '700' } : undefined}>
+            <Text variant="caption" color={color} numberOfLines={1} style={{ fontSize: 11, fontWeight: focused ? '600' : '500' }}>
               {label}
             </Text>
           </Pressable>
@@ -85,11 +85,11 @@ const styles = StyleSheet.create({
   bar: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.xs },
   cell: { flex: 1, minHeight: TOUCH + 8, alignItems: 'center', justifyContent: 'center', gap: 2 },
   publish: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -22,
+    marginTop: -14,
   },
 });
