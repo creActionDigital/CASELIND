@@ -160,7 +160,7 @@ Disponibilité dans WeChat : **G** = globale, **R** = régionale (surtout Chine 
 | I-14 | Notifications centrales (§24) | `notifications` (Expo Push) | — | **testé** (lot 3) : centre, préférences, mode silencieux, push Expo (reçus différés non traités) |
 | I-15 | Back-office, feature flags par pays (§26) | `admin`, `flags` | RBAC | flags **testé** (lot 1b, API par pays et par rôle) ; interface back-office à venir |
 | I-16 | i18n FR/EN/SW (§27) | `packages/i18n` | — | planifié |
-| I-17 | Navigation mobile imposée : Accueil · Maps · + · Messagerie · Plus ; en-tête logo / recherche / wallet + devise / panier / compte | app mobile | — | planifié (phase mobile) |
+| I-17 | Navigation mobile imposée : Accueil · Maps · + · Messagerie · Plus ; en-tête logo / recherche / wallet + devise / panier / compte | app mobile | — | **testé** (M1, Expo web) : onglets et en-tête en place ; appareil réel à faire |
 
 ---
 

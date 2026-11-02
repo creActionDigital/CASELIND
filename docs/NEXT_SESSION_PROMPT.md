@@ -22,29 +22,20 @@ CASELIND est construit en **reproduisant l'écosystème fonctionnel de WeChat/We
 3. Le cahier des charges `CASELIND_CAHIER_DES_CHARGES_DEFINITIF.md` : seulement les sections utiles au lot en cours (§6 messagerie, §24 notifications, §27 et §32 UX).
 4. `git log --oneline` : `1ee71ff` (lots 1 et 1b), `a30d667` (lot 2). L'identité Git est configurée localement pour ce dépôt.
 
-## État au 2026-11-02
-- Backend NestJS 12 (ESM) + PostgreSQL (Drizzle, migrations SQL 0001–0006), contrats Zod partagés dans `packages/contracts`, OpenAPI généré sur `GET /v1/openapi.json`. Le test d'exhaustivité exige que chaque nouvelle route soit ajoutée à `apps/api/src/openapi/registry.ts`.
-- Lots testés : 1 (identité), 1b (flags, confidentialité, export et suppression), 2 (organisations et médias). **162 tests sur 162** (`npm test -w @caselind/api`, PostgreSQL embarqué réel, pas de Docker).
-- Ni mobile ni web commencés.
+## État au 2026-11-02 (fin de session)
+- Backend NestJS 12 (ESM) + PostgreSQL (Drizzle, migrations 0001–0008), contrats Zod dans `packages/contracts`, OpenAPI sur `GET /v1/openapi.json` (toute nouvelle route va dans `apps/api/src/openapi/registry.ts`).
+- Lots backend testés : 1, 1b, 2, **3 (messagerie temps réel Socket.IO + notifications push Expo, commit `cd30771`)**. **223 tests sur 223** (`npm test -w @caselind/api`, à lancer **serveurs de dev arrêtés**, sinon le PostgreSQL embarqué des tests peut redémarrer).
+- **Mobile M1 codé** (`apps/mobile`, Expo SDK 58, expo-router) : socle, auth, navigation imposée, messagerie temps réel, notifications. 17 tests unitaires ; parcours vérifié sur Expo web contre l'API réelle. **Pas encore validé sur appareil par le propriétaire.**
+- Lancement local : `.claude/launch.json` (`db`, `api`, `mobile-web`). `apps/api/.env` est local (non versionné) ; la base de dev doit être en UTF-8 (le migrateur refuse sinon).
+- Web non commencé.
 
 ## Ordre imposé (ne pas modifier sans mon accord)
 Backend → **mobile React Native + Expo** → intégration et validation du mobile → web React + TypeScript + Vite (pas de Next.js). Ne commence pas le web avant la validation du mobile.
 
-## Prochaine étape : lot backend 3 (messagerie et notifications), puis le mobile
-Recherche déjà faite (versions vérifiées le 2026-11-01) :
-- Installer `@nestjs/websockets@12.3.2`, `@nestjs/platform-socket.io@12.3.2` (socket.io 4.8.4), `expo-server-sdk@8.0.0` ; en devDependency, `socket.io-client@4.8.4`. Aucune contrainte TypeScript 7.
-- **Authentification WebSocket au handshake** : un middleware `server.use()` dans `afterInit`, avec le token passé dans `socket.handshake.auth.token` (jamais dans l'URL). Il réutilise la même vérification de session en base que `AuthGuard` (extraire une méthode partagée). `handleConnection` n'est pas attendu par Nest et n'est pas protégé : ne pas y faire l'authentification.
-- La garde HTTP globale doit ignorer les contextes non HTTP (`ctx.getType() !== 'http'`). Socket.IO a sa propre configuration CORS.
-- Diffuser uniquement via des rooms (`user:<id>`, `conversation:<id>`), pour pouvoir passer plus tard à l'adaptateur Redis. Déconnecter les sockets d'un utilisateur quand une session est révoquée ou un compte suspendu.
-- Push : un port `PushGateway`, avec un adaptateur Expo (seul fichier qui importe expo-server-sdk) et un faux adaptateur pour les tests (jamais de réseau en test). Envoyer après le commit, sans faire échouer la requête. Supprimer les jetons `DeviceNotRegistered`.
-- La messagerie doit appliquer les blocages (`PrivacyService.isBlockedEitherWay`), les réglages `contactRequestsFrom` et `readReceipts`, et étendre `canRead` des médias aux pièces jointes de conversation (point d'extension dans `apps/api/src/media/access.ts`).
-- Migrations suivantes : 0007+.
-
-Ensuite : le **mobile Expo** (`apps/mobile`).
-- Navigation imposée en bas d'écran : Accueil · Maps · + Publier · Messagerie · Plus.
-- En-tête : logo CASELIND, recherche, wallet avec devise, panier, menu compte.
-- Stories en haut de l'accueil.
-- Le refresh token est stocké dans `expo-secure-store`, avec un seul rafraîchissement à la fois.
+## Prochaine étape
+1. Faire valider M1 par le propriétaire sur un appareil (Expo Go ou build de développement) et corriger ses retours ; contrôle visuel à 360 px (en-tête, bouton « + »).
+2. Lot backend 4 (social : posts, Stories 24 h, réactions, commentaires, abonnements, signalements), puis mobile M2 (fil, Stories, publication).
+3. Points ouverts du lot 3 dans `docs/BACKLOG.md` (lot 3b) et décision Q8 (compte Expo/EAS pour le push réel).
 
 ## Méthode de travail (décisions déjà prises avec moi)
 - Sois autonome : ne me demande que les décisions métier, financières, réglementaires ou les dépenses.

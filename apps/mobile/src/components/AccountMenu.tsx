@@ -1,0 +1,110 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useState, type ComponentProps } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useAuth } from '../auth/auth-context';
+import { useI18n } from '../i18n';
+import { useUnreadCount } from '../notifications/hooks';
+import { spacing, TOUCH } from '../theme/tokens';
+import { useTheme } from '../theme/use-theme';
+import { Avatar, Badge, Button, Text } from '../ui';
+import { SheetModal } from './SheetModal';
+
+type Icon = ComponentProps<typeof Ionicons>['name'];
+type Path = '/profile' | '/sessions' | '/privacy' | '/language' | '/notifications' | '/notification-preferences';
+
+/** Menu Compte : MyProfile, Sessions, Confidentialité, Langue, Déconnexion (avec confirmation). */
+export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { colors } = useTheme();
+  const { t } = useI18n();
+  const { me, signOut } = useAuth();
+  const router = useRouter();
+  const unread = useUnreadCount();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  function close() {
+    setConfirming(false);
+    onClose();
+  }
+  function go(path: Path) {
+    close();
+    router.push(path);
+  }
+
+  const items: { icon: Icon; label: string; path: Path }[] = [
+    { icon: 'person-outline', label: t('account.profile'), path: '/profile' },
+    { icon: 'notifications-outline', label: t('account.notifications'), path: '/notifications' },
+    { icon: 'options-outline', label: t('account.notificationPreferences'), path: '/notification-preferences' },
+    { icon: 'phone-portrait-outline', label: t('account.sessions'), path: '/sessions' },
+    { icon: 'shield-checkmark-outline', label: t('account.privacy'), path: '/privacy' },
+    { icon: 'language-outline', label: t('account.language'), path: '/language' },
+  ];
+
+  return (
+    <SheetModal visible={visible} onClose={close}>
+      <View style={styles.head}>
+        <Avatar name={me?.displayName ?? '?'} size={48} />
+        <View style={{ flex: 1 }}>
+          <Text variant="heading" numberOfLines={1}>
+            {me?.displayName}
+          </Text>
+          <Text variant="small" muted numberOfLines={1}>
+            @{me?.handle}
+          </Text>
+        </View>
+      </View>
+      {confirming ? (
+        <View style={{ gap: spacing.md }}>
+          <Text variant="heading" accessibilityRole="header">
+            {t('signOut.confirmTitle')}
+          </Text>
+          <Text muted>{t('signOut.confirmBody')}</Text>
+          <Button
+            variant="danger"
+            label={t('account.signOut')}
+            loading={busy}
+            onPress={async () => {
+              setBusy(true);
+              await signOut();
+            }}
+          />
+          <Button variant="secondary" label={t('common.cancel')} onPress={() => setConfirming(false)} />
+        </View>
+      ) : (
+        <View>
+          {items.map((it) => (
+            <Pressable
+              key={it.path}
+              accessibilityRole="button"
+              accessibilityLabel={it.path === '/notifications' && unread > 0 ? `${it.label}, ${t('notifications.unreadCount', { n: unread })}` : it.label}
+              onPress={() => go(it.path)}
+              style={styles.item}
+            >
+              <Ionicons name={it.icon} size={22} color={colors.primary} />
+              <Text style={{ flex: 1 }}>{it.label}</Text>
+              {it.path === '/notifications' && unread > 0 ? <Badge label={unread > 99 ? '99+' : String(unread)} /> : null}
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+          ))}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('account.signOut')}
+            onPress={() => setConfirming(true)}
+            style={styles.item}
+          >
+            <Ionicons name="log-out-outline" size={22} color={colors.danger} />
+            <Text color={colors.danger} style={{ flex: 1 }}>
+              {t('account.signOut')}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+    </SheetModal>
+  );
+}
+
+const styles = StyleSheet.create({
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+  item: { minHeight: TOUCH + 4, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+});

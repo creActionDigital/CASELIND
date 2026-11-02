@@ -8,7 +8,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 
 1. Reverse engineering et cartographie WeChat : **v1 faite** (sources publiques ; à enrichir module par module)
 2. **Backend** : en cours (lots 1, 1b, 2 et 3 testés)
-3. **Mobile** (React Native + Expo) : en cours (démarré après le lot 3)
+3. **Mobile** (React Native + Expo) : en cours. M1 (socle, auth, messagerie temps réel, notifications) codé et testé sur Expo web ; validation sur appareil à faire
 4. Intégration mobile ↔ backend, tests et validation
 5. **Web** (React + TS + Vite) : seulement après la validation du mobile
 
@@ -29,6 +29,14 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 7 — Lieux et recherche | Lieux, proximité (PostGIS en prod), recherche universelle | | planifié |
 | 8+ | Livraison, mini-apps (OAuth à code éphémère + scopes), IA, mobilité, services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
 
+## Lots mobile
+
+| Lot | Contenu | Statut |
+|---|---|---|
+| M1 — Socle et messagerie | Design system, navigation imposée, en-tête, auth, sessions, confidentialité, messagerie temps réel, notifications, push | **testé** (unitaires + parcours Expo web contre l'API réelle) ; appareil réel à faire |
+| M1b — Reste | Contacts et QR, messages vocaux, recherche, archive, avatars réels, persistance de la langue, compte Expo/EAS pour le push réel | planifié |
+| M2 — Social | Fil, Stories, publication (après le lot backend 4) | planifié |
+
 ## Décisions attendues du propriétaire (bloquantes seulement pour leur module)
 
 | # | Question | Bloque | Options / recommandation |
@@ -39,6 +47,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | Q4 | **Règles CSL Coins** | Module CSL (désactivé) | Ne seront pas inventées (CDC §18) |
 | Q5 | Partenaire de paiement / Mobile Money | Wallet réel | Flutterwave, Paystack, CinetPay, opérateurs directs : dépend de Q1 |
 | Q6 | Hébergement (budget) | Staging et production, TURN/SFU, stockage médias | Option bas coût : VPS + PostgreSQL managé + stockage S3-compatible |
+| Q8 | **Compte Expo / EAS** (gratuit au départ) | Push réel et builds iOS/Android | Recommandation : compte EAS gratuit pour obtenir un `projectId` |
 | Q7 | Découverte de proximité type « People Nearby » (H-09) | — | Recommandation : ne pas la retenir (vie privée) |
 
 ## Risques suivis

@@ -1,0 +1,28 @@
+import { View } from 'react-native';
+import { useTheme } from '../theme/use-theme';
+import { Text } from './Text';
+
+/** Mot-symbole CASELIND : texte stylé (pas d'image), point ambre en signature. */
+export function Wordmark({ size = 20 }: { size?: number }) {
+  const { colors } = useTheme();
+  return (
+    <View accessible accessibilityRole="header" accessibilityLabel="CASELIND" style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+      <Text
+        color={colors.primary}
+        style={{ fontSize: size, lineHeight: size * 1.2, fontWeight: '900', letterSpacing: size * 0.12 }}
+      >
+        CASELIND
+      </Text>
+      <View
+        style={{
+          width: size * 0.26,
+          height: size * 0.26,
+          borderRadius: size,
+          backgroundColor: colors.accent,
+          marginLeft: 2,
+          marginBottom: size * 0.2,
+        }}
+      />
+    </View>
+  );
+}

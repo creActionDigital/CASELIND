@@ -1,5 +1,29 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-02 — Mobile M1 (socle Expo et messagerie)
+
+### Réalisé (`apps/mobile`, Expo SDK 58, React Native 0.88, expo-router)
+- **M1a, socle** : design system original (`src/theme/tokens.ts`, indigo `#3730A3`, bouton central ambre, clair/sombre, cibles ≥ 44 pt), composants `src/ui`, i18n fr/en. Navigation imposée en bas : Accueil · Maps · + Publier · Messagerie · Plus. En-tête : logo CASELIND, recherche, wallet « bientôt » (aucun solde inventé), panier, menu compte. Stories en haut de l'accueil (état vide : pas encore de backend social). Auth complète (connexion, inscription, OTP, mot de passe oublié). Client API validé par les contrats Zod, **un seul rafraîchissement en vol**, refresh token dans `expo-secure-store` (repli `sessionStorage` sur le web, pour le développement seulement). Profil, sessions, confidentialité, langue ; tuile « Paris » visible seulement si le flag `betting` l'autorise.
+- **M1b, messagerie** : un seul socket Socket.IO (jeton fourni par fonction à chaque reconnexion, rafraîchissement sur `unauthenticated`) qui alimente le cache react-query ; liste des conversations (non-lus, épinglage, sourdine, archivage), salon avec **envoi optimiste** par `clientId`, accusés envoyé/reçu/lu, « en train d'écrire », réponse, réaction, rappel, masquage, photos (`expo-image-picker`, envoi en deux temps, affichage authentifié `AuthImage`) ; infos de groupe ; centre et préférences de notifications ; push Expo (permission demandée après une explication, jeton désenregistré avant le logout, tap qui ouvre le salon).
+- **Vérification dans le navigateur (Expo web, 390 × 844) contre l'API réelle** : connexion, retour à la connexion quand le refresh échoue, création d'une conversation par @handle (idempotente), envoi d'un message avec emoji, **réception en direct** du message d'un autre utilisateur, passage à « lu ». Trois défauts trouvés et corrigés :
+  - `/` sans session menait à une route inexistante (ajout de `(auth)/index`) ;
+  - sur le web, la feuille « Nouvelle conversation » restait affichée par-dessus le salon ;
+  - le texte vide de la messagerie annonçait encore « bientôt ».
+- **Backend** : la base de dev créée lors d'une session précédente était en WIN1252, donc tout emoji provoquait une erreur 500 (`22P05`). Le migrateur refuse désormais toute base qui n'est pas en UTF-8. En local, une base `caselind_utf8` a été créée sans supprimer l'ancienne.
+
+### Tests réellement exécutés (2026-11-02)
+- `npm run typecheck` (api + mobile) : 0 erreur. Mobile `vitest` : **2 fichiers, 17 tests, 17 réussis** (rafraîchissement unique sous 10 requêtes 401 concurrentes, fusion optimiste/serveur sans doublon, état d'accusé, limitation de `typing`). `npx expo export --platform web` : réussi.
+- API `npm test -w @caselind/api` : **19 fichiers, 223 tests, 223 réussis**, serveurs de dev arrêtés. Une première exécution lancée pendant que la base de dev, l'API et Metro tournaient a vu le PostgreSQL embarqué des tests redémarrer (`ECONNRESET`) : il faut lancer la suite sans les serveurs de dev.
+
+### Non vérifié / limites
+- Rien n'a tourné sur un appareil iOS ou Android ni sur un émulateur. Push réel non testé : il faut un `projectId` EAS, donc un compte Expo, à décider.
+- Pas de capture d'écran (panneau du navigateur masqué) : la mise en page à 360 px et le chevauchement du bouton « + » restent à contrôler visuellement.
+- Envoi de photo, groupes, réactions et rappel dans l'interface : codés, pas exercés dans le navigateur.
+- Avatars en initiales seulement ; langue non persistée localement.
+
+### Prochaine étape
+Votre validation du mobile sur appareil, puis M2 (social et Stories, après le lot backend 4). Le web reste après la validation du mobile.
+
 ## 2026-11-02 — Lot backend 3 (messagerie temps réel et notifications)
 
 ### Exécution

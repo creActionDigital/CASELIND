@@ -20,6 +20,14 @@ export async function migrate(databaseUrl: string, dir = MIGRATIONS_DIR): Promis
   const client = new pg.Client({ connectionString: databaseUrl });
   await client.connect();
   try {
+    // User content (messages, names) must accept any Unicode text, e.g. emoji: refuse other encodings
+    // up front instead of failing later with 22P05 on the first emoji.
+    const { rows: enc } = await client.query<{ encoding: string }>(
+      'SELECT pg_encoding_to_char(encoding) AS encoding FROM pg_database WHERE datname = current_database()',
+    );
+    if (enc[0]?.encoding !== 'UTF8') {
+      throw new Error(`Database encoding must be UTF8 (found ${enc[0]?.encoding ?? 'unknown'})`);
+    }
     await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       name text PRIMARY KEY,
       checksum text NOT NULL,
