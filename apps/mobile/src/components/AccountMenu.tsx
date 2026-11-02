@@ -11,7 +11,7 @@ import { Avatar, Badge, Button, Text } from '../ui';
 import { SheetModal } from './SheetModal';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
-type Path = '/profile' | '/sessions' | '/privacy' | '/language' | '/notifications' | '/notification-preferences';
+type Path = '/profile' | '/sessions' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports';
 
 /** Menu Compte : MyProfile, Sessions, Confidentialité, Langue, Déconnexion (avec confirmation). */
 export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -38,6 +38,7 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
     { icon: 'options-outline', label: t('account.notificationPreferences'), path: '/notification-preferences' },
     { icon: 'phone-portrait-outline', label: t('account.sessions'), path: '/sessions' },
     { icon: 'shield-checkmark-outline', label: t('account.privacy'), path: '/privacy' },
+    { icon: 'flag-outline', label: t('report.mine.title'), path: '/my-reports' },
     { icon: 'language-outline', label: t('account.language'), path: '/language' },
   ];
 

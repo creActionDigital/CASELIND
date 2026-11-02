@@ -8,6 +8,7 @@ import { useI18n, type MessageKey } from '../../i18n';
 import { formatListTime } from '../../messaging/api';
 import { qk } from '../../messaging/keys';
 import { fetchNotifications, useUnreadCount } from '../../notifications/hooks';
+import { socialTarget } from '../../social/routing';
 import { spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, EmptyState, ErrorState, IconButton, Text } from '../../ui';
@@ -52,7 +53,11 @@ export default function NotificationCenter() {
   function open(n: Notification) {
     if (!n.readAt) readOne.mutate(n.id);
     const conversationId = n.data.conversationId;
-    if (conversationId) router.push({ pathname: '/messages/[conversationId]', params: { conversationId } });
+    if (conversationId) return router.push({ pathname: '/messages/[conversationId]', params: { conversationId } });
+    if (n.category === 'social') {
+      const target = socialTarget(n.data);
+      if (target) router.push(target);
+    }
   }
 
   const header = (

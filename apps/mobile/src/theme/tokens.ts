@@ -66,6 +66,9 @@ export const dark: Palette = {
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
 export const radius = { sm: 10, md: 14, lg: 22, xl: 28, pill: 999 } as const;
 
+/** Texte et icônes posés sur un média ou sur l'overlay (toujours clair, quel que soit le thème). */
+export const onMedia = '#FFFFFF';
+
 /** Taille minimale d'une cible tactile (points). */
 export const TOUCH = 44;
 

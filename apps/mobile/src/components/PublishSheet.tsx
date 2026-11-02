@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../i18n';
 import { radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
@@ -18,10 +19,18 @@ const ACTIONS: { key: MessageKey; icon: Icon }[] = [
   { key: 'publish.listing', icon: 'megaphone-outline' },
 ];
 
+/** Actions déjà actives : touche -> route. Les autres restent « bientôt ». */
+const ROUTES: Partial<Record<MessageKey, string>> = {
+  'publish.story': '/story/new',
+  'publish.post': '/compose?mode=post',
+  'publish.video': '/compose?mode=video',
+};
+
 /** Feuille « + Publier » : toutes les actions sont annoncées « bientôt » (backend social non livré). */
 export function PublishSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const router = useRouter();
   return (
     <SheetModal visible={visible} onClose={onClose}>
       <Text variant="title" accessibilityRole="header">
@@ -31,7 +40,22 @@ export function PublishSheet({ visible, onClose }: { visible: boolean; onClose: 
         {t('publish.subtitle')}
       </Text>
       <View style={styles.grid}>
-        {ACTIONS.map((a) => (
+        {ACTIONS.map((a) =>
+          ROUTES[a.key] ? (
+            <Pressable
+              key={a.key}
+              accessibilityRole="button"
+              accessibilityLabel={t(a.key)}
+              onPress={() => {
+                onClose();
+                router.push(ROUTES[a.key]!);
+              }}
+              style={[styles.tile, { backgroundColor: colors.primarySoft, opacity: 1 }]}
+            >
+              <Ionicons name={a.icon} size={26} color={colors.primary} />
+              <Text variant="small">{t(a.key)}</Text>
+            </Pressable>
+          ) : (
           <View
             key={a.key}
             accessible
@@ -44,7 +68,8 @@ export function PublishSheet({ visible, onClose }: { visible: boolean; onClose: 
             <Text variant="small">{t(a.key)}</Text>
             <Badge tone="neutral" label={t('common.soon')} />
           </View>
-        ))}
+          ),
+        )}
       </View>
     </SheetModal>
   );

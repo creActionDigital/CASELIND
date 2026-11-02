@@ -34,7 +34,7 @@ Backend → **mobile React Native + Expo** → intégration et validation du mob
 
 ## Prochaine étape
 1. Faire valider M1 par le propriétaire sur un appareil (Expo Go ou build de développement) et corriger ses retours ; contrôle visuel à 360 px (en-tête, bouton « + »).
-2. Mobile M2 : fil, Stories, publication, profil social (backend lot 4 prêt). Design : ADR-016 (style Apple), skills `apple-design` et `ui-ux-pro-max`.
+2. Mobile M2 fait (fil, stories, publication, profils, signalements). Suite : lot backend 5 (commerce : catalogue, panier, commandes) puis mobile M3. Design : ADR-016 (style Apple), skills `apple-design` et `ui-ux-pro-max`.
 3. Points ouverts du lot 3 dans `docs/BACKLOG.md` (lot 3b) et décision Q8 (compte Expo/EAS pour le push réel).
 
 ## Méthode de travail (décisions déjà prises avec moi)

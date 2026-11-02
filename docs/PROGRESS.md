@@ -1,5 +1,22 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-02 — Mobile M2 (fil, publications, stories, signalements) et design Apple
+
+### Réalisé (`apps/mobile`)
+- **Design** (ADR-016, skills `apple-design` et `ui-ux-pro-max`) : fond neutre, accent indigo unique, rouge réservé aux pastilles, échelle typographique iOS, boutons en pilule, retour tactile, clair et sombre.
+- **M2a** : fil d'accueil (défilement infini, tirer pour rafraîchir), carte de publication (voir plus, médias 1 à 4+, vidéo `expo-video`, réaction rapide et 6 types en appui long, menu modifier/supprimer/signaler), création (texte 5000, 10 photos ou 1 vidéo, visibilité, `clientId`, envoi qui continue après fermeture), détail et commentaires, profil social (Suivre, Message, abonnés, abonnements), notifications `social` qui ouvrent la publication ou le profil.
+- **M2b** : barre de stories réelle (anneau indigo non vue, gris vue), visionneuse plein écran (progression, suivante et précédente, pause, balayage pour fermer, auteur suivant, spectateurs et suppression pour l'auteur), création de story, signalements (publications, stories, messages) et « Mes signalements ».
+- Correction après contrôle visuel : marge du bouton « Annuler » de l'écran de création.
+
+### Tests réellement exécutés (2026-11-02)
+- `npm run typecheck` : 0 erreur ; mobile `vitest` : **6 fichiers, 39 tests, 39 réussis** ; `expo export --platform web` réussi (rapports des agents).
+- **Navigateur intégré (Expo web, 375 × 812, clair) contre l'API réelle**, données créées par l'API : Bob publie et poste une story, abonnements croisés. Vérifié : la publication apparaît dans le fil d'Alice, la story dans la barre (non vue), « J'aime » enregistré côté API (`like: 1`), visionneuse ouverte avec l'image authentifiée, vue d'Alice enregistrée (liste des spectateurs de Bob), écran de création conforme.
+
+### Limites
+- Envoi de photos ou de vidéo, commentaires, profil, signalement : codés, non exercés dans le navigateur.
+- Metro (Expo web) s'est arrêté une fois faute de mémoire (« process out of memory ») ; même cause probable que les plantages de vitest en parallèle.
+- Progression d'envoi par fichier et non par octet ; pas de vignette vidéo côté serveur ; code d'envoi des médias dupliqué entre stories et publications (à factoriser).
+
 ## 2026-11-02 — Lot backend 4 (social, stories, modération)
 
 ### Réalisé

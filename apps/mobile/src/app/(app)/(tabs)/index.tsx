@@ -1,46 +1,82 @@
-import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
-import { radius, spacing } from '../../../theme/tokens';
+import { fetchFeed } from '../../../social/api';
+import { sk } from '../../../social/keys';
+import type { CachedPost } from '../../../social/logic';
+import { PostCard } from '../../../social/PostCard';
+import { StoriesBar } from '../../../stories/StoriesBar';
+import { spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
-import { Avatar, EmptyState, Screen, Text } from '../../../ui';
-import { useAuth } from '../../../auth/auth-context';
+import { EmptyState, ErrorState } from '../../../ui';
 
-/** Accueil : barre de stories en haut, puis le flux (vide tant que le backend social n'existe pas). */
+/** Accueil : barre de stories en haut, puis le fil des publications (défilement infini, tirer pour rafraîchir). */
 export default function Home() {
   const { colors } = useTheme();
   const { t } = useI18n();
-  const { me } = useAuth();
+  const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const feed = useInfiniteQuery({
+    queryKey: sk.feed,
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => fetchFeed(pageParam),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+  const items = (feed.data?.pages.flatMap((p) => p.items) ?? []) as CachedPost[];
+
+  let state: 'loading' | 'error' | 'empty' | 'list';
+  if (feed.isPending) state = 'loading';
+  else if (feed.isError && items.length === 0) state = 'error';
+  else if (items.length === 0) state = 'empty';
+  else state = 'list';
+
   return (
-    <Screen edges={[]} padded={false}>
-      <View style={[styles.stories, { borderBottomColor: colors.border }]} accessibilityLabel={t('home.stories.empty')}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesRow}>
-          <View accessible accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel={t('home.stories.addA11y')} style={styles.story}>
-            <View style={[styles.ring, { borderColor: colors.border }]}>
-              <Avatar name={me?.displayName ?? '?'} size={56} />
-              <View style={[styles.plus, { backgroundColor: colors.primary, borderColor: colors.background }]}>
-                <Ionicons name="add" size={14} color={colors.onPrimary} />
-              </View>
-            </View>
-            <Text variant="caption" muted numberOfLines={1}>
-              {t('home.stories.mine')}
-            </Text>
+    <View style={[styles.flex, { backgroundColor: colors.background }]}>
+      <FlatList
+        data={items}
+        keyExtractor={(p) => p.id}
+        renderItem={({ item }) => <PostCard post={item} />}
+        ListHeaderComponent={
+          <View>
+            <StoriesBar />
+            {state === 'loading' ? <ActivityIndicator style={styles.pad} color={colors.primary} accessibilityLabel={t('common.loading')} /> : null}
+            {state === 'error' ? <ErrorState error={feed.error} onRetry={() => feed.refetch()} /> : null}
+            {state === 'empty' ? (
+              <EmptyState
+                icon="newspaper-outline"
+                title={t('feed.emptyTitle')}
+                body={t('feed.emptyBody')}
+                actionLabel={t('feed.emptyAction')}
+                onAction={() => router.push('/search')}
+              />
+            ) : null}
           </View>
-          <Text variant="small" muted style={styles.storiesEmpty}>
-            {t('home.stories.empty')}
-          </Text>
-        </ScrollView>
-      </View>
-      <EmptyState icon="newspaper-outline" title={t('home.feed.emptyTitle')} body={t('home.feed.emptyBody')} />
-    </Screen>
+        }
+        ListFooterComponent={feed.isFetchingNextPage ? <ActivityIndicator style={styles.pad} color={colors.primary} accessibilityLabel={t('common.loading')} /> : undefined}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={colors.primary}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await feed.refetch();
+              setRefreshing(false);
+            }}
+          />
+        }
+        onEndReached={() => feed.hasNextPage && !feed.isFetchingNextPage && feed.fetchNextPage()}
+        onEndReachedThreshold={0.6}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stories: { borderBottomWidth: StyleSheet.hairlineWidth },
-  storiesRow: { alignItems: 'center', padding: spacing.lg, gap: spacing.lg },
-  story: { alignItems: 'center', gap: spacing.xs, width: 72 },
-  ring: { borderWidth: 2, borderStyle: 'dashed', borderRadius: radius.pill, padding: 2 },
-  plus: { position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  storiesEmpty: { maxWidth: 220 },
+  flex: { flex: 1 },
+  pad: { padding: spacing.xl },
 });

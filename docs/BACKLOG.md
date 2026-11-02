@@ -36,7 +36,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 |---|---|---|
 | M1 — Socle et messagerie | Design system, navigation imposée, en-tête, auth, sessions, confidentialité, messagerie temps réel, notifications, push | **testé** (unitaires + parcours Expo web contre l'API réelle) ; appareil réel à faire |
 | M1b — Reste | Contacts et QR, messages vocaux, recherche, archive, avatars réels, persistance de la langue, compte Expo/EAS pour le push réel | planifié |
-| M2 — Social | Fil, Stories, publication (après le lot backend 4) | planifié |
+| M2 — Social | Fil, publications, commentaires, profils, Stories, signalements ; design Apple (ADR-016) | **testé** (unitaires + parcours Expo web contre l'API réelle) |
 
 ## Décisions attendues du propriétaire (bloquantes seulement pour leur module)
 

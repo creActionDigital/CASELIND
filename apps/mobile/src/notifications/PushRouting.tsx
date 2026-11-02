@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { socialTarget } from '../social/routing';
 import { PUSH_SUPPORTED, registerPushIfGranted } from './push';
 
 /** Monté une fois connecté : rafraîchit le jeton push et ouvre le salon quand on touche une notification. */
@@ -24,7 +25,9 @@ export function PushRouting() {
       });
       const open = (data: unknown) => {
         const id = (data as { conversationId?: unknown } | null)?.conversationId;
-        if (typeof id === 'string' && id) router.push({ pathname: '/messages/[conversationId]', params: { conversationId: id } });
+        if (typeof id === 'string' && id) return router.push({ pathname: '/messages/[conversationId]', params: { conversationId: id } });
+        const social = socialTarget(data);
+        if (social) router.push(social);
       };
       const last = Notifications.getLastNotificationResponse();
       if (last) open(last.notification.request.content.data);

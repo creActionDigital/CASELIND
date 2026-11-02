@@ -25,7 +25,12 @@
       "expo-router",
       "expo-secure-store",
       "expo-notifications",
-      ["expo-image-picker", { "photosPermission": "CASELIND accède à vos photos pour joindre des images à vos messages." }],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CASELIND accède à vos photos pour joindre des images à vos messages."
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -33,7 +38,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {}
   }

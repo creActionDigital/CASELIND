@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { useI18n } from '../../i18n';
 import { PushRouting } from '../../notifications/PushRouting';
+import { ReportSheet } from '../../report/ReportSheet';
 import { useTheme } from '../../theme/use-theme';
 
 export default function AppLayout() {
@@ -9,6 +10,7 @@ export default function AppLayout() {
   return (
     <>
     <PushRouting />
+    <ReportSheet />
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
@@ -29,7 +31,13 @@ export default function AppLayout() {
       <Stack.Screen name="messages/[conversationId]" options={{ title: t('messages.room') }} />
       <Stack.Screen name="group/[conversationId]" options={{ title: t('group.info') }} />
       <Stack.Screen name="notifications" options={{ title: t('notifications.title') }} />
+      <Stack.Screen name="compose" options={{ presentation: 'modal', title: t('compose.title') }} />
+      <Stack.Screen name="post/[postId]" options={{ title: t('post.title') }} />
+      <Stack.Screen name="user/[userId]/index" options={{ title: t('profile.social.title') }} />
       <Stack.Screen name="notification-preferences" options={{ title: t('notifications.preferences') }} />
+      <Stack.Screen name="my-reports" options={{ title: t('report.mine.title') }} />
+      <Stack.Screen name="story/[userId]" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="story/new" options={{ headerShown: false, presentation: 'modal' }} />
     </Stack>
     </>
   );

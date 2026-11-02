@@ -8,6 +8,7 @@ import { ActivityIndicator, AppState, FlatList, Pressable, StyleSheet, TextInput
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, useAuth } from '../../../auth/auth-context';
 import { SheetModal } from '../../../components/SheetModal';
+import { openReport } from '../../../report/open-report';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
@@ -411,6 +412,17 @@ export default function ChatRoom() {
             ) : null}
             {actionsMine && !actions.local && !actions.recalled ? (
               <Button variant="secondary" label={t('chat.recall')} onPress={() => recall(actions)} />
+            ) : null}
+            {!actionsMine && !actions.local && actions.kind !== 'system' ? (
+              <Button
+                variant="secondary"
+                label={t('report.action')}
+                onPress={() => {
+                  const id = actions.id;
+                  setActions(null);
+                  openReport({ targetType: 'message', targetId: id });
+                }}
+              />
             ) : null}
             <Button variant="secondary" label={actions.local ? t('chat.discard') : t('chat.hide')} onPress={() => hide(actions)} />
             <Button variant="ghost" label={t('common.cancel')} onPress={() => setActions(null)} />
