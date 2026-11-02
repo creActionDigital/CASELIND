@@ -2,6 +2,20 @@
 
 Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShell disponibles). Le nom du produit est CASELIND, jamais Casalind.
 
+## Principe fondateur : WeChat est la base fonctionnelle de CASELIND
+CASELIND est construit en **reproduisant l'écosystème fonctionnel de WeChat/Weixin** : compte, messagerie, Moments/stories, Channels, comptes officiels, Pay/wallet, mini-programmes, recherche, services. On y ajoute ensuite toutes les exigences propres au cahier des charges (marketplace, vitrines, Mobile Money, CSL Coins, IA, livraison…).
+- **La référence de travail est `docs/reverse-engineering/WECHAT_FUNCTIONAL_MAP.md`** : 96 lignes, avec preuves, écarts, écrans, API, tests d'acceptation et état. Chaque module que tu construis doit partir des lignes concernées de cette matrice, puis mettre à jour leur état (planifié → en cours → implémenté → testé).
+- On clone **les fonctions et les parcours**, pas l'identité. Ni logo, ni textes de marque, ni assets, ni écrans protégés, ni code propriétaire de WeChat. L'identité visuelle CASELIND est originale.
+
+## REA (reverse engineering) : à utiliser, dans son cadre
+- **Au démarrage, vérifie si REA est réellement utilisable** : outils MCP `rea` présents dans la session, ou CLI (`rea`, ou `npx -y rea-agents@latest`). Le 2026-11-01, seul le skill `reverse-engineer-anything` était installé, sans serveur MCP ni CLI. Si REA est disponible, utilise-le pour approfondir la cartographie WeChat module par module, avant de coder chaque module.
+- **Cibles légitimes** :
+  - comportements observables publiquement (pages web publiques, documentation officielle Weixin/Tencent pour développeurs) ;
+  - captures et observations que je fournirais moi-même ;
+  - artefacts dont nous avons les droits, comme nos propres builds CASELIND ou les sources SaaS achetées.
+- **Interdit** (ADR-009) : décompiler ou extraire le code de l'application WeChat, contourner une authentification ou une protection, récupérer des données privées.
+- Si REA est absent, continue avec les sources publiques et la recherche web, en indiquant le niveau de confiance (V / DP / CG / D / I, voir `EVIDENCE_AND_GAPS.md`). Ne prétends jamais avoir utilisé REA si ce n'est pas le cas.
+
 ## Commence par lire, dans cet ordre
 1. `docs/PROGRESS.md` (état réel et tests exécutés), `docs/BACKLOG.md` (lots, décisions Q1–Q7 en attente), `docs/architecture/CASELIND_ARCHITECTURE.md`, `docs/architecture/DECISIONS.md` (ADR-001 à 013), `docs/architecture/API_CONTRACTS.md`.
 2. `docs/reverse-engineering/WECHAT_FUNCTIONAL_MAP.md` (matrice de couverture WeChat → CASELIND) et `SCREEN_INVENTORY.md` (écrans mobiles et navigation imposée).
