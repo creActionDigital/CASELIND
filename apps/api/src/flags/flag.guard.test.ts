@@ -32,6 +32,7 @@ function fakeFlags(on: string[]) {
 
 function context(cls: object, handler: () => void, auth?: { userId: string }): ExecutionContext {
   return {
+    getType: () => 'http',
     getHandler: () => handler,
     getClass: () => cls,
     switchToHttp: () => ({ getRequest: () => ({ auth }) }),

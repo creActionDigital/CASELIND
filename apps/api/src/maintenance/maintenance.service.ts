@@ -233,6 +233,25 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           )
         ORDER BY m.org_id, m.user_id`);
       await tx.delete(orgMembers).where(inArray(orgMembers.userId, ids));
+
+      // Messaging (lot 3A): memberships become "left", message bodies and attachments are erased
+      // (the rows stay so conversations keep their numbering), reactions are dropped. A group left
+      // without an owner hands it to its longest-standing admin, else member.
+      await tx.execute(sql`
+        UPDATE conversation_members SET status = 'left', left_at = now(), role = 'member'
+        WHERE user_id = ANY(${idArray}) AND status = 'active'`);
+      await tx.execute(sql`UPDATE messages SET body = NULL, media_id = NULL WHERE sender_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM message_reactions WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`
+        UPDATE conversation_members cm SET role = 'owner'
+        WHERE (cm.conversation_id, cm.user_id) IN (
+          SELECT DISTINCT ON (m.conversation_id) m.conversation_id, m.user_id
+          FROM conversation_members m JOIN conversations c ON c.id = m.conversation_id AND c.kind = 'group'
+          WHERE m.status = 'active'
+            AND NOT EXISTS (
+              SELECT 1 FROM conversation_members o
+              WHERE o.conversation_id = m.conversation_id AND o.status = 'active' AND o.role = 'owner')
+          ORDER BY m.conversation_id, (m.role = 'admin') DESC, m.joined_at, m.user_id)`);
       if (orphans.rows.length > 0) {
         await tx.execute(sql`
           UPDATE organizations SET status = 'suspended'

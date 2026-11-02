@@ -37,7 +37,13 @@ export type AuditAction =
   | 'org.member_role_changed'
   | 'org.member_removed'
   /** System (maintenance): the org's last active owner was purged; metadata.orgId. */
-  | 'org.suspended_orphaned';
+  | 'org.suspended_orphaned'
+  /** Messaging governance (lot 3A). Never the message content. */
+  | 'conversation.group_created'
+  | 'conversation.member_added'
+  | 'conversation.member_removed'
+  | 'conversation.member_role_changed'
+  | 'message.recalled';
 
 export interface AuditInput {
   action: AuditAction;

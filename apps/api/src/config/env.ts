@@ -59,6 +59,17 @@ const envSchema = z
     MEDIA_QUOTA_BYTES_PER_USER: z.coerce.number().int().min(1).default(1024 * MIB),
     /** Stricter per-client budget for announcing uploads, sending their bytes and re-issuing tokens. */
     MEDIA_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
+    /** Per-client budget for sending messages (the send route only). */
+    MESSAGING_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(60),
+    /** Push provider: `log` only journals (nothing is delivered), `expo` calls the Expo Push API. */
+    PUSH_PROVIDER: z.enum(['expo', 'log']).default('log'),
+    EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
+    /** Seconds between rechecks of the sessions of connected sockets; 0 disables the safety net. */
+    REALTIME_SESSION_RECHECK_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
+    /** Maximum active members of one group conversation. */
+    MESSAGING_GROUP_MAX_MEMBERS: z.coerce.number().int().min(2).max(5000).default(500),
+    /** How long after sending the author may recall a message for everyone (409 afterwards). */
+    MESSAGE_RECALL_WINDOW_SECONDS: z.coerce.number().int().min(0).max(86400).default(120),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.OTP_PROVIDER === 'console') {

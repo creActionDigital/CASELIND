@@ -22,6 +22,7 @@ export class FlagGuard implements CanActivate {
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    if (ctx.getType() !== 'http') return true;
     const key = this.reflector.getAllAndOverride<string | undefined>(REQUIRE_FLAG, [
       ctx.getHandler(),
       ctx.getClass(),

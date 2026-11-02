@@ -12,15 +12,28 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
-import { auditEvents, mediaAssets, organizations, orgMembers, sessions, users } from '../db/schema.js';
+import {
+  auditEvents,
+  conversationMembers,
+  conversations,
+  mediaAssets,
+  messages,
+  organizations,
+  orgMembers,
+  sessions,
+  users,
+} from '../db/schema.js';
 import { contentUrlOf } from '../media/media.service.js';
 import type { Tx } from '../orgs/orgs.service.js';
 import { PrivacyService } from '../privacy/privacy.service.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 import type { AuthUser } from '../security/auth.guard.js';
 import { PasswordService } from '../security/password.service.js';
 import { UsersService } from '../users/users.service.js';
 
 const DAY_MS = 86_400_000;
+/** The export carries at most this many sent messages (the most recent ones). */
+const EXPORT_MESSAGES_MAX = 10_000;
 
 /** Right of access (export) and right of erasure (deletion request) for the signed-in user. */
 @Injectable()
@@ -32,6 +45,7 @@ export class AccountService {
     private readonly users: UsersService,
     private readonly privacy: PrivacyService,
     private readonly audit: AuditService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   /**
@@ -95,6 +109,23 @@ export class AccountService {
       .where(eq(mediaAssets.ownerUserId, auth.userId))
       .orderBy(asc(mediaAssets.createdAt), asc(mediaAssets.id));
 
+    // Lot 3A: the conversations the user is in, and what they wrote (recalled and system messages excluded).
+    const conversationRows = await this.db
+      .select({ id: conversations.id, kind: conversations.kind, role: conversationMembers.role, joinedAt: conversationMembers.joinedAt })
+      .from(conversationMembers)
+      .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
+      .where(and(eq(conversationMembers.userId, auth.userId), eq(conversationMembers.status, 'active')))
+      .orderBy(asc(conversationMembers.joinedAt), asc(conversations.id));
+    const sentRows = await this.db
+      .select({ id: messages.id, conversationId: messages.conversationId, kind: messages.kind, body: messages.body, createdAt: messages.createdAt })
+      .from(messages)
+      .where(and(eq(messages.senderId, auth.userId), isNull(messages.recalledAt)))
+      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .limit(EXPORT_MESSAGES_MAX + 1);
+    const messagesSentTruncated = sentRows.length > EXPORT_MESSAGES_MAX;
+    // The most recent ones, returned oldest first.
+    const sentKept = sentRows.slice(0, EXPORT_MESSAGES_MAX).reverse();
+
     const result: AccountExport = {
       exportedAt: new Date().toISOString(),
       profile,
@@ -132,6 +163,15 @@ export class AccountService {
         contentUrl: m.status === 'ready' ? contentUrlOf(m.id) : null,
         createdAt: m.createdAt.toISOString(),
       })),
+      conversations: conversationRows.map((c) => ({ id: c.id, kind: c.kind, role: c.role, joinedAt: c.joinedAt.toISOString() })),
+      messagesSent: sentKept.map((m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        kind: m.kind,
+        body: m.body,
+        createdAt: m.createdAt.toISOString(),
+      })),
+      messagesSentTruncated,
     };
     await this.audit.record({
       action: 'user.data_exported',
@@ -178,6 +218,7 @@ export class AccountService {
         .set({ revokedAt: requestedAt, revokeReason: 'account_deletion_requested' })
         .where(and(eq(sessions.userId, auth.userId), isNull(sessions.revokedAt)));
     });
+    this.realtime.disconnectUser(auth.userId);
     const deletionScheduledFor = new Date(requestedAt.getTime() + this.env.ACCOUNT_DELETION_GRACE_DAYS * DAY_MS);
     await this.audit.record({
       action: 'user.deletion_requested',

@@ -3,6 +3,7 @@ import { sessionSchema } from './auth.js';
 import { mediaMimeSchema, mediaPurposeSchema, mediaStatusSchema } from './media.js';
 import { orgMemberStatusSchema, orgRoleSchema } from './orgs.js';
 import { blockedUserSchema, privacySettingsSchema } from './privacy.js';
+import { exportedConversationSchema, exportedMessageSchema } from './messaging.js';
 import { meSchema } from './users.js';
 
 /** A session as listed in the data export: every session, including revoked ones. */
@@ -60,6 +61,11 @@ export const accountExportSchema = z.object({
   securityEvents: z.array(exportedSecurityEventSchema),
   orgMemberships: z.array(exportedOrgMembershipSchema),
   media: z.array(exportedMediaSchema),
+  conversations: z.array(exportedConversationSchema),
+  /** The 10 000 most recent messages sent by the user, oldest first. */
+  messagesSent: z.array(exportedMessageSchema),
+  /** True when older messages were left out of `messagesSent`. */
+  messagesSentTruncated: z.boolean(),
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;
 

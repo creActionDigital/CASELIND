@@ -1,5 +1,37 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-02 — Lot backend 3 (messagerie temps réel et notifications)
+
+### Exécution
+Interfaces partagées posées d'abord (`RealtimeService`, `ConversationRoomsResolver`, `NotificationsService`), puis deux sous-agents en parallèle (3A messagerie, 3B temps réel et push), puis une passe unique de revue, correction et intégration.
+
+### Réalisé
+- **Messagerie** (migration 0007, `apps/api/src/messaging/*`, contrats `messaging.ts`, flag `messaging`) :
+  - conversations directes (une par paire, création idempotente) et groupes (owner/admin/member, annonce, avatar, taille max configurable) ;
+  - messages texte, média et système, numérotés par `seq` sous verrou ; idempotence par `clientId` ; réponses, mentions, réactions ; rappel pour tous dans un délai de 120 s, masquage pour soi ;
+  - accusés envoyé/reçu/lu, non-lus, épinglage, sourdine, archivage ; un membre arrivé tard ne voit pas l'historique ;
+  - application des blocages, de `contactRequestsFrom` (« contact » = conversation directe commune) et de `readReceipts` ;
+  - pièces jointes lisibles par les membres actifs de la conversation (`canReadAsync`), plus après un rappel ;
+  - export (`conversations`, `messagesSent` plafonné à 10 000) et purge (adhésions quittées, corps effacés, propriété du groupe transmise) ;
+  - limite de débit dédiée à l'envoi (`MESSAGING_RATE_LIMIT_PER_MINUTE`, défaut 60).
+- **Temps réel** (`apps/api/src/realtime/*`) : Socket.IO sur `/v1/socket.io` ; jeton lu seulement dans `handshake.auth.token`, vérifié par `SessionVerifier` (partagé avec `AuthGuard`) ; diffusion uniquement par rooms `user:`, `session:`, `conversation:` (compatible avec un futur adaptateur Redis) ; sockets coupées au logout, à la révocation, au rejeu, à la réinitialisation du mot de passe et à la demande de suppression ; revérification périodique (60 s) ; `typing` limité aux membres de la room. Les gardes HTTP ignorent les contextes non HTTP.
+- **Notifications** (migration 0008, `apps/api/src/notifications/*`) : centre de notifications (liste, non-lus, lecture), préférences (catégories coupées, `security` non désactivable, mode silencieux, aperçus des messages coupés par défaut), jetons push liés à la session ; port `PushGateway` avec adaptateur Expo (seul import d'`expo-server-sdk`) et adaptateur de journalisation par défaut ; jetons `DeviceNotRegistered` supprimés ; notification de sécurité à chaque connexion. Les pushs de message ne contiennent jamais le texte (« Nouveau message »).
+- **Revue** : 1 défaut élevé (le filtre d'exceptions journalisait les paramètres SQL, donc le corps d'un message en cas d'échec d'INSERT), 2 moyens (une erreur après commit renvoyait 500 et pouvait laisser un membre retiré dans la room), 1 bloquant de tests ; tous corrigés, avec des tests.
+- Base embarquée de dev et de test forcée en UTF-8 (sous Windows, WIN1252 rendait les emoji impossibles).
+
+### Tests réellement exécutés (2026-11-02)
+- `npm run typecheck` : 0 erreur.
+- `npm test -w @caselind/api` : **19 fichiers, 223 tests, 223 réussis** (≈ 53 s), sur PostgreSQL embarqué réel. Nouveaux : `messaging` (25), `realtime` (12), `notifications` (15), `messaging-realtime` (8, bout à bout avec deux clients Socket.IO et le faux PushGateway), test du filtre d'exceptions.
+
+### Limites
+- Aucun push réel envoyé (pas de réseau en test) ; les reçus différés d'Expo ne sont pas traités.
+- La suspension d'un compte hors des chemins connus coupe ses sockets au contrôle périodique (≤ 60 s), pas immédiatement.
+- Points faibles ouverts : `message.updated` et `message.reaction` diffusés à toute la room (enveloppe sans corps visible par un membre arrivé après le message) ; course étroite entre un `message.new` et l'ajout d'un membre.
+- Ni transfert, ni messages éphémères ou programmés, ni recherche, ni appels (backlog).
+
+### Prochaine étape
+Application mobile Expo (`apps/mobile`) : authentification, accueil, messagerie.
+
 ## 2026-11-02 — Lot backend 2 (organisations et médias)
 
 ### Réalisé

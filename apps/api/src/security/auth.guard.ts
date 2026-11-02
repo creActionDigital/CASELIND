@@ -2,18 +2,14 @@ import {
   type CanActivate,
   createParamDecorator,
   type ExecutionContext,
-  Inject,
   Injectable,
   SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { PlatformRole } from '@caselind/contracts';
-import { and, eq, gt, isNull } from 'drizzle-orm';
 import type { Request } from 'express';
 import { AppError } from '../common/app-error.js';
-import { DB, type Db } from '../db/db.module.js';
-import { sessions, users } from '../db/schema.js';
-import { TokenService } from './token.service.js';
+import { SessionVerifier } from './session-verifier.js';
 
 export interface AuthUser {
   userId: string;
@@ -51,11 +47,12 @@ export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionConte
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly tokens: TokenService,
-    @Inject(DB) private readonly db: Db,
+    private readonly verifier: SessionVerifier,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    // WebSocket handlers are authenticated once, at the handshake (realtime gateway).
+    if (ctx.getType() !== 'http') return true;
     const targets = [ctx.getHandler(), ctx.getClass()];
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
 
@@ -64,25 +61,8 @@ export class AuthGuard implements CanActivate {
     const [scheme, token] = header.split(' ');
     if (scheme !== 'Bearer' || !token) throw AppError.unauthenticated();
 
-    const claims = await this.tokens.verifyAccess(token);
-    if (!claims) throw AppError.unauthenticated('Invalid or expired access token');
-
-    const [row] = await this.db
-      .select({ status: users.status, roles: users.roles })
-      .from(sessions)
-      .innerJoin(users, eq(users.id, sessions.userId))
-      .where(
-        and(
-          eq(sessions.id, claims.sid),
-          eq(sessions.userId, claims.sub),
-          isNull(sessions.revokedAt),
-          gt(sessions.expiresAt, new Date()),
-        ),
-      )
-      .limit(1);
-    if (!row || row.status !== 'active') throw AppError.unauthenticated('Session is no longer valid');
-
-    const auth: AuthUser = { userId: claims.sub, sessionId: claims.sid, roles: row.roles as PlatformRole[] };
+    const auth = await this.verifier.verify(token);
+    if (!auth) throw AppError.unauthenticated('Invalid, expired or revoked session');
     req.auth = auth;
 
     const required = this.reflector.getAllAndOverride<PlatformRole[] | undefined>(ROLES, targets);

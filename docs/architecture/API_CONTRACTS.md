@@ -122,6 +122,59 @@ Stockage : interface `MediaStorage` avec un seul adaptateur, disque local (`MEDI
 
 **Côté clients** : le contenu exige le jeton d'accès ; une balise `<img>` web ne peut pas l'envoyer, il faut donc télécharger avec `fetch` + en-tête `Authorization` puis afficher un blob (des URL signées CDN viendront avec le stockage objet).
 
+## Lot 3B — Temps réel et notifications (implémenté et testé)
+
+Toutes les routes exigent un jeton d'accès. Schémas dans `packages/contracts/src/notifications.ts`.
+
+| Route | Rôle |
+|---|---|
+| `PUT /v1/me/push-tokens` `{token, platform: ios\|android\|web}` | 204, idempotent. Rattache le jeton Expo (`ExponentPushToken[...]`) à la session courante, le réattribue s'il appartenait à un autre compte ; 400 si le jeton n'est pas Expo ; 10 jetons max par utilisateur (le plus ancien est supprimé). |
+| `POST /v1/me/push-tokens/unregister` `{token}` | 204. Ne supprime que ses propres jetons. |
+| `GET /v1/notifications?limit&cursor&unreadOnly` | `{items, nextCursor}`, du plus récent au plus ancien. |
+| `GET /v1/notifications/unread-count` | `{count}`. |
+| `POST /v1/notifications/:id/read` | 204, idempotent ; notification d'autrui ou inconnue : 404. |
+| `POST /v1/notifications/read-all` | 204. |
+| `GET` / `PATCH /v1/me/notification-preferences` | `{pushDisabledCategories, quietUntil, messagePreviews}`. `security` ne peut pas être désactivée (400). |
+
+**Push** : envoyé aux seuls jetons dont la session est active. Pas de push pour une catégorie désactivée ni pendant `quietUntil`, sauf `urgent` (la catégorie `security` ignore l'opt-out). Sans `messagePreviews`, le texte des messages est remplacé par « Nouveau message ». Un jeton refusé par le fournisseur (`DeviceNotRegistered`) est supprimé. Chaque connexion réussie crée une notification `security` « Nouvelle connexion ».
+
+**Protocole Socket.IO** : path `/v1/socket.io`, transport WebSocket recommandé. Authentification au handshake : `io(url, { path: '/v1/socket.io', auth: { token: <accessToken> } })` ; le jeton n'est jamais lu dans l'URL. Refus : `connect_error` de message `unauthenticated`. La socket est déconnectée (`io server disconnect`) à la déconnexion, la révocation de sa session, la réinitialisation du mot de passe, la détection de rejeu du jeton de rafraîchissement, la demande de suppression, ou la suspension du compte (revérification périodique, `REALTIME_SESSION_RECHECK_SECONDS`, 60 s par défaut). Un jeton d'accès expiré ne coupe pas une socket déjà ouverte ; le client doit rafraîchir ses jetons avant de se reconnecter.
+
+Rooms : `user:<id>`, `session:<id>` et `conversation:<id>` (conversations de l'utilisateur, rejointes à la connexion).
+
+| Événement | Sens | Charge utile |
+|---|---|---|
+| `message.new`, `message.updated`, `message.reaction`, `receipt.updated`, `conversation.updated`, `conversation.member_added`, `conversation.member_removed` | serveur → client | Définie par la messagerie (lot 3A). |
+| `notification.new` | serveur → client | Une `Notification` (même forme que la liste). |
+| `typing` | client → serveur `{conversationId}` | Accepté si la socket est dans la room ; limité à 1 par 2 s et par conversation. |
+| `typing` | serveur → client | `{conversationId, userId}` aux autres membres de la room. |
+
+Lectures, envois et reçus passent par HTTP, jamais par la socket. Variables : `PUSH_PROVIDER` (`log` par défaut, `expo`), `EXPO_ACCESS_TOKEN` (optionnel), `REALTIME_SESSION_RECHECK_SECONDS`. Les reçus différés d'Expo ne sont pas traités.
+
+## Lot 3A — Messagerie (implémenté et testé)
+
+Toutes les routes exigent un jeton d'accès et le flag `messaging`. Schémas dans `packages/contracts/src/messaging.ts`. Non-membre, ancien membre ou id mal formé : **404** (l'existence d'une conversation n'est jamais révélée).
+
+| Route | Rôle |
+|---|---|
+| `POST /v1/conversations` `{kind:'direct', userId}` ou `{kind:'group', title, announcement?, avatarAssetId?, memberIds}` | 201 ; **200** si le direct existe déjà (une seule conversation par paire, création idempotente). Cible inactive : 404. Blocage (dans un sens ou l'autre) : 403. Réglage `contactRequestsFrom` de la cible : 403 `details.reason = contact_requests_restricted`. Groupe plein : 409 `group_full`. |
+| `GET /v1/conversations?archived&limit&cursor` | Épinglées d'abord, puis dernière activité ; `unreadCount`, `lastMessage`, `peer` (direct), `mutedUntil`, `pinned`, `archived`. Un direct sans message n'apparaît pas chez le destinataire. |
+| `GET /v1/conversations/:id` | Vue de l'appelant. |
+| `PATCH /v1/conversations/:id` `{title?, announcement?, avatarAssetId?}` | Groupe, admin ou owner (403 sinon). Un changement de titre ajoute un message système. |
+| `PATCH /v1/conversations/:id/me` `{mutedUntil?, pinned?, archived?}` | État personnel. |
+| `GET /v1/conversations/:id/messages?beforeSeq&limit` | Plus récents d'abord (défaut 50, max 100), `hasMore`. Un membre ne voit que les messages postérieurs à son entrée ; ceux masqués « pour moi » sont omis. |
+| `POST /v1/conversations/:id/messages` `{clientId, kind:'text'\|'media', body?, mediaId?, replyToId?, mentions?}` | 201 ; **200** si le `clientId` est déjà connu (message stocké renvoyé). Texte 1–4000 caractères. Média : asset `message`, `ready`, à soi, sinon 400. `replyToId` de la même conversation, `mentions` (≤ 50) membres, sinon 400. Direct bloqué ou pair parti : 403. |
+| `POST /v1/conversations/:id/delivered` / `/read` `{seq}` | 200 `{lastDeliveredSeq, lastReadSeq, unreadCount}`. Monotone, borné au dernier `seq`. `readReceipts=false` : la position est stockée mais jamais exposée (événement, liste des membres). |
+| `GET` / `POST /v1/conversations/:id/members` `{userIds}` | Liste des membres actifs ; ajout (groupe, admin/owner) : renvoie les membres réellement ajoutés. Cible bloquée ou inconnue : 404 identique ; réglage de contact : 403. |
+| `PATCH /v1/conversations/:id/members/:userId` `{role}` | Owner seulement ; au moins un owner (409 `last_owner`). |
+| `DELETE /v1/conversations/:id/members/:userId` | 204. Soi = quitter ; retirer un autre = admin/owner, un admin ne retire pas un owner. Le dernier owner qui part transfère au plus ancien admin, puis membre. Direct : 403. |
+| `PUT /v1/messages/:id/reaction` `{emoji\|null}` | 200, une réaction par utilisateur (≤ 16 caractères). Message rappelé : 409. |
+| `DELETE /v1/messages/:id?scope=me\|all` | 204. `me` (défaut) : masque pour soi. `all` : l'auteur seul, dans `MESSAGE_RECALL_WINDOW_SECONDS` (défaut 120, au-delà 409 `recall_window_elapsed`) ; corps, média et réactions effacés, le message reste comme « rappelé ». |
+
+**Contact** : deux utilisateurs sont « contacts » s'ils sont membres actifs d'une même conversation directe. `contactRequestsFrom` de la cible s'applique à celui qui initie (création d'un direct, ajout à un groupe) : `everyone` ; `contacts_of_contacts` = contact existant ou contact commun ; `nobody` = contact existant seulement.
+
+**Temps réel** (après commit) : `message.new`, `message.updated` (rappel), `message.reaction`, `receipt.updated` (`lastReadSeq` null si `readReceipts=false`), `conversation.updated`, `conversation.member_added/removed`. **Push** : `category:'message'`, titre = expéditeur (direct) ou groupe, corps générique « Nouveau message », jamais le contenu ; pas de push en sourdine sauf mention (`urgent`). **Médias** : un asset `message` est lisible par tout membre actif d'une conversation où il a été envoyé dans un message non rappelé. **Audit** : création de groupe, ajout/retrait de membre, changement de rôle, rappel (jamais le contenu). **Compte** : l'export ajoute `conversations` et `messagesSent` ; la purge d'un compte supprimé passe ses adhésions à « parti » et efface ses corps de messages. Variables : `MESSAGING_GROUP_MAX_MEMBERS` (500), `MESSAGE_RECALL_WINDOW_SECONDS` (120), `MESSAGING_RATE_LIMIT_PER_MINUTE` (60). **Débit** : `POST /v1/conversations/{id}/messages` est sous un throttler dédié `messaging`, par client, → 429 `rate_limited`. **Export** : `messagesSent` est limité aux 10 000 messages les plus récents (ordre chronologique) ; `messagesSentTruncated: boolean` indique que des plus anciens ont été omis. Les effets post-commit (événements temps réel, push) ne font jamais échouer la requête ; le retrait d'un membre le sort toujours de la room.
+
 ## Lots suivants — contrats prévus (non implémentés)
 
 Les routes sont listées dans [WECHAT_FUNCTIONAL_MAP.md](../reverse-engineering/WECHAT_FUNCTIONAL_MAP.md), colonne « API & données ». Chacune sera ajoutée ici au moment de son implémentation, avec son schéma dans `packages/contracts`.

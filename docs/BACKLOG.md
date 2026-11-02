@@ -1,14 +1,14 @@
 # Backlog CASELIND
 
-Dernière mise à jour : 2026-11-01. **Règle CDC §0 : rien n'est supprimé.** Ce qui est différé reste ici avec son statut. Traçabilité fonctionnelle complète : [WECHAT_FUNCTIONAL_MAP.md](reverse-engineering/WECHAT_FUNCTIONAL_MAP.md) (96 lignes).
+Dernière mise à jour : 2026-11-02. **Règle CDC §0 : rien n'est supprimé.** Ce qui est différé reste ici avec son statut. Traçabilité fonctionnelle complète : [WECHAT_FUNCTIONAL_MAP.md](reverse-engineering/WECHAT_FUNCTIONAL_MAP.md) (96 lignes).
 
 Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` · `bloqué` · `reporté`
 
 ## Ordre imposé
 
 1. Reverse engineering et cartographie WeChat : **v1 faite** (sources publiques ; à enrichir module par module)
-2. **Backend** : en cours (lots 1 et 1b testés)
-3. **Mobile** (React Native + Expo) : démarre dès que les lots backend 2 et 3 sont testés
+2. **Backend** : en cours (lots 1, 1b, 2 et 3 testés)
+3. **Mobile** (React Native + Expo) : en cours (démarré après le lot 3)
 4. Intégration mobile ↔ backend, tests et validation
 5. **Web** (React + TS + Vite) : seulement après la validation du mobile
 
@@ -21,7 +21,8 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 1c — Reste identité | 2FA TOTP ; changement d'identifiant (téléphone/e-mail) ; connexion web par QR ; Dockerfile + CI ; cache Redis (sessions, flags, throttling) | à détailler au démarrage du lot | planifié |
 | 2 — Organisations et médias | Organisations, membres et rôles, invitations, vitrine publique ; médias avec détection du type réel, quotas et purge ; intégration avec la suppression de compte | 162 tests (voir PROGRESS) | **testé** |
 | 2b — Reste médias et organisations | Adaptateur S3 + CDN (après Q6), Range/304 vidéo, ré-encodage et suppression EXIF, expiration et limite des invitations, slugs réservés en base, suspension et vérification des organisations par l'admin, suppression d'organisation | | planifié |
-| 3 — Messagerie et notifications | Conversations 1:1 et groupes, messages, pièces jointes, accusés, WebSocket, push Expo, centre de notifications | | planifié |
+| 3 — Messagerie et notifications | Conversations 1:1 et groupes, messages, pièces jointes, accusés, WebSocket, push Expo, centre de notifications | 223 tests (voir PROGRESS) | **testé** |
+| 3b — Reste messagerie | Transfert, favoris, brouillons serveur, messages éphémères et programmés, partage de position, messages vocaux (côté mobile), reçus différés Expo, déconnexion immédiate à la suspension admin, filtrage par `firstSeq` des événements `message.updated`/`message.reaction`, appels WebRTC (décision TURN/SFU, Q6), traduction (consentement), conversation commerciale (lot 5) | | planifié |
 | 4 — Social | Posts, visibilité, réactions, commentaires, abonnements, stories 24 h, vidéos courtes, signalements et modération | | planifié |
 | 5 — Commerce | Catalogue, variantes, stock, panier multi-vendeurs, commandes scindées, avis vérifiés, coupons | | planifié |
 | 6 — Ledger et wallet (sandbox) | Ledger en partie double append-only, wallet, transferts idempotents, QR marchand signé, KYC par niveaux, **aucun argent réel** | | planifié |

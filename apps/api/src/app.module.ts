@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { type DynamicModule, Module, type Type } from '@nestjs/common';
+import { type DynamicModule, Logger, Module, type Type } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AccountController } from './account/account.controller.js';
 import { AccountService } from './account/account.service.js';
@@ -19,6 +19,21 @@ import { FlagGuard } from './flags/flag.guard.js';
 import { AdminFlagsController, ConfigController } from './flags/flags.controller.js';
 import { FlagsService } from './flags/flags.service.js';
 import { HealthController } from './health/health.controller.js';
+import { ExpoPushGateway } from './notifications/expo-push.gateway.js';
+import { NotificationsController } from './notifications/notifications.controller.js';
+import { NotificationsService } from './notifications/notifications.service.js';
+import { LogPushGateway, PushGateway } from './notifications/push-gateway.js';
+import { RealtimeGateway } from './realtime/realtime.gateway.js';
+import { ConversationRoomsResolver, RealtimeService } from './realtime/realtime.service.js';
+import { HttpThrottlerGuard } from './security/http-throttler.guard.js';
+import { SessionVerifier } from './security/session-verifier.js';
+// Lot 3A (messaging), separate import block to limit merge conflicts with parallel work.
+import { ContactsService } from './messaging/contacts.service.js';
+import { ConversationsService } from './messaging/conversations.service.js';
+import { ConversationMembersService } from './messaging/members.service.js';
+import { MessagesService } from './messaging/messages.service.js';
+import { ConversationsController, MessagesController, SEND_MESSAGE_HANDLER } from './messaging/messaging.controller.js';
+import { MessagingRooms } from './messaging/rooms.js';
 import { MaintenanceService } from './maintenance/maintenance.service.js';
 import { AvatarController } from './media/avatar.controller.js';
 import { MEDIA_THROTTLED_HANDLERS, MediaController } from './media/media.controller.js';
@@ -43,11 +58,13 @@ export interface AppModuleOptions {
   otpSender?: OtpSender;
   /** Test-only: extra controllers mounted behind the same global guards (e.g. a @RequireFlag probe). */
   extraControllers?: Type[];
+  /** Overrides the push provider adapter (tests capture pushes this way; never any network). */
+  pushGateway?: PushGateway;
 }
 
 @Module({})
 export class AppModule {
-  static forRoot({ env, otpSender, extraControllers = [] }: AppModuleOptions): DynamicModule {
+  static forRoot({ env, otpSender, extraControllers = [], pushGateway }: AppModuleOptions): DynamicModule {
     return {
       module: AppModule,
       imports: [
@@ -84,6 +101,16 @@ export class AppModule {
               skipIf: (ctx) =>
                 ctx.getClass() !== MediaController || !MEDIA_THROTTLED_HANDLERS.has(ctx.getHandler().name),
             },
+            {
+              // Message sending only: every message is a write plus a fan-out to the room and pushes.
+              name: 'messaging',
+              ttl: 60_000,
+              limit: env.MESSAGING_RATE_LIMIT_PER_MINUTE,
+              skipIf: (ctx) =>
+                ctx.getType() !== 'http' ||
+                ctx.getClass() !== ConversationsController ||
+                ctx.getHandler().name !== SEND_MESSAGE_HANDLER,
+            },
           ],
         }),
         DbModule,
@@ -105,6 +132,9 @@ export class AppModule {
         PublicOrgsController,
         MediaController,
         AvatarController,
+        ConversationsController,
+        MessagesController,
+        NotificationsController,
         ...extraControllers,
       ],
       providers: [
@@ -125,8 +155,30 @@ export class AppModule {
         MediaService,
         // Only adapter until the object storage provider is chosen (BACKLOG Q6).
         { provide: MediaStorage, inject: [ENV], useFactory: (e: Env) => new LocalDiskStorage(e.MEDIA_STORAGE_DIR) },
+        // Lot 3: realtime fan-out and notifications (ports shared by messaging and later lots).
+        RealtimeService,
+        RealtimeGateway,
+        SessionVerifier,
+        NotificationsService,
+        {
+          provide: PushGateway,
+          useFactory: (): PushGateway => {
+            if (pushGateway) return pushGateway;
+            if (env.PUSH_PROVIDER === 'expo') return new ExpoPushGateway(env.EXPO_ACCESS_TOKEN);
+            if (env.NODE_ENV === 'production') {
+              new Logger('PushGateway').warn('PUSH_PROVIDER=log in production: no push notification will be delivered');
+            }
+            return new LogPushGateway();
+          },
+        },
+        // Provided by the messaging module.
+        ContactsService,
+        ConversationsService,
+        ConversationMembersService,
+        MessagesService,
+        { provide: ConversationRoomsResolver, useClass: MessagingRooms },
         { provide: OtpSender, useValue: otpSender ?? new ConsoleOtpSender() },
-        { provide: APP_GUARD, useClass: ThrottlerGuard },
+        { provide: APP_GUARD, useClass: HttpThrottlerGuard },
         { provide: APP_GUARD, useClass: AuthGuard },
         // Must stay after AuthGuard: global guards run in registration order and it needs req.auth.
         { provide: APP_GUARD, useClass: FlagGuard },

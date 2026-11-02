@@ -7,3 +7,5 @@ export * from './privacy.js';
 export * from './account.js';
 export * from './orgs.js';
 export * from './media.js';
+export * from './messaging.js';
+export * from './notifications.js';

@@ -13,6 +13,24 @@ const httpStatusCodes: Record<number, string> = {
   429: ErrorCodes.rateLimited,
 };
 
+/**
+ * What may be logged of an unhandled error. A failed Drizzle query carries its bound parameters
+ * (in `params` and in the message), i.e. user content such as message bodies or credentials: they
+ * are cut out, only the statement and the driver's error code remain.
+ */
+export function redactedError(err: unknown): unknown {
+  if (!(err instanceof Error)) return err;
+  const e = err as Error & { query?: unknown; params?: unknown; cause?: unknown };
+  const marker = '\nparams:';
+  if (!('params' in e) && !e.message.includes(marker)) return err;
+  const cause = e.cause as { code?: unknown } | undefined;
+  const safe = new Error(e.message.split(marker)[0]);
+  safe.name = e.name;
+  safe.stack = e.stack?.replace(e.message, safe.message);
+  if (typeof cause?.code === 'string') (safe as Error & { code?: string }).code = cause.code;
+  return safe;
+}
+
 /** Renders every error as the shared ApiError envelope. Internal details never leak to clients. */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -44,7 +62,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     if (status >= 500) {
-      this.logger.error({ err: exception, requestId }, 'unhandled error');
+      this.logger.error({ err: redactedError(exception), requestId }, 'unhandled error');
     }
     res.status(status).json({ error: { ...body, requestId } } satisfies ApiError);
   }

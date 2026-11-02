@@ -5,6 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AppModule, type AppModuleOptions } from './app.module.js';
+import { CaselindIoAdapter } from './realtime/realtime.adapter.js';
 
 /** Builds the HTTP application. Shared by main.ts and the integration tests. */
 export async function createApp(options: AppModuleOptions): Promise<INestApplication> {
@@ -21,6 +22,7 @@ export async function createApp(options: AppModuleOptions): Promise<INestApplica
     origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false,
     credentials: false,
   });
+  app.useWebSocketAdapter(new CaselindIoAdapter(app, env.CORS_ORIGINS));
   app.setGlobalPrefix('v1');
   app.enableShutdownHooks();
   return app;

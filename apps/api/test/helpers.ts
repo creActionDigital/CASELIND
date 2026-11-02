@@ -12,6 +12,7 @@ import type { AppModuleOptions } from '../src/app.module.js';
 import { createApp } from '../src/bootstrap.js';
 import { type Env, loadEnv } from '../src/config/env.js';
 import { migrate } from '../src/db/migrator.js';
+import { PushGateway, type PushMessage, type PushResult } from '../src/notifications/push-gateway.js';
 
 /** Captures outgoing OTP messages instead of sending them. */
 export class CapturingOtpSender extends OtpSender {
@@ -28,8 +29,30 @@ export class CapturingOtpSender extends OtpSender {
   }
 }
 
+/** Captures pushes instead of sending them (tests never touch the network). */
+export class FakePushGateway extends PushGateway {
+  readonly sent: PushMessage[] = [];
+  /** Results returned by the next calls, by token; default is ok. */
+  readonly failures = new Map<string, PushResult>();
+  /** When set, the next `send` rejects with this error. */
+  throwOnSend: Error | null = null;
+  calls = 0;
+
+  async send(messages: PushMessage[]): Promise<PushResult[]> {
+    this.calls += 1;
+    if (this.throwOnSend) throw this.throwOnSend;
+    this.sent.push(...messages);
+    return messages.map((m) => this.failures.get(m.to) ?? { status: 'ok' });
+  }
+
+  tokensSent(): string[] {
+    return this.sent.map((m) => m.to);
+  }
+}
+
 export interface TestContext {
   app: INestApplication;
+  push: FakePushGateway;
   http: ReturnType<typeof request>;
   otp: CapturingOtpSender;
   databaseUrl: string;
@@ -42,6 +65,7 @@ export interface TestContext {
 export async function createTestContext(
   envOverrides: Record<string, string> = {},
   options: Pick<AppModuleOptions, 'extraControllers'> = {},
+  pushGateway: FakePushGateway = new FakePushGateway(),
 ): Promise<TestContext> {
   const adminUrl = inject('pgAdminUrl');
   const dbName = `caselind_test_${randomBytes(6).toString('hex')}`;
@@ -69,16 +93,18 @@ export async function createTestContext(
     RATE_LIMIT_PER_MINUTE: '10000',
     AUTH_RATE_LIMIT_PER_MINUTE: '10000',
     MEDIA_RATE_LIMIT_PER_MINUTE: '10000',
+    MESSAGING_RATE_LIMIT_PER_MINUTE: '10000',
     MAINTENANCE_ENABLED: 'false',
     ...envOverrides,
   });
   const otp = new CapturingOtpSender();
-  const app = await createApp({ env, otpSender: otp, ...options });
+  const app = await createApp({ env, otpSender: otp, pushGateway, ...options });
   await app.init();
   const sql = new pg.Pool({ connectionString: databaseUrl, max: 2 });
 
   return {
     app,
+    push: pushGateway,
     http: request(app.getHttpServer()),
     otp,
     databaseUrl,

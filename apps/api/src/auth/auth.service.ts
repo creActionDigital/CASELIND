@@ -11,11 +11,13 @@ import {
 } from '@caselind/contracts';
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
-import { refreshTokens, sessions, users, type UserRow } from '../db/schema.js';
+import { pushTokens, refreshTokens, sessions, users, type UserRow } from '../db/schema.js';
 import type { AuthUser } from '../security/auth.guard.js';
 import { PasswordService } from '../security/password.service.js';
 import { TokenService } from '../security/token.service.js';
@@ -62,6 +64,8 @@ export class AuthService {
     private readonly otp: OtpService,
     private readonly sender: OtpSender,
     private readonly audit: AuditService,
+    private readonly realtime: RealtimeService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -165,6 +169,16 @@ export class AuthService {
     }
     const pair = await this.createSession(user, req.device, meta);
     await this.audit.record({ action: 'auth.login', subjectUserId: user.id, sessionId: pair.sessionId, meta });
+    // Security alert for the user's other devices; fire-and-forget, never fails the login.
+    void this.notifications
+      .notify({
+        userId: user.id,
+        category: 'security',
+        title: 'Nouvelle connexion',
+        body: req.device.name ?? req.device.platform,
+        urgent: true,
+      })
+      .catch(() => undefined);
     return pair;
   }
 
@@ -189,6 +203,7 @@ export class AuthService {
     if (!claimed) {
       if (!found.session.revokedAt) {
         await this.revoke(found.session.id, 'refresh_token_reuse');
+        this.realtime.disconnectUser(found.user.id);
         await this.audit.record({
           action: 'auth.refresh_token_reuse',
           subjectUserId: found.user.id,
@@ -241,6 +256,8 @@ export class AuthService {
       .returning({ id: sessions.id });
     // Same answer for "not yours" and "does not exist": no cross-user probing.
     if (!row) throw AppError.notFound('Session not found');
+    await this.db.delete(pushTokens).where(eq(pushTokens.sessionId, sessionId));
+    this.realtime.disconnectSession(sessionId);
     await this.audit.record({
       action: 'auth.session_revoked',
       actorUserId: auth.userId,
@@ -276,6 +293,7 @@ export class AuthService {
         .set({ revokedAt: new Date(), revokeReason: 'password_reset' })
         .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
     });
+    this.realtime.disconnectUser(userId);
     await this.audit.record({ action: 'auth.password_reset', subjectUserId: userId, meta });
   }
 
@@ -384,5 +402,7 @@ export class AuthService {
       .update(sessions)
       .set({ revokedAt: new Date(), revokeReason: reason })
       .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)));
+    await this.db.delete(pushTokens).where(eq(pushTokens.sessionId, sessionId));
+    this.realtime.disconnectSession(sessionId);
   }
 }

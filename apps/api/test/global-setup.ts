@@ -32,6 +32,8 @@ export default async function setup(project: TestProject) {
     // We delete the directory ourselves below: the library's own cleanup (persistent: false)
     // runs a plain rm right after taskkill and fails with EBUSY on Windows.
     persistent: true,
+    // UTF8 whatever the host locale: on Windows the default is WIN1252, which cannot store emoji (messaging).
+    initdbFlags: ['--encoding=UTF8'],
     onLog: () => undefined,
   });
   await pg.initialise();

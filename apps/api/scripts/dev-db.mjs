@@ -11,7 +11,7 @@ const databaseDir = join(root, '.data', 'pg');
 const port = Number(process.env.DEV_DB_PORT ?? 54329);
 const password = process.env.DEV_DB_PASSWORD ?? 'caselind-dev-only';
 
-const pg = new EmbeddedPostgres({ databaseDir, port, user: 'postgres', password, persistent: true });
+const pg = new EmbeddedPostgres({ databaseDir, port, user: 'postgres', password, persistent: true, initdbFlags: ['--encoding=UTF8'] });
 if (!existsSync(join(databaseDir, 'PG_VERSION'))) {
   await pg.initialise();
 }
