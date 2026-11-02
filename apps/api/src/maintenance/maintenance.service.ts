@@ -4,7 +4,12 @@ import { inArray, lt, or, sql } from 'drizzle-orm';
 import type pg from 'pg';
 import { ENV, type Env } from '../config/env.js';
 import { DB, type Db, PG_POOL } from '../db/db.module.js';
-import { auditEvents, otpChallenges, refreshTokens, sessions, userBlocks } from '../db/schema.js';
+import { auditEvents, orgMembers, otpChallenges, refreshTokens, sessions, userBlocks } from '../db/schema.js';
+import { contentUrlOf, MediaService } from '../media/media.service.js';
+import { MediaStorage } from '../media/storage.js';
+
+/** Media of deleted accounts removed per maintenance run (files first, then rows); the rest waits for the next run. */
+const DELETED_USER_MEDIA_BATCH = 500;
 
 /** Session-level advisory lock key; distinct from the migrator's 727372. */
 export const MAINTENANCE_LOCK_KEY = 727373;
@@ -21,9 +26,20 @@ export interface MaintenanceResult {
   sessions: number;
   /** Accounts anonymised because their deletion grace period elapsed. */
   deletedAccounts: number;
+  /** Media uploads never completed or refused, older than 24 hours (with their files). */
+  staleUploads: number;
+  /** Media assets of deleted accounts removed (stored file, then row). */
+  deletedUserMedia: number;
 }
 
-const ZERO: MaintenanceResult = { otpChallenges: 0, refreshTokens: 0, sessions: 0, deletedAccounts: 0 };
+const ZERO: MaintenanceResult = {
+  otpChallenges: 0,
+  refreshTokens: 0,
+  sessions: 0,
+  deletedAccounts: 0,
+  staleUploads: 0,
+  deletedUserMedia: 0,
+};
 
 /**
  * Hourly cleanup of stale identity data.
@@ -43,6 +59,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     @Inject(DB) private readonly db: Db,
     @Inject(PG_POOL) private readonly pool: pg.Pool,
     @Inject(ENV) private readonly env: Env,
+    private readonly media: MediaService,
+    private readonly storage: MediaStorage,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -90,9 +108,12 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           refreshTokens: await this.purgeRefreshTokens(now),
           sessions: await this.purgeSessions(now),
           deletedAccounts: await this.purgeDueDeletions(now),
+          staleUploads: await this.media.purgeStaleUploads(now),
+          // After purgeDueDeletions committed: also retries what a previous run could not delete.
+          deletedUserMedia: await this.purgeDeletedUsersMedia(),
         };
         this.logger.log(
-          `maintenance done: otpChallenges=${result.otpChallenges} refreshTokens=${result.refreshTokens} sessions=${result.sessions} deletedAccounts=${result.deletedAccounts}`,
+          `maintenance done: otpChallenges=${result.otpChallenges} refreshTokens=${result.refreshTokens} sessions=${result.sessions} deletedAccounts=${result.deletedAccounts} staleUploads=${result.staleUploads} deletedUserMedia=${result.deletedUserMedia}`,
         );
         return result;
       } finally {
@@ -136,11 +157,40 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
    * (right of erasure). The row is kept (ids stay valid for the append-only audit log) but holds
    * no personal data any more: identifiers are released so they can be registered again, the
    * password hash is unusable (argon2 verify fails, PasswordService.verify returns false), and
-   * sessions (refresh tokens cascade), OTP challenges and blocks are deleted. One transaction.
+   * sessions (refresh tokens cascade), OTP challenges, blocks and organisation memberships
+   * (active and invited) are deleted. One transaction.
+   *
+   * Organisations: the deletion request is refused while the user is the last owner (409), but an
+   * org can still end up owner-less here (e.g. it was suspended at request time, or ownership
+   * changed through a path outside the API). Such an org is suspended and audited as
+   * `org.suspended_orphaned` so platform support can hand it over; it is never deleted.
+   * Locking: the orgs the candidates actively own are locked FOR UPDATE (id order) BEFORE the user
+   * rows, the same org -> user order as OrgMembersService and AccountService.requestDeletion.
+   *
+   * Media rows and files are NOT removed here: purgeDeletedUsersMedia does it after this commits
+   * (file I/O must not run inside a DB transaction, and it retries on the next run on failure).
    */
   private async purgeDueDeletions(now: Date): Promise<number> {
     const cutoff = new Date(now.getTime() - this.env.ACCOUNT_DELETION_GRACE_DAYS * DAY_MS);
     return this.db.transaction(async (tx) => {
+      const candidates = await tx.execute<{ id: string }>(sql`
+        SELECT id FROM users
+        WHERE deletion_requested_at < ${cutoff.toISOString()}::timestamptz AND status <> 'deleted'`);
+      const candidateIds = candidates.rows.map((r) => r.id);
+      if (candidateIds.length === 0) return 0;
+      const candidateArray = sql`ARRAY[${sql.join(
+        candidateIds.map((id) => sql`${id}`),
+        sql`, `,
+      )}]::uuid[]`;
+      await tx.execute(sql`
+        SELECT id FROM organizations
+        WHERE id IN (
+          SELECT org_id FROM org_members
+          WHERE user_id = ANY(${candidateArray}) AND role = 'owner' AND status = 'active'
+        )
+        ORDER BY id
+        FOR UPDATE`);
+
       const res = await tx.execute<{ id: string }>(sql`
         UPDATE users SET
           status = 'deleted',
@@ -159,12 +209,46 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           locked_until = NULL
         WHERE id IN (
           SELECT id FROM users
-          WHERE deletion_requested_at < ${cutoff.toISOString()}::timestamptz AND status <> 'deleted'
+          WHERE id = ANY(${candidateArray})
+            AND deletion_requested_at < ${cutoff.toISOString()}::timestamptz AND status <> 'deleted'
           FOR UPDATE SKIP LOCKED
         )
         RETURNING id`);
       const ids = res.rows.map((r) => r.id);
       if (ids.length === 0) return 0;
+      const idArray = sql`ARRAY[${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `,
+      )}]::uuid[]`;
+
+      // Orgs whose only active owners are being purged now (one row per org, the first such owner).
+      const orphans = await tx.execute<{ org_id: string; user_id: string; status: string }>(sql`
+        SELECT DISTINCT ON (m.org_id) m.org_id, m.user_id, o.status
+        FROM org_members m JOIN organizations o ON o.id = m.org_id
+        WHERE m.user_id = ANY(${idArray}) AND m.role = 'owner' AND m.status = 'active'
+          AND NOT EXISTS (
+            SELECT 1 FROM org_members m2
+            WHERE m2.org_id = m.org_id AND m2.role = 'owner' AND m2.status = 'active'
+              AND NOT (m2.user_id = ANY(${idArray}))
+          )
+        ORDER BY m.org_id, m.user_id`);
+      await tx.delete(orgMembers).where(inArray(orgMembers.userId, ids));
+      if (orphans.rows.length > 0) {
+        await tx.execute(sql`
+          UPDATE organizations SET status = 'suspended'
+          WHERE id = ANY(ARRAY[${sql.join(
+            orphans.rows.map((o) => sql`${o.org_id}`),
+            sql`, `,
+          )}]::uuid[])`);
+        await tx.insert(auditEvents).values(
+          orphans.rows.map((o) => ({
+            action: 'org.suspended_orphaned',
+            subjectUserId: o.user_id,
+            metadata: { orgId: o.org_id, previousStatus: o.status, reason: 'last_owner_deleted' },
+          })),
+        );
+      }
+
       await tx.delete(sessions).where(inArray(sessions.userId, ids));
       await tx.delete(otpChallenges).where(inArray(otpChallenges.userId, ids));
       await tx.delete(userBlocks).where(or(inArray(userBlocks.blockerId, ids), inArray(userBlocks.blockedId, ids)));
@@ -173,6 +257,51 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         ids.map((id) => ({ action: 'user.deleted', subjectUserId: id, metadata: { reason: 'deletion_grace_elapsed' } })),
       );
       return ids.length;
+    });
+  }
+
+  /**
+   * Deletes the media of deleted (anonymised) accounts: for each asset the stored file first, then
+   * the row, together with any organisation logo/banner that pointed at it. Order chosen for
+   * safety: a row is only removed once its file is gone, so a storage failure (logged, not fatal)
+   * leaves the row in place and the next run retries it; the reverse order would leave unreachable
+   * orphan files with no record of them. Between the two steps the content route answers 404
+   * (file missing), which is the intended end state anyway. Avatars were already cleared by the
+   * anonymisation. Runs outside any transaction; bounded per run by DELETED_USER_MEDIA_BATCH.
+   */
+  private async purgeDeletedUsersMedia(): Promise<number> {
+    const { rows } = await this.db.execute<{ id: string; storage_key: string }>(sql`
+      SELECT m.id, m.storage_key FROM media_assets m JOIN users u ON u.id = m.owner_user_id
+      WHERE u.status = 'deleted'
+      ORDER BY m.id
+      LIMIT ${DELETED_USER_MEDIA_BATCH}`);
+    const removable: string[] = [];
+    for (const asset of rows) {
+      try {
+        await this.storage.delete(asset.storage_key);
+        removable.push(asset.id);
+      } catch (err) {
+        this.logger.error(
+          `could not delete a stored media object of a deleted account (asset ${asset.id}); retrying next run`,
+          err instanceof Error ? err.stack : String(err),
+        );
+      }
+    }
+    if (removable.length === 0) return 0;
+    const urls = removable.map((id) => contentUrlOf(id));
+    return this.db.transaction(async (tx) => {
+      const urlArray = sql`ARRAY[${sql.join(
+        urls.map((u) => sql`${u}`),
+        sql`, `,
+      )}]::text[]`;
+      await tx.execute(sql`UPDATE organizations SET logo_url = NULL WHERE logo_url = ANY(${urlArray})`);
+      await tx.execute(sql`UPDATE organizations SET banner_url = NULL WHERE banner_url = ANY(${urlArray})`);
+      const res = await tx.execute(sql`
+        DELETE FROM media_assets WHERE id = ANY(ARRAY[${sql.join(
+          removable.map((id) => sql`${id}`),
+          sql`, `,
+        )}]::uuid[])`);
+      return res.rowCount ?? 0;
     });
   }
 }

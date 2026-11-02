@@ -1,4 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import type { TokenPair } from '@caselind/contracts';
 import pg from 'pg';
@@ -51,16 +54,21 @@ export async function createTestContext(
   url.pathname = `/${dbName}`;
   const databaseUrl = url.toString();
   await migrate(databaseUrl);
+  const mediaDir = await mkdtemp(join(tmpdir(), 'caselind-media-'));
 
   const env: Env = loadEnv({
     NODE_ENV: 'test',
     DATABASE_URL: databaseUrl,
     JWT_ACCESS_SECRET: randomBytes(32).toString('hex'),
     OTP_PEPPER: randomBytes(32).toString('hex'),
+    MEDIA_SIGNING_SECRET: randomBytes(32).toString('hex'),
+    // One media directory per test file, removed by close().
+    MEDIA_STORAGE_DIR: mediaDir,
     OTP_RESEND_COOLDOWN_SECONDS: '0',
     LOG_LEVEL: 'silent',
     RATE_LIMIT_PER_MINUTE: '10000',
     AUTH_RATE_LIMIT_PER_MINUTE: '10000',
+    MEDIA_RATE_LIMIT_PER_MINUTE: '10000',
     MAINTENANCE_ENABLED: 'false',
     ...envOverrides,
   });
@@ -78,6 +86,7 @@ export async function createTestContext(
     async close() {
       await app.close();
       await sql.end();
+      await rm(mediaDir, { recursive: true, force: true, maxRetries: 3 });
     },
   };
 }

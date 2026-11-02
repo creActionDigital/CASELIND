@@ -24,7 +24,20 @@ export type AuditAction =
   | 'user.data_exported'
   | 'user.deletion_requested'
   | 'user.deleted'
-  | 'admin.flag_updated';
+  | 'admin.flag_updated'
+  | 'media.uploaded'
+  | 'media.rejected'
+  | 'media.deleted'
+  | 'user.avatar_updated'
+  | 'org.created'
+  | 'org.updated'
+  | 'org.member_invited'
+  | 'org.invitation_accepted'
+  | 'org.invitation_declined'
+  | 'org.member_role_changed'
+  | 'org.member_removed'
+  /** System (maintenance): the org's last active owner was purged; metadata.orgId. */
+  | 'org.suspended_orphaned';
 
 export interface AuditInput {
   action: AuditAction;

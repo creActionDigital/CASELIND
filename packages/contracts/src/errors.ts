@@ -30,6 +30,10 @@ export const ErrorCodes = {
   otpResendTooSoon: 'otp_resend_too_soon',
   refreshTokenInvalid: 'refresh_token_invalid',
   featureDisabled: 'feature_disabled',
+  /** 413: the uploaded content exceeds the size limit (details.maxBytes). */
+  payloadTooLarge: 'payload_too_large',
+  /** 415: the content type is not accepted, or does not match the declared one (details.reason). */
+  unsupportedMediaType: 'unsupported_media_type',
   internal: 'internal_error',
 } as const;
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

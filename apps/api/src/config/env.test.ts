@@ -7,6 +7,7 @@ const base = {
   DATABASE_URL: 'postgres://localhost/x',
   JWT_ACCESS_SECRET: 'a'.repeat(32),
   OTP_PEPPER: 'b'.repeat(32),
+  MEDIA_SIGNING_SECRET: 'c'.repeat(32),
 };
 
 describe('environment validation', () => {

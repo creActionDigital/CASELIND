@@ -5,3 +5,5 @@ export * from './pagination.js';
 export * from './flags.js';
 export * from './privacy.js';
 export * from './account.js';
+export * from './orgs.js';
+export * from './media.js';

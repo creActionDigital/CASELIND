@@ -1,4 +1,8 @@
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+
+const MIB = 1024 * 1024;
 
 const envSchema = z
   .object({
@@ -33,6 +37,28 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('true')
       .transform((v) => v === 'true'),
+    /** Signs the short-lived upload tokens of POST /v1/media/uploads. */
+    MEDIA_SIGNING_SECRET: z.string().min(32, 'MEDIA_SIGNING_SECRET must be at least 32 characters'),
+    /**
+     * Local-disk media storage (objects/ + staging tmp/). Relative paths are resolved against the
+     * working directory; the default is apps/api/.data/media (git-ignored). Staging always happens
+     * here, even once an S3-compatible adapter exists (pending decision Q6).
+     */
+    MEDIA_STORAGE_DIR: z
+      .string()
+      .min(1)
+      .default(fileURLToPath(new URL('../../.data/media', import.meta.url)))
+      .transform((v) => resolve(v)),
+    MEDIA_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).default(10 * MIB),
+    MEDIA_MAX_VIDEO_BYTES: z.coerce.number().int().min(1).default(100 * MIB),
+    MEDIA_MAX_AUDIO_BYTES: z.coerce.number().int().min(1).default(20 * MIB),
+    MEDIA_MAX_DOCUMENT_BYTES: z.coerce.number().int().min(1).default(20 * MIB),
+    /** Unfinished uploads (pending or rejected, purged after 24 h) one user may have at once. */
+    MEDIA_MAX_PENDING_PER_USER: z.coerce.number().int().min(1).default(20),
+    /** Bytes one user may hold: ready sizes plus the declared sizes of pending uploads (default 1 GiB). */
+    MEDIA_QUOTA_BYTES_PER_USER: z.coerce.number().int().min(1).default(1024 * MIB),
+    /** Stricter per-client budget for announcing uploads, sending their bytes and re-issuing tokens. */
+    MEDIA_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.OTP_PROVIDER === 'console') {

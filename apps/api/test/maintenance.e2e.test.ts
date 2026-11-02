@@ -67,7 +67,7 @@ describe('maintenance', () => {
     const expiredRecently = await insertSession(ago(29 * DAY), null);
 
     const service = ctx.app.get(MaintenanceService);
-    expect(await service.runOnce(now)).toEqual({ otpChallenges: 1, refreshTokens: 2, sessions: 2, deletedAccounts: 0 });
+    expect(await service.runOnce(now)).toEqual({ otpChallenges: 1, refreshTokens: 2, sessions: 2, deletedAccounts: 0, staleUploads: 0, deletedUserMedia: 0 });
 
     const ids = async (table: string): Promise<string[]> =>
       (await ctx.sql.query<{ id: string }>(`SELECT id FROM ${table}`)).rows.map((r) => r.id);
@@ -92,7 +92,7 @@ describe('maintenance', () => {
     );
     expect(sessionsLeft).toHaveLength(4);
 
-    expect(await service.runOnce(now)).toEqual({ otpChallenges: 0, refreshTokens: 0, sessions: 0, deletedAccounts: 0 });
+    expect(await service.runOnce(now)).toEqual({ otpChallenges: 0, refreshTokens: 0, sessions: 0, deletedAccounts: 0, staleUploads: 0, deletedUserMedia: 0 });
   });
 
   it('skips the run when another instance holds the maintenance lock', async () => {
@@ -104,7 +104,7 @@ describe('maintenance', () => {
     const holder = await ctx.sql.connect();
     try {
       await holder.query('SELECT pg_advisory_lock($1)', [MAINTENANCE_LOCK_KEY]);
-      expect(await service.runOnce()).toEqual({ otpChallenges: 0, refreshTokens: 0, sessions: 0, deletedAccounts: 0 });
+      expect(await service.runOnce()).toEqual({ otpChallenges: 0, refreshTokens: 0, sessions: 0, deletedAccounts: 0, staleUploads: 0, deletedUserMedia: 0 });
     } finally {
       await holder.query('SELECT pg_advisory_unlock($1)', [MAINTENANCE_LOCK_KEY]);
       holder.release();

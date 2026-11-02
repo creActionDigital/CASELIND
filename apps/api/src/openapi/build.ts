@@ -32,11 +32,19 @@ function apiVersion(): string {
   }
 }
 
+/** Raw bytes: OpenAPI 3.1 describes a binary payload by its media type alone (empty schema, no encoding). */
+function binaryContent(types: readonly string[]): Record<string, unknown> {
+  return Object.fromEntries(types.map((type) => [type, {}]));
+}
+
 function buildOperation(op: ApiOperation): Record<string, unknown> {
   const parameters: Record<string, unknown>[] = [];
   for (const [, name] of op.path.matchAll(/\{(\w+)\}/g)) {
     const schema = op.params?.[name!];
     parameters.push({ name, in: 'path', required: true, schema: schema ? toSchema(schema, 'input') : { type: 'string' } });
+  }
+  for (const [name, schema] of Object.entries(op.headers ?? {})) {
+    parameters.push({ name, in: 'header', required: true, schema: toSchema(schema, 'input') });
   }
   if (op.query) {
     const json = toSchema(op.query, 'input');
@@ -63,11 +71,15 @@ function buildOperation(op: ApiOperation): Record<string, unknown> {
   if (parameters.length) operation.parameters = parameters;
   if (op.body) {
     operation.requestBody = { required: true, content: { 'application/json': { schema: toSchema(op.body, 'input') } } };
+  } else if (op.rawBody) {
+    operation.requestBody = { required: true, content: binaryContent(op.rawBody) };
   }
   operation.responses = {
     [String(op.status)]: op.response
       ? { description: 'Success', content: { 'application/json': { schema: toSchema(op.response, 'output') } } }
-      : { description: 'Success (no content)' },
+      : op.rawResponse
+        ? { description: 'Success (raw bytes)', content: binaryContent(op.rawResponse) }
+        : { description: 'Success (no content)' },
     default: { $ref: '#/components/responses/Error' },
   };
   if (op.auth !== 'public') operation.security = [{ bearer: [] }];

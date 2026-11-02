@@ -1,5 +1,38 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-02 — Lot backend 2 (organisations et médias)
+
+### Réalisé
+- **Organisations** (migration 0005, `apps/api/src/orgs/*`) :
+  - organisations configurables (`kind`), membres avec 10 rôles et permissions vérifiées côté serveur (`OrgGuard`) ;
+  - invitations par @handle, vitrine publique `GET /v1/public/orgs/:slug` accessible sans connexion ;
+  - invariant « au moins un propriétaire actif » protégé par transaction et verrou, y compris en concurrence ;
+  - le badge vérifié est retiré si le nom, le type ou les coordonnées changent ;
+  - un membre peut quitter une organisation suspendue.
+- **Médias** (migration 0006, `apps/api/src/media/*`) :
+  - envoi en deux temps (annonce, puis envoi des octets avec un jeton HMAC de 15 min, renouvelable) ;
+  - type réel détecté par les premiers octets du fichier (SVG et HTML refusés) ;
+  - limites de taille par type, quota par utilisateur (envois en attente et octets), limite de débit dédiée ;
+  - diffusion avec `nosniff` et une CSP sandbox, photo de profil, purge des envois abandonnés ;
+  - stockage sur disque local derrière un port : l'adaptateur S3 attend la décision Q6.
+- **Intégration** :
+  - suppression de compte refusée tant que l'utilisateur est le dernier propriétaire d'une organisation (409 `last_owner`) ;
+  - la purge supprime les adhésions et les fichiers de l'utilisateur, et suspend une organisation restée sans propriétaire ;
+  - l'export inclut les adhésions et les médias.
+- **Revue de sécurité** (agent dédié) : 2 défauts élevés (plantage du processus sur une erreur d'écriture disque ; absence de quota), 4 moyens et 3 faibles corrigés, avec des tests. Reportés au backlog : Range/304 pour la vidéo, expiration des invitations, réservation de slugs en base.
+
+### Tests réellement exécutés (2026-11-02)
+- `npm run typecheck` : 0 erreur.
+- `npm test -w @caselind/api` : **14 fichiers, 162 tests, 162 réussis**, sur PostgreSQL embarqué réel.
+
+### Limites
+- Aucun test de charge ; pas de stress test de concurrence pour les nouveaux verrous de suppression.
+- Pas de stockage objet distant ni de CDN (Q6) ; pas de ré-encodage d'image ni de suppression des métadonnées EXIF.
+- Les permissions métier des organisations (catalogue, commandes, stock…) sont déclarées mais pas encore utilisées.
+
+### Prochaine étape
+Lot 3 : messagerie temps réel (Socket.IO authentifié au handshake) et notifications push Expo, puis démarrage de l'application mobile.
+
 ## 2026-11-01 — Lot backend 1b (compléments identité)
 
 ### Exécution

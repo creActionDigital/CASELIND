@@ -1,6 +1,7 @@
 // Typed mirror of migrations/*.sql for Drizzle queries.
 // The SQL migrations are the source of truth; keep this file in sync with them.
 import {
+  bigint,
   bigserial,
   boolean,
   char,
@@ -133,3 +134,74 @@ export type UserRow = typeof users.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type OtpChallengeRow = typeof otpChallenges.$inferSelect;
 export type FeatureFlagRow = typeof featureFlags.$inferSelect;
+
+/* Organisations (0005_organizations). Role/kind literal unions mirror @caselind/contracts. */
+
+export const organizations = pgTable('organizations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  slug: citext('slug').notNull(),
+  name: text('name').notNull(),
+  kind: text('kind')
+    .$type<'shop' | 'restaurant' | 'hotel' | 'pharmacy' | 'school' | 'hospital' | 'services' | 'warehouse' | 'other'>()
+    .notNull(),
+  description: text('description'),
+  logoUrl: text('logo_url'),
+  bannerUrl: text('banner_url'),
+  country: char('country', { length: 2 }),
+  city: text('city'),
+  address: text('address'),
+  phone: text('phone'),
+  email: citext('email'),
+  website: text('website'),
+  /** Shape: OpeningHours (validated by the contract before it is stored). */
+  openingHours: jsonb('opening_hours').$type<Record<string, { open: string; close: string }[] | undefined>>(),
+  visibility: text('visibility').$type<'public' | 'private'>().notNull().default('public'),
+  status: text('status').$type<'active' | 'suspended'>().notNull().default('active'),
+  verificationStatus: text('verification_status')
+    .$type<'unverified' | 'pending' | 'verified'>()
+    .notNull()
+    .default('unverified'),
+  createdBy: uuid('created_by'),
+  createdAt: tstz('created_at').notNull().defaultNow(),
+  updatedAt: tstz('updated_at').notNull().defaultNow(),
+});
+
+export const orgMembers = pgTable(
+  'org_members',
+  {
+    orgId: uuid('org_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    role: text('role')
+      .$type<'owner' | 'admin' | 'manager' | 'finance' | 'stock' | 'sales' | 'hr' | 'support' | 'delivery' | 'employee'>()
+      .notNull(),
+    status: text('status').$type<'invited' | 'active'>().notNull(),
+    invitedBy: uuid('invited_by'),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+    joinedAt: tstz('joined_at'),
+  },
+  (t) => [primaryKey({ columns: [t.orgId, t.userId] })],
+);
+
+export type OrganizationRow = typeof organizations.$inferSelect;
+export type OrgMemberRow = typeof orgMembers.$inferSelect;
+
+/** Uploaded files (0006_media). `mime` is detected from the content, never trusted from the client. */
+export const mediaAssets = pgTable('media_assets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id').notNull(),
+  purpose: text('purpose')
+    .$type<'avatar' | 'post' | 'message' | 'story' | 'org_logo' | 'org_banner' | 'product' | 'document'>()
+    .notNull(),
+  declaredMime: text('declared_mime').notNull(),
+  mime: text('mime'),
+  /** mode number: limits are far below 2^53. */
+  sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+  sha256: text('sha256'),
+  status: text('status').$type<'pending' | 'ready' | 'rejected'>().notNull().default('pending'),
+  storageKey: text('storage_key').notNull(),
+  createdAt: tstz('created_at').notNull().defaultNow(),
+  uploadedAt: tstz('uploaded_at'),
+  rejectedReason: text('rejected_reason'),
+});
+
+export type MediaAssetRow = typeof mediaAssets.$inferSelect;

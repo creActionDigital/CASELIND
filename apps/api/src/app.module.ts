@@ -20,7 +20,15 @@ import { AdminFlagsController, ConfigController } from './flags/flags.controller
 import { FlagsService } from './flags/flags.service.js';
 import { HealthController } from './health/health.controller.js';
 import { MaintenanceService } from './maintenance/maintenance.service.js';
+import { AvatarController } from './media/avatar.controller.js';
+import { MEDIA_THROTTLED_HANDLERS, MediaController } from './media/media.controller.js';
+import { MediaService } from './media/media.service.js';
+import { LocalDiskStorage, MediaStorage } from './media/storage.js';
 import { OpenApiController } from './openapi/openapi.controller.js';
+import { OrgGuard } from './orgs/org.guard.js';
+import { OrgMembersService } from './orgs/org-members.service.js';
+import { MyOrgsController, OrgsController, PublicOrgsController } from './orgs/orgs.controller.js';
+import { OrgsService } from './orgs/orgs.service.js';
 import { PrivacyController } from './privacy/privacy.controller.js';
 import { PrivacyService } from './privacy/privacy.service.js';
 import { AuthGuard } from './security/auth.guard.js';
@@ -68,6 +76,14 @@ export class AppModule {
               limit: env.AUTH_RATE_LIMIT_PER_MINUTE,
               skipIf: (ctx) => ctx.getClass() !== AuthController,
             },
+            {
+              // Upload announce / bytes / token re-issue: each one costs disk and a database row.
+              name: 'media',
+              ttl: 60_000,
+              limit: env.MEDIA_RATE_LIMIT_PER_MINUTE,
+              skipIf: (ctx) =>
+                ctx.getClass() !== MediaController || !MEDIA_THROTTLED_HANDLERS.has(ctx.getHandler().name),
+            },
           ],
         }),
         DbModule,
@@ -84,6 +100,11 @@ export class AppModule {
         AdminFlagsController,
         PrivacyController,
         AccountController,
+        OrgsController,
+        MyOrgsController,
+        PublicOrgsController,
+        MediaController,
+        AvatarController,
         ...extraControllers,
       ],
       providers: [
@@ -97,6 +118,13 @@ export class AppModule {
         MaintenanceService,
         PrivacyService,
         AccountService,
+        OrgsService,
+        OrgMembersService,
+        // Route-level guard attached by @OrgPermission (runs after the global guards below).
+        OrgGuard,
+        MediaService,
+        // Only adapter until the object storage provider is chosen (BACKLOG Q6).
+        { provide: MediaStorage, inject: [ENV], useFactory: (e: Env) => new LocalDiskStorage(e.MEDIA_STORAGE_DIR) },
         { provide: OtpSender, useValue: otpSender ?? new ConsoleOtpSender() },
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: AuthGuard },

@@ -26,6 +26,29 @@ import {
 } from '@caselind/contracts';
 import { z } from 'zod';
 import { auditQuerySchema } from '../admin/admin.controller.js';
+// Lot 2a (organisations), kept as a separate import to limit merge conflicts with parallel lots.
+import {
+  createOrgRequestSchema,
+  inviteOrgMemberRequestSchema,
+  myOrgMembershipListSchema,
+  myOrgMembershipSchema,
+  orgMemberListQuerySchema,
+  orgMemberListSchema,
+  orgMemberSchema,
+  orgSchema,
+  publicOrgSchema,
+  updateOrgMemberRequestSchema,
+  updateOrgRequestSchema,
+} from '@caselind/contracts';
+// Lot 2b (media), separate import for the same reason.
+import {
+  createUploadRequestSchema,
+  createUploadResponseSchema,
+  mediaAssetPublicSchema,
+  mediaAssetSchema,
+  mediaMimeSchema,
+  setAvatarRequestSchema,
+} from '@caselind/contracts';
 
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 /** public: no token; user: any authenticated account; admin: requires the `admin` platform role. */
@@ -46,6 +69,12 @@ export interface ApiOperation {
   /** Omitted for responses without a body (204). */
   response?: z.ZodType;
   status: number;
+  /** Required request headers (besides Authorization), keyed by header name. */
+  headers?: Record<string, z.ZodType>;
+  /** Binary request body (raw bytes, not JSON) accepted under these content types; exclusive with `body`. */
+  rawBody?: readonly string[];
+  /** Binary response body served under these content types; exclusive with `response`. */
+  rawResponse?: readonly string[];
 }
 
 /* Response shapes that exist only in the API (no contract in @caselind/contracts). */
@@ -113,8 +142,30 @@ export const apiOperations: readonly ApiOperation[] = [
 
   // Account (data rights)
   { method: 'get', path: '/v1/me/export', summary: 'Export everything held about the caller (right of access); audited', tags: ['account'], auth: 'user', response: accountExportSchema, status: 200 },
-  { method: 'post', path: '/v1/me/deletion-request', summary: 'Schedule account deletion (password required); signing in again cancels it', tags: ['account'], auth: 'user', body: deletionRequestSchema, response: deletionRequestResponseSchema, status: 202 },
+  { method: 'post', path: '/v1/me/deletion-request', summary: 'Schedule account deletion (password required; last active owner of an organisation: 409 last_owner); signing in again cancels it', tags: ['account'], auth: 'user', body: deletionRequestSchema, response: deletionRequestResponseSchema, status: 202 },
 
   // Admin
   { method: 'get', path: '/v1/admin/audit-events', summary: 'Audit log, newest first (pass the last id as `before` for the next page)', tags: ['admin'], auth: 'admin', query: auditQuerySchema, response: auditEventPageSchema, status: 200 },
+
+  // Organisations (lot 2a). `{orgId}` routes: non-member or malformed id → 404, role without the permission → 403.
+  { method: 'post', path: '/v1/orgs', summary: 'Create an organisation; the caller becomes its owner (slug taken or owner quota reached: 409)', tags: ['orgs'], auth: 'user', body: createOrgRequestSchema, response: orgSchema, status: 201 },
+  { method: 'get', path: '/v1/orgs/{orgId}', summary: 'Full organisation (active members only)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, response: orgSchema, status: 200 },
+  { method: 'patch', path: '/v1/orgs/{orgId}', summary: 'Update the organisation profile (org.profile.edit); audited', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, body: updateOrgRequestSchema, response: orgSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/members', summary: 'Members and pending invitations, oldest first (org.members.view; cursor pagination)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, query: orgMemberListQuerySchema, response: orgMemberListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/invitations', summary: 'Invite a user by handle (org.members.manage; owner/admin roles need org.admins.manage)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, body: inviteOrgMemberRequestSchema, response: orgMemberSchema, status: 201 },
+  { method: 'patch', path: '/v1/orgs/{orgId}/members/{userId}', summary: "Change a member's role (last active owner cannot be demoted: 409)", tags: ['orgs'], auth: 'user', params: { orgId: z.string(), userId: z.string() }, body: updateOrgMemberRequestSchema, response: orgMemberSchema, status: 200 },
+  { method: 'delete', path: '/v1/orgs/{orgId}/members/{userId}', summary: 'Remove a member, cancel an invitation, or leave (own id); last active owner: 409', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), userId: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/me/orgs', summary: "The caller's organisation memberships and pending invitations", tags: ['orgs'], auth: 'user', response: myOrgMembershipListSchema, status: 200 },
+  { method: 'post', path: '/v1/me/org-invitations/{orgId}/accept', summary: 'Accept a pending invitation', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, response: myOrgMembershipSchema, status: 200 },
+  { method: 'post', path: '/v1/me/org-invitations/{orgId}/decline', summary: 'Decline a pending invitation', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/public/orgs/{slug}', summary: 'Public storefront page (public and active organisations only; no token needed)', tags: ['orgs'], auth: 'public', params: { slug: z.string() }, response: publicOrgSchema, status: 200 },
+
+  // Media (lot 2b)
+  { method: 'post', path: '/v1/media/uploads', summary: 'Announce an upload: purpose, declared type and size (limit per kind: 400; per-user quota of unfinished uploads and bytes: 409 quota_exceeded); returns a 15-minute upload token', tags: ['media'], auth: 'user', body: createUploadRequestSchema, response: createUploadResponseSchema, status: 201 },
+  { method: 'post', path: '/v1/media/uploads/{id}/token', summary: 'Re-issue a 15-minute upload token for a pending upload of the caller (404 not theirs, 409 no longer pending)', tags: ['media'], auth: 'user', params: { id: z.uuid() }, response: createUploadResponseSchema, status: 200 },
+  { method: 'put', path: '/v1/media/uploads/{id}/content', summary: 'Send the raw bytes of a pending upload (owner + X-Upload-Token; bad token 403, done 409, larger than announced or than the limit 413, type refused or mismatched 415)', tags: ['media'], auth: 'user', params: { id: z.uuid() }, headers: { 'X-Upload-Token': z.string() }, rawBody: ['application/octet-stream', ...mediaMimeSchema.options], response: mediaAssetSchema, status: 200 },
+  { method: 'get', path: '/v1/media/{id}', summary: 'Media metadata (owner: full view, any state; others: reduced view of ready assets they may read, 404 otherwise)', tags: ['media'], auth: 'user', params: { id: z.uuid() }, response: z.union([mediaAssetSchema, mediaAssetPublicSchema]), status: 200 },
+  { method: 'get', path: '/v1/media/{id}/content', summary: 'Media bytes with the detected Content-Type (nosniff; PDF as attachment)', tags: ['media'], auth: 'user', params: { id: z.uuid() }, rawResponse: mediaMimeSchema.options, status: 200 },
+  { method: 'delete', path: '/v1/media/{id}', summary: "Delete one of the caller's media and its file (clears the avatar using it); audited", tags: ['media'], auth: 'user', params: { id: z.uuid() }, status: 204 },
+  { method: 'patch', path: '/v1/me/avatar', summary: 'Set the avatar to a ready `avatar` upload of the caller, or remove it with null; audited', tags: ['media', 'users'], auth: 'user', body: setAvatarRequestSchema, response: meSchema, status: 200 },
 ];

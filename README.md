@@ -26,7 +26,7 @@ npm install
 cp apps/api/.env.example apps/api/.env
 ```
 
-Remplissez `JWT_ACCESS_SECRET` et `OTP_PEPPER` dans `apps/api/.env`, par exemple avec :
+Remplissez `JWT_ACCESS_SECRET`, `OTP_PEPPER` et `MEDIA_SIGNING_SECRET` (trois valeurs distinctes) dans `apps/api/.env`, par exemple avec :
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
