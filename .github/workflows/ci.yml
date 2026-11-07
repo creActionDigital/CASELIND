@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-postgres-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # test/global-setup.ts uses this server instead of starting embedded-postgres;
+      # each test file creates and migrates its own database on it.
+      TEST_DATABASE_ADMIN_URL: postgres://postgres:ci-postgres-only@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @caselind/contracts
+      - run: npm run typecheck -w @caselind/api
+      - run: npm test -w @caselind/api
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @caselind/contracts
+      - run: npm run typecheck -w @caselind/mobile
+      - run: npm test -w @caselind/mobile
+      - run: npx expo export --platform web
+        working-directory: apps/mobile
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Non-blocking at first: dependency advisories are reviewed, not yet a merge gate.
+    # Remove continue-on-error once the baseline is clean.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm audit --omit=dev --audit-level=high
