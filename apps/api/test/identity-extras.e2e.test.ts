@@ -331,3 +331,14 @@ describe('rate limit of the account-security routes', () => {
     }
   });
 });
+
+describe('GET /v1/me twoFactorEnabled', () => {
+  it('is false until 2FA is enabled and true after', async () => {
+    const user = await signUp(ctx);
+    const before = await ctx.http.get('/v1/me').set(bearer(user.tokens.accessToken)).expect(200);
+    expect(before.body.twoFactorEnabled).toBe(false);
+    await enroll(user);
+    const after = await ctx.http.get('/v1/me').set(bearer(user.tokens.accessToken)).expect(200);
+    expect(after.body.twoFactorEnabled).toBe(true);
+  });
+});

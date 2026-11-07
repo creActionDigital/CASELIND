@@ -9,6 +9,7 @@ import {
   type UpdateOrgLocationRequest,
 } from '@caselind/contracts';
 import { type SQL, sql } from 'drizzle-orm';
+import { readOrgLocation } from '../orgs/orgs.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
@@ -84,6 +85,11 @@ export class PlacesService {
   ) {}
 
   // ---- organisation side -----------------------------------------------------------------------
+
+  /** Null when the organisation has no location yet. */
+  async getLocation(orgId: string): Promise<OrgLocation | null> {
+    return readOrgLocation(this.db, orgId);
+  }
 
   async setLocation(orgId: string, actorId: string, body: SetOrgLocationRequest, meta: RequestMeta): Promise<OrgLocation> {
     const res = await this.db.execute(sql`

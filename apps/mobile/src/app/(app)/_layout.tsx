@@ -31,6 +31,9 @@ export default function AppLayout() {
       <Stack.Screen name="wallet/topup" options={{ title: t('wallet.topup.title') }} />
       <Stack.Screen name="wallet/receive" options={{ title: t('wallet.receive.title') }} />
       <Stack.Screen name="wallet/pin" options={{ title: t('wallet.pin.title') }} />
+      <Stack.Screen name="scan" options={{ title: t('scan.title') }} />
+      <Stack.Screen name="pay" options={{ title: t('pay.title') }} />
+      <Stack.Screen name="u/[handle]" options={{ title: t('profile.social.title') }} />
       <Stack.Screen name="seller"options={{ headerShown: false }} />
       <Stack.Screen name="cart" options={{ title: t('cart.title') }} />
       <Stack.Screen name="shop" options={{ title: t('shop.title') }} />
@@ -48,6 +51,9 @@ export default function AppLayout() {
       <Stack.Screen name="user/[userId]/index" options={{ title: t('profile.social.title') }} />
       <Stack.Screen name="notification-preferences" options={{ title: t('notifications.preferences') }} />
       <Stack.Screen name="my-reports" options={{ title: t('report.mine.title') }} />
+      <Stack.Screen name="favorites" options={{ title: t('messagesX.fav.title') }} />
+      <Stack.Screen name="scheduled" options={{ title: t('messagesX.scheduled.title') }} />
+      <Stack.Screen name="chat-info/[conversationId]" options={{ title: t('messagesX.info') }} />
       <Stack.Screen name="story/[userId]" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       <Stack.Screen name="story/new" options={{ headerShown: false, presentation: 'modal' }} />
     </Stack>

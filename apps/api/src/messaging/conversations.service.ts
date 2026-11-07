@@ -18,6 +18,7 @@ import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
 import {
   type ConversationMemberRow,
+  conversationDrafts,
   conversationMembers,
   type ConversationRow,
   conversations,
@@ -288,6 +289,12 @@ export class ConversationsService {
 
     const unread = await this.unreadCounts(exec, userId, ids);
 
+    const draftRows = await exec
+      .select({ conversationId: conversationDrafts.conversationId, body: conversationDrafts.body, updatedAt: conversationDrafts.updatedAt })
+      .from(conversationDrafts)
+      .where(and(eq(conversationDrafts.userId, userId), inArray(conversationDrafts.conversationId, ids)));
+    const draftById = new Map(draftRows.map((d) => [d.conversationId, d]));
+
     return rows.map(({ conversation: c, member: m }) => {
       const peer = peerById.get(c.id);
       return {
@@ -307,6 +314,7 @@ export class ConversationsService {
         pinned: m.pinned,
         archived: m.archived,
         disappearingSeconds: c.disappearingSeconds,
+        draft: draftById.has(c.id) ? { body: draftById.get(c.id)!.body, updatedAt: draftById.get(c.id)!.updatedAt.toISOString() } : null,
         lastActivityAt: (c.lastMessageAt ?? c.createdAt).toISOString(),
         createdAt: c.createdAt.toISOString(),
       };

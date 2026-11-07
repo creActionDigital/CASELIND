@@ -34,7 +34,7 @@ Backend → **mobile React Native + Expo** → intégration et validation du mob
 
 ## Prochaine étape
 1. Faire valider M1 par le propriétaire sur un appareil (Expo Go ou build de développement) et corriger ses retours ; contrôle visuel à 360 px (en-tête, bouton « + »).
-2. Mobile M2 fait (fil, stories, publication, profils, signalements). Mobile M3 fait (boutique, commandes, espace vendeur). Décisions du 2026-11-07 dans `docs/BACKLOG.md` (Q1 RDC/Goma USD+CDF ; Q2 e-mail Brevo + WhatsApp ; Q5 FlexPay ; Q8 connexion Expo à faire par le propriétaire). Suite : écrans mobiles recherche, lieux (carte), scan QR et paiement marchand, KYC et 2FA ; puis lots 8+ (livraison, mini-apps, IA…). En dev, lancer l'API compilée (`node --env-file=.env dist/main.js`), le mode watch redémarre en boucle. Design : ADR-016 (style Apple), skills `apple-design` et `ui-ux-pro-max`.
+2. Mobile M2 fait (fil, stories, publication, profils, signalements). Mobile M3 fait (boutique, commandes, espace vendeur). Décisions du 2026-11-07 dans `docs/BACKLOG.md` (Q1 RDC/Goma USD+CDF ; Q2 e-mail Brevo + WhatsApp ; Q5 FlexPay ; Q8 connexion Expo à faire par le propriétaire). Mobile M5 fait (recherche, lieux, QR, 2FA, KYC, messagerie). Suite : validation du mobile par le propriétaire, puis lots 8+ (livraison, mini-apps, IA…) ; le web reste après la validation du mobile. Ne jamais lancer deux `npm install` en parallèle (corruption de paquets). En dev, lancer l'API compilée (`node --env-file=.env dist/main.js`), le mode watch redémarre en boucle. Design : ADR-016 (style Apple), skills `apple-design` et `ui-ux-pro-max`.
 3. Points ouverts du lot 3 dans `docs/BACKLOG.md` (lot 3b) et décision Q8 (compte Expo/EAS pour le push réel).
 
 ## Méthode de travail (décisions déjà prises avec moi)

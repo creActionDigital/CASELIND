@@ -113,6 +113,7 @@ export default function Wallet() {
         <Action icon="paper-plane-outline" label={t('wallet.action.send')} onPress={() => router.push('/wallet/send')} />
         <Action icon="add-circle-outline" label={t('wallet.action.topup')} onPress={() => router.push('/wallet/topup')} />
         <Action icon="qr-code-outline" label={t('wallet.action.receive')} onPress={() => router.push('/wallet/receive')} />
+        <Action icon="scan-outline" label={t('scan.action')} onPress={() => router.push('/scan')} />
       </View>
       <Pressable
         accessibilityRole="button"
@@ -129,6 +130,16 @@ export default function Wallet() {
             </Text>
           ) : null}
         </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('kyc.raiseLimits')}
+        onPress={() => router.push('/kyc')}
+        style={[styles.pinRow, { backgroundColor: colors.surface }]}
+      >
+        <Ionicons name="id-card-outline" size={22} color={colors.primary} />
+        <Text style={{ flex: 1 }}>{t('kyc.raiseLimits')}</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </Pressable>
       <Text variant="heading" accessibilityRole="header" style={{ marginTop: spacing.sm }}>

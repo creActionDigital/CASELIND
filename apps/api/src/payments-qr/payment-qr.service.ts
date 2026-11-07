@@ -143,6 +143,25 @@ export class PaymentQrService {
     return { items: rows.map((r) => toQr(r, now)), nextCursor: res.rows.length > q.limit && last ? encodeCursor(last.ts, last.id) : null };
   }
 
+  /** Re-signs the payload of an existing QR (same fields, same signature input). Revoked or foreign: 404. */
+  async payloadOf(m: OrgMembership, qrId: string): Promise<{ payload: string }> {
+    this.assertMerchantRole(m);
+    const [row] = await this.db
+      .select()
+      .from(paymentQrCodes)
+      .where(and(eq(paymentQrCodes.id, qrId), eq(paymentQrCodes.orgId, m.orgId)))
+      .limit(1);
+    if (!row || row.revokedAt) throw AppError.notFound('QR code not found');
+    const payload = this.signer.sign({
+      orgId: m.orgId,
+      qrId: row.id,
+      amountMinor: row.amountMinor,
+      currency: row.currency,
+      expiresAtSec: row.expiresAt ? Math.floor(row.expiresAt.getTime() / 1000) : null,
+    });
+    return { payload };
+  }
+
   /** Idempotent. A QR of another org is a 404. */
   async revoke(m: OrgMembership, userId: string, qrId: string, meta: RequestMeta): Promise<void> {
     this.assertMerchantRole(m);

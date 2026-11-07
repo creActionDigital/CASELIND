@@ -142,3 +142,23 @@ describe('GET /v1/places', () => {
     expect(cols.rows.map((r) => r.table_name)).toEqual(['organizations', 'organizations']);
   });
 });
+
+describe('reading the organisation location', () => {
+  it('returns null then the location to members only, and exposes it on Org but not PublicOrg', async () => {
+    const owner = await user();
+    const stranger = await user();
+    const org = await createOrg(owner);
+    const url = `/v1/orgs/${org.id}/location`;
+    const empty = await ctx.http.get(url).set(bearer(owner.token)).expect(200);
+    expect(empty.body).toBeNull();
+    expect((await ctx.http.get(`/v1/orgs/${org.id}`).set(bearer(owner.token)).expect(200)).body.location).toBeNull();
+    await ctx.http.post(url).set(bearer(owner.token)).send({ ...GOMA, label: 'Centre' }).expect(201);
+    const got = await ctx.http.get(url).set(bearer(owner.token)).expect(200);
+    expect(got.body).toEqual({ ...GOMA, label: 'Centre' });
+    expect((await ctx.http.get(`/v1/orgs/${org.id}`).set(bearer(owner.token)).expect(200)).body.location).toEqual({ ...GOMA, label: 'Centre' });
+    const pub = await ctx.http.get(`/v1/public/orgs/${org.slug}`).expect(200);
+    expect(pub.body.location).toBeUndefined();
+    await ctx.http.get(url).set(bearer(stranger.token)).expect(404);
+    await ctx.http.get(url).expect(401);
+  });
+});

@@ -1,5 +1,24 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-07 — Mobile M5 (recherche, lieux, QR, sécurité, KYC, messagerie)
+
+### Réalisé (4 agents mobiles en parallèle, puis 1 agent API)
+- **M5a** : recherche universelle (onglets, « Voir plus », historique contrôlable, 429) ; onglet Maps : boutiques par distance autour de Goma, rayon, types, « Utiliser ma position » (position jamais stockée), itinéraire vers l'app de cartes ; emplacement de boutique dans l'espace vendeur.
+- **M5b** : scanner universel (`expo-camera`, repli « Coller un code »), paiement marchand avec PIN et reçu, QR de boutique (création, réaffichage, révocation), QR de profil (`react-native-qrcode-svg`).
+- **M5c** : connexion en deux étapes, activation/désactivation de la 2FA avec codes de secours, changement d'identifiant (ADR-020), approbation de connexion web, KYC niveaux 1 et 2 avec photos, section « Sécurité » du compte.
+- **M5d** : transférer, favoris, messages éphémères, messages programmés, brouillons synchronisés.
+- **API** : `twoFactorEnabled` dans `/me`, emplacement d'org, réaffichage d'un QR, `draft` sur les conversations, `favorited` sur les messages.
+- **Correctif** : l'app restait bloquée sur l'écran de chargement si `/me` ne respectait pas le contrat (cas d'une API plus ancienne que l'app) : retour à la connexion.
+
+### Tests réellement exécutés (2026-11-07)
+- `npm run typecheck` : 0 erreur. API : **36 fichiers, 443 tests, 443 réussis**. Mobile : **13 fichiers, 137 tests, 137 réussis**.
+- **Navigateur intégré contre l'API réelle** : recherche « goma » (boutique + 2 produits), onglet Maps (Goma Market à 2,3 km), scan par collage d'un QR marchand de 3,00 $ → récapitulatif → PIN → reçu ; wallet de la boutique crédité de 3,00 $ ; QR à usage unique refusé au second paiement (`already_used`).
+
+### Limites
+- Caméra, 2FA, KYC, transfert et messages programmés : non exercés à l'écran. Rien sur appareil réel.
+- Une installation concurrente avait corrompu `expo-camera` (réinstallé) : ne jamais lancer deux `npm install` en parallèle.
+- Une boutique sans logo affiche une roue de chargement au lieu de ses initiales (recherche, lieux).
+
 ## 2026-11-07 — Lots 6 (wallet sandbox), 7 (lieux, recherche), 1c, 3b, 5b, OTP, CI et mobile M4a
 
 ### Exécution

@@ -2,6 +2,7 @@ import { identifierSchema } from '@caselind/contracts';
 import { useState } from 'react';
 import { useAuth } from '../../auth/auth-context';
 import { AuthShell } from '../../auth/AuthShell';
+import { TwoFactorStep } from '../../auth/TwoFactorStep';
 import { FormError } from '../../auth/FormError';
 import { useI18n } from '../../i18n';
 import { errorMessage } from '../../lib/errors';
@@ -15,6 +16,7 @@ export default function SignIn() {
   const [fieldErrors, setFieldErrors] = useState<{ identifier?: string; password?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
 
   async function submit() {
     const errs: typeof fieldErrors = {};
@@ -25,11 +27,27 @@ export default function SignIn() {
     if (Object.keys(errs).length) return;
     setLoading(true);
     try {
-      await signIn(identifier, password);
+      const res = await signIn(identifier, password);
+      if (res) {
+        setChallengeId(res.challengeId);
+        setLoading(false);
+      }
     } catch (e) {
       setError(errorMessage(e, t, locale));
       setLoading(false);
     }
+  }
+
+  if (challengeId) {
+    return (
+      <TwoFactorStep
+        challengeId={challengeId}
+        onRestart={() => {
+          setChallengeId(null);
+          setPassword('');
+        }}
+      />
+    );
   }
 
   return (

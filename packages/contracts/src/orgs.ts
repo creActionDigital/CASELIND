@@ -167,6 +167,8 @@ export const orgSchema = z.object({
   verificationStatus: orgVerificationStatusSchema,
   supportUserId: z.uuid().nullable(),
   createdBy: z.uuid().nullable(),
+  /** Published position (members only; not part of PublicOrg). */
+  location: z.object({ lat: z.number(), lng: z.number(), label: z.string().nullable() }).nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

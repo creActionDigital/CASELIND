@@ -8,6 +8,8 @@ import { useTheme } from '../theme/use-theme';
 import { Avatar, Badge, Text } from '../ui';
 import { conversationTitle, formatListTime, messagePreview } from './api';
 import { isMuted } from './cache';
+import { useDraftText } from './extras-hooks';
+import { draftPreview } from './extras-logic';
 
 interface Props {
   conversation: Conversation;
@@ -20,13 +22,15 @@ function Row({ conversation: c, onPress, onLongPress }: Props) {
   const { t, locale } = useI18n();
   const title = conversationTitle(c, t);
   const muted = isMuted(c);
+  const draft = useDraftText(c.id) ?? c.draft?.body ?? null;
+  const draftText = draft && draft.trim() ? draftPreview(draft) : '';
   const preview = c.lastMessage ? messagePreview(c.lastMessage, t) : t('chat.noMessages');
   const label = [
     title,
     c.unreadCount > 0 ? t('chat.unreadA11y', { n: c.unreadCount }) : '',
     c.pinned ? t('chat.pinned') : '',
     muted ? t('chat.muted') : '',
-    preview,
+    draftText ? t('messagesX.draftPrefix') + draftText : preview,
   ]
     .filter(Boolean)
     .join(', ');
@@ -54,7 +58,16 @@ function Row({ conversation: c, onPress, onLongPress }: Props) {
         </View>
         <View style={styles.line}>
           <Text variant="small" muted numberOfLines={1} style={[styles.flex, c.lastMessage?.recalled && styles.italic]}>
-            {preview}
+            {draftText ? (
+              <>
+                <Text variant="small" color={colors.primary}>
+                  {t('messagesX.draftPrefix')}
+                </Text>
+                {draftText}
+              </>
+            ) : (
+              preview
+            )}
           </Text>
           {c.unreadCount > 0 ? <Badge label={c.unreadCount > 99 ? '99+' : String(c.unreadCount)} tone={muted ? 'neutral' : 'primary'} /> : null}
         </View>

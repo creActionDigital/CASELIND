@@ -8,6 +8,7 @@ import { SheetModal } from '../../../components/SheetModal';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { fetchConversation, fetchMembers, lookupHandle, startChatErrorKey } from '../../../messaging/api';
+import { DisappearingSetting } from '../../../messaging/DisappearingSetting';
 import { qk } from '../../../messaging/keys';
 import { radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -177,7 +178,15 @@ export default function GroupInfo() {
         </View>
       ))}
 
-      <Button variant="danger" label={t('group.leave')} onPress={() => setLeaving(true)} style={{ marginTop: spacing.xl }} />
+      <DisappearingSetting conversation={c} />
+      <Button
+        variant="secondary"
+        label={t('messagesX.scheduled.menu')}
+        onPress={() => router.push({ pathname: '/scheduled', params: { conversationId: id } })}
+        style={{ marginTop: spacing.xl }}
+      />
+
+      <Button variant="danger" label={t('group.leave')} onPress={() => setLeaving(true)} style={{ marginTop: spacing.md }} />
 
       <SheetModal visible={!!target} onClose={() => setTarget(null)}>
         {target ? (

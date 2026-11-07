@@ -5,10 +5,10 @@ import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
-import { auditEvents, users, type UserRow } from '../db/schema.js';
+import { auditEvents, userTotp, users, type UserRow } from '../db/schema.js';
 import { PrivacyService } from '../privacy/privacy.service.js';
 
-function toMe(u: UserRow): Me {
+function toMe(u: UserRow, twoFactorEnabled: boolean): Me {
   return {
     id: u.id,
     handle: u.handle,
@@ -21,6 +21,7 @@ function toMe(u: UserRow): Me {
     country: u.country,
     roles: u.roles as Me['roles'],
     status: u.status,
+    twoFactorEnabled,
     createdAt: u.createdAt.toISOString(),
   };
 }
@@ -36,7 +37,12 @@ export class UsersService {
   async me(userId: string): Promise<Me> {
     const [u] = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!u) throw AppError.notFound('User not found');
-    return toMe(u);
+    return toMe(u, await this.hasTotp(userId));
+  }
+
+  private async hasTotp(userId: string): Promise<boolean> {
+    const [t] = await this.db.select({ at: userTotp.enabledAt }).from(userTotp).where(eq(userTotp.userId, userId)).limit(1);
+    return !!t?.at;
   }
 
   async updateMe(userId: string, patch: UpdateMeRequest, meta: RequestMeta): Promise<Me> {
@@ -49,7 +55,7 @@ export class UsersService {
         meta,
         metadata: { fields: Object.keys(patch) },
       });
-      return toMe(u);
+      return toMe(u, await this.hasTotp(userId));
     } catch (err) {
       const pgErr = ((err as { cause?: unknown }).cause ?? err) as { code?: string; constraint?: string };
       if (pgErr.code === '23505' && pgErr.constraint === 'users_handle_key') {

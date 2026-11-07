@@ -6,7 +6,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { ApiRequestError } from '../../../../lib/api';
 import { useI18n, type MessageKey } from '../../../../i18n';
 import { fetchOrders, fetchProducts, sk, useMyOrgs } from '../../../../seller/api';
-import { can, canReadCatalog, canViewReviews } from '../../../../seller/permissions';
+import { can, canEditProfile, canReadCatalog, canViewReviews } from '../../../../seller/permissions';
 import { Card, Chips, Loading, SectionTitle } from '../../../../seller/ui';
 import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
@@ -55,6 +55,8 @@ export default function SellerDashboard() {
     { icon: 'ticket-outline', label: 'seller.coupons', path: '/coupons', show: can(role, 'orders.manage') },
     { icon: 'star-outline', label: 'seller.reviews', path: '/reviews', show: canViewReviews(role) },
     { icon: 'wallet-outline', label: 'wallet.org.card', path: '/wallet', show: canViewFinance(role) },
+    { icon: 'location-outline', label: 'seller.location', path: '/location', show: canEditProfile(role) },
+    { icon: 'qr-code-outline', label: 'sellerQr.title', path: '/qr', show: canViewFinance(role) || can(role, 'orders.manage') },
   ];
 
   return (

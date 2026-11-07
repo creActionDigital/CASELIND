@@ -9,11 +9,13 @@ import {
   type Conversation,
   type Message,
   type PublicProfile,
-  type SystemEvent,
 } from '@caselind/contracts';
 import { api } from '../auth/auth-context';
 import type { MessageKey } from '../i18n';
 import { ApiRequestError } from '../lib/api';
+import { systemText } from './system-text';
+
+export { systemText };
 
 type T = (key: MessageKey, params?: Record<string, string | number>) => string;
 
@@ -56,23 +58,6 @@ export const createGroup = (title: string, memberIds: string[]): Promise<Convers
 export function conversationTitle(c: Pick<Conversation, 'kind' | 'title' | 'peer'>, t: T): string {
   if (c.kind === 'direct') return c.peer?.displayName ?? t('chat.unknownUser');
   return c.title ?? t('chat.group');
-}
-
-export function systemText(ev: SystemEvent, name: (userId: string | null) => string, t: T): string {
-  switch (ev.type) {
-    case 'group_created':
-      return t('chat.system.group_created', { name: name(ev.actorId) });
-    case 'member_added':
-      return t('chat.system.member_added', { name: name(ev.userId), actor: name(ev.actorId) });
-    case 'member_removed':
-      return t('chat.system.member_removed', { name: name(ev.userId), actor: name(ev.actorId) });
-    case 'member_left':
-      return t('chat.system.member_left', { name: name(ev.userId) });
-    case 'title_changed':
-      return t('chat.system.title_changed', { name: name(ev.actorId), title: ev.title ?? '' });
-    case 'disappearing_changed':
-      return t(ev.seconds ? 'chat.system.disappearing_on' : 'chat.system.disappearing_off', { name: name(ev.actorId) });
-  }
 }
 
 /** Aperçu d'un message pour la liste (jamais de contenu pour un message rappelé). */

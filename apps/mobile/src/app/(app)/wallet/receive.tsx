@@ -5,12 +5,10 @@ import { useI18n } from '../../../i18n';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Avatar, Button, Text } from '../../../ui';
+import { ProfileQrCard } from '../../../scan/ProfileQrCard';
 import { SandboxBanner } from '../../../wallet/ui';
 
-/**
- * Recevoir : @handle en grand et partage. Aucune bibliothèque QR n'est installée (ni react-native-svg, ni qrcode) :
- * le QR « profil » reste un point ouvert, sans dépendance ajoutée dans ce lot.
- */
+/** Recevoir : QR de profil (`caselind://u/<handle>`), @handle en grand et partage. */
 export default function WalletReceive() {
   const { colors } = useTheme();
   const { t } = useI18n();
@@ -27,6 +25,7 @@ export default function WalletReceive() {
           <Text variant="display" color={colors.primary} selectable accessibilityLabel={t('wallet.receive.handleLabel', { handle })} adjustsFontSizeToFit numberOfLines={1}>
             @{handle}
           </Text>
+          <ProfileQrCard handle={handle} />
           <Text muted style={{ textAlign: 'center' }}>
             {t('wallet.receive.intro')}
           </Text>

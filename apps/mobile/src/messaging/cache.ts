@@ -54,6 +54,7 @@ export function buildOptimisticMessage(input: {
     createdAt: (input.now ?? new Date()).toISOString(),
     forwarded: false,
     expiresAt: null,
+    favorited: false,
     local: 'sending',
     localUri: input.localUri,
     localMime: input.localMime,

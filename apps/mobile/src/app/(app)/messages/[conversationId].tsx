@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { Message } from '@caselind/contracts';
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -41,7 +41,20 @@ import {
   type MessagePages,
   type Outbox,
 } from '../../../messaging/cache';
+import { useExpiryTimer } from '../../../messaging/extras-hooks';
+import {
+  deleteDraft,
+  extrasKeys,
+  fetchDraft,
+  fetchScheduled,
+  saveDraft,
+  scheduleMessage,
+  setFavorite,
+} from '../../../messaging/extras-api';
+import { createDebouncer, DRAFT_DEBOUNCE_MS, shouldApplyRemoteDraft } from '../../../messaging/extras-logic';
+import { ForwardSheet } from '../../../messaging/ForwardSheet';
 import { qk } from '../../../messaging/keys';
+import { ScheduleSheet } from '../../../messaging/ScheduleSheet';
 import { MessageBubble } from '../../../messaging/MessageBubble';
 import { receiptsFromMembers, receiptStatus, type ReceiptMap } from '../../../messaging/receipts';
 import { useRealtime, useTypingUsers } from '../../../realtime/realtime-context';
@@ -54,7 +67,7 @@ const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
 /** Salon : historique inversé, envoi optimiste, accusés, saisie en cours, réponses, réactions, rappel, images. */
 export default function ChatRoom() {
-  const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
+  const { conversationId, focus } = useLocalSearchParams<{ conversationId: string; focus?: string }>();
   const id = String(conversationId);
   const { colors } = useTheme();
   const { t, locale } = useI18n();
@@ -71,6 +84,14 @@ export default function ChatRoom() {
   const [notice, setNotice] = useState<string | null>(null);
   const [focused, setFocused] = useState(true);
   const [active, setActive] = useState(AppState.currentState === 'active');
+  const [forwardId, setForwardId] = useState<string | null>(null);
+  const [scheduling, setScheduling] = useState(false);
+  const [schedBusy, setSchedBusy] = useState(false);
+  const [favOverrides, setFavOverrides] = useState<Map<string, boolean>>(() => new Map());
+  const listRef = useRef<FlatList<CachedMessage>>(null);
+  const focused_ = useRef<string | null>(null);
+  const lastSaved = useRef<string | null>(null);
+  const draftRestored = useRef(false);
 
   const conv = useQuery({ queryKey: qk.conversation(id), queryFn: () => fetchConversation(id) });
   const members = useQuery({ queryKey: qk.members(id), queryFn: () => fetchMembers(id) });
@@ -81,6 +102,13 @@ export default function ChatRoom() {
     getNextPageParam: (last) => (last.hasMore ? oldestSeq(last) : undefined),
   });
   const outboxQ = useQuery<Outbox>({ queryKey: ['outbox', id], queryFn: () => [], enabled: false, initialData: [] });
+  const draftKey = extrasKeys.draft(id);
+  const draftQ = useQuery<string | null>({
+    queryKey: draftKey,
+    queryFn: async () => (await fetchDraft(id))?.body ?? null,
+    staleTime: Infinity,
+  });
+  const scheduledQ = useQuery({ queryKey: extrasKeys.scheduled, queryFn: fetchScheduled });
   const receiptsQ = useQuery<ReceiptMap>({ queryKey: qk.receipts(id), queryFn: () => ({}), enabled: false, initialData: {} });
 
   // Initialise les positions de lecture depuis la liste des membres (sans reculer).
@@ -113,8 +141,47 @@ export default function ChatRoom() {
     return () => sub.remove();
   }, []);
 
+  // Brouillon : enregistrement anti-rebond (800 ms), vidé quand le champ l'est, flush en quittant le salon.
+  const drafter = useMemo(
+    () =>
+      createDebouncer((body: string) => {
+        if (!body.trim()) {
+          lastSaved.current = null;
+          qc.setQueryData<string | null>(draftKey, null);
+          deleteDraft(id).catch(() => undefined);
+        } else {
+          lastSaved.current = body;
+          qc.setQueryData<string | null>(draftKey, body);
+          saveDraft(id, body).catch(() => undefined);
+        }
+      }, DRAFT_DEBOUNCE_MS),
+    [id, qc, draftKey],
+  );
+  useEffect(() => () => drafter.flush(), [drafter]);
+  useEffect(() => {
+    draftRestored.current = false;
+    lastSaved.current = null;
+  }, [id]);
+  useEffect(() => {
+    if (draftQ.data === undefined) return;
+    if (!draftRestored.current) {
+      // Restauration à l'ouverture (sans écraser ce qui a déjà été tapé).
+      draftRestored.current = true;
+      lastSaved.current = draftQ.data;
+      if (draftQ.data && !text) setText(draftQ.data);
+      return;
+    }
+    // Brouillon venu d'un autre appareil (draft.updated).
+    if (shouldApplyRemoteDraft({ remote: draftQ.data, current: text, lastSaved: lastSaved.current, hasPendingSave: drafter.pending() })) {
+      lastSaved.current = draftQ.data;
+      setText(draftQ.data ?? '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftQ.data]);
+
   const data = history.data as MessagePages | undefined;
   const items = useMemo(() => displayMessages(data, outboxQ.data), [data, outboxQ.data]);
+  useExpiryTimer(id, items);
   const byId = useMemo(() => new Map(items.map((m) => [m.id, m])), [items]);
   const names = useMemo(() => new Map((members.data?.items ?? []).map((m) => [m.userId, m.displayName])), [members.data]);
   const nameOf = useCallback(
@@ -131,6 +198,7 @@ export default function ChatRoom() {
   useEffect(() => {
     if (!focused || !active || newest <= lastRead.current) return;
     lastRead.current = newest;
+    void qc.invalidateQueries({ queryKey: extrasKeys.scheduled });
     postReceipt(id, 'read', newest).then(
       (state) => qc.setQueriesData<ConversationPages>({ queryKey: qk.conversationsAll }, (d) => applyReadState(d, state)),
       () => {
@@ -138,6 +206,15 @@ export default function ChatRoom() {
       },
     );
   }, [focused, active, newest, id, qc]);
+
+  useEffect(() => {
+    if (!focus || focused_.current === focus) return;
+    const index = items.findIndex((m) => m.id === focus);
+    if (index < 0) return;
+    focused_.current = focus;
+    const handle = setTimeout(() => listRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.5 }), 150);
+    return () => clearTimeout(handle);
+  }, [focus, items]);
 
   const setOutbox = (fn: (o: Outbox | undefined) => Outbox) => qc.setQueryData<Outbox>(['outbox', id], fn);
 
@@ -175,10 +252,55 @@ export default function ChatRoom() {
     if (!body) return;
     const msg = buildOptimisticMessage({ conversationId: id, senderId: myId, clientId: uuidv4(), kind: 'text', body, replyToId: replyTo?.id });
     setText('');
+    drafter.cancel();
+    lastSaved.current = null;
+    qc.setQueryData<string | null>(draftKey, null);
     setReplyTo(null);
     setNotice(null);
     setOutbox((o) => outboxAdd(o, msg));
     void deliver(msg);
+  }
+
+  async function schedule(at: Date) {
+    const body = text.trim();
+    if (!body) return setScheduling(false);
+    setSchedBusy(true);
+    try {
+      await scheduleMessage(id, { clientId: uuidv4(), body, scheduledAt: at.toISOString(), replyToId: replyTo?.id });
+      // 202 : pas de bulle ; la ligne « Programmé pour … » vient de la liste des programmés.
+      setText('');
+      setReplyTo(null);
+      drafter.cancel();
+      lastSaved.current = null;
+      qc.setQueryData<string | null>(draftKey, null);
+      void qc.invalidateQueries({ queryKey: extrasKeys.scheduled });
+      setNotice(null);
+    } catch (err) {
+      setNotice(errorMessage(err, t, locale));
+    } finally {
+      setSchedBusy(false);
+      setScheduling(false);
+    }
+  }
+
+  function isFavorite(m: CachedMessage): boolean {
+    const override = favOverrides.get(m.id);
+    if (override !== undefined) return override;
+    if (m.favorited) return true;
+    const cached = qc.getQueryData<InfiniteData<{ items: { message: { id: string } }[] }>>(extrasKeys.favorites);
+    return !!cached?.pages.some((p) => p.items.some((f) => f.message.id === m.id));
+  }
+
+  async function toggleFavorite(m: CachedMessage) {
+    const on = !isFavorite(m);
+    setActions(null);
+    try {
+      await setFavorite(m.id, on);
+      setFavOverrides((s) => new Map(s).set(m.id, on));
+      void qc.invalidateQueries({ queryKey: extrasKeys.favorites });
+    } catch (err) {
+      setNotice(errorMessage(err, t, locale));
+    }
   }
 
   async function attach() {
@@ -253,16 +375,19 @@ export default function ChatRoom() {
     <Stack.Screen
       options={{
         title,
-        headerRight:
-          conv.data?.kind === 'group'
-            ? () => (
-                <IconButton
-                  icon="information-circle-outline"
-                  label={t('chat.groupInfo')}
-                  onPress={() => router.push({ pathname: '/group/[conversationId]', params: { conversationId: id } })}
-                />
-              )
-            : undefined,
+        headerRight: conv.data
+          ? () => (
+              <IconButton
+                icon="information-circle-outline"
+                label={conv.data.kind === 'group' ? t('chat.groupInfo') : t('messagesX.info')}
+                onPress={() =>
+                  conv.data.kind === 'group'
+                    ? router.push({ pathname: '/group/[conversationId]', params: { conversationId: id } })
+                    : router.push({ pathname: '/chat-info/[conversationId]', params: { conversationId: id } })
+                }
+              />
+            )
+          : undefined,
       }}
     />
   );
@@ -285,6 +410,7 @@ export default function ChatRoom() {
     );
   }
 
+  const mySched = (scheduledQ.data?.items ?? []).filter((s) => s.conversationId === id);
   const peerGone = conv.data.kind === 'direct' && !conv.data.peer;
   const isGroup = conv.data.kind === 'group';
   const actionsMine = !!actions && actions.senderId === myId;
@@ -293,6 +419,7 @@ export default function ChatRoom() {
     <SafeAreaView edges={['bottom']} style={[styles.flex, { backgroundColor: colors.background }]}>
       {header}
       <FlatList
+        ref={listRef}
         style={styles.flex}
         inverted
         data={items}
@@ -312,6 +439,32 @@ export default function ChatRoom() {
             />
           );
         }}
+        onScrollToIndexFailed={() => undefined}
+        ListHeaderComponent={
+          mySched.length > 0 ? (
+            <View>
+              {mySched.map((s) => (
+                <Pressable
+                  key={s.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('messagesX.schedule.at', { when: new Date(s.scheduledAt).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' }) })}, ${s.body ?? t('messagesX.scheduled.media')}`}
+                  onPress={() => router.push({ pathname: '/scheduled', params: { conversationId: id } })}
+                  style={[styles.sched, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}
+                >
+                  <Ionicons name="time-outline" size={16} color={colors.primary} />
+                  <View style={styles.flex}>
+                    <Text variant="caption" color={colors.primary}>
+                      {t('messagesX.schedule.at', { when: new Date(s.scheduledAt).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' }) })}
+                    </Text>
+                    <Text variant="small" numberOfLines={1}>
+                      {s.body ?? t('messagesX.scheduled.media')}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : undefined
+        }
         onEndReached={() => history.hasNextPage && !history.isFetchingNextPage && history.fetchNextPage()}
         onEndReachedThreshold={0.5}
         ListFooterComponent={history.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.pad} /> : undefined}
@@ -362,6 +515,7 @@ export default function ChatRoom() {
               value={text}
               onChangeText={(v) => {
                 setText(v);
+                drafter.call(v);
                 if (v) emitTyping(id);
               }}
               accessibilityLabel={t('chat.input')}
@@ -377,9 +531,27 @@ export default function ChatRoom() {
               </Text>
             ) : null}
           </View>
-          <IconButton icon="send" label={t('chat.send')} onPress={send} disabled={!text.trim()} color={colors.primary} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('chat.send')}
+            accessibilityHint={t('messagesX.schedule.hint')}
+            accessibilityState={{ disabled: !text.trim() }}
+            accessibilityActions={[{ name: 'schedule', label: t('messagesX.schedule.action') }]}
+            onAccessibilityAction={(e) => e.nativeEvent.actionName === 'schedule' && text.trim() && setScheduling(true)}
+            disabled={!text.trim()}
+            onPress={send}
+            onLongPress={() => setScheduling(true)}
+            delayLongPress={400}
+            hitSlop={4}
+            style={({ pressed }) => [styles.sendBtn, { opacity: !text.trim() ? 0.5 : pressed ? 0.6 : 1 }]}
+          >
+            <Ionicons name="send" size={24} color={colors.primary} />
+          </Pressable>
         </View>
       )}
+
+      <ForwardSheet messageId={forwardId} onClose={() => setForwardId(null)} />
+      <ScheduleSheet visible={scheduling} onClose={() => setScheduling(false)} onConfirm={schedule} busy={schedBusy} />
 
       <SheetModal visible={!!actions} onClose={() => setActions(null)}>
         {actions ? (
@@ -409,6 +581,23 @@ export default function ChatRoom() {
                   setActions(null);
                 }}
               />
+            ) : null}
+            {!actions.local && !actions.recalled && actions.kind !== 'system' ? (
+              <>
+                <Button
+                  variant="secondary"
+                  label={t('messagesX.forward')}
+                  onPress={() => {
+                    setForwardId(actions.id);
+                    setActions(null);
+                  }}
+                />
+                <Button
+                  variant="secondary"
+                  label={isFavorite(actions) ? t('messagesX.fav.remove') : t('messagesX.fav.add')}
+                  onPress={() => toggleFavorite(actions)}
+                />
+              </>
             ) : null}
             {actionsMine && !actions.local && !actions.recalled ? (
               <Button variant="secondary" label={t('chat.recall')} onPress={() => recall(actions)} />
@@ -443,6 +632,8 @@ const styles = StyleSheet.create({
   reply: { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs, padding: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   input: { minHeight: TOUCH, maxHeight: 140, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  sendBtn: { width: TOUCH, height: TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  sched: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginVertical: 2, padding: spacing.sm, borderWidth: 1, borderRadius: radius.md },
   count: { textAlign: 'right', marginTop: 2 },
   emojis: { flexDirection: 'row', justifyContent: 'space-between' },
   emoji: { width: TOUCH, height: TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },

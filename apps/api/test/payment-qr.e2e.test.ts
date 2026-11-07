@@ -306,3 +306,21 @@ describe('paying a QR', () => {
     expect(await orgBalance(m.orgId)).toBe(5_00);
   });
 });
+
+describe('re-displaying a QR', () => {
+  it('returns the same signed payload, with the creation rights; revoked or foreign QR is a 404', async () => {
+    const m = await merchant();
+    const other = await merchant();
+    const created = await createQr(m.finance, m.orgId, { currency: 'USD', amountMinor: 500 }).expect(201);
+    const url = `/v1/orgs/${m.orgId}/payment-qr/${created.body.qrId}`;
+    const got = await ctx.http.get(url).set(bearer(m.owner.token)).expect(200);
+    expect(got.body).toEqual({ payload: created.body.payload });
+    await resolve(await user(), got.body.payload).expect(200);
+    await ctx.http.get(url).set(bearer(m.employee.token)).expect(403);
+    await ctx.http.get(url).expect(401);
+    await ctx.http.get(`/v1/orgs/${other.orgId}/payment-qr/${created.body.qrId}`).set(bearer(other.owner.token)).expect(404);
+    await ctx.http.get(`/v1/orgs/${m.orgId}/payment-qr/nope`).set(bearer(m.owner.token)).expect(404);
+    await ctx.http.delete(url).set(bearer(m.owner.token)).expect(204);
+    await ctx.http.get(url).set(bearer(m.owner.token)).expect(404);
+  });
+});

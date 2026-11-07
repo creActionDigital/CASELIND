@@ -33,6 +33,7 @@ export function AppHeader() {
           <Wordmark size={17} />
         </View>
         <IconButton icon="search-outline" label={t('header.search')} onPress={() => router.push('/search')} />
+        <IconButton icon="qr-code-outline" label={t('scan.action')} onPress={() => router.push('/scan')} />
         <WalletChip />
         <IconButton
           icon="cart-outline"

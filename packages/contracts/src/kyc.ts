@@ -166,6 +166,9 @@ export const createdPaymentQrSchema = paymentQrSchema.extend({
 });
 export type CreatedPaymentQr = z.infer<typeof createdPaymentQrSchema>;
 
+export const qrPayloadResponseSchema = z.object({ payload: z.string() });
+export type QrPayloadResponse = z.infer<typeof qrPayloadResponseSchema>;
+
 export const paymentQrListSchema = z.object({
   items: z.array(paymentQrSchema),
   nextCursor: z.string().nullable(),

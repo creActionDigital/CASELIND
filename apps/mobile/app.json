@@ -26,6 +26,12 @@
       "expo-secure-store",
       "expo-notifications",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CASELIND utilise votre position pour afficher les boutiques proches et placer votre boutique. Elle reste sur votre appareil."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "CASELIND accède à vos photos pour joindre des images à vos messages."
@@ -39,7 +45,13 @@
           "imageWidth": 76
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CASELIND utilise la caméra pour scanner des codes QR (paiement, connexion web, profil)."
+        }
+      ]
     ],
     "experiments": {}
   }

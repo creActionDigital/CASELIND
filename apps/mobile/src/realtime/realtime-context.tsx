@@ -20,6 +20,7 @@ import {
   type ConversationPages,
   type MessagePages,
 } from '../messaging/cache';
+import { extrasKeys } from '../messaging/extras-api';
 import { qk } from '../messaging/keys';
 import { mergeReceipt, type ReceiptMap } from '../messaging/receipts';
 import { createRealtimeSocket, isUnauthenticated } from './socket';
@@ -131,6 +132,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     };
     s.on('conversation.member_added', membership);
     s.on('conversation.member_removed', membership);
+    // Brouillon modifié depuis un autre appareil (ou écho du nôtre) : le salon décide s'il l'applique.
+    s.on('draft.updated', (raw: unknown) => {
+      const ev = raw as { conversationId?: unknown; body?: unknown } | null;
+      if (!ev || typeof ev.conversationId !== 'string') return;
+      const body = typeof ev.body === 'string' && ev.body.length > 0 ? ev.body : null;
+      queryClient.setQueryData<string | null>(extrasKeys.draft(ev.conversationId), body);
+    });
     s.on('notification.new', (raw: unknown) => {
       if (!notificationSchema.safeParse(raw).success) return;
       void queryClient.invalidateQueries({ queryKey: qk.notifications });

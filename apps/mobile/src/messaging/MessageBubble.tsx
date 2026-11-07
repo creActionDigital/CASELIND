@@ -39,13 +39,15 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
   const fg = m.recalled ? colors.textMuted : mine ? colors.onPrimary : colors.text;
   const time = new Date(m.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const statusLabel = status ? t(`chat.status.${status}`) : '';
+  const fwd = m.forwarded && !m.recalled;
+  const expiry = m.expiresAt && !m.recalled ? new Date(m.expiresAt).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' }) : '';
   const summary = m.recalled ? t('chat.recalled') : m.kind === 'media' ? t('chat.photo') : (m.body ?? '');
 
   return (
     <View style={[styles.wrap, mine ? styles.right : styles.left]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${senderName ? senderName + ', ' : ''}${summary}, ${time}${statusLabel ? ', ' + statusLabel : ''}`}
+        accessibilityLabel={`${senderName ? senderName + ', ' : ''}${fwd ? t('messagesX.forwarded') + ', ' : ''}${summary}, ${time}${statusLabel ? ', ' + statusLabel : ''}${expiry ? ', ' + t('messagesX.timer', { when: expiry }) : ''}`}
         accessibilityHint={t('chat.bubbleHint')}
         onLongPress={() => onLongPress(m)}
         delayLongPress={300}
@@ -55,6 +57,14 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
           <Text variant="caption" color={colors.primary} style={styles.sender}>
             {senderName}
           </Text>
+        ) : null}
+        {fwd ? (
+          <View style={styles.fwd}>
+            <Ionicons name="arrow-redo-outline" size={12} color={mine ? colors.onPrimary : colors.textMuted} />
+            <Text variant="caption" color={mine ? colors.onPrimary : colors.textMuted} style={styles.italic}>
+              {t('messagesX.forwarded')}
+            </Text>
+          </View>
         ) : null}
         {m.replyToId ? (
           <View style={[styles.quote, { borderLeftColor: colors.primary, backgroundColor: colors.primarySoft }]}>
@@ -89,6 +99,9 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
           </View>
         ) : null}
         <View style={styles.meta}>
+          {expiry ? (
+            <Ionicons name="timer-outline" size={13} color={mine ? colors.onPrimary : colors.textMuted} accessibilityLabel={t('messagesX.timer', { when: expiry })} />
+          ) : null}
           <Text variant="caption" color={mine && !m.recalled ? colors.onPrimary : colors.textMuted}>
             {time}
           </Text>
@@ -128,6 +141,7 @@ const styles = StyleSheet.create({
   left: { alignItems: 'flex-start' },
   bubble: { maxWidth: '82%', minHeight: TOUCH - 8, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
   sender: { fontWeight: '700' },
+  fwd: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   quote: { borderLeftWidth: 3, borderRadius: radius.sm, padding: spacing.xs },
   italic: { fontStyle: 'italic' },
   image: { width: 220, height: 220 },

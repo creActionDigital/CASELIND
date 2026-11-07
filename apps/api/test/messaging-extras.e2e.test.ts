@@ -394,3 +394,24 @@ describe('drafts', () => {
     await ctx.http.get(url(dm)).set(bearer(b.token)).expect(404);
   });
 });
+
+describe('per-caller flags on messages and conversations', () => {
+  it('reports favorited on the message page and the draft on the conversation list', async () => {
+    const [a, b] = [await user(), await user()];
+    const dm = await direct(a, b);
+    const m1 = (await send(b, dm, { body: 'un' }).expect(201)).body.id as string;
+    const m2 = (await send(b, dm, { body: 'deux' }).expect(201)).body.id as string;
+    await ctx.http.put(`/v1/messages/${m1}/favorite`).set(bearer(a.token)).expect(204);
+    const flags = (u: TU) =>
+      messagesOf(u, dm).then((r) => Object.fromEntries(r.body.items.map((i: { id: string; favorited: boolean }) => [i.id, i.favorited])));
+    expect(await flags(a)).toEqual({ [m1]: true, [m2]: false });
+    expect(await flags(b)).toEqual({ [m1]: false, [m2]: false });
+
+    const list = (u: TU) => ctx.http.get('/v1/conversations').set(bearer(u.token)).expect(200);
+    expect((await list(a)).body.items[0].draft).toBeNull();
+    await ctx.http.put(`/v1/conversations/${dm}/draft`).set(bearer(a.token)).send({ body: 'brouillon' }).expect(200);
+    const withDraft = (await list(a)).body.items[0].draft;
+    expect(withDraft).toEqual({ body: 'brouillon', updatedAt: expect.any(String) });
+    expect((await list(b)).body.items[0].draft).toBeNull();
+  });
+});

@@ -39,6 +39,7 @@ function msg(over: Partial<Message>): Message {
     createdAt: '2026-01-01T00:00:00.000Z',
     forwarded: false,
     expiresAt: null,
+    favorited: false,
     ...over,
   };
 }
@@ -113,6 +114,7 @@ function conv(over: Partial<Conversation>): Conversation {
     lastActivityAt: '2026-01-01T00:00:00.000Z',
     createdAt: '2026-01-01T00:00:00.000Z',
     disappearingSeconds: null,
+    draft: null,
     ...over,
   };
 }

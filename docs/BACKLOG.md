@@ -39,6 +39,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | M1b — Reste | Contacts et QR, messages vocaux, recherche, archive, avatars réels, persistance de la langue, compte Expo/EAS pour le push réel | planifié |
 | M3 — Commerce | Boutique, fiche produit, panier, commande (paiement à la livraison), suivi, avis ; espace vendeur (produits, stock, commandes, coupons, avis) | **testé** (unitaires + parcours d'achat Expo web contre l'API réelle) ; espace vendeur non exercé à l'écran |
 | M4a — Wallet | Wallet sandbox, envoi avec PIN, recharge de test, wallet d'organisation | **testé** (unitaires + parcours Expo web) |
+| M5 — Recherche, lieux, QR, sécurité | Recherche, Maps (liste par distance), scanner et paiement QR, QR vendeur et profil, 2FA, KYC, changement d'identifiant, compléments de messagerie | **testé** (unitaires + parcours recherche, lieux, paiement QR sur Expo web) |
 | M2 — Social | Fil, publications, commentaires, profils, Stories, signalements ; design Apple (ADR-016) | **testé** (unitaires + parcours Expo web contre l'API réelle) |
 
 ## Décisions attendues du propriétaire (bloquantes seulement pour leur module)

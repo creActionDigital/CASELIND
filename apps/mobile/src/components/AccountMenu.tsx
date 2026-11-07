@@ -12,7 +12,7 @@ import { Avatar, Badge, Button, Text } from '../ui';
 import { SheetModal } from './SheetModal';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
-type Path = '/profile' | '/sessions' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/wallet/pin' | '/orders' | '/seller' | '/seller/new';
+type Path = '/profile' | '/sessions' | '/security/2fa' | '/security/identifier' | '/kyc' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/seller' | '/seller/new';
 
 /** Menu Compte : MyProfile, Sessions, Confidentialité, Langue, Déconnexion (avec confirmation). */
 export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -47,11 +47,20 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
     },
     { icon: 'notifications-outline', label: t('account.notifications'), path: '/notifications' },
     { icon: 'options-outline', label: t('account.notificationPreferences'), path: '/notification-preferences' },
-    { icon: 'phone-portrait-outline', label: t('account.sessions'), path: '/sessions' },
     { icon: 'shield-checkmark-outline', label: t('account.privacy'), path: '/privacy' },
-    { icon: 'keypad-outline', label: t('account.paymentSecurity'), path: '/wallet/pin' },
     { icon: 'flag-outline', label: t('report.mine.title'), path: '/my-reports' },
+    { icon: 'star-outline', label: t('messagesX.fav.title'), path: '/favorites' },
+    { icon: 'time-outline', label: t('messagesX.scheduled.menu'), path: '/scheduled' },
     { icon: 'language-outline', label: t('account.language'), path: '/language' },
+  ];
+
+  // Section « Sécurité » : sessions, double authentification, identifiant, PIN de paiement, vérification d'identité.
+  const securityItems: { icon: Icon; label: string; path: Path }[] = [
+    { icon: 'phone-portrait-outline', label: t('account.sessions'), path: '/sessions' },
+    { icon: 'lock-closed-outline', label: t('security.2fa.title'), path: '/security/2fa' },
+    { icon: 'swap-horizontal-outline', label: t('security.identifier.title'), path: '/security/identifier' },
+    { icon: 'keypad-outline', label: t('account.paymentSecurity'), path: '/wallet/pin' },
+    { icon: 'id-card-outline', label: t('kyc.title'), path: '/kyc' },
   ];
 
   return (
@@ -97,6 +106,16 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
               <Ionicons name={it.icon} size={22} color={colors.primary} />
               <Text style={{ flex: 1 }}>{it.label}</Text>
               {it.path === '/notifications' && unread > 0 ? <Badge label={unread > 99 ? '99+' : String(unread)} /> : null}
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+          ))}
+          <Text variant="small" muted accessibilityRole="header" style={{ marginTop: spacing.md }}>
+            {t('security.menu.section')}
+          </Text>
+          {securityItems.map((it) => (
+            <Pressable key={it.path} accessibilityRole="button" accessibilityLabel={it.label} onPress={() => go(it.path)} style={styles.item}>
+              <Ionicons name={it.icon} size={22} color={colors.primary} />
+              <Text style={{ flex: 1 }}>{it.label}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
           ))}

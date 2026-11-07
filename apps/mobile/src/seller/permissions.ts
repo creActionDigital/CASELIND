@@ -44,3 +44,8 @@ export function canViewReviews(role: OrgRole | undefined): boolean {
 export function hasSellerAccess(role: OrgRole | undefined): boolean {
   return can(role, 'catalog.manage') || can(role, 'orders.view') || can(role, 'inventory.manage');
 }
+
+/** Emplacement de la boutique : permission `org.profile.edit` (propriétaire et administrateur). */
+export function canEditProfile(role: OrgRole | undefined): boolean {
+  return role === 'owner' || role === 'admin';
+}

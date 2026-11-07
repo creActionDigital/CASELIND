@@ -67,6 +67,8 @@ export const messageSchema = z.object({
   forwarded: z.boolean(),
   /** Lot 3b: when a disappearing message stops being served; null = permanent. */
   expiresAt: z.iso.datetime().nullable(),
+  /** The caller has favourited this message; always false in realtime events (not per-user). */
+  favorited: z.boolean(),
 });
 export type Message = z.infer<typeof messageSchema>;
 
@@ -130,6 +132,8 @@ export const conversationSchema = z.object({
   archived: z.boolean(),
   /** Lot 3b: lifetime of new messages in seconds (86400, 604800, 7776000); null = permanent. */
   disappearingSeconds: z.number().int().nullable(),
+  /** The caller's unsent draft in this conversation, or null. */
+  draft: z.object({ body: z.string(), updatedAt: z.iso.datetime() }).nullable(),
   lastActivityAt: z.iso.datetime(),
   createdAt: z.iso.datetime(),
 });

@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   type OrgLocation,
   type PlaceList,
@@ -25,6 +26,13 @@ export class PlacesController {
   @Get('places')
   nearby(@CurrentUser() user: AuthUser, @Query(new ZodPipe(placesQuerySchema)) query: PlacesQuery): Promise<PlaceList> {
     return this.places.nearby(user.userId, query);
+  }
+
+  @Get('orgs/:orgId/location')
+  @OrgPermission('org.view')
+  async get(@CurrentMembership() m: OrgMembership, @Res() res: Response): Promise<void> {
+    // Nest sends an empty body for null: answer the literal JSON `null` so clients can parse it.
+    res.json(await this.places.getLocation(m.orgId));
   }
 
   @Post('orgs/:orgId/location')

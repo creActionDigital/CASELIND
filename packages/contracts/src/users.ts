@@ -21,6 +21,7 @@ export const meSchema = z.object({
   country: z.string().nullable(),
   roles: z.array(platformRoleSchema),
   status: z.enum(['pending_verification', 'active', 'suspended', 'deleted']),
+  twoFactorEnabled: z.boolean(),
   createdAt: z.iso.datetime(),
 });
 export type Me = z.infer<typeof meSchema>;

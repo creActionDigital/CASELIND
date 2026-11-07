@@ -86,7 +86,7 @@ export class MessagesService {
   /** Real-time event and push, after the commit; neither can make the request fail. */
   async afterSend(senderId: string, conversation: ConversationRow, row: MessageRow, message: Message): Promise<void> {
     try {
-      this.realtime.emitToConversation(conversation.id, 'message.new', { ...message, myReaction: null });
+      this.realtime.emitToConversation(conversation.id, 'message.new', { ...message, myReaction: null, favorited: false });
       const recipients = await this.db.execute<{ user_id: string; muted: boolean }>(sql`
         SELECT cm.user_id, (cm.muted_until IS NOT NULL AND cm.muted_until > now()) AS muted
         FROM conversation_members cm

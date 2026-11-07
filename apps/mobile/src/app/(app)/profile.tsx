@@ -8,6 +8,7 @@ import { ApiRequestError } from '../../lib/api';
 import { errorMessage } from '../../lib/errors';
 import { spacing } from '../../theme/tokens';
 import { Avatar, Button, Screen, Text, TextField } from '../../ui';
+import { ProfileQrCard } from '../../scan/ProfileQrCard';
 
 /** MyProfile : GET/PATCH /v1/me. Les données viennent du contexte d'auth (chargées par GET /me). */
 export default function Profile() {
@@ -58,6 +59,9 @@ export default function Profile() {
         <Text variant="small" muted>
           {t('profile.phone')} : {me.phone ?? t('profile.none')}
         </Text>
+      </View>
+      <View style={{ marginBottom: spacing.xl }}>
+        <ProfileQrCard handle={me.handle} size={160} />
       </View>
       <FormError message={error} />
       <TextField label={t('field.displayName')} value={displayName} onChangeText={setDisplayName} maxLength={80} />

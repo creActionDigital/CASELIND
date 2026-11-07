@@ -10,6 +10,7 @@ import {
   conversations,
   mediaAssets,
   type MessageRow,
+  messageFavorites,
   messageReactions,
   messages,
 } from '../db/schema.js';
@@ -140,6 +141,14 @@ export async function loadMessages(exec: Exec, rows: MessageRow[], viewerId: str
     .select({ messageId: messageReactions.messageId, userId: messageReactions.userId, emoji: messageReactions.emoji })
     .from(messageReactions)
     .where(inArray(messageReactions.messageId, ids));
+  const favRows =
+    viewerId === null
+      ? []
+      : await exec
+          .select({ messageId: messageFavorites.messageId })
+          .from(messageFavorites)
+          .where(and(eq(messageFavorites.userId, viewerId), inArray(messageFavorites.messageId, ids)));
+  const favorited = new Set(favRows.map((f) => f.messageId));
   const byMessage = new Map<string, { counts: Map<string, number>; mine: string | null }>();
   for (const r of reactionRows) {
     const entry = byMessage.get(r.messageId) ?? { counts: new Map(), mine: null };
@@ -177,6 +186,7 @@ export async function loadMessages(exec: Exec, rows: MessageRow[], viewerId: str
       createdAt: row.createdAt.toISOString(),
       forwarded: row.forwarded,
       expiresAt: row.expiresAt?.toISOString() ?? null,
+      favorited: favorited.has(row.id),
     };
   });
 }

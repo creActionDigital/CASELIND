@@ -11,6 +11,7 @@ import { SheetModal } from './SheetModal';
 type Icon = ComponentProps<typeof Ionicons>['name'];
 
 const ACTIONS: { key: MessageKey; icon: Icon }[] = [
+  { key: 'scan.action', icon: 'qr-code-outline' },
   { key: 'publish.post', icon: 'create-outline' },
   { key: 'publish.story', icon: 'aperture-outline' },
   { key: 'publish.video', icon: 'videocam-outline' },
@@ -21,6 +22,7 @@ const ACTIONS: { key: MessageKey; icon: Icon }[] = [
 
 /** Actions déjà actives : touche -> route. Les autres restent « bientôt ». */
 const ROUTES: Partial<Record<MessageKey, string>> = {
+  'scan.action': '/scan',
   'publish.story': '/story/new',
   'publish.post': '/compose?mode=post',
   'publish.video': '/compose?mode=video',

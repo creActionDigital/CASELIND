@@ -10,6 +10,7 @@ import {
   type PayQrResponse,
   type PaymentQrList,
   type QrPayloadRequest,
+  type QrPayloadResponse,
   qrPayloadSchema,
   type ResolvedPaymentQr,
 } from '@caselind/contracts';
@@ -45,6 +46,13 @@ export class OrgPaymentQrController {
   @OrgPermission('org.view')
   list(@CurrentMembership() m: OrgMembership, @Query(new ZodPipe(pageQuerySchema)) q: PageQuery): Promise<PaymentQrList> {
     return this.qr.list(m, q);
+  }
+
+  @Get(':qrId')
+  @OrgPermission('org.view')
+  payload(@CurrentMembership() m: OrgMembership, @Param('qrId') qrId: string): Promise<QrPayloadResponse> {
+    if (!UUID_RE.test(qrId)) throw AppError.notFound('QR code not found');
+    return this.qr.payloadOf(m, qrId);
   }
 
   @Delete(':qrId')

@@ -9,17 +9,23 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform } from 'react-native';
+import { z } from 'zod';
 import { isLocale, useI18n } from '../i18n';
 import { ApiRequestError, createApiClient } from '../lib/api';
 import { API_URL } from '../lib/config';
 import { clearRefreshToken, getRefreshToken, setRefreshToken } from '../lib/token-store';
+import { classifyLogin } from '../security/login-response';
+
+export type SignInResult = { twoFactorRequired: true; challengeId: string } | null;
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
 interface AuthValue {
   status: AuthStatus;
   me: Me | null;
-  signIn(identifier: string, password: string): Promise<void>;
+  /** Renvoie le défi de double authentification quand le compte en a une, sinon se connecte. */
+  signIn(identifier: string, password: string): Promise<SignInResult>;
+  verifyTwoFactor(challengeId: string, factor: { code: string } | { backupCode: string }): Promise<void>;
   register(input: { identifier: string; password: string; displayName: string }): Promise<ChallengeResponse>;
   verifyOtp(challengeId: string, code: string): Promise<void>;
   resendOtp(challengeId: string): Promise<ChallengeResponse>;
@@ -100,6 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled && !(err instanceof ApiRequestError && err.status !== 0 && err.status < 500)) {
           setStatus('signedOut');
         }
+        // Toute autre erreur (réponse non conforme au contrat, 4xx déjà traité ailleurs) ne doit jamais
+        // laisser l'application bloquée sur l'écran de chargement.
+        if (!cancelled) setStatus((s) => (s === 'loading' ? 'signedOut' : s));
       }
     })();
     return () => {
@@ -122,9 +131,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       me,
       setMe: setMeState,
       async signIn(identifier, password) {
-        const pair = await api.request('/auth/login', {
+        const raw = await api.request('/auth/login', {
           method: 'POST',
           body: { identifier: identifier.trim(), password, device },
+          schema: z.unknown(),
+          auth: false,
+        });
+        const outcome = classifyLogin(raw);
+        if (!outcome) throw new ApiRequestError(200, 'invalid_response', 'Response does not match the contract');
+        if (outcome.kind === 'twoFactor') return { twoFactorRequired: true, challengeId: outcome.challengeId };
+        await acceptTokens(outcome.pair);
+        return null;
+      },
+      async verifyTwoFactor(challengeId, factor) {
+        const pair = await api.request('/auth/2fa/verify', {
+          method: 'POST',
+          body: { challengeId, ...factor, device },
           schema: tokenPairSchema,
           auth: false,
         });

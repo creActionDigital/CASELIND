@@ -9,7 +9,7 @@ import {
   type PublicOrg,
   type UpdateOrgRequest,
 } from '@caselind/contracts';
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
@@ -40,7 +40,16 @@ function sameValue(field: (typeof VERIFICATION_SENSITIVE_FIELDS)[number], a: str
   return a === b;
 }
 
-export function toOrg(o: OrganizationRow): Org {
+export type OrgLocationValue = NonNullable<Org['location']>;
+
+/** lat/lng live outside the Drizzle mirror (migration 0016): read them with raw SQL. */
+export async function readOrgLocation(db: Db | Tx, orgId: string): Promise<OrgLocationValue | null> {
+  const res = await db.execute(sql`SELECT lat, lng, location_label FROM organizations WHERE id = ${orgId}::uuid`);
+  const r = res.rows[0] as { lat: number | null; lng: number | null; location_label: string | null } | undefined;
+  return r && r.lat !== null && r.lng !== null ? { lat: r.lat, lng: r.lng, label: r.location_label } : null;
+}
+
+export function toOrg(o: OrganizationRow, location: OrgLocationValue | null = null): Org {
   return {
     id: o.id,
     slug: o.slug,
@@ -61,6 +70,7 @@ export function toOrg(o: OrganizationRow): Org {
     verificationStatus: o.verificationStatus,
     supportUserId: o.supportUserId,
     createdBy: o.createdBy,
+    location,
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
   };
@@ -156,7 +166,7 @@ export class OrgsService {
   async get(orgId: string): Promise<Org> {
     const [org] = await this.db.select().from(organizations).where(eq(organizations.id, orgId)).limit(1);
     if (!org) throw orgNotFound();
-    return toOrg(org);
+    return toOrg(org, await readOrgLocation(this.db, orgId));
   }
 
   /**
@@ -206,7 +216,7 @@ export class OrgsService {
         },
         tx,
       );
-      return toOrg(org);
+      return toOrg(org, await readOrgLocation(tx, orgId));
     });
   }
 
