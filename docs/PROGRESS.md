@@ -23,7 +23,7 @@ Jusqu'à 7 agents en parallèle sur des fichiers disjoints (demande du propriét
 
 ### Limites et décisions ouvertes
 - Aucun argent réel : FlexPay (Q5) à contracter. Envoi des OTP réels : comptes Brevo et Meta à créer (Q2).
-- À trancher : exiger le second facteur pour changer d'identifiant (recommandé) ; délai de `password/forgot` qui distingue un compte connu.
+- Décidé (ADR-020) : pas de second facteur pour changer d'identifiant. À traiter : délai de `password/forgot` qui distingue un compte connu.
 - Non exercés à l'écran : espace vendeur, wallet d'organisation, recherche (pas encore d'écran mobile), 2FA (pas d'écran mobile).
 - La notification « Nouvelle connexion » affiche « other » comme appareil quand le client ne fournit pas de nom.
 
