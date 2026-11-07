@@ -18,6 +18,9 @@ import { contentUrlOf } from '../media/media.service.js';
 /** The query surface shared by the pool-backed database and a transaction. */
 export type Exec = Pick<Db, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
 
+/** SQL predicate: the message of alias `m` has not expired (disappearing messages are never served past expires_at). */
+export const NOT_EXPIRED_M = sql`(m.expires_at IS NULL OR m.expires_at > now())`;
+
 /** Any syntactically valid UUID (what Postgres accepts); anything else cannot name a row. */
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -172,6 +175,8 @@ export async function loadMessages(exec: Exec, rows: MessageRow[], viewerId: str
       reactions: recalled || !reactions ? [] : [...reactions.counts].map(([emoji, count]) => ({ emoji, count })),
       myReaction: recalled ? null : (reactions?.mine ?? null),
       createdAt: row.createdAt.toISOString(),
+      forwarded: row.forwarded,
+      expiresAt: row.expiresAt?.toISOString() ?? null,
     };
   });
 }

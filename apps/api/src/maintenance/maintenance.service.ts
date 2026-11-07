@@ -7,6 +7,7 @@ import { DB, type Db, PG_POOL } from '../db/db.module.js';
 import { auditEvents, orgMembers, otpChallenges, refreshTokens, sessions, userBlocks } from '../db/schema.js';
 import { contentUrlOf, MediaService } from '../media/media.service.js';
 import { MediaStorage } from '../media/storage.js';
+import { reconcile } from '../ledger/ledger.queries.js';
 
 /** Media of deleted accounts removed per maintenance run (files first, then rows); the rest waits for the next run. */
 const DELETED_USER_MEDIA_BATCH = 500;
@@ -114,6 +115,10 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         };
         // Lot 4B: not part of the result shape; logged only.
         await this.purgeOldStoryViews(now);
+        // Lot 3b: disappearing messages past their expiry lose body and media, like a recall.
+        await this.wipeExpiredMessages(now);
+        // Lot 6A: hourly ledger reconciliation; any divergence is logged as an error.
+        await this.reconcileLedger();
         this.logger.log(
           `maintenance done: otpChallenges=${result.otpChallenges} refreshTokens=${result.refreshTokens} sessions=${result.sessions} deletedAccounts=${result.deletedAccounts} staleUploads=${result.staleUploads} deletedUserMedia=${result.deletedUserMedia}`,
         );
@@ -127,6 +132,40 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       // Destroy the connection if the unlock failed so the lock cannot leak back into the pool.
       lockClient.release(unlockFailed);
     }
+  }
+
+  /** Compares cached balances with the postings; logs every divergence (never throws). */
+  private async reconcileLedger(): Promise<void> {
+    try {
+      const r = await reconcile(this.db);
+      if (!r.ok) {
+        this.logger.error(
+          `ledger reconciliation FAILED: ${r.divergences.length} account divergence(s) ${JSON.stringify(r.divergences)}, currency totals ${JSON.stringify(r.currencyTotals)}`,
+        );
+      }
+    } catch (err) {
+      this.logger.error('ledger reconciliation could not run', err instanceof Error ? err.stack : String(err));
+    }
+  }
+
+  /** Lot 3b: body, media and mentions of expired messages are erased (the rows stay so numbering holds); reactions and favourites go. */
+  private async wipeExpiredMessages(now: Date): Promise<number> {
+    const res = await this.db.execute<{ id: string }>(sql`
+      UPDATE messages SET body = NULL, media_id = NULL, mentions = '{}'
+      WHERE expires_at IS NOT NULL AND expires_at <= ${now.toISOString()}::timestamptz
+        AND (body IS NOT NULL OR media_id IS NOT NULL OR cardinality(mentions) > 0)
+      RETURNING id`);
+    const ids = res.rows.map((r) => r.id);
+    if (ids.length > 0) {
+      const arr = sql`ARRAY[${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `,
+      )}]::uuid[]`;
+      await this.db.execute(sql`DELETE FROM message_reactions WHERE message_id = ANY(${arr})`);
+      await this.db.execute(sql`DELETE FROM message_favorites WHERE message_id = ANY(${arr})`);
+      this.logger.log(`maintenance: ${ids.length} expired messages erased`);
+    }
+    return ids.length;
   }
 
   /** Views of stories that expired more than 30 days ago (the stories stay in their author's archive). */
@@ -143,6 +182,12 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
   private async purgeOtpChallenges(now: Date): Promise<number> {
     const cutoff = new Date(now.getTime() - DAY_MS);
     const res = await this.db.delete(otpChallenges).where(lt(otpChallenges.expiresAt, cutoff));
+    // Lot 1c: expired 2FA login challenges and QR login sessions follow the same retention.
+    const extra = await this.db.execute(sql`
+      WITH a AS (DELETE FROM two_factor_challenges WHERE expires_at < ${cutoff.toISOString()}::timestamptz RETURNING 1),
+           b AS (DELETE FROM qr_login_sessions WHERE expires_at < ${cutoff.toISOString()}::timestamptz RETURNING 1)
+      SELECT (SELECT count(*) FROM a)::int AS a, (SELECT count(*) FROM b)::int AS b`);
+    void extra;
     return res.rowCount ?? 0;
   }
 
@@ -254,6 +299,10 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         WHERE user_id = ANY(${idArray}) AND status = 'active'`);
       await tx.execute(sql`UPDATE messages SET body = NULL, media_id = NULL WHERE sender_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM message_reactions WHERE user_id = ANY(${idArray})`);
+      // Lot 3b: favourites, drafts and scheduled messages of the account.
+      await tx.execute(sql`DELETE FROM message_favorites WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM conversation_drafts WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM scheduled_messages WHERE sender_id = ANY(${idArray})`);
       await tx.execute(sql`
         UPDATE conversation_members cm SET role = 'owner'
         WHERE (cm.conversation_id, cm.user_id) IN (
@@ -287,14 +336,30 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       await tx.execute(sql`UPDATE reports SET reporter_id = NULL, details = NULL WHERE reporter_id = ANY(${idArray})`);
       // Social (lot 4A): follows and reactions are dropped, posts and comments are deleted.
       await tx.execute(sql`DELETE FROM follows WHERE follower_id = ANY(${idArray}) OR followee_id = ANY(${idArray})`);
+      // Lot 7: search history and its setting are personal data.
+      await tx.execute(sql`DELETE FROM search_history WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM search_settings WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM post_reactions WHERE user_id = ANY(${idArray})`);
       // Commerce (lot 5B): the cart and the reviews go; orders stay for the seller accounting with the address erased.
       await tx.execute(sql`DELETE FROM cart_items WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM reviews WHERE user_id = ANY(${idArray})`);
+      // Ledger (lot 6A): postings are append-only and kept (retention); the user's accounts are frozen, never deleted.
+      // A non-zero sandbox balance left on them is reported by the reconciliation/back-office, not erased.
+      await tx.execute(sql`UPDATE ledger_accounts SET status = 'frozen' WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`UPDATE orders SET address = NULL, address_anonymized_at = now() WHERE buyer_id = ANY(${idArray}) AND address IS NOT NULL`);
       // Posts and comments are erased for good (bodies included; reactions, media links and replies cascade).
       await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM posts WHERE author_id = ANY(${idArray})`);
+      // KYC and payment PIN (lot 6B): declared identity, encrypted number and PIN go; the decisions stay in the audit trail.
+      // The identity files are media rows of the user, removed with the rest by purgeDeletedUsersMedia.
+      await tx.execute(sql`DELETE FROM kyc_submissions WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM kyc_profiles WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM payment_pins WHERE user_id = ANY(${idArray})`);
+      // Lot 1c: TOTP secret, backup codes, pending 2FA challenges and QR approvals go with the account.
+      await tx.execute(sql`DELETE FROM user_totp WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM user_backup_codes WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM two_factor_challenges WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM qr_login_sessions WHERE approved_by = ANY(${idArray})`);
       await tx.delete(sessions).where(inArray(sessions.userId, ids));
       await tx.delete(otpChallenges).where(inArray(otpChallenges.userId, ids));
       await tx.delete(userBlocks).where(or(inArray(userBlocks.blockerId, ids), inArray(userBlocks.blockedId, ids)));

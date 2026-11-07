@@ -4,6 +4,19 @@ import { z } from 'zod';
 
 const MIB = 1024 * 1024;
 
+/** Hex when the string is hex, base64 otherwise. */
+export function decodeKeyMaterial(v: string): Buffer {
+  return /^(?:[0-9a-f]{2})+$/i.test(v) ? Buffer.from(v, 'hex') : Buffer.from(v, 'base64');
+}
+
+const kycTierLimitsSchema = z.object({
+  maxBalanceMinor: z.number().int().min(0),
+  maxSingleTransferMinor: z.number().int().min(0),
+  maxDailyOutgoingMinor: z.number().int().min(0),
+});
+const kycLimitsOverrideSchema = z.record(z.string().regex(/^[A-Z]{3}$/), z.record(z.enum(['0', '1', '2']), kycTierLimitsSchema));
+export type KycLimitsOverride = z.infer<typeof kycLimitsOverrideSchema>;
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -15,8 +28,22 @@ const envSchema = z
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
     OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(1800).default(600),
     OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(0).max(600).default(60),
-    /** console = codes written to the server log; only allowed outside production. */
+    /** Alias kept for compatibility: `console` is the default of both channels below. */
     OTP_PROVIDER: z.enum(['console']).default('console'),
+    /** e-mail codes: `brevo` (transactional API) or `console` (server log, never in production). */
+    OTP_EMAIL_PROVIDER: z.enum(['brevo', 'console']).optional(),
+    /** phone codes: `whatsapp` (Cloud API authentication template) or `console` (never in production). */
+    OTP_PHONE_PROVIDER: z.enum(['whatsapp', 'console']).optional(),
+    BREVO_API_KEY: z.string().min(1).optional(),
+    /** Verified sender address of the e-mail codes (Brevo sender or domain). */
+    OTP_EMAIL_FROM: z.string().email().optional(),
+    OTP_EMAIL_FROM_NAME: z.string().min(1).default('CASELIND'),
+    WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
+    WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+    /** Name of the approved WhatsApp authentication template. */
+    WHATSAPP_OTP_TEMPLATE: z.string().min(1).optional(),
+    WHATSAPP_TEMPLATE_LANG: z.string().min(2).default('fr'),
+    WHATSAPP_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/, 'WHATSAPP_GRAPH_VERSION looks like v21.0').default('v21.0'),
     LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(20).default(5),
     LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(120),
@@ -65,6 +92,8 @@ const envSchema = z
     STORY_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     /** Lot 4B: per-client budget for filing reports (the create route only). */
     REPORTS_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(10),
+    /** Lot 7: per-client budget for GET /v1/search (each call runs up to four queries). */
+    SEARCH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(60),
     /** Push provider: `log` only journals (nothing is delivered), `expo` calls the Expo Push API. */
     PUSH_PROVIDER: z.enum(['expo', 'log']).default('log'),
     EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
@@ -78,18 +107,100 @@ const envSchema = z
       .default('USD,CDF')
       .transform((v) => v.split(',').map((c) => c.trim().toUpperCase()).filter((c) => c.length > 0))
       .refine((a) => a.length > 0 && a.every((c) => /^[A-Z]{3}$/.test(c)), 'COMMERCE_CURRENCIES must be a list of ISO 4217 codes'),
+    /** Lot 6A: max sandbox top-up per request, in USD minor units (other currencies scale by a rough rate). */
+    WALLET_SANDBOX_TOPUP_MAX_MINOR: z.coerce.number().int().min(1).default(100_00),
+    /** Lot 6A: sandbox top-up is always allowed outside production; in production only when this is `true`. */
+    WALLET_SANDBOX_TOPUP_ENABLED: z.enum(['true', 'false']).optional(),
     /** How long after sending the author may recall a message for everyone (409 afterwards). */
     MESSAGE_RECALL_WINDOW_SECONDS: z.coerce.number().int().min(0).max(86400).default(120),
+    /** Lot 3b: false = the minute job that sends scheduled messages is not started on this instance. */
+    MESSAGING_SCHEDULER_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    /**
+     * Lot 6B: key encrypting identity document numbers (AES-256-GCM). Hex or base64 of at least 32 bytes
+     * (generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"). Required in
+     * production; elsewhere a key derived from JWT_ACCESS_SECRET is used when absent.
+     */
+    KYC_ENCRYPTION_KEY: z
+      .string()
+      .optional()
+      .refine((v) => v === undefined || decodeKeyMaterial(v).length >= 32, 'KYC_ENCRYPTION_KEY must be hex or base64 of at least 32 bytes'),
+    /**
+     * Lot 1c: key encrypting TOTP secrets (AES-256-GCM). Hex or base64 of at least 32 bytes. Required in
+     * production; elsewhere a key derived from JWT_ACCESS_SECRET is used when absent.
+     */
+    TOTP_ENCRYPTION_KEY: z
+      .string()
+      .optional()
+      .refine((v) => v === undefined || decodeKeyMaterial(v).length >= 32, 'TOTP_ENCRYPTION_KEY must be hex or base64 of at least 32 bytes'),
+    /** Lot 1c: polling budget of the public QR login status route (the web client polls every 1-2 s). */
+    QR_POLL_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(90),
+    /** Lot 6B: signs merchant payment QR payloads (HMAC-SHA256). Required in production; derived elsewhere when absent. */
+    PAYMENT_QR_SECRET: z.string().min(32, 'PAYMENT_QR_SECRET must be at least 32 characters').optional(),
+    /** Lot 6B: per-currency, per-KYC-tier limits as JSON, e.g. {"USD":{"1":{"maxBalanceMinor":1,"maxSingleTransferMinor":1,"maxDailyOutgoingMinor":1}}}; unlisted entries use the defaults. */
+    KYC_LIMITS: z
+      .string()
+      .optional()
+      .transform((v, ctx) => {
+        if (v === undefined || v.trim() === '') return undefined;
+        try {
+          return kycLimitsOverrideSchema.parse(JSON.parse(v));
+        } catch {
+          ctx.addIssue({ code: 'custom', message: 'KYC_LIMITS must be a JSON object {CUR: {"0"|"1"|"2": {maxBalanceMinor, maxSingleTransferMinor, maxDailyOutgoingMinor}}}' });
+          return z.NEVER;
+        }
+      }),
+    /** Lot 6B: wrong payment PINs before the lock, and the lock duration. */
+    PAYMENT_PIN_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+    PAYMENT_PIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === 'production' && env.OTP_PROVIDER === 'console') {
+    if (env.NODE_ENV === 'production') {
+      for (const key of ['KYC_ENCRYPTION_KEY', 'PAYMENT_QR_SECRET', 'TOTP_ENCRYPTION_KEY'] as const) {
+        if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
+      }
+    }
+    const isProd = env.NODE_ENV === 'production';
+    const need = (names: (keyof typeof env)[], provider: string) => {
+      for (const name of names) {
+        if (!env[name]) {
+          ctx.addIssue({ code: 'custom', path: [name], message: `${name} is required when ${provider} is the OTP provider` });
+        }
+      }
+    };
+    const { email, phone } = resolveOtpProviders(env);
+    if (isProd && email === 'console') {
       ctx.addIssue({
         code: 'custom',
-        path: ['OTP_PROVIDER'],
-        message: 'the console OTP provider must not be used in production; configure a real SMS/e-mail provider',
+        path: ['OTP_EMAIL_PROVIDER'],
+        message:
+          'the console OTP provider (OTP_PROVIDER=console is an alias) must not be used in production for e-mail; set OTP_EMAIL_PROVIDER=brevo',
       });
     }
+    if (isProd && phone === 'console') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['OTP_PHONE_PROVIDER'],
+        message:
+          'the console OTP provider (OTP_PROVIDER=console is an alias) must not be used in production for phone numbers; set OTP_PHONE_PROVIDER=whatsapp',
+      });
+    }
+    if (email === 'brevo') need(['BREVO_API_KEY', 'OTP_EMAIL_FROM'], 'brevo');
+    if (phone === 'whatsapp') {
+      need(['WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_OTP_TEMPLATE'], 'whatsapp');
+    }
   });
+
+/** Provider of each channel: the specific variable wins, then the OTP_PROVIDER alias (default console). */
+export function resolveOtpProviders(env: {
+  OTP_PROVIDER: 'console';
+  OTP_EMAIL_PROVIDER?: 'brevo' | 'console' | undefined;
+  OTP_PHONE_PROVIDER?: 'whatsapp' | 'console' | undefined;
+}): { email: 'brevo' | 'console'; phone: 'whatsapp' | 'console' } {
+  return { email: env.OTP_EMAIL_PROVIDER ?? env.OTP_PROVIDER, phone: env.OTP_PHONE_PROVIDER ?? env.OTP_PROVIDER };
+}
 
 export type Env = z.infer<typeof envSchema>;
 

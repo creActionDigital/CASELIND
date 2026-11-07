@@ -8,6 +8,7 @@ import { cancelOrder, fetchOrder } from '../../../shop/api';
 import { formatMoney } from '../../../shop/format';
 import { shopKeys } from '../../../shop/hooks';
 import { canCancel, canReview, mediaContentUrl } from '../../../shop/order-logic';
+import { ContactSeller } from '../../../shop/ContactSeller';
 import { StatusPill } from '../../../shop/parts';
 import { radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -149,6 +150,8 @@ export default function OrderDetail() {
             </View>
           ))}
         </View>
+
+        <ContactSeller contactUserId={o.contactUserId} />
 
         {cancel.isError ? (
           <Text color={colors.danger} accessibilityLiveRegion="polite">

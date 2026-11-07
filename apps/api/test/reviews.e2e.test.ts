@@ -185,6 +185,44 @@ describe('verified reviews', () => {
     expect((await reviewsOf(buyer, s.productId)).body.items[0].reply.body).toBe('Mise à jour');
   });
 
+  it('lists the reviews of the whole organisation with the product, filtered by reply status', async () => {
+    const s = await shop();
+    const other = await shop();
+    const [b1, b2, outsider, employee, support] = [await user(), await user(), await user(), await user(), await user()];
+    for (const [u, role] of [[employee, 'employee'], [support, 'support']] as const) {
+      await ctx.http.post(`/v1/orgs/${s.orgId}/invitations`).set(bearer(s.owner.token)).send({ handle: u.handle, role }).expect(201);
+      await ctx.http.post(`/v1/me/org-invitations/${s.orgId}/accept`).set(bearer(u.token)).expect(200);
+    }
+    await buy(s, b1);
+    await buy(s, b2);
+    await buy(other, b1);
+    const r1 = (await review(b1, s.productId, { rating: 4, body: 'Bien' }).expect(201)).body;
+    const r2 = (await review(b2, s.productId, { rating: 2 }).expect(201)).body;
+    await review(b1, other.productId, { rating: 5 }).expect(201);
+
+    const url = `/v1/orgs/${s.orgId}/reviews`;
+    const all = await ctx.http.get(url).set(bearer(s.owner.token)).expect(200);
+    expect(all.body.items.map((r: any) => r.id)).toEqual([r2.id, r1.id]);
+    expect(all.body.items[0].product).toMatchObject({ id: s.productId, imageAssetId: null });
+    expect(typeof all.body.items[0].product.title).toBe('string');
+    expect(all.body.items[0].author.userId).toBe(b2.id);
+
+    await ctx.http.post(`${url}/${r2.id}/reply`).set(bearer(s.owner.token)).send({ body: 'Merci' }).expect(200);
+    const open = await ctx.http.get(`${url}?status=unanswered`).set(bearer(s.owner.token)).expect(200);
+    expect(open.body.items.map((r: any) => r.id)).toEqual([r1.id]);
+    const page = await ctx.http.get(`${url}?limit=1`).set(bearer(s.owner.token)).expect(200);
+    expect(page.body.items).toHaveLength(1);
+    expect(page.body.nextCursor).toEqual(expect.any(String));
+    const next = await ctx.http.get(`${url}?limit=1&cursor=${page.body.nextCursor}`).set(bearer(s.owner.token)).expect(200);
+    expect(next.body.items[0].id).toBe(r1.id);
+    expect(next.body.nextCursor).toBeNull();
+
+    await ctx.http.get(`${url}?status=nope`).set(bearer(s.owner.token)).expect(400);
+    await ctx.http.get(url).set(bearer(support.token)).expect(200); // orders.view
+    await ctx.http.get(url).set(bearer(employee.token)).expect(403);
+    await ctx.http.get(url).set(bearer(outsider.token)).expect(404);
+  });
+
   it('hides a review through moderation for everyone but its author, excluding it from the average', async () => {
     const s = await shop();
     const author = await user();

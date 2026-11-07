@@ -2,6 +2,9 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } fr
 import {
   type CreateReviewRequest,
   createReviewRequestSchema,
+  type OrgReviewList,
+  type OrgReviewListQuery,
+  orgReviewListQuerySchema,
   type Review,
   type ReviewList,
   type ReviewListQuery,
@@ -11,9 +14,11 @@ import {
   type UpdateReviewRequest,
   updateReviewRequestSchema,
 } from '@caselind/contracts';
+import { AppError } from '../common/app-error.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { RequireFlag } from '../flags/flag.guard.js';
 import { CurrentMembership, type OrgMembership, OrgPermission } from '../orgs/org.guard.js';
+import { roleHasPermission } from '../orgs/org-permissions.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
 import { ReviewsService } from './reviews.service.js';
 
@@ -54,6 +59,17 @@ export class ReviewsController {
   @HttpCode(204)
   async remove(@CurrentUser() user: AuthUser, @Param('reviewId') reviewId: string): Promise<void> {
     await this.reviews.remove(user.userId, reviewId);
+  }
+
+  /** `orders.view` or `catalog.manage` (the guard only checks membership, the role check is here). */
+  @Get('orgs/:orgId/reviews')
+  @OrgPermission('org.view')
+  listForOrg(
+    @CurrentMembership() m: OrgMembership,
+    @Query(new ZodPipe(orgReviewListQuerySchema)) q: OrgReviewListQuery,
+  ): Promise<OrgReviewList> {
+    if (!roleHasPermission(m.role, 'orders.view') && !roleHasPermission(m.role, 'catalog.manage')) throw AppError.forbidden();
+    return this.reviews.listForOrg(m.orgId, q);
   }
 
   @Post('orgs/:orgId/reviews/:reviewId/reply')

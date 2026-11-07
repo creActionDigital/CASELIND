@@ -1,5 +1,5 @@
 // Lot 3 messaging tables (0007_messaging.sql is the source of truth; keep this mirror in sync).
-import { bigint, boolean, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const tstz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
@@ -14,6 +14,7 @@ export const conversations = pgTable('conversations', {
   /** mode number: a conversation will never reach 2^53 messages. */
   lastSeq: bigint('last_seq', { mode: 'number' }).notNull().default(0),
   lastMessageAt: tstz('last_message_at'),
+  disappearingSeconds: integer('disappearing_seconds'),
   createdAt: tstz('created_at').notNull().defaultNow(),
   updatedAt: tstz('updated_at').notNull().defaultNow(),
 });
@@ -52,6 +53,8 @@ export const messages = pgTable('messages', {
   mentions: uuid('mentions').array().notNull().default([]),
   systemEvent: jsonb('system_event'),
   recalledAt: tstz('recalled_at'),
+  forwarded: boolean('forwarded').notNull().default(false),
+  expiresAt: tstz('expires_at'),
   createdAt: tstz('created_at').notNull().defaultNow(),
 });
 export type MessageRow = typeof messages.$inferSelect;

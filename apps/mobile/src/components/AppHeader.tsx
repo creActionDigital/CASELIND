@@ -9,6 +9,7 @@ import { useCartCount } from '../shop/hooks';
 import { radius, spacing, TOUCH } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Avatar, Badge, IconButton, Text, Wordmark } from '../ui';
+import { WalletChip } from '../wallet/WalletChip';
 import { AccountMenu } from './AccountMenu';
 
 /**
@@ -32,17 +33,7 @@ export function AppHeader() {
           <Wordmark size={17} />
         </View>
         <IconButton icon="search-outline" label={t('header.search')} onPress={() => router.push('/search')} />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('header.walletSoon')}
-          onPress={() => router.push('/wallet')}
-          style={({ pressed }) => [styles.chip, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 }]}
-        >
-          <Text variant="caption" color={colors.text} style={{ fontWeight: '600' }}>
-            {t('header.wallet')}
-          </Text>
-          <Badge tone="neutral" label={t('common.soon')} />
-        </Pressable>
+        <WalletChip />
         <IconButton
           icon="cart-outline"
           label={t('header.cart', { n: cartCount })}
@@ -72,15 +63,6 @@ const styles = StyleSheet.create({
   bar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: TOUCH + 8 },
   logo: { flex: 1, paddingLeft: spacing.xs },
-  chip: {
-    minHeight: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.pill,
-    marginHorizontal: spacing.xs,
-  },
   unread: { position: 'absolute', top: 0, right: 0 },
   avatar: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
 });

@@ -137,11 +137,13 @@ describe('seller routes and roles', () => {
     const otherOrg = await createOrg(other);
     const v = variant({ sku: 'DUP-1' });
     await create(owner, org.id, productBody({ variants: [v] })).expect(201);
-    await create(owner, org.id, productBody({ variants: [variant({ sku: 'DUP-1' })] })).expect(409);
+    const taken = await create(owner, org.id, productBody({ variants: [variant({ sku: 'DUP-1' })] })).expect(409);
+    expect(taken.body.error.details).toEqual({ reason: 'sku_taken', field: 'sku', sku: 'DUP-1' });
     // Same SKU in another org is fine.
     await create(other, otherOrg.id, productBody({ variants: [variant({ sku: 'DUP-1' })] })).expect(201);
     // Duplicate inside the request.
-    await create(owner, org.id, productBody({ variants: [variant({ sku: 'X' }), variant({ sku: 'X' })] })).expect(409);
+    const twice = await create(owner, org.id, productBody({ variants: [variant({ sku: 'X' }), variant({ sku: 'X' })] })).expect(409);
+    expect(twice.body.error.details).toEqual({ reason: 'duplicate_sku_in_request', field: 'sku', sku: 'X' });
 
     await create(owner, org.id, productBody({ variants: [variant({ currency: 'EUR' })] })).expect(400);
     await create(owner, org.id, productBody({ variants: [variant({ priceMinor: 0 })] })).expect(400);
@@ -175,8 +177,10 @@ describe('seller routes and roles', () => {
     const owner = await user();
     const org = await createOrg(owner);
     const p = (await create(owner, org.id, productBody({ variants: [variant({ active: false })] })).expect(201)).body;
-    await ctx.http.patch(`/v1/orgs/${org.id}/products/${p.id}`).set(bearer(owner.token)).send({ status: 'published' }).expect(409);
-    await create(owner, org.id, productBody({ status: 'published', variants: [variant({ active: false })] })).expect(409);
+    const refused = await ctx.http.patch(`/v1/orgs/${org.id}/products/${p.id}`).set(bearer(owner.token)).send({ status: 'published' }).expect(409);
+    expect(refused.body.error.details).toEqual({ reason: 'publish_without_variant' });
+    const refusedCreate = await create(owner, org.id, productBody({ status: 'published', variants: [variant({ active: false })] })).expect(409);
+    expect(refusedCreate.body.error.details.reason).toBe('publish_without_variant');
 
     const v0 = p.variants[0];
     const res = await ctx.http
@@ -331,7 +335,8 @@ describe('stock', () => {
     const up = await ctx.http.post(url).set(bearer(stock.token)).send({ delta: 10, reason: 'restock' }).expect(200);
     expect(up.body.stock).toBe(15);
     expect((await ctx.http.post(url).set(bearer(owner.token)).send({ delta: -3, reason: 'damage' }).expect(200)).body.stock).toBe(12);
-    await ctx.http.post(url).set(bearer(owner.token)).send({ delta: -13, reason: 'adjustment' }).expect(409);
+    const negative = await ctx.http.post(url).set(bearer(owner.token)).send({ delta: -13, reason: 'adjustment' }).expect(409);
+    expect(negative.body.error.details).toEqual({ reason: 'stock_negative' });
     await ctx.http.post(url).set(bearer(owner.token)).send({ delta: 0, reason: 'adjustment' }).expect(400);
     await ctx.http.post(url).set(bearer(owner.token)).send({ delta: 1, reason: 'order_reserved' }).expect(400);
     await ctx.http.post(url).set(bearer(employee.token)).send({ delta: 1, reason: 'restock' }).expect(403);
@@ -359,11 +364,43 @@ describe('stock', () => {
     const owner = await user();
     const org = await createOrg(owner);
     const p = await publishedProduct(owner, org.id, { variants: [variant({ trackStock: false, stock: 0 })] });
-    await ctx.http
+    const res = await ctx.http
       .post(`/v1/orgs/${org.id}/variants/${p.variants[0]!.id}/stock`)
       .set(bearer(owner.token))
       .send({ delta: 1, reason: 'restock' })
       .expect(409);
+    expect(res.body.error.details).toEqual({ reason: 'stock_not_tracked' });
+  });
+
+  it('names the colliding SKU when an edit reuses another variant SKU', async () => {
+    const owner = await user();
+    const org = await createOrg(owner);
+    await create(owner, org.id, productBody({ variants: [variant({ sku: 'TAKEN-1' })] })).expect(201);
+    const p = (await create(owner, org.id, productBody({ variants: [variant({ sku: 'MINE-1' })] })).expect(201)).body;
+    const v0 = p.variants[0];
+    const res = await ctx.http
+      .patch(`/v1/orgs/${org.id}/products/${p.id}`)
+      .set(bearer(owner.token))
+      .send({ variants: [{ id: v0.id, sku: 'TAKEN-1', options: {}, priceMinor: 2000, currency: 'CDF', active: true, trackStock: true }] })
+      .expect(409);
+    expect(res.body.error.details).toEqual({ reason: 'sku_taken', field: 'sku', sku: 'TAKEN-1' });
+  });
+
+  it('lets the stock role read products and variants but not write them', async () => {
+    const [owner, stock, employee, outsider] = [await user(), await user(), await user(), await user()];
+    const org = await createOrg(owner);
+    await addMember(org.id, owner, stock, 'stock');
+    await addMember(org.id, owner, employee, 'employee');
+    const p = await publishedProduct(owner, org.id);
+    const list = await ctx.http.get(`/v1/orgs/${org.id}/products`).set(bearer(stock.token)).expect(200);
+    expect(list.body.items.map((i: any) => i.id)).toContain(p.id);
+    const one = await ctx.http.get(`/v1/orgs/${org.id}/products/${p.id}`).set(bearer(stock.token)).expect(200);
+    expect(one.body.variants[0].stock).toBe(5);
+    await ctx.http.patch(`/v1/orgs/${org.id}/products/${p.id}`).set(bearer(stock.token)).send({ title: 'Nope' }).expect(403);
+    await create(stock, org.id, productBody()).expect(403);
+    await ctx.http.get(`/v1/orgs/${org.id}/products`).set(bearer(employee.token)).expect(403);
+    await ctx.http.get(`/v1/orgs/${org.id}/products/${p.id}`).set(bearer(employee.token)).expect(403);
+    await ctx.http.get(`/v1/orgs/${org.id}/products`).set(bearer(outsider.token)).expect(404);
   });
 });
 

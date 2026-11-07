@@ -17,6 +17,14 @@ export type AuditAction =
   | 'auth.password_reset_requested'
   | 'auth.password_reset'
   | 'auth.deletion_cancelled'
+  /** Lot 1c: 2FA and QR login. Never a code, a secret or a payload; metadata {remaining} / {qrSessionId} / {channel}. */
+  | 'auth.2fa_enabled'
+  | 'auth.2fa_disabled'
+  | 'auth.2fa_failed'
+  | 'auth.2fa_backup_used'
+  | 'auth.qr_approved'
+  | 'user.identifier_change_requested'
+  | 'user.identifier_changed'
   | 'user.profile_updated'
   | 'user.privacy_updated'
   | 'user.blocked'
@@ -54,7 +62,25 @@ export type AuditAction =
   | 'product.created'
   | 'product.published'
   | 'product.archived'
-  | 'stock.adjusted';
+  | 'stock.adjusted'
+  /** Sandbox wallet (lot 6A): metadata {transferId, amountMinor, currency, counterpartyId}. Never the note. */
+  | 'wallet.transfer'
+  | 'wallet.sandbox_topup'
+  /** Ledger back-office (lot 6A): metadata {accountId, ownerKind, orgId, currency}. */
+  | 'ledger.account_frozen'
+  | 'ledger.account_unfrozen'
+  /** KYC (lot 6B): metadata {submissionId, level[, reason]}. Never the identity, the number or the files. */
+  | 'kyc.submitted'
+  | 'kyc.approved'
+  | 'kyc.rejected'
+  | 'kyc.viewed'
+  /** Payment PIN (lot 6B): never the PIN. */
+  | 'wallet.pin_set'
+  | 'wallet.pin_failed'
+  | 'wallet.pin_locked'
+  /** Merchant QR (lot 6B): metadata {orgId, qrId[, currency, amountMinor]}. */
+  | 'wallet.qr_created'
+  | 'wallet.qr_revoked';
 
 export interface AuditInput {
   action: AuditAction;

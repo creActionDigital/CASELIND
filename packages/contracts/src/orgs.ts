@@ -116,6 +116,12 @@ const orgEditableFields = {
   visibility: orgVisibilitySchema,
 };
 
+/**
+ * PATCH-only: the active member buyers are pointed to for support (default: the oldest active owner).
+ * `null` goes back to the default. Must be an active member of the organisation (else 400).
+ */
+const supportUserIdSchema = z.uuid().nullable();
+
 /** POST /orgs. The creator becomes the active owner. */
 export const createOrgRequestSchema = z.object({
   slug: orgSlugSchema,
@@ -135,7 +141,7 @@ export type CreateOrgRequest = z.infer<typeof createOrgRequestSchema>;
 
 /** PATCH /orgs/:orgId. The slug is immutable in this lot (public URLs are shared). `null` clears a field. */
 export const updateOrgRequestSchema = z
-  .object(orgEditableFields)
+  .object({ ...orgEditableFields, supportUserId: supportUserIdSchema })
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'at least one field is required');
 export type UpdateOrgRequest = z.infer<typeof updateOrgRequestSchema>;
@@ -159,6 +165,7 @@ export const orgSchema = z.object({
   visibility: orgVisibilitySchema,
   status: orgStatusSchema,
   verificationStatus: orgVerificationStatusSchema,
+  supportUserId: z.uuid().nullable(),
   createdBy: z.uuid().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -183,7 +190,11 @@ export const publicOrgSchema = orgSchema
     website: true,
     openingHours: true,
   })
-  .extend({ verified: z.boolean() });
+  .extend({
+    verified: z.boolean(),
+    /** Member to open a direct conversation with; null when none, or blocked with the caller (token optional). */
+    contactUserId: z.uuid().nullable(),
+  });
 export type PublicOrg = z.infer<typeof publicOrgSchema>;
 
 export const orgSummarySchema = orgSchema.pick({

@@ -59,6 +59,9 @@ export default function NewCoupon() {
         onChange={(kind) => set({ kind })}
       />
       <Chips scroll={false} options={SELLER_CURRENCIES.map((c) => ({ value: c, label: c }))} value={d.currency as (typeof SELLER_CURRENCIES)[number]} onChange={(currency) => set({ currency })} />
+      <Text variant="caption" muted style={{ marginBottom: 8 }}>
+        {t('seller.coupon.currencyHint')}
+      </Text>
       <TextField
         label={percent ? t('seller.coupon.valuePercent') : t('seller.coupon.valueAmount', { currency: d.currency })}
         value={d.value}

@@ -30,6 +30,16 @@ export function canAdjustStock(role: OrgRole | undefined): boolean {
   return can(role, 'inventory.manage') || can(role, 'catalog.manage');
 }
 
+/** Lecture des produits et variantes (stock exact) : `catalog.manage` ou `inventory.manage` ; l'écriture reste `catalog.manage`. */
+export function canReadCatalog(role: OrgRole | undefined): boolean {
+  return can(role, 'catalog.manage') || can(role, 'inventory.manage');
+}
+
+/** Avis de la boutique : `orders.view` ou `catalog.manage`. */
+export function canViewReviews(role: OrgRole | undefined): boolean {
+  return can(role, 'orders.view') || can(role, 'catalog.manage');
+}
+
 /** L'espace vendeur n'a d'intérêt que si le rôle donne accès à au moins un module. */
 export function hasSellerAccess(role: OrgRole | undefined): boolean {
   return can(role, 'catalog.manage') || can(role, 'orders.view') || can(role, 'inventory.manage');

@@ -18,6 +18,7 @@ import { DB, type Db } from '../db/db.module.js';
 import { cartItems, orderEvents, orderItems, orgMembers, orders, type OrderRow } from '../db/schema.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { ORG_ROLE_PERMISSIONS } from '../orgs/org-permissions.js';
+import { resolveContactUserId } from '../orgs/org-contact.js';
 import { pgErrorOf, type Tx } from '../orgs/orgs.service.js';
 import { CouponsService } from './coupons.service.js';
 import {
@@ -221,7 +222,12 @@ export class OrdersService {
 
   async getMine(buyerId: string, orderId: string): Promise<OrderDetail> {
     const row = await this.findOwned(orderId, eq(orders.buyerId, buyerId));
-    return hydrateDetail(this.db, row);
+    return this.withContact(await hydrateDetail(this.db, row), buyerId);
+  }
+
+  /** Buyer view: who to talk to about the order (null when blocked with the buyer or nobody is available). */
+  private async withContact(detail: OrderDetail, buyerId: string): Promise<OrderDetail> {
+    return { ...detail, contactUserId: await resolveContactUserId(this.db, detail.orgId, buyerId) };
   }
 
   async getForOrg(orgId: string, orderId: string): Promise<OrderDetail> {
@@ -238,8 +244,8 @@ export class OrdersService {
 
   /* ------------------------------------------------------------------ lifecycle */
 
-  cancelAsBuyer(buyerId: string, orderId: string, note?: string): Promise<OrderDetail> {
-    return this.transition(orderId, { kind: 'buyer', userId: buyerId }, 'cancelled', note);
+  async cancelAsBuyer(buyerId: string, orderId: string, note?: string): Promise<OrderDetail> {
+    return this.withContact(await this.transition(orderId, { kind: 'buyer', userId: buyerId }, 'cancelled', note), buyerId);
   }
 
   changeStatusAsOrg(orgId: string, userId: string, orderId: string, to: OrderStatus, note: string | undefined, meta: RequestMeta): Promise<OrderDetail> {

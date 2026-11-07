@@ -1,17 +1,19 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   type CreateReviewRequest,
+  type OrgReviewList,
+  type OrgReviewListQuery,
   type Review,
   type ReviewList,
   type ReviewListQuery,
   type ReviewReplyRequest,
   type UpdateReviewRequest,
 } from '@caselind/contracts';
-import { and, desc, eq, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
 import { CatalogPort } from '../commerce/catalog.port.js';
 import { DB, type Db } from '../db/db.module.js';
-import { orderItems, orders, reviews, users, type ReviewRow } from '../db/schema.js';
+import { orderItems, orders, products, reviews, users, type ReviewRow } from '../db/schema.js';
 import { ModerationRegistry } from '../moderation/moderation-registry.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { pgErrorOf } from '../orgs/orgs.service.js';
@@ -139,6 +141,43 @@ export class ReviewsService implements OnModuleInit {
       items: page.map((r) => toReview(r.row, r.author)),
       nextCursor: rows.length > q.limit && last ? encodeCursor(last.exact, last.row.id) : null,
       summary: { ratingCount: count, averageRating: count > 0 ? Math.round((sum / count) * 100) / 100 : null, distribution },
+    };
+  }
+
+  /**
+   * Reviews of every product of the organisation, newest first (moderation-hidden ones excluded: they can not be
+   * answered). `unanswered` keeps those without a seller reply. Includes the product so the seller needs no
+   * product-by-product round trips.
+   */
+  async listForOrg(orgId: string, q: OrgReviewListQuery): Promise<OrgReviewList> {
+    const filters = [eq(reviews.orgId, orgId), eq(reviews.hidden, false)];
+    if (q.status === 'unanswered') filters.push(isNull(reviews.replyBody));
+    if (q.cursor) {
+      const c = decodeCursor(q.cursor);
+      filters.push(sql`(${reviews.createdAt}, ${reviews.id}) < (${c.ts}::timestamptz, ${c.id}::uuid)`);
+    }
+    const rows = await this.db
+      .select({
+        row: reviews,
+        author: authorColumns,
+        exact: sql<string>`${reviews.createdAt}::text`,
+        productTitle: sql<string>`coalesce(${products.title}, '')`,
+        imageAssetId: sql<string | null>`(SELECT pm.media_id::text FROM product_media pm WHERE pm.product_id = ${reviews.productId} ORDER BY pm.position LIMIT 1)`,
+      })
+      .from(reviews)
+      .innerJoin(users, eq(users.id, reviews.userId))
+      .leftJoin(products, eq(products.id, reviews.productId))
+      .where(and(...filters))
+      .orderBy(desc(reviews.createdAt), desc(reviews.id))
+      .limit(q.limit + 1);
+    const page = rows.slice(0, q.limit);
+    const last = page.at(-1);
+    return {
+      items: page.map((r) => ({
+        ...toReview(r.row, r.author),
+        product: { id: r.row.productId, title: r.productTitle, imageAssetId: r.imageAssetId },
+      })),
+      nextCursor: rows.length > q.limit && last ? encodeCursor(last.exact, last.row.id) : null,
     };
   }
 

@@ -5,7 +5,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { ENV, type Env } from '../config/env.js';
 import { AppError } from '../common/app-error.js';
 import { DB, type Db } from '../db/db.module.js';
-import { otpChallenges, type OtpChallengeRow } from '../db/schema.js';
+import { otpChallenges, type OtpChallengeRow, users } from '../db/schema.js';
 import { OtpSender } from './otp-sender.js';
 
 type Purpose = OtpChallengeRow['purpose'];
@@ -65,6 +65,7 @@ export class OtpService {
         destination: input.destination,
         purpose: input.purpose,
         code,
+        locale: await this.localeOf(input.userId),
       });
     }
     return { challengeId: id, channel: input.channel, expiresAt: expiresAt.toISOString() };
@@ -108,7 +109,8 @@ export class OtpService {
     if (!row || row.consumedAt || row.expiresAt <= new Date() || row.resendCount >= MAX_RESENDS) {
       throw new AppError(410, ErrorCodes.otpExpired, 'This challenge can no longer be resent, start again');
     }
-    const elapsed = (Date.now() - row.lastSentAt.getTime()) / 1000;
+    // Clamped: the database clock can be ahead of this process, which would yield a negative elapsed time.
+    const elapsed = Math.max(0, (Date.now() - row.lastSentAt.getTime()) / 1000);
     if (elapsed < this.env.OTP_RESEND_COOLDOWN_SECONDS) {
       throw new AppError(429, ErrorCodes.otpResendTooSoon, 'Please wait before requesting a new code', {
         retryAfterSeconds: Math.ceil(this.env.OTP_RESEND_COOLDOWN_SECONDS - elapsed),
@@ -138,9 +140,15 @@ export class OtpService {
         destination: row.destination,
         purpose: row.purpose,
         code,
+        locale: await this.localeOf(row.userId),
       });
     }
     return { challengeId: row.id, channel: row.channel, expiresAt: expiresAt.toISOString() };
+  }
+
+  private async localeOf(userId: string): Promise<string | undefined> {
+    const [row] = await this.db.select({ locale: users.locale }).from(users).where(eq(users.id, userId)).limit(1);
+    return row?.locale;
   }
 
   static generateCode(): string {

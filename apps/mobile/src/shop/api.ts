@@ -30,7 +30,7 @@ export const fetchCategories = () => api.request('/catalog/categories', { schema
 export const fetchProducts = (f: ShopFilters, cursor?: string) =>
   api.request('/products', { query: { ...f, limit: PAGE, cursor }, schema: storefrontProductListSchema });
 export const fetchProduct = (id: string) => api.request(`/products/${id}`, { schema: storefrontProductDetailSchema });
-export const fetchStore = (slug: string) => api.request(`/public/orgs/${encodeURIComponent(slug)}`, { schema: publicOrgSchema, auth: false });
+export const fetchStore = (slug: string) => api.request(`/public/orgs/${encodeURIComponent(slug)}`, { schema: publicOrgSchema });
 export const fetchStoreProducts = (slug: string, cursor?: string) =>
   api.request(`/public/orgs/${encodeURIComponent(slug)}/products`, { query: { limit: PAGE, cursor }, schema: storefrontProductListSchema, auth: false });
 

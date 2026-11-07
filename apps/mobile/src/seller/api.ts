@@ -9,11 +9,12 @@ import {
   productCategoryListSchema,
   productListSchema,
   productSchema,
-  reviewListSchema,
+  orgReviewListSchema,
   reviewSchema,
   variantSchema,
   type CreateCouponRequest,
   type OrderStatus,
+  type OrgReviewList,
   type OrgKind,
   type ProductStatus,
 } from '@caselind/contracts';
@@ -28,7 +29,7 @@ export const sk = {
   orders: (orgId: string) => ['seller', orgId, 'orders'] as const,
   order: (orgId: string, id: string) => ['seller', orgId, 'order', id] as const,
   coupons: (orgId: string) => ['seller', orgId, 'coupons'] as const,
-  reviews: (orgId: string, productId: string) => ['seller', orgId, 'reviews', productId] as const,
+  reviews: (orgId: string) => ['seller', orgId, 'reviews'] as const,
   count: (orgId: string, name: string) => ['seller', orgId, 'count', name] as const,
 };
 
@@ -65,8 +66,8 @@ export const createCoupon = (orgId: string, body: CreateCouponRequest) =>
 export const deactivateCoupon = (orgId: string, id: string) =>
   api.request(`/orgs/${orgId}/coupons/${id}`, { method: 'PATCH', body: { active: false }, schema: couponSchema });
 
-export const fetchProductReviews = (productId: string, cursor?: string) =>
-  api.request(`/products/${productId}/reviews`, { query: { cursor, limit: 20 }, schema: reviewListSchema });
+export const fetchOrgReviews = (orgId: string, status: 'all' | 'unanswered', cursor?: string): Promise<OrgReviewList> =>
+  api.request(`/orgs/${orgId}/reviews`, { query: { status, cursor, limit: 20 }, schema: orgReviewListSchema });
 export const replyToReview = (orgId: string, reviewId: string, body: string) =>
   api.request(`/orgs/${orgId}/reviews/${reviewId}/reply`, { method: 'POST', body: { body }, schema: reviewSchema });
 

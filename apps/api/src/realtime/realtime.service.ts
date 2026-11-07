@@ -9,6 +9,7 @@ export type RealtimeEvent =
   | 'conversation.updated'
   | 'conversation.member_added'
   | 'conversation.member_removed'
+  | 'draft.updated'
   | 'typing'
   | 'notification.new';
 

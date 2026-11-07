@@ -52,6 +52,8 @@ export function buildOptimisticMessage(input: {
     reactions: [],
     myReaction: null,
     createdAt: (input.now ?? new Date()).toISOString(),
+    forwarded: false,
+    expiresAt: null,
     local: 'sending',
     localUri: input.localUri,
     localMime: input.localMime,

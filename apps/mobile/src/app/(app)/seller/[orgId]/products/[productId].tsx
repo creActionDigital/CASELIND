@@ -145,11 +145,15 @@ function Editor({ orgId, product }: { orgId: string; product?: Product }) {
     },
     onError: (e) => {
       if (e instanceof ApiRequestError && e.status === 409) {
-        if (/sku/i.test(e.message)) {
-          const named = /:\s*(.+)$/.exec(e.message)?.[1]?.trim() ?? null;
+        // `details.reason` est la source stable ; le texte du message ne sert que de repli (anciens serveurs).
+        const reason = e.detail<string>('reason');
+        if (reason === 'sku_taken' || reason === 'duplicate_sku_in_request' || (!reason && /sku/i.test(e.message))) {
+          const named = e.detail<string>('sku') ?? (/:\s*(.+)$/.exec(e.message)?.[1]?.trim() || null);
           return setSkuConflict({ sku: named });
         }
-        if (/at least one active variant/i.test(e.message)) return setVariantsError(t('seller.product.errNoVariant'));
+        if (reason === 'publish_without_variant' || (!reason && /at least one active variant/i.test(e.message))) {
+          return setVariantsError(t('seller.product.errNoVariant'));
+        }
       }
       setBanner(sellerErrorMessage(e, t, locale));
     },

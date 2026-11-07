@@ -1,12 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type {
-  CreateOrgRequest,
-  MyOrgMembership,
-  OpeningHours,
-  Org,
-  OrgSummary,
-  PublicOrg,
-  UpdateOrgRequest,
+import {
+  type CreateOrgRequest,
+  ErrorCodes,
+  type MyOrgMembership,
+  type OpeningHours,
+  type Org,
+  type OrgSummary,
+  type PublicOrg,
+  type UpdateOrgRequest,
 } from '@caselind/contracts';
 import { and, count, desc, eq } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
@@ -15,6 +16,7 @@ import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
 import { type OrganizationRow, organizations, orgMembers, type OrgMemberRow, users } from '../db/schema.js';
 import { orgNotFound } from './org.guard.js';
+import { resolveContactUserId } from './org-contact.js';
 
 export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -57,6 +59,7 @@ export function toOrg(o: OrganizationRow): Org {
     visibility: o.visibility,
     status: o.status,
     verificationStatus: o.verificationStatus,
+    supportUserId: o.supportUserId,
     createdBy: o.createdBy,
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
@@ -166,6 +169,18 @@ export class OrgsService {
     return this.db.transaction(async (tx) => {
       const [current] = await tx.select().from(organizations).where(eq(organizations.id, orgId)).for('update');
       if (!current) throw orgNotFound();
+      if (patch.supportUserId) {
+        const [member] = await tx
+          .select({ userId: orgMembers.userId })
+          .from(orgMembers)
+          .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, patch.supportUserId), eq(orgMembers.status, 'active')))
+          .limit(1);
+        if (!member) {
+          throw new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [
+            { path: 'supportUserId', message: 'must be an active member of the organization' },
+          ]);
+        }
+      }
       const changed = VERIFICATION_SENSITIVE_FIELDS.filter(
         (f) => f in patch && patch[f] !== undefined && !sameValue(f, patch[f] ?? null, current[f] ?? null),
       );
@@ -199,7 +214,7 @@ export class OrgsService {
    * Storefront (CDC §5): readable without a token. Only public AND active orgs; anything else
    * (private, suspended, unknown, malformed slug) is the same 404. Public fields only.
    */
-  async publicBySlug(slug: string): Promise<PublicOrg> {
+  async publicBySlug(slug: string, viewerId: string | null = null): Promise<PublicOrg> {
     if (!SLUG_RE.test(slug)) throw orgNotFound();
     const [o] = await this.db
       .select()
@@ -223,6 +238,7 @@ export class OrgsService {
       website: o.website,
       openingHours: o.openingHours as OpeningHours | null,
       verified: o.verificationStatus === 'verified',
+      contactUserId: await resolveContactUserId(this.db, o.id, viewerId),
     };
   }
 

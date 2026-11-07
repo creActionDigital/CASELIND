@@ -20,7 +20,7 @@ const citext = customType<{ data: string }>({ dataType: () => 'citext' });
 const tstz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
 export const userStatus = pgEnum('user_status', ['pending_verification', 'active', 'suspended', 'deleted']);
-export const otpPurpose = pgEnum('otp_purpose', ['signup', 'password_reset']);
+export const otpPurpose = pgEnum('otp_purpose', ['signup', 'password_reset', 'identifier_change']);
 export const otpChannel = pgEnum('otp_channel', ['sms', 'email']);
 
 export const users = pgTable('users', {
@@ -161,6 +161,8 @@ export const organizations = pgTable('organizations', {
     .$type<'unverified' | 'pending' | 'verified'>()
     .notNull()
     .default('unverified'),
+  /** Support contact chosen by the org (0015); null = oldest active owner. */
+  supportUserId: uuid('support_user_id'),
   createdBy: uuid('created_by'),
   createdAt: tstz('created_at').notNull().defaultNow(),
   updatedAt: tstz('updated_at').notNull().defaultNow(),
@@ -190,7 +192,7 @@ export const mediaAssets = pgTable('media_assets', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerUserId: uuid('owner_user_id').notNull(),
   purpose: text('purpose')
-    .$type<'avatar' | 'post' | 'message' | 'story' | 'org_logo' | 'org_banner' | 'product' | 'document'>()
+    .$type<'avatar' | 'post' | 'message' | 'story' | 'org_logo' | 'org_banner' | 'product' | 'document' | 'kyc_document'>()
     .notNull(),
   declaredMime: text('declared_mime').notNull(),
   mime: text('mime'),
@@ -213,3 +215,7 @@ export * from './schema-social.js';
 export * from './schema-stories.js';
 export * from './schema-catalog.js';
 export * from './schema-orders.js';
+export * from './schema-ledger.js';
+export * from './schema-kyc.js';
+export * from './schema-messaging-extras.js';
+export * from './schema-identity.js';

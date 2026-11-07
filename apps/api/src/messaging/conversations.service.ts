@@ -41,6 +41,7 @@ import {
   loadMessage,
   loadMessages,
   lockConversation,
+  NOT_EXPIRED_M,
   requireActiveMember,
   UUID_RE,
   userNotFound,
@@ -56,6 +57,7 @@ export function toInfo(c: ConversationRow, memberCount: number): ConversationInf
     announcement: c.announcement,
     avatarUrl: c.avatarUrl,
     memberCount,
+    disappearingSeconds: c.disappearingSeconds,
   };
 }
 
@@ -276,7 +278,7 @@ export class ConversationsService {
       SELECT DISTINCT ON (m.conversation_id) m.id
       FROM messages m
       JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ${userId}
-      WHERE m.conversation_id = ANY(${uuidArray(ids)}) AND m.seq >= cm.first_seq
+      WHERE m.conversation_id = ANY(${uuidArray(ids)}) AND m.seq >= cm.first_seq AND ${NOT_EXPIRED_M}
         AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.message_id = m.id AND h.user_id = ${userId})
       ORDER BY m.conversation_id, m.seq DESC`);
     const lastRows: MessageRow[] =
@@ -304,6 +306,7 @@ export class ConversationsService {
         mutedUntil: m.mutedUntil?.toISOString() ?? null,
         pinned: m.pinned,
         archived: m.archived,
+        disappearingSeconds: c.disappearingSeconds,
         lastActivityAt: (c.lastMessageAt ?? c.createdAt).toISOString(),
         createdAt: c.createdAt.toISOString(),
       };
@@ -318,7 +321,7 @@ export class ConversationsService {
       JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ${userId}
       WHERE m.conversation_id = ANY(${uuidArray(conversationIds)})
         AND m.seq > cm.last_read_seq AND m.seq >= cm.first_seq
-        AND m.kind <> 'system' AND m.recalled_at IS NULL AND m.sender_id IS DISTINCT FROM ${userId}
+        AND m.kind <> 'system' AND m.recalled_at IS NULL AND m.sender_id IS DISTINCT FROM ${userId} AND ${NOT_EXPIRED_M}
         AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.message_id = m.id AND h.user_id = ${userId})
       GROUP BY m.conversation_id`);
     return new Map(res.rows.map((r) => [r.conversation_id, r.n]));
@@ -329,17 +332,21 @@ export class ConversationsService {
   /** Title, announcement, avatar of a group (admin or owner). */
   async update(userId: string, conversationId: string, patch: UpdateConversationRequest): Promise<Conversation> {
     const { conversation, member } = await requireActiveMember(this.db, conversationId, userId);
-    if (conversation.kind !== 'group') throw AppError.forbidden('Only groups have a profile');
-    if (member.role === 'member') throw AppError.forbidden('Only owners and admins can edit the group');
+    const profileEdit = patch.title !== undefined || patch.announcement !== undefined || patch.avatarAssetId !== undefined;
+    // A direct conversation has no profile; its disappearing setting belongs to both participants.
+    if (conversation.kind !== 'group' && profileEdit) throw AppError.forbidden('Only groups have a profile');
+    if (conversation.kind === 'group' && member.role === 'member') throw AppError.forbidden('Only owners and admins can edit the group');
     const avatarUrl =
       patch.avatarAssetId === undefined ? undefined : patch.avatarAssetId === null ? null : await this.avatarUrlFor(userId, patch.avatarAssetId);
 
     const out = await this.db.transaction(async (tx) => {
-      await lockConversation(tx, conversationId);
+      const locked = await lockConversation(tx, conversationId);
       if (!(await activeMemberRow(tx, conversationId, userId))) throw AppError.notFound('Conversation not found');
+      const disappearingChanged = patch.disappearingSeconds !== undefined && patch.disappearingSeconds !== locked.disappearingSeconds;
       const [updated] = await tx
         .update(conversations)
         .set({
+          ...(patch.disappearingSeconds !== undefined && { disappearingSeconds: patch.disappearingSeconds }),
           ...(patch.title !== undefined && { title: patch.title }),
           ...(patch.announcement !== undefined && { announcement: patch.announcement || null }),
           ...(avatarUrl !== undefined && { avatarUrl }),
@@ -350,16 +357,25 @@ export class ConversationsService {
       const system = titleChanged
         ? await appendSystemMessage(tx, conversationId, { type: 'title_changed', userId: null, actorId: userId, title: patch.title ?? null })
         : null;
+      const disappearingSystem = disappearingChanged
+        ? await appendSystemMessage(tx, conversationId, {
+            type: 'disappearing_changed',
+            userId: null,
+            actorId: userId,
+            title: null,
+            seconds: patch.disappearingSeconds ?? null,
+          })
+        : null;
       const [counted] = await tx
         .select({ n: count() })
         .from(conversationMembers)
         .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.status, 'active')));
-      return { updated: updated!, system, memberCount: counted?.n ?? 0 };
+      return { updated: updated!, system, disappearingSystem, memberCount: counted?.n ?? 0 };
     });
     this.realtime.emitToConversation(conversationId, 'conversation.updated', toInfo(out.updated, out.memberCount));
-    const system = out.system;
-    if (system) {
-      await bestEffort(this.logger, 'title_changed event', async () =>
+    for (const system of [out.system, out.disappearingSystem]) {
+      if (!system) continue;
+      await bestEffort(this.logger, 'system message event', async () =>
         this.realtime.emitToConversation(conversationId, 'message.new', await loadMessage(this.db, system, null)),
       );
     }

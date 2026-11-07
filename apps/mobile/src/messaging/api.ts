@@ -70,6 +70,8 @@ export function systemText(ev: SystemEvent, name: (userId: string | null) => str
       return t('chat.system.member_left', { name: name(ev.userId) });
     case 'title_changed':
       return t('chat.system.title_changed', { name: name(ev.actorId), title: ev.title ?? '' });
+    case 'disappearing_changed':
+      return t(ev.seconds ? 'chat.system.disappearing_on' : 'chat.system.disappearing_off', { name: name(ev.actorId) });
   }
 }
 

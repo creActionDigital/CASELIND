@@ -278,14 +278,30 @@ describe('coupons', () => {
     const res = await checkout(buyer, { couponCodes: ['GROS'] }).expect(201);
     expect(res.body.orders[0]).toMatchObject({ discountMinor: 10_000, totalMinor: 0 });
     await createCoupon(s.orgId, s.owner, { code: 'X', kind: 'percent', value: 10 }).expect(400);
+    // A minimum needs a currency (percent or fixed).
+    await createCoupon(s.orgId, s.owner, { code: 'NOCUR', kind: 'percent', value: 10, minOrderMinor: 100 }).expect(400);
     await createCoupon(s.orgId, s.owner, { code: 'BAD1', kind: 'percent', value: 91 }).expect(400);
     await createCoupon(s.orgId, s.owner, { code: 'BAD2', kind: 'fixed', value: 10 }).expect(400);
     await createCoupon(s.orgId, s.owner, { code: 'BAD3', kind: 'percent', value: 10, startsAt: '2030-01-02T00:00:00Z', endsAt: '2030-01-01T00:00:00Z' }).expect(400);
   });
 
+  it('applies the right coupon when the same code exists in two organisations of the cart', async () => {
+    const s1 = await seller('CDF');
+    const s2 = await seller('CDF');
+    // Org 1's SAME coupon is in USD (does not fit its CDF group); org 2's fits.
+    await createCoupon(s1.orgId, s1.owner, { code: 'SAMECODE', kind: 'fixed', value: 100, currency: 'USD' }).expect(201);
+    await createCoupon(s2.orgId, s2.owner, { code: 'SAMECODE', kind: 'fixed', value: 1_000, currency: 'CDF' }).expect(201);
+    const buyer = await user();
+    await setItem(buyer, s1.a, 1).expect(200);
+    await setItem(buyer, s2.a, 1).expect(200);
+    const res = await checkout(buyer, { couponCodes: ['SAMECODE'] }).expect(201);
+    const o2 = res.body.orders.find((o: any) => o.orgId === s2.orgId);
+    expect(o2.discountMinor).toBe(1_000);
+  });
+
   it('rejects unusable coupons with details.reason', async () => {
     const s = await seller();
-    await createCoupon(s.orgId, s.owner, { code: 'MIN', kind: 'percent', value: 10, minOrderMinor: 50_000 }).expect(201);
+    await createCoupon(s.orgId, s.owner, { code: 'MIN', kind: 'percent', value: 10, currency: 'CDF', minOrderMinor: 50_000 }).expect(201);
     await createCoupon(s.orgId, s.owner, { code: 'OLD', kind: 'percent', value: 10, startsAt: '2020-01-01T00:00:00Z', endsAt: '2020-02-01T00:00:00Z' }).expect(201);
     await createCoupon(s.orgId, s.owner, { code: 'LATER', kind: 'percent', value: 10, startsAt: '2099-01-01T00:00:00Z' }).expect(201);
     const off = (await createCoupon(s.orgId, s.owner, { code: 'OFF', kind: 'percent', value: 10 }).expect(201)).body;
@@ -580,5 +596,83 @@ describe('account export and purge', () => {
     const seen = await ctx.http.get(`/v1/orgs/${s.orgId}/orders/${order.id}`).set(bearer(s.owner.token)).expect(200);
     expect(seen.body.address).toBeNull();
     expect(seen.body.items).toHaveLength(1);
+  });
+});
+
+describe('coupon currency', () => {
+  it('only applies to orders of its currency and checks the minimum in that currency', async () => {
+    const s = await seller('CDF');
+    const pct = await createCoupon(s.orgId, s.owner, { code: 'CDFONLY', kind: 'percent', value: 10, currency: 'CDF', minOrderMinor: 5_000 }).expect(201);
+    expect(pct.body).toMatchObject({ kind: 'percent', currency: 'CDF', minOrderMinor: 5_000 });
+    await createCoupon(s.orgId, s.owner, { code: 'USDPCT', kind: 'percent', value: 10, currency: 'USD' }).expect(201);
+    const any = await createCoupon(s.orgId, s.owner, { code: 'ANYCUR', kind: 'percent', value: 10 }).expect(201);
+    expect(any.body.currency).toBeNull();
+
+    const buyer = await user();
+    await setItem(buyer, s.a, 1).expect(200);
+    const refused = await checkout(buyer, { couponCodes: ['USDPCT'] });
+    expect(refused.status).toBe(400);
+    expect(refused.body.error.details.reason).toBe('not_applicable');
+    const ok = await checkout(buyer, { couponCodes: ['CDFONLY'] }).expect(201);
+    expect(ok.body.orders[0]).toMatchObject({ discountMinor: 1_000, totalMinor: 9_000 });
+  });
+
+  it('keeps currency-less percentage coupons usable and forbids a minimum without currency in the database', async () => {
+    const s = await seller('USD');
+    const c = await createCoupon(s.orgId, s.owner, { code: 'LEGACY', kind: 'percent', value: 20 }).expect(201);
+    expect(c.body.minOrderMinor).toBe(0);
+    const buyer = await user();
+    await setItem(buyer, s.a, 1).expect(200);
+    await checkout(buyer, { couponCodes: ['LEGACY'] }).expect(201);
+    await expect(ctx.sql.query(`UPDATE coupons SET min_order_minor = 5 WHERE id = $1`, [c.body.id])).rejects.toThrow(/coupons_min_currency_check/);
+  });
+});
+
+describe('seller contact', () => {
+  const detailOf = async (buyer: TU, orderId: string) => (await ctx.http.get(`/v1/orders/${orderId}`).set(bearer(buyer.token)).expect(200)).body;
+  const patchOrg = (orgId: string, who: TU, body: Record<string, unknown>) => ctx.http.patch(`/v1/orgs/${orgId}`).set(bearer(who.token)).send(body);
+  const slugOf = async (orgId: string): Promise<string> => (await ctx.sql.query('SELECT slug FROM organizations WHERE id = $1', [orgId])).rows[0].slug;
+
+  it('points the buyer to the oldest owner by default, or to the member the org chose', async () => {
+    const s = await seller();
+    const support = await user();
+    const stranger = await user();
+    await addMember(s.orgId, s.owner, support, 'support');
+    const buyer = await user();
+    await setItem(buyer, s.a, 1).expect(200);
+    const order = (await checkout(buyer).expect(201)).body.orders[0];
+    expect((await detailOf(buyer, order.id)).contactUserId).toBe(s.owner.id);
+    const seen = (await ctx.http.get(`/v1/orgs/${s.orgId}/orders/${order.id}`).set(bearer(s.owner.token)).expect(200)).body;
+    expect(seen.contactUserId).toBeNull(); // buyer view only
+
+    const org = (await patchOrg(s.orgId, s.owner, { supportUserId: support.id }).expect(200)).body;
+    expect(org.supportUserId).toBe(support.id);
+    expect((await detailOf(buyer, order.id)).contactUserId).toBe(support.id);
+    const pub = (await ctx.http.get(`/v1/public/orgs/${await slugOf(s.orgId)}`).set(bearer(buyer.token)).expect(200)).body;
+    expect(pub.contactUserId).toBe(support.id);
+    // Anonymous visitors never learn the contact (blocks cannot be checked without a viewer).
+    expect((await ctx.http.get(`/v1/public/orgs/${await slugOf(s.orgId)}`).expect(200)).body.contactUserId).toBeNull();
+
+    await patchOrg(s.orgId, s.owner, { supportUserId: stranger.id }).expect(400); // not a member
+    await patchOrg(s.orgId, support, { supportUserId: null }).expect(403); // support has no org.profile.edit
+    await ctx.http.delete(`/v1/orgs/${s.orgId}/members/${support.id}`).set(bearer(s.owner.token)).expect(204);
+    expect((await detailOf(buyer, order.id)).contactUserId).toBe(s.owner.id); // fell back to the owner
+    await patchOrg(s.orgId, s.owner, { supportUserId: null }).expect(200);
+  });
+
+  it('hides the contact when blocked with the buyer, on the order and on the storefront', async () => {
+    const s = await seller();
+    const buyer = await user();
+    await setItem(buyer, s.a, 1).expect(200);
+    const order = (await checkout(buyer).expect(201)).body.orders[0];
+    const slug = await slugOf(s.orgId);
+    await ctx.http.put(`/v1/blocks/${buyer.id}`).set(bearer(s.owner.token)).expect(204);
+    expect((await detailOf(buyer, order.id)).contactUserId).toBeNull();
+    const withToken = await ctx.http.get(`/v1/public/orgs/${slug}`).set(bearer(buyer.token)).expect(200);
+    expect(withToken.body.contactUserId).toBeNull();
+    const anonymous = await ctx.http.get(`/v1/public/orgs/${slug}`).expect(200);
+    expect(anonymous.body.contactUserId).toBeNull();
+    await ctx.http.delete(`/v1/blocks/${buyer.id}`).set(bearer(s.owner.token)).expect(204);
+    expect((await detailOf(buyer, order.id)).contactUserId).toBe(s.owner.id);
   });
 });

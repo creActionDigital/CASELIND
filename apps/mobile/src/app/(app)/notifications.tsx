@@ -11,6 +11,7 @@ import { fetchNotifications, useUnreadCount } from '../../notifications/hooks';
 import { commerceTarget } from '../../shop/order-logic';
 import { sellerTarget } from '../../seller/routing';
 import { socialTarget } from '../../social/routing';
+import { walletTarget } from '../../wallet/routing';
 import { spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, EmptyState, ErrorState, IconButton, Text } from '../../ui';
@@ -63,6 +64,7 @@ export default function NotificationCenter() {
       const target = commerceTarget(n.data);
       if (target) router.push(target);
     }
+    if (n.category === 'payment') return router.push(walletTarget(n.data));
     if (n.category === 'social') {
       const target = socialTarget(n.data);
       if (target) router.push(target);

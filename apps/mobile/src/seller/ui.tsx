@@ -181,6 +181,11 @@ export function sellerErrorMessage(err: unknown, t: (k: MessageKey, p?: Record<s
   if (err instanceof ApiRequestError && err.status === 409) {
     const reason = err.detail<string>('reason');
     if (reason === 'invalid_transition') return t('seller.error.invalidTransition');
+    if (reason === 'stock_negative') return t('seller.error.stockNegative');
+    if (reason === 'stock_not_tracked') return t('seller.error.stockNotTracked');
+    if (reason === 'publish_without_variant') return t('seller.product.errNoVariant');
+    if (reason === 'sku_taken') return t('seller.variant.err.sku_taken');
+    if (reason === 'duplicate_sku_in_request') return t('seller.variant.err.sku_duplicate');
     if (reason === 'code_taken') return t('seller.error.codeTaken');
     if (reason === 'owner_limit') return t('seller.error.ownerLimit');
     if (/negative/i.test(err.message)) return t('seller.error.stockNegative');

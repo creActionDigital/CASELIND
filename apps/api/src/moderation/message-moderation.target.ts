@@ -29,6 +29,7 @@ export class MessageModerationTarget implements OnModuleInit {
           SELECT 1 FROM messages m
           JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = ${viewerId} AND cm.status = 'active'
           WHERE m.id = ${targetId} AND m.recalled_at IS NULL AND m.kind <> 'system' AND m.seq >= cm.first_seq
+            AND (m.expires_at IS NULL OR m.expires_at > now())
             AND NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.message_id = m.id AND h.user_id = ${viewerId})
           LIMIT 1`);
         return res.rows.length > 0;

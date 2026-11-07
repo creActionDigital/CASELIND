@@ -6,10 +6,11 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { ApiRequestError } from '../../../../lib/api';
 import { useI18n, type MessageKey } from '../../../../i18n';
 import { fetchOrders, fetchProducts, sk, useMyOrgs } from '../../../../seller/api';
-import { can } from '../../../../seller/permissions';
+import { can, canReadCatalog, canViewReviews } from '../../../../seller/permissions';
 import { Card, Chips, Loading, SectionTitle } from '../../../../seller/ui';
 import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
+import { canViewFinance } from '../../../../wallet/org-access';
 import { ErrorState, Text } from '../../../../ui';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
@@ -33,7 +34,7 @@ export default function SellerDashboard() {
   const published = useQuery({
     queryKey: sk.count(orgId, 'published-products'),
     queryFn: () => fetchProducts(orgId, 'published'),
-    enabled: can(role, 'catalog.manage'),
+    enabled: canReadCatalog(role),
   });
 
   const title = <Stack.Screen options={{ title: current?.org.name ?? t('seller.title') }} />;
@@ -50,9 +51,10 @@ export default function SellerDashboard() {
   const shortcuts: { icon: Icon; label: MessageKey; path: string; show: boolean }[] = [
     { icon: 'receipt-outline', label: 'seller.orders', path: '/orders', show: can(role, 'orders.view') },
     { icon: 'pricetags-outline', label: 'seller.products', path: '/products', show: can(role, 'catalog.manage') },
-    { icon: 'layers-outline', label: 'seller.stock', path: '/stock', show: can(role, 'catalog.manage') },
+    { icon: 'layers-outline', label: 'seller.stock', path: '/stock', show: canReadCatalog(role) },
     { icon: 'ticket-outline', label: 'seller.coupons', path: '/coupons', show: can(role, 'orders.manage') },
-    { icon: 'star-outline', label: 'seller.reviews', path: '/reviews', show: can(role, 'catalog.manage') },
+    { icon: 'star-outline', label: 'seller.reviews', path: '/reviews', show: canViewReviews(role) },
+    { icon: 'wallet-outline', label: 'wallet.org.card', path: '/wallet', show: canViewFinance(role) },
   ];
 
   return (
@@ -81,14 +83,16 @@ export default function SellerDashboard() {
                 onPress={() => base('/orders')}
               />
             ) : null}
-            {can(role, 'catalog.manage') ? (
+            {canReadCatalog(role) ? (
               <>
-                <Counter
-                  label={t('seller.count.published')}
-                  value={published.isError ? '!' : more(published.data)}
-                  loading={published.isPending}
-                  onPress={() => base('/products')}
-                />
+                {can(role, 'catalog.manage') ? (
+                  <Counter
+                    label={t('seller.count.published')}
+                    value={published.isError ? '!' : more(published.data)}
+                    loading={published.isPending}
+                    onPress={() => base('/products')}
+                  />
+                ) : null}
                 <Counter
                   label={t('seller.count.outOfStock')}
                   value={published.isError ? '!' : outOfStock === null ? '–' : String(outOfStock)}

@@ -55,7 +55,8 @@ export function toCouponRequest(d: CouponDraft): CreateCouponRequest {
     code: d.code.trim(),
     kind: d.kind,
     value,
-    ...(d.kind === 'fixed' ? { currency: d.currency } : {}),
+    // Devise requise pour un montant fixe et pour tout minimum ; un pourcentage sans minimum vaut pour toutes les devises.
+    ...(d.kind === 'fixed' || d.min.trim() ? { currency: d.currency } : {}),
     minOrderMinor: d.min.trim() ? parseDecimalToMinor(d.min, d.currency)! : 0,
     ...(d.startsAt.trim() ? { startsAt: dayToIso(d.startsAt, false)! } : {}),
     ...(d.endsAt.trim() ? { endsAt: dayToIso(d.endsAt, true)! } : {}),

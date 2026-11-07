@@ -1,13 +1,17 @@
 import { z } from 'zod';
+import { exportedKycSchema } from './kyc.js';
 import { sessionSchema } from './auth.js';
 import { mediaMimeSchema, mediaPurposeSchema, mediaStatusSchema } from './media.js';
 import { orgMemberStatusSchema, orgRoleSchema } from './orgs.js';
 import { blockedUserSchema, privacySettingsSchema } from './privacy.js';
 import { exportedConversationSchema, exportedMessageSchema } from './messaging.js';
+import { exportedFavoriteMessageSchema } from './messaging-extras.js';
 import { exportedCommentSchema, exportedFollowSchema, exportedPostSchema } from './social.js';
 import { exportedReportSchema, exportedStorySchema } from './stories.js';
 import { exportedCartItemSchema, exportedOrderSchema, exportedReviewSchema } from './orders.js';
+import { exportedSearchHistorySchema } from './search.js';
 import { meSchema } from './users.js';
+import { exportedWalletSchema } from './wallet.js';
 
 /** A session as listed in the data export: every session, including revoked ones. */
 export const exportedSessionSchema = sessionSchema.omit({ current: true }).extend({
@@ -62,6 +66,9 @@ export const accountExportSchema = z.object({
   sessions: z.array(exportedSessionSchema),
   blocks: z.array(blockedUserSchema),
   securityEvents: z.array(exportedSecurityEventSchema),
+  /** Lot 1c: two-factor status and enrolment date (never the secret or the backup codes). */
+  twoFactorEnabled: z.boolean(),
+  twoFactorEnabledAt: z.iso.datetime().nullable(),
   orgMemberships: z.array(exportedOrgMembershipSchema),
   media: z.array(exportedMediaSchema),
   conversations: z.array(exportedConversationSchema),
@@ -69,6 +76,8 @@ export const accountExportSchema = z.object({
   messagesSent: z.array(exportedMessageSchema),
   /** True when older messages were left out of `messagesSent`. */
   messagesSentTruncated: z.boolean(),
+  /** Lot 3b: messages the user favourited and can still access. */
+  favoriteMessages: z.array(exportedFavoriteMessageSchema),
   /** Lot 4A: the user's (non-deleted) posts and comments, and the accounts they follow. */
   posts: z.array(exportedPostSchema),
   comments: z.array(exportedCommentSchema),
@@ -81,6 +90,12 @@ export const accountExportSchema = z.object({
   reviews: z.array(exportedReviewSchema),
   /** Lot 5B: the lines of the cart (no stock is reserved by it). */
   cart: z.array(exportedCartItemSchema),
+  /** Lot 6B: KYC level and request statuses/dates (no document number, no file). */
+  kyc: exportedKycSchema,
+  /** Lot 7: the search history (own queries only; empty when disabled or cleared). */
+  searchHistory: z.array(exportedSearchHistorySchema),
+  /** Lot 6A: sandbox wallet balances and transactions (no real money). */
+  wallet: exportedWalletSchema,
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;
 

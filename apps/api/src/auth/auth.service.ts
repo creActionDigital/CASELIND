@@ -4,9 +4,11 @@ import {
   type ChallengeResponse,
   ErrorCodes,
   type LoginRequest,
+  type LoginResponse,
   type RegisterRequest,
   type Session,
   type TokenPair,
+  type TwoFactorVerifyRequest,
   type VerifyOtpRequest,
 } from '@caselind/contracts';
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
@@ -21,6 +23,7 @@ import { pushTokens, refreshTokens, sessions, users, type UserRow } from '../db/
 import type { AuthUser } from '../security/auth.guard.js';
 import { PasswordService } from '../security/password.service.js';
 import { TokenService } from '../security/token.service.js';
+import { TwoFactorService } from './identity/two-factor.service.js';
 import { OtpSender } from './otp-sender.js';
 import { OtpService } from './otp.service.js';
 
@@ -66,6 +69,7 @@ export class AuthService {
     private readonly audit: AuditService,
     private readonly realtime: RealtimeService,
     private readonly notifications: NotificationsService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   /**
@@ -126,7 +130,7 @@ export class AuthService {
     return this.createSession({ ...user, status: 'active' }, req.device, meta);
   }
 
-  async login(req: LoginRequest, meta: RequestMeta): Promise<TokenPair> {
+  async login(req: LoginRequest, meta: RequestMeta): Promise<LoginResponse> {
     const user = await this.findByIdentifier(req.identifier);
     if (user?.lockedUntil && user.lockedUntil > new Date()) {
       throw new AppError(423, ErrorCodes.accountLocked, 'Too many failed attempts, try again later', {
@@ -146,18 +150,46 @@ export class AuthService {
       throw new AppError(403, ErrorCodes.accountSuspended, 'This account is not active');
     }
 
-    // Pending deletion (decision, plan Phase 3): a successful login during the grace period
-    // cancels the request. Once the grace period is over the account is refused even if the
-    // maintenance purge has not run yet: the deletion is due and must not be undone silently.
-    let cancelDeletion = false;
-    if (user.deletionRequestedAt) {
-      const dueAt = user.deletionRequestedAt.getTime() + this.env.ACCOUNT_DELETION_GRACE_DAYS * 86_400_000;
-      if (dueAt <= Date.now()) {
-        throw new AppError(403, ErrorCodes.accountSuspended, 'This account is being deleted');
-      }
-      cancelDeletion = true;
-    }
+    const cancelDeletion = this.assertDeletionNotDue(user);
+    // Lot 1c: with 2FA the password only opens a challenge; counters, deletion cancellation and the
+    // session wait for the second factor (POST /auth/2fa/verify).
+    if (await this.twoFactor.isEnabled(user.id)) return this.twoFactor.createLoginChallenge(user.id, req.device);
+    return this.completeLogin(user, cancelDeletion, req.device, meta);
+  }
 
+  /** Second step of a login on an account with 2FA. */
+  async verifyTwoFactor(req: TwoFactorVerifyRequest, meta: RequestMeta): Promise<TokenPair> {
+    const { userId, device } = await this.twoFactor.completeLoginChallenge(req, meta);
+    const [user] = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user || user.status !== 'active') {
+      throw new AppError(403, ErrorCodes.accountSuspended, 'This account is not active');
+    }
+    const cancelDeletion = this.assertDeletionNotDue(user);
+    return this.completeLogin(user, cancelDeletion, device, meta, true);
+  }
+
+  /**
+   * Pending deletion (decision, plan Phase 3): a successful login during the grace period
+   * cancels the request. Once the grace period is over the account is refused even if the
+   * maintenance purge has not run yet: the deletion is due and must not be undone silently.
+   * Returns true when the pending deletion must be cancelled by this login.
+   */
+  private assertDeletionNotDue(user: UserRow): boolean {
+    if (!user.deletionRequestedAt) return false;
+    const dueAt = user.deletionRequestedAt.getTime() + this.env.ACCOUNT_DELETION_GRACE_DAYS * 86_400_000;
+    if (dueAt <= Date.now()) {
+      throw new AppError(403, ErrorCodes.accountSuspended, 'This account is being deleted');
+    }
+    return true;
+  }
+
+  private async completeLogin(
+    user: UserRow,
+    cancelDeletion: boolean,
+    device: Device,
+    meta: RequestMeta,
+    twoFactor = false,
+  ): Promise<TokenPair> {
     if (user.failedLoginCount > 0 || user.lockedUntil || cancelDeletion) {
       await this.db
         .update(users)
@@ -167,15 +199,21 @@ export class AuthService {
     if (cancelDeletion) {
       await this.audit.record({ action: 'auth.deletion_cancelled', subjectUserId: user.id, meta });
     }
-    const pair = await this.createSession(user, req.device, meta);
-    await this.audit.record({ action: 'auth.login', subjectUserId: user.id, sessionId: pair.sessionId, meta });
+    const pair = await this.createSession(user, device, meta);
+    await this.audit.record({
+      action: 'auth.login',
+      subjectUserId: user.id,
+      sessionId: pair.sessionId,
+      meta,
+      ...(twoFactor ? { metadata: { twoFactor: true } } : {}),
+    });
     // Security alert for the user's other devices; fire-and-forget, never fails the login.
     void this.notifications
       .notify({
         userId: user.id,
         category: 'security',
         title: 'Nouvelle connexion',
-        body: req.device.name ?? req.device.platform,
+        body: device.name ?? device.platform,
         urgent: true,
       })
       .catch(() => undefined);
@@ -283,6 +321,7 @@ export class AuthService {
     });
   }
 
+  /** Two-factor authentication deliberately survives a reset: the password step alone never opens a session. */
   async resetPassword(challengeId: string, code: string, newPassword: string, meta: RequestMeta): Promise<void> {
     const userId = await this.otp.verify(challengeId, code, 'password_reset');
     const passwordHash = await this.passwords.hash(newPassword);
@@ -364,7 +403,8 @@ export class AuthService {
     }
   }
 
-  private async createSession(user: UserRow, device: Device, meta: RequestMeta): Promise<TokenPair> {
+  /** Opens a session and issues the first token pair (login, sign-up, 2FA and QR flows). */
+  async createSession(user: UserRow, device: Device, meta: RequestMeta): Promise<TokenPair> {
     const [session] = await this.db
       .insert(sessions)
       .values({

@@ -20,15 +20,12 @@ import {
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrivacyService } from '../privacy/privacy.service.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
+import { insertUserMessage } from './message-insert.js';
 import {
-  activeMemberRow,
   bestEffort,
-  conversationNotFound,
   type Exec,
   loadMessage,
   loadMessages,
-  lockConversation,
-  nextSeq,
   requireActiveMember,
   UUID_RE,
   validationError,
@@ -63,58 +60,31 @@ export class MessagesService {
     if (req.mediaId) await this.assertSendableMedia(userId, req.mediaId);
     if (req.replyToId) await this.assertReplyTarget(userId, conversationId, req.replyToId);
 
-    const out = await this.db.transaction(async (tx) => {
-      await lockConversation(tx, conversationId);
-      if (!(await activeMemberRow(tx, conversationId, userId))) throw conversationNotFound();
-      const [dup] = await tx
-        .select()
-        .from(messages)
-        .where(and(eq(messages.senderId, userId), eq(messages.conversationId, conversationId), eq(messages.clientId, req.clientId)))
-        .limit(1);
-      if (dup) return { row: dup, created: false };
-
-      const seq = await nextSeq(tx, conversationId);
-      const [row] = await tx
-        .insert(messages)
-        .values({
-          conversationId,
-          seq,
-          senderId: userId,
-          kind: req.kind,
-          clientId: req.clientId,
-          body: req.kind === 'text' ? req.body!.trim() : req.body?.trim() || null,
-          mediaId: req.kind === 'media' ? req.mediaId! : null,
-          replyToId: req.replyToId ?? null,
-          mentions,
-        })
-        .returning();
-      // Writing implies having seen everything so far.
-      await tx
-        .update(conversationMembers)
-        .set({ lastDeliveredSeq: seq, lastReadSeq: seq })
-        .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, userId)));
-      // A new message brings the conversation back for those who archived it.
-      await tx
-        .update(conversationMembers)
-        .set({ archived: false })
-        .where(
-          and(
-            eq(conversationMembers.conversationId, conversationId),
-            eq(conversationMembers.status, 'active'),
-            eq(conversationMembers.archived, true),
-            sql`${conversationMembers.userId} <> ${userId}`,
-          ),
-        );
-      return { row: row!, created: true };
-    });
+    const out = await this.db.transaction((tx) =>
+      insertUserMessage(tx, userId, conversationId, {
+        kind: req.kind,
+        clientId: req.clientId,
+        body: req.kind === 'text' ? req.body!.trim() : req.body?.trim() || null,
+        mediaId: req.kind === 'media' ? req.mediaId! : null,
+        replyToId: req.replyToId ?? null,
+        mentions,
+        clearDraft: true,
+      }),
+    );
+    if (out.created) await this.clearDraftEvent(userId, conversationId);
 
     const message = await loadMessage(this.db, out.row, userId);
     if (out.created) await this.afterSend(userId, conversation, out.row, message);
     return { message, created: out.created };
   }
 
+  /** A draft consumed by a send disappears on the user's other devices too. */
+  private async clearDraftEvent(userId: string, conversationId: string): Promise<void> {
+    await bestEffort(this.logger, 'draft event', () => this.realtime.emitToUser(userId, 'draft.updated', { conversationId, body: null }));
+  }
+
   /** Real-time event and push, after the commit; neither can make the request fail. */
-  private async afterSend(senderId: string, conversation: ConversationRow, row: MessageRow, message: Message): Promise<void> {
+  async afterSend(senderId: string, conversation: ConversationRow, row: MessageRow, message: Message): Promise<void> {
     try {
       this.realtime.emitToConversation(conversation.id, 'message.new', { ...message, myReaction: null });
       const recipients = await this.db.execute<{ user_id: string; muted: boolean }>(sql`
@@ -151,7 +121,7 @@ export class MessagesService {
     }
   }
 
-  private async assertDirectOpen(userId: string, conversationId: string): Promise<void> {
+  async assertDirectOpen(userId: string, conversationId: string): Promise<void> {
     const [peer] = await this.db
       .select({ userId: conversationMembers.userId })
       .from(conversationMembers)
@@ -167,7 +137,7 @@ export class MessagesService {
     if (await this.privacy.isBlockedEitherWay(userId, peer.userId)) throw AppError.forbidden('You cannot message this user');
   }
 
-  private async assertMentionsAreMembers(conversationId: string, mentions: string[]): Promise<void> {
+  async assertMentionsAreMembers(conversationId: string, mentions: string[]): Promise<void> {
     if (mentions.length === 0) return;
     const rows = await this.db
       .select({ userId: conversationMembers.userId })
@@ -182,7 +152,7 @@ export class MessagesService {
     if (rows.length !== mentions.length) throw validationError('mentions', 'every mention must be a member of the conversation');
   }
 
-  private async assertSendableMedia(userId: string, mediaId: string): Promise<void> {
+  async assertSendableMedia(userId: string, mediaId: string): Promise<void> {
     const [asset] = await this.db
       .select({ ownerUserId: mediaAssets.ownerUserId, purpose: mediaAssets.purpose, status: mediaAssets.status })
       .from(mediaAssets)
@@ -193,7 +163,7 @@ export class MessagesService {
     }
   }
 
-  private async assertReplyTarget(userId: string, conversationId: string, replyToId: string): Promise<void> {
+  async assertReplyTarget(userId: string, conversationId: string, replyToId: string): Promise<void> {
     const found = await this.visibleMessage(this.db, userId, replyToId);
     if (!found || found.message.conversationId !== conversationId) {
       throw validationError('replyToId', 'must be a message of this conversation');
@@ -214,6 +184,7 @@ export class MessagesService {
           sql`${messages.seq} >= ${member.firstSeq}`,
           q.beforeSeq !== undefined ? lt(messages.seq, q.beforeSeq) : undefined,
           sql`NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.message_id = ${messages.id} AND h.user_id = ${userId})`,
+          sql`(${messages.expiresAt} IS NULL OR ${messages.expiresAt} > now())`,
         ),
       )
       .orderBy(desc(messages.seq))
@@ -222,7 +193,7 @@ export class MessagesService {
   }
 
   /** The message if the user is an active member who may see it (404 semantics otherwise). */
-  private async visibleMessage(
+  async visibleMessage(
     exec: Exec,
     userId: string,
     messageId: string,
@@ -244,6 +215,7 @@ export class MessagesService {
           eq(messages.id, messageId),
           sql`${messages.seq} >= ${conversationMembers.firstSeq}`,
           sql`NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h.message_id = ${messages.id} AND h.user_id = ${userId})`,
+          sql`(${messages.expiresAt} IS NULL OR ${messages.expiresAt} > now())`,
         ),
       )
       .limit(1);

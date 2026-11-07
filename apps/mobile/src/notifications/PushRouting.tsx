@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { commerceTarget } from '../shop/order-logic';
 import { sellerTarget } from '../seller/routing';
 import { socialTarget } from '../social/routing';
+import { walletTarget } from '../wallet/routing';
 import { PUSH_SUPPORTED, registerPushIfGranted } from './push';
 
 /** Monté une fois connecté : rafraîchit le jeton push et ouvre le salon quand on touche une notification. */
@@ -33,6 +34,7 @@ export function PushRouting() {
         if (seller) return router.push(seller);
         const commerce = commerceTarget(data);
         if (commerce) return router.push(commerce);
+        if ((data as { transferId?: unknown } | null)?.transferId) return router.push(walletTarget(data));
         const social = socialTarget(data);
         if (social) router.push(social);
       };

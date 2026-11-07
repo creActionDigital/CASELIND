@@ -27,7 +27,11 @@ export default function AppLayout() {
       <Stack.Screen name="language" options={{ title: t('language.title') }} />
       <Stack.Screen name="search" options={{ title: t('search.title') }} />
       <Stack.Screen name="wallet" options={{ title: t('wallet.title') }} />
-      <Stack.Screen name="seller" options={{ headerShown: false }} />
+      <Stack.Screen name="wallet/send" options={{ title: t('wallet.send.title') }} />
+      <Stack.Screen name="wallet/topup" options={{ title: t('wallet.topup.title') }} />
+      <Stack.Screen name="wallet/receive" options={{ title: t('wallet.receive.title') }} />
+      <Stack.Screen name="wallet/pin" options={{ title: t('wallet.pin.title') }} />
+      <Stack.Screen name="seller"options={{ headerShown: false }} />
       <Stack.Screen name="cart" options={{ title: t('cart.title') }} />
       <Stack.Screen name="shop" options={{ title: t('shop.title') }} />
       <Stack.Screen name="product/[productId]" options={{ title: t('product.title') }} />

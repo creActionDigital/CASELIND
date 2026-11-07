@@ -32,12 +32,14 @@ export const messageMediaSchema = z.object({
 export type MessageMedia = z.infer<typeof messageMediaSchema>;
 
 export const systemEventSchema = z.object({
-  type: z.enum(['group_created', 'member_added', 'member_removed', 'member_left', 'title_changed']),
+  type: z.enum(['group_created', 'member_added', 'member_removed', 'member_left', 'title_changed', 'disappearing_changed']),
   /** Member concerned (added, removed, left). */
   userId: z.uuid().nullable(),
   /** Who did it. */
   actorId: z.uuid().nullable(),
   title: z.string().nullable(),
+  /** Lot 3b, `disappearing_changed`: the new lifetime in seconds, null = off. */
+  seconds: z.number().int().nullable().optional(),
 });
 export type SystemEvent = z.infer<typeof systemEventSchema>;
 
@@ -61,6 +63,10 @@ export const messageSchema = z.object({
   /** The caller's own reaction; always null in realtime events (they are not per-user). */
   myReaction: z.string().nullable(),
   createdAt: z.iso.datetime(),
+  /** Lot 3b: forwarded message (the original author is never exposed). */
+  forwarded: z.boolean(),
+  /** Lot 3b: when a disappearing message stops being served; null = permanent. */
+  expiresAt: z.iso.datetime().nullable(),
 });
 export type Message = z.infer<typeof messageSchema>;
 
@@ -81,6 +87,8 @@ export const sendMessageRequestSchema = z
     mediaId: z.uuid().optional(),
     replyToId: z.uuid().optional(),
     mentions: z.array(z.uuid()).max(MESSAGE_MENTIONS_MAX).optional(),
+    /** Lot 3b: deferred sending, from 1 minute to 30 days ahead. */
+    scheduledAt: z.iso.datetime().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.kind === 'text') {
@@ -120,6 +128,8 @@ export const conversationSchema = z.object({
   mutedUntil: z.iso.datetime().nullable(),
   pinned: z.boolean(),
   archived: z.boolean(),
+  /** Lot 3b: lifetime of new messages in seconds (86400, 604800, 7776000); null = permanent. */
+  disappearingSeconds: z.number().int().nullable(),
   lastActivityAt: z.iso.datetime(),
   createdAt: z.iso.datetime(),
 });
@@ -161,6 +171,8 @@ export const updateConversationRequestSchema = z
     title: titleSchema.optional(),
     announcement: announcementSchema.nullable().optional(),
     avatarAssetId: z.uuid().nullable().optional(),
+    /** Lot 3b: disappearing messages; a direct conversation accepts only this field. */
+    disappearingSeconds: z.union([z.literal(86400), z.literal(604800), z.literal(7776000)]).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'at least one field is required');
 export type UpdateConversationRequest = z.infer<typeof updateConversationRequestSchema>;
@@ -221,6 +233,7 @@ export const conversationInfoSchema = z.object({
   announcement: z.string().nullable(),
   avatarUrl: z.string().nullable(),
   memberCount: z.number().int(),
+  disappearingSeconds: z.number().int().nullable(),
 });
 export type ConversationInfo = z.infer<typeof conversationInfoSchema>;
 

@@ -9,6 +9,7 @@ import {
 } from '@caselind/contracts';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
+import { MessageExtrasService } from '../messaging/message-extras.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { ENV, type Env } from '../config/env.js';
@@ -25,7 +26,10 @@ import {
   reviews,
   organizations,
   follows,
+  kycProfiles,
+  kycSubmissions,
   orgMembers,
+  paymentPins,
   postComments,
   posts,
   reports,
@@ -40,6 +44,8 @@ import { RealtimeService } from '../realtime/realtime.service.js';
 import type { AuthUser } from '../security/auth.guard.js';
 import { PasswordService } from '../security/password.service.js';
 import { UsersService } from '../users/users.service.js';
+import { WalletService } from '../ledger/wallet.service.js';
+import { TwoFactorService } from '../auth/identity/two-factor.service.js';
 
 const DAY_MS = 86_400_000;
 /** The export carries at most this many sent messages (the most recent ones). */
@@ -56,6 +62,9 @@ export class AccountService {
     private readonly privacy: PrivacyService,
     private readonly audit: AuditService,
     private readonly realtime: RealtimeService,
+    private readonly wallets: WalletService,
+    private readonly twoFactor: TwoFactorService,
+    private readonly messageExtras: MessageExtrasService,
   ) {}
 
   /**
@@ -116,7 +125,8 @@ export class AccountService {
         createdAt: mediaAssets.createdAt,
       })
       .from(mediaAssets)
-      .where(eq(mediaAssets.ownerUserId, auth.userId))
+      // Identity documents are not listed (nor linked) in the export: the kyc section carries statuses and dates only.
+      .where(and(eq(mediaAssets.ownerUserId, auth.userId), sql`${mediaAssets.purpose} <> 'kyc_document'`))
       .orderBy(asc(mediaAssets.createdAt), asc(mediaAssets.id));
 
     // Lot 3A: the conversations the user is in, and what they wrote (recalled and system messages excluded).
@@ -129,12 +139,21 @@ export class AccountService {
     const sentRows = await this.db
       .select({ id: messages.id, conversationId: messages.conversationId, kind: messages.kind, body: messages.body, createdAt: messages.createdAt })
       .from(messages)
-      .where(and(eq(messages.senderId, auth.userId), isNull(messages.recalledAt)))
+      .where(
+        and(
+          eq(messages.senderId, auth.userId),
+          isNull(messages.recalledAt),
+          sql`(${messages.expiresAt} IS NULL OR ${messages.expiresAt} > now())`,
+        ),
+      )
       .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(EXPORT_MESSAGES_MAX + 1);
     const messagesSentTruncated = sentRows.length > EXPORT_MESSAGES_MAX;
     // The most recent ones, returned oldest first.
     const sentKept = sentRows.slice(0, EXPORT_MESSAGES_MAX).reverse();
+
+    // Lot 3b: favourite messages the user can still reach.
+    const favoriteMessages = await this.messageExtras.exportFavorites(auth.userId);
 
     // Lot 4B: the user's stories (archive included) and the reports they filed.
     const storyRows = await this.db
@@ -191,6 +210,22 @@ export class AccountService {
       .where(eq(reviews.userId, auth.userId))
       .orderBy(asc(reviews.createdAt), asc(reviews.id));
 
+    const wallet = await this.wallets.exportFor(auth.userId);
+    // Lot 6B: KYC level and request statuses/dates; never the document number nor the files.
+    const [kycProfile] = await this.db.select({ level: kycProfiles.level }).from(kycProfiles).where(eq(kycProfiles.userId, auth.userId)).limit(1);
+    const kycRows = await this.db
+      .select({ id: kycSubmissions.id, level: kycSubmissions.level, status: kycSubmissions.status, createdAt: kycSubmissions.createdAt, decidedAt: kycSubmissions.decidedAt })
+      .from(kycSubmissions)
+      .where(eq(kycSubmissions.userId, auth.userId))
+      .orderBy(asc(kycSubmissions.createdAt), asc(kycSubmissions.id));
+    const [pinRow] = await this.db.select({ id: paymentPins.userId }).from(paymentPins).where(eq(paymentPins.userId, auth.userId)).limit(1);
+
+    // Lot 7: the user's own search history.
+    const searchRows = await this.db.execute(sql`
+      SELECT query, scope, created_at FROM search_history WHERE user_id = ${auth.userId}::uuid ORDER BY created_at, id`);
+
+    // Lot 1c: status and enrolment date only, never the secret nor the backup codes.
+    const twoFactor = await this.twoFactor.exportStatus(auth.userId);
     const result: AccountExport = {
       exportedAt: new Date().toISOString(),
       profile,
@@ -205,6 +240,7 @@ export class AccountService {
         revokedAt: s.revokedAt?.toISOString() ?? null,
       })),
       blocks,
+      ...twoFactor,
       securityEvents: eventRows.map((e) => ({
         action: e.action,
         occurredAt: e.occurredAt.toISOString(),
@@ -237,6 +273,7 @@ export class AccountService {
         createdAt: m.createdAt.toISOString(),
       })),
       messagesSentTruncated,
+      favoriteMessages,
       posts: postRows.map((p) => ({ id: p.id, body: p.body, visibility: p.visibility, createdAt: p.createdAt.toISOString() })),
       comments: commentRows.map((c) => ({ id: c.id, postId: c.postId, body: c.body, createdAt: c.createdAt.toISOString() })),
       following: followingRows.map((f) => ({ userId: f.userId, handle: f.handle, followedAt: f.followedAt.toISOString() })),
@@ -267,12 +304,29 @@ export class AccountService {
           .map((i) => ({ title: i.title, variantLabel: i.variantLabel, quantity: i.quantity, unitPriceMinor: i.unitPriceMinor })),
       })),
       cart: cartRows.map((c) => ({ variantId: c.variantId, quantity: c.quantity, addedAt: c.createdAt.toISOString() })),
+      kyc: {
+        level: (kycProfile?.level ?? 0) as 0 | 1 | 2,
+        hasPaymentPin: pinRow !== undefined,
+        submissions: kycRows.map((k) => ({
+          id: k.id,
+          level: k.level,
+          status: k.status,
+          submittedAt: k.createdAt.toISOString(),
+          decidedAt: k.decidedAt?.toISOString() ?? null,
+        })),
+      },
       reviews: reviewRows.map((r) => ({
         id: r.id,
         productId: r.productId,
         rating: r.rating,
         body: r.body,
         createdAt: r.createdAt.toISOString(),
+      })),
+      wallet,
+      searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
+        query: r.query,
+        scope: r.scope,
+        createdAt: new Date(r.created_at).toISOString(),
       })),
     };
     await this.audit.record({

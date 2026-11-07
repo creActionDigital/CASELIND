@@ -74,7 +74,7 @@ export class CouponsService {
             code: normalizeCouponCode(req.code),
             kind: req.kind,
             value: req.value,
-            currency: req.kind === 'fixed' ? (req.currency ?? null) : null,
+            currency: req.currency ?? null,
             minOrderMinor: req.minOrderMinor,
             startsAt: req.startsAt ? new Date(req.startsAt) : null,
             endsAt: req.endsAt ? new Date(req.endsAt) : null,
@@ -155,11 +155,13 @@ export class CouponsService {
       .for('update');
 
     for (const code of normalized) {
-      const matches = found.filter((c) => c.code === code);
+      // The same code may exist in several organisations of the cart: only the coupons that fit a group count.
+      const matches = found.filter(
+        (c) => c.code === code && c.active && groups.some((g) => g.orgId === c.orgId && (!c.currency || g.currency === c.currency.trim())),
+      );
       if (matches.length === 0) throw rejected('not_applicable', code);
       for (const c of matches) {
-        const group = groups.find((g) => g.orgId === c.orgId && (c.kind === 'percent' || g.currency === c.currency?.trim()));
-        if (!c.active || !group) throw rejected('not_applicable', code);
+        const group = groups.find((g) => g.orgId === c.orgId && (!c.currency || g.currency === c.currency.trim()))!;
         const key = `${group.orgId}|${group.currency}`;
         if (applied.has(key)) throw rejected('not_applicable', code);
         if ((c.startsAt && c.startsAt > now) || (c.endsAt && c.endsAt <= now)) throw rejected('expired', code);
@@ -171,7 +173,8 @@ export class CouponsService {
             .where(and(eq(couponRedemptions.couponId, c.id), eq(couponRedemptions.userId, userId), isNull(couponRedemptions.releasedAt)));
           if ((used?.n ?? 0) >= c.maxUsesPerUser) throw rejected('exhausted', code);
         }
-        if (group.subtotalMinor < c.minOrderMinor) throw rejected('min_not_reached', code);
+        // A coupon without currency (legacy percentage) has no minimum: 0015 cleared it.
+        if (c.currency && group.subtotalMinor < c.minOrderMinor) throw rejected('min_not_reached', code);
         applied.set(key, { coupon: c, discountMinor: discountFor(c, group.subtotalMinor) });
       }
     }

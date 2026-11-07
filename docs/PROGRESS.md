@@ -1,5 +1,32 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-07 — Lots 6 (wallet sandbox), 7 (lieux, recherche), 1c, 3b, 5b, OTP, CI et mobile M4a
+
+### Exécution
+Jusqu'à 7 agents en parallèle sur des fichiers disjoints (demande du propriétaire), puis deux revues parallèles (argent et commerce ; identité, messagerie et recherche), suite complète unique et contrôle dans le navigateur.
+
+### Réalisé
+- **6A, ledger et wallet sandbox** (migration 0013) : partie double, écritures append-only, somme nulle vérifiée par la base, solde jamais négatif, verrous ordonnés, idempotence (même clé et autres montants → 409), limites KYC, comptes gelés, réconciliation admin et horaire, recharge de test plafonnée et coupée en production, wallet d'organisation. Flag `wallet.sandbox` ; `wallet.real_money` reste coupé.
+- **6B, KYC, PIN, QR** (0014) : niveaux 0–2 validés à la main par un admin (pas d'auto-validation), numéro de pièce chiffré AES-256-GCM, documents lisibles par le propriétaire et l'admin d'une demande ; PIN Argon2id (5 essais, verrou, `attemptsRemaining`/`lockedUntil`) ; QR marchand HMAC (montant fixe ou libre, expiration, usage unique, révocation).
+- **Envoi des OTP** (ADR-018, `docs/OTP_SETUP.md`) : e-mail Brevo et WhatsApp Cloud API, routage par canal, console en dev, clés exigées en production.
+- **1c** (0018) : TOTP maison (RFC 6238) et codes de secours, connexion en deux étapes, changement d'identifiant par OTP, connexion web par QR (secret de poll hors du QR, jetons délivrés une fois).
+- **3b** (0017) : transfert, favoris, messages éphémères et programmés, brouillons.
+- **7** (0016, ADR-019) : lieux d'organisation triés par distance (haversine sans PostGIS), recherche universelle respectant visibilité, blocages et consentement de découverte, historique contrôlable.
+- **5b** (0015) : contact du vendeur, avis par organisation, `details.reason` sur les 409 du catalogue, rôle `stock`, devise des coupons.
+- **CI** (`e67bcbc`) : GitHub Actions, Dockerfile, `docs/DEPLOYMENT.md` (non exécutés ici : pas de Docker).
+- **Mobile M4a** : puce Wallet avec solde masquable, écran Wallet (USD/CDF, niveau KYC et limites, historique), envoi avec pavé PIN, recharge de test, réception par @handle, PIN, wallet d'organisation ; bandeau « Mode test » partout.
+- **Revues** : 10 défauts corrigés, dont l'idempotence qui renvoyait le premier transfert pour un montant différent (élevé), un interblocage possible des paiements QR, la lecture admin de documents KYC non soumis, `contactUserId` exposé aux anonymes, le secret de session QR et les coordonnées de recherche dans les journaux, la force brute du 2FA (quota auth), un message éphémère signalable après expiration, le test OTP instable.
+
+### Tests réellement exécutés (2026-11-07)
+- `npm run typecheck` : 0 erreur. API : **36 fichiers, 439 tests, 439 réussis** (un test d'export corrigé et relancé seul). Mobile : **9 fichiers, 94 tests, 94 réussis**.
+- **Navigateur intégré contre l'API réelle** : recharge de test de 50 $ ; envoi de 12,50 $ à Bob ; PIN faux → « Essais restants : 4 » ; PIN juste → nouveau solde 37,50 $ ; solde de Bob 12,50 $ côté API ; écran Wallet et historique conformes.
+
+### Limites et décisions ouvertes
+- Aucun argent réel : FlexPay (Q5) à contracter. Envoi des OTP réels : comptes Brevo et Meta à créer (Q2).
+- À trancher : exiger le second facteur pour changer d'identifiant (recommandé) ; délai de `password/forgot` qui distingue un compte connu.
+- Non exercés à l'écran : espace vendeur, wallet d'organisation, recherche (pas encore d'écran mobile), 2FA (pas d'écran mobile).
+- La notification « Nouvelle connexion » affiche « other » comme appareil quand le client ne fournit pas de nom.
+
 ## 2026-11-07 — Mobile M3 (boutique, commandes, espace vendeur)
 
 ### Réalisé (`apps/mobile`)

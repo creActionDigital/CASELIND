@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { fetchStore, fetchStoreProducts } from '../../../shop/api';
 import { shopKeys } from '../../../shop/hooks';
+import { ContactSeller } from '../../../shop/ContactSeller';
 import { ProductGrid } from '../../../shop/ProductGrid';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -69,6 +70,7 @@ export default function StoreScreen() {
         </Text>
       ) : null}
       {o.description ? <Text>{o.description}</Text> : null}
+      <ContactSeller contactUserId={o.contactUserId} />
       {o.openingHours ? <Hours hours={o.openingHours} /> : null}
       <Text variant="heading" accessibilityRole="header" style={{ marginTop: spacing.sm }}>
         {t('shop.store.products')}

@@ -1,72 +1,52 @@
-import type { Product, Review } from '@caselind/contracts';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { OrgReview } from '@caselind/contracts';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useI18n } from '../../../../i18n';
-import { fetchProductReviews, fetchProducts, replyToReview, sk, useMembership } from '../../../../seller/api';
+import { fetchOrgReviews, replyToReview, sk, useMembership } from '../../../../seller/api';
 import { can } from '../../../../seller/permissions';
-import { Card, Chips, Loading, PagedList, sellerErrorMessage, Stars } from '../../../../seller/ui';
+import { Card, Chips, PagedList, sellerErrorMessage, Stars } from '../../../../seller/ui';
 import { spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
-import { Button, EmptyState, ErrorState, Text, TextField } from '../../../../ui';
+import { Button, Text, TextField } from '../../../../ui';
 
-/** Avis sur les produits de la boutique, un produit à la fois, avec réponse du vendeur. */
+type Filter = 'all' | 'unanswered';
+
+/** Avis sur tous les produits de la boutique (un seul fil, filtre « sans réponse »), avec réponse du vendeur. */
 export default function SellerReviews() {
   const { t } = useI18n();
   const { orgId } = useLocalSearchParams<{ orgId: string }>();
-  const products = useQuery({
-    queryKey: [...sk.products(orgId), 'for-reviews'],
-    queryFn: () => fetchProducts(orgId),
+  const { role } = useMembership(orgId);
+  const canReply = can(role, 'orders.manage');
+  const [filter, setFilter] = useState<Filter>('all');
+  const q = useInfiniteQuery({
+    queryKey: [...sk.reviews(orgId), filter],
+    queryFn: ({ pageParam }) => fetchOrgReviews(orgId, filter, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
-  const [picked, setPicked] = useState<string | null>(null);
-
-  const title = <Stack.Screen options={{ title: t('seller.reviews') }} />;
-  if (products.isPending) return <>{title}<Loading /></>;
-  if (products.isError) return <>{title}<ErrorState error={products.error} onRetry={() => products.refetch()} /></>;
-  const list = products.data.items.filter((p) => p.status !== 'draft');
-  if (list.length === 0) return <>{title}<EmptyState icon="star-outline" title={t('seller.reviews.noProductTitle')} body={t('seller.reviews.noProductBody')} /></>;
-  const current = list.find((p) => p.id === picked) ?? list[0];
   return (
     <>
-      {title}
-      <ProductReviews orgId={orgId} products={list} current={current} onPick={setPicked} />
+      <Stack.Screen options={{ title: t('seller.reviews') }} />
+      <PagedList<OrgReview>
+        query={q}
+        keyExtractor={(r) => r.id}
+        header={
+          <Chips
+            options={(['all', 'unanswered'] as Filter[]).map((f) => ({ value: f, label: t(`seller.reviews.filter.${f}` as const) }))}
+            value={filter}
+            onChange={setFilter}
+          />
+        }
+        empty={{ icon: 'star-outline', title: t('seller.reviews.emptyTitle'), body: t('seller.reviews.emptyBody') }}
+        renderItem={({ item: r }) => <ReviewCard orgId={orgId} review={r} canReply={canReply} />}
+      />
     </>
   );
 }
 
-function ProductReviews({ orgId, products, current, onPick }: { orgId: string; products: Product[]; current: Product; onPick: (id: string) => void }) {
-  const { t } = useI18n();
-  const { role } = useMembership(orgId);
-  const canReply = can(role, 'orders.manage');
-  const q = useInfiniteQuery({
-    queryKey: sk.reviews(orgId, current.id),
-    queryFn: ({ pageParam }) => fetchProductReviews(current.id, pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.nextCursor ?? undefined,
-  });
-  const summary = q.data?.pages[0]?.summary;
-  return (
-    <PagedList<Review>
-      query={q}
-      keyExtractor={(r) => r.id}
-      header={
-        <View>
-          <Chips options={products.map((p) => ({ value: p.id, label: p.title }))} value={current.id} onChange={onPick} />
-          {summary && summary.ratingCount > 0 ? (
-            <Text variant="small" muted style={{ paddingHorizontal: spacing.lg }}>
-              {t('seller.reviews.summary', { avg: summary.averageRating?.toFixed(1) ?? '–', n: summary.ratingCount })}
-            </Text>
-          ) : null}
-        </View>
-      }
-      empty={{ icon: 'star-outline', title: t('seller.reviews.emptyTitle'), body: t('seller.reviews.emptyBody') }}
-      renderItem={({ item: r }) => <ReviewCard orgId={orgId} productId={current.id} review={r} canReply={canReply} />}
-    />
-  );
-}
-
-function ReviewCard({ orgId, productId, review: r, canReply }: { orgId: string; productId: string; review: Review; canReply: boolean }) {
+function ReviewCard({ orgId, review: r, canReply }: { orgId: string; review: OrgReview; canReply: boolean }) {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const qc = useQueryClient();
@@ -78,12 +58,15 @@ function ReviewCard({ orgId, productId, review: r, canReply }: { orgId: string; 
     onMutate: () => setError(null),
     onSuccess: () => {
       setEditing(false);
-      void qc.invalidateQueries({ queryKey: sk.reviews(orgId, productId) });
+      void qc.invalidateQueries({ queryKey: sk.reviews(orgId) });
     },
     onError: (e) => setError(sellerErrorMessage(e, t, locale)),
   });
   return (
     <Card>
+      <Text variant="caption" muted numberOfLines={1}>
+        {t('seller.reviews.on', { title: r.product.title })}
+      </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <Stars rating={r.rating} />
         <Text variant="caption" muted style={{ flex: 1 }}>

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { dayToIso, toCouponRequest, validateCoupon, type CouponDraft } from './coupon-form';
 import { formatMinor, minorToDecimalString, parseDecimalToMinor } from './money';
 import { allowedNext, sortNewestFirst } from './order-flow';
-import { can, canAdjustStock } from './permissions';
+import { can, canAdjustStock, canReadCatalog, canViewReviews } from './permissions';
 import { hasErrors, moveItem, toVariantInput, validateVariants, type VariantDraft } from './variants';
 
 const draft = (o: Partial<VariantDraft> = {}): VariantDraft => ({
@@ -75,6 +75,11 @@ describe('role permissions', () => {
     expect(can('stock', 'catalog.manage')).toBe(false);
     expect(canAdjustStock('stock')).toBe(true);
     expect(canAdjustStock('finance')).toBe(false);
+    expect(canReadCatalog('stock')).toBe(true);
+    expect(can('stock', 'catalog.manage')).toBe(false);
+    expect(canReadCatalog('support')).toBe(false);
+    expect(canViewReviews('support')).toBe(true);
+    expect(canViewReviews('stock')).toBe(false);
     expect(can('finance', 'orders.view')).toBe(true);
     expect(can('finance', 'orders.manage')).toBe(false);
   });
@@ -132,6 +137,8 @@ describe('coupon form', () => {
   it('accepts a minimal percent coupon', () => {
     expect(validateCoupon(base)).toEqual({});
     expect(toCouponRequest(base)).toEqual({ code: 'BIENVENUE', kind: 'percent', value: 10, minOrderMinor: 0 });
+    // A minimum on a percentage carries the currency.
+    expect(toCouponRequest({ ...base, min: '20' })).toMatchObject({ kind: 'percent', currency: base.currency, minOrderMinor: 2000 });
   });
   it('rejects out-of-range percentages and bad codes', () => {
     expect(validateCoupon({ ...base, value: '95' }).value).toBe('range');

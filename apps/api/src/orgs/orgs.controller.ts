@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import {
   type CreateOrgRequest,
   createOrgRequestSchema,
@@ -16,9 +16,11 @@ import {
   type UpdateOrgRequest,
   updateOrgRequestSchema,
 } from '@caselind/contracts';
+import type { Request } from 'express';
 import { ReqMeta, type RequestMeta } from '../common/request-meta.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { type AuthUser, CurrentUser, Public } from '../security/auth.guard.js';
+import { SessionVerifier } from '../security/session-verifier.js';
 import { AllowSelfLeaveWhenSuspended, CurrentMembership, type OrgMembership, OrgPermission } from './org.guard.js';
 import { OrgMembersService } from './org-members.service.js';
 import { OrgsService } from './orgs.service.js';
@@ -145,11 +147,17 @@ export class MyOrgsController {
 /** Storefront pages (CDC §5): no token required so they can be indexed and shared. */
 @Controller('public/orgs')
 export class PublicOrgsController {
-  constructor(private readonly orgs: OrgsService) {}
+  constructor(
+    private readonly orgs: OrgsService,
+    private readonly verifier: SessionVerifier,
+  ) {}
 
+  /** No token needed; a valid one only lets `contactUserId` skip members blocked with the caller. */
   @Get(':slug')
   @Public()
-  storefront(@Param('slug') slug: string): Promise<PublicOrg> {
-    return this.orgs.publicBySlug(slug);
+  async storefront(@Param('slug') slug: string, @Req() req: Request): Promise<PublicOrg> {
+    const [scheme, token] = (req.get('authorization') ?? '').split(' ');
+    const viewer = scheme === 'Bearer' && token ? await this.verifier.verify(token) : null;
+    return this.orgs.publicBySlug(slug, viewer?.userId ?? null);
   }
 }

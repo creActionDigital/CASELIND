@@ -109,5 +109,6 @@ export async function hydrateDetail(db: DbExecutor, row: OrderRow): Promise<Orde
     .from(orderEvents)
     .where(eq(orderEvents.orderId, row.id))
     .orderBy(asc(orderEvents.createdAt), asc(orderEvents.id));
-  return { ...order!, events: events.map(toEvent) };
+  // contactUserId is only filled for the buyer (OrdersService.getMine / cancelAsBuyer).
+  return { ...order!, events: events.map(toEvent), contactUserId: null };
 }

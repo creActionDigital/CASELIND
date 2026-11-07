@@ -3,6 +3,7 @@ import {
   type ChallengeResponse,
   forgotPasswordRequestSchema,
   type LoginRequest,
+  type LoginResponse,
   loginRequestSchema,
   refreshRequestSchema,
   type RegisterRequest,
@@ -11,6 +12,8 @@ import {
   resetPasswordRequestSchema,
   type Session,
   type TokenPair,
+  type TwoFactorVerifyRequest,
+  twoFactorVerifyRequestSchema,
   type VerifyOtpRequest,
   verifyOtpRequestSchema,
 } from '@caselind/contracts';
@@ -58,8 +61,22 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  login(@Body(new ZodPipe(loginRequestSchema)) body: LoginRequest, @ReqMeta() meta: RequestMeta): Promise<TokenPair> {
+  login(
+    @Body(new ZodPipe(loginRequestSchema)) body: LoginRequest,
+    @ReqMeta() meta: RequestMeta,
+  ): Promise<LoginResponse> {
     return this.auth.login(body, meta);
+  }
+
+  /** Second step of a login on an account with two-factor authentication (lot 1c). */
+  @Public()
+  @Post('2fa/verify')
+  @HttpCode(200)
+  verifyTwoFactor(
+    @Body(new ZodPipe(twoFactorVerifyRequestSchema)) body: TwoFactorVerifyRequest,
+    @ReqMeta() meta: RequestMeta,
+  ): Promise<TokenPair> {
+    return this.auth.verifyTwoFactor(body, meta);
   }
 
   @Public()

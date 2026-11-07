@@ -179,3 +179,20 @@ export type StorefrontQuery = z.infer<typeof storefrontQuerySchema>;
 /** Public storefront of one organisation: same filters minus org. */
 export const orgStorefrontQuerySchema = storefrontQuerySchema.omit({ orgId: true });
 export type OrgStorefrontQuery = z.infer<typeof orgStorefrontQuerySchema>;
+
+/**
+ * Stable `details.reason` of the catalogue 409s (the message is for humans, never parse it):
+ * - `sku_taken` (+ `field: 'sku'`, `sku` when known): SKU already used by another variant of the organisation;
+ * - `duplicate_sku_in_request` (+ `field: 'sku'`, `sku`): the same SKU twice in one request;
+ * - `publish_without_variant`: a published product needs at least one active variant;
+ * - `stock_not_tracked`: stock adjustment on a variant with `trackStock = false`;
+ * - `stock_negative`: the adjustment would take the stock below 0.
+ */
+export const catalogConflictReasonSchema = z.enum([
+  'sku_taken',
+  'duplicate_sku_in_request',
+  'publish_without_variant',
+  'stock_not_tracked',
+  'stock_negative',
+]);
+export type CatalogConflictReason = z.infer<typeof catalogConflictReasonSchema>;

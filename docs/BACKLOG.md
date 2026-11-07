@@ -7,7 +7,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 ## Ordre imposé
 
 1. Reverse engineering et cartographie WeChat : **v1 faite** (sources publiques ; à enrichir module par module)
-2. **Backend** : en cours (lots 1, 1b, 2, 3, 4 et 5 testés)
+2. **Backend** : en cours (lots 1, 1b, 1c, 2, 3, 3b, 4, 5, 5b, 6 sandbox et 7 testés)
 3. **Mobile** (React Native + Expo) : en cours. M1 (socle, auth, messagerie temps réel, notifications) codé et testé sur Expo web ; validation sur appareil à faire
 4. Intégration mobile ↔ backend, tests et validation
 5. **Web** (React + TS + Vite) : seulement après la validation du mobile
@@ -18,7 +18,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 |---|---|---|---|
 | **1 — Identité** | Socle (config, BD, migrations, erreurs, journaux, rate limit, health), inscription téléphone/e-mail + OTP, connexion, verrouillage, rotation des refresh tokens + détection de rejeu, sessions et révocation à distance, mot de passe oublié, profil et @handle, profil public, journal de sécurité, audit append-only, RBAC plateforme | 39 tests automatisés (voir PROGRESS) | **testé** |
 | **1b — Compléments identité** | Feature flags par pays et par rôle (réglementés coupés par défaut, confirmation explicite verrouillée en transaction) ; confidentialité et blocages ; export des données et demande de suppression (grâce de 30 j, puis anonymisation) ; OpenAPI 3.1 généré depuis Zod (`GET /v1/openapi.json`) ; nettoyage planifié des OTP, refresh tokens et sessions périmés | 82 tests automatisés au total, dont 43 nouveaux (voir PROGRESS). Réglages de confidentialité stockés, appliqués par les lots messagerie et recherche | **testé** |
-| 1c — Reste identité | 2FA TOTP ; changement d'identifiant (téléphone/e-mail) ; connexion web par QR ; Dockerfile + CI ; cache Redis (sessions, flags, throttling) | à détailler au démarrage du lot | planifié |
+| 1c — Reste identité | 2FA TOTP, changement d'identifiant, connexion web par QR ; CI et Dockerfile | 439 tests (voir PROGRESS) | **testé** (CI non exécutée ici) |
 | 2 — Organisations et médias | Organisations, membres et rôles, invitations, vitrine publique ; médias avec détection du type réel, quotas et purge ; intégration avec la suppression de compte | 162 tests (voir PROGRESS) | **testé** |
 | 2b — Reste médias et organisations | Adaptateur S3 + CDN (après Q6), Range/304 vidéo, ré-encodage et suppression EXIF, expiration et limite des invitations, slugs réservés en base, suspension et vérification des organisations par l'admin, suppression d'organisation | | planifié |
 | 3 — Messagerie et notifications | Conversations 1:1 et groupes, messages, pièces jointes, accusés, WebSocket, push Expo, centre de notifications | 223 tests (voir PROGRESS) | **testé** |
@@ -27,8 +27,8 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 4b — Reste social | Listes d’amis proches et audiences personnalisées, salons, live, favoris (C-08), stickers (C-11), tableau de bord créateur (C-12), classement du flux vidéo, limite de débit des publications, accès modérateur aux médias masqués | | planifié |
 | 5 — Commerce | Catalogue, variantes, stock, panier multi-vendeurs, commandes scindées, avis vérifiés, coupons | 330 tests (voir PROGRESS) ; paiement à la livraison seulement (ADR-017) | **testé** |
 | 5b — Reste commerce | Contact du vendeur depuis une commande, avis par organisation, `details.reason` sur les 409 du catalogue, lecture des variantes pour le rôle `stock`, devise du minimum des coupons en pourcentage ; paiement en ligne (après Q5), livraison et suivi (lot 9), promotions et ventes flash (E-05), live shopping (E-07), service client dans le chat (E-06), favoris produits, recherche plein texte avancée | | planifié |
-| 6 — Ledger et wallet (sandbox) | Ledger en partie double append-only, wallet, transferts idempotents, QR marchand signé, KYC par niveaux, **aucun argent réel** | | planifié |
-| 7 — Lieux et recherche | Lieux, proximité (PostGIS en prod), recherche universelle | | planifié |
+| 6 — Ledger et wallet (sandbox) | Ledger en partie double, wallet USD/CDF, transferts idempotents, QR marchand signé, KYC par niveaux, PIN ; **aucun argent réel** | 439 tests | **testé** (sandbox) ; FlexPay après contrat (Q5) |
+| 7 — Lieux et recherche | Lieux par distance (sans PostGIS), recherche universelle, historique contrôlable | 439 tests | **testé** |
 | 8+ | Livraison, mini-apps (OAuth à code éphémère + scopes), IA, mobilité, services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
 
 ## Lots mobile
@@ -38,6 +38,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | M1 — Socle et messagerie | Design system, navigation imposée, en-tête, auth, sessions, confidentialité, messagerie temps réel, notifications, push | **testé** (unitaires + parcours Expo web contre l'API réelle) ; appareil réel à faire |
 | M1b — Reste | Contacts et QR, messages vocaux, recherche, archive, avatars réels, persistance de la langue, compte Expo/EAS pour le push réel | planifié |
 | M3 — Commerce | Boutique, fiche produit, panier, commande (paiement à la livraison), suivi, avis ; espace vendeur (produits, stock, commandes, coupons, avis) | **testé** (unitaires + parcours d'achat Expo web contre l'API réelle) ; espace vendeur non exercé à l'écran |
+| M4a — Wallet | Wallet sandbox, envoi avec PIN, recharge de test, wallet d'organisation | **testé** (unitaires + parcours Expo web) |
 | M2 — Social | Fil, publications, commentaires, profils, Stories, signalements ; design Apple (ADR-016) | **testé** (unitaires + parcours Expo web contre l'API réelle) |
 
 ## Décisions attendues du propriétaire (bloquantes seulement pour leur module)
@@ -45,7 +46,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | # | Question | Bloque | Options / recommandation |
 |---|---|---|---|
 | Q1 | **Pays de lancement et devises** | — | **Décidé le 2026-11-07 : RDC, ville pilote Goma ; devises USD et CDF** (défaut `COMMERCE_CURRENCIES=USD,CDF` conforme) |
-| Q2 | **Fournisseur OTP** (le propriétaire veut du gratuit) | OTP réels en staging et production | Aucun SMS gratuit en RDC. Proposition du 2026-11-07 : e-mail via Brevo (gratuit, 300/jour) + WhatsApp Cloud API (≈ 0,004–0,005 $ par code, à confirmer sur la grille Meta) ; SMS (≈ 0,03 à 0,44 $ selon l’opérateur) en secours seulement. **En attente : création des comptes Brevo et Meta Business par le propriétaire** |
+| Q2 | **Fournisseur OTP** (le propriétaire veut du gratuit) | OTP réels en staging et production | Aucun SMS gratuit en RDC. Décision du 2026-11-07 (ADR-018, code livré, mise en service : docs/OTP_SETUP.md) : e-mail via Brevo (gratuit, 300/jour) + WhatsApp Cloud API (≈ 0,004–0,005 $ par code, à confirmer sur la grille Meta) ; SMS (≈ 0,03 à 0,44 $ selon l’opérateur) en secours seulement. **En attente : création des comptes Brevo et Meta Business par le propriétaire** |
 | Q3 | **Chemins des sources SaaS achetées** | Réutilisation (CDC §3) | Voir [SAAS_INVENTORY.md](SAAS_INVENTORY.md) |
 | Q4 | **Règles CSL Coins** | Module CSL (désactivé) | Ne seront pas inventées (CDC §18) |
 | Q5 | Partenaire Mobile Money | Paiement en ligne, wallet réel | Recommandation du 2026-11-07 : **FlexPay** (agrégateur congolais agréé par la BCC : M-Pesa, Airtel Money, Orange Money, Afrimoney ; USD/CDF), alternative Nomba. **En attente : compte marchand (documents d’entreprise) et grille de frais du fournisseur** |

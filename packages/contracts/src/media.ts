@@ -10,6 +10,8 @@ export const mediaPurposeSchema = z.enum([
   'org_banner',
   'product',
   'document',
+  /** Identity documents (lot 6B): readable by the owner and admins only. */
+  'kyc_document',
 ]);
 export type MediaPurpose = z.infer<typeof mediaPurposeSchema>;
 
@@ -55,6 +57,7 @@ export const MEDIA_ALLOWED_MIMES: Readonly<Record<MediaPurpose, readonly MediaMi
   story: [...IMAGES, ...VIDEOS],
   message: [...IMAGES, ...VIDEOS, ...AUDIO, 'application/pdf'],
   document: ['application/pdf'],
+  kyc_document: [...IMAGES, 'application/pdf'],
 };
 
 export function isMimeAllowedFor(purpose: MediaPurpose, mime: MediaMime): boolean {

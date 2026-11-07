@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { totp } from '../src/auth/identity/totp.js';
 import { bearer, createTestContext, PASSWORD, signUp, type TestContext, uniqueEmail } from './helpers.js';
 
 let ctx: TestContext;
@@ -133,6 +134,18 @@ describe('registration and OTP verification', () => {
     }
     await ctx.http.post('/v1/auth/otp/verify').send({ challengeId: reg.body.challengeId, code: newCode }).expect(200);
   });
+
+  it('resend is not blocked when the database clock is ahead of the process (cooldown 0)', async () => {
+    const email = uniqueEmail();
+    const reg = await ctx.http
+      .post('/v1/auth/register')
+      .send({ identifier: email, password: PASSWORD, displayName: 'Skew' })
+      .expect(202);
+    await ctx.sql.query(`UPDATE otp_challenges SET last_sent_at = now() + interval '1 hour' WHERE id = $1`, [
+      reg.body.challengeId,
+    ]);
+    await ctx.http.post('/v1/auth/otp/resend').send({ challengeId: reg.body.challengeId }).expect(202);
+  });
 });
 
 describe('login', () => {
@@ -260,6 +273,24 @@ describe('password reset', () => {
     await ctx.http.get('/v1/me').set(bearer(tokens.accessToken)).expect(401);
     await ctx.http.post('/v1/auth/login').send({ identifier, password: PASSWORD }).expect(401);
     await ctx.http.post('/v1/auth/login').send({ identifier, password: 'brand-new-password-42' }).expect(200);
+  });
+
+  it('keeps two-factor authentication after a reset: the new password still needs the second factor', async () => {
+    const { identifier, tokens } = await signUp(ctx);
+    const setup = await ctx.http.post('/v1/me/2fa/totp/setup').set(bearer(tokens.accessToken)).expect(200);
+    await ctx.http
+      .post('/v1/me/2fa/totp/enable')
+      .set(bearer(tokens.accessToken))
+      .send({ code: totp(setup.body.secret, Date.now()), password: PASSWORD })
+      .expect(200);
+    const forgot = await ctx.http.post('/v1/auth/password/forgot').send({ identifier }).expect(202);
+    await ctx.http
+      .post('/v1/auth/password/reset')
+      .send({ challengeId: forgot.body.challengeId, code: ctx.otp.lastCodeFor(identifier), newPassword: 'brand-new-password-42' })
+      .expect(204);
+    const login = await ctx.http.post('/v1/auth/login').send({ identifier, password: 'brand-new-password-42' }).expect(200);
+    expect(login.body.twoFactorRequired).toBe(true);
+    expect(login.body.accessToken).toBeUndefined();
   });
 
   it('answers identically for an unknown identifier and sends nothing', async () => {

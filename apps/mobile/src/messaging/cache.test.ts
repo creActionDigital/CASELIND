@@ -37,6 +37,8 @@ function msg(over: Partial<Message>): Message {
     reactions: [],
     myReaction: null,
     createdAt: '2026-01-01T00:00:00.000Z',
+    forwarded: false,
+    expiresAt: null,
     ...over,
   };
 }
@@ -110,6 +112,7 @@ function conv(over: Partial<Conversation>): Conversation {
     archived: false,
     lastActivityAt: '2026-01-01T00:00:00.000Z',
     createdAt: '2026-01-01T00:00:00.000Z',
+    disappearingSeconds: null,
     ...over,
   };
 }

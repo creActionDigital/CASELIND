@@ -10,10 +10,21 @@ import {
   type ConversationMemberList,
   type CreateConversationRequest,
   createConversationRequestSchema,
+  type DraftRequest,
+  draftRequestSchema,
+  type Draft,
+  type FavoriteList,
+  type FavoriteListQuery,
+  favoriteListQuerySchema,
+  type ForwardMessageRequest,
+  forwardMessageRequestSchema,
+  type ForwardMessageResponse,
   type Message,
   type MessageList,
   type MessageListQuery,
   messageListQuerySchema,
+  type ScheduledMessage,
+  type ScheduledMessageList,
   type ReactionRequest,
   reactionRequestSchema,
   type ReceiptRequest,
@@ -37,7 +48,9 @@ import { RequireFlag } from '../flags/flag.guard.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
 import { ConversationsService } from './conversations.service.js';
 import { ConversationMembersService } from './members.service.js';
+import { MessageExtrasService } from './message-extras.service.js';
 import { MessagesService } from './messages.service.js';
+import { ScheduledMessagesService } from './scheduled-messages.service.js';
 
 /** Name of the send handler: the `messaging` throttler (app.module.ts) applies to it alone. */
 export const SEND_MESSAGE_HANDLER = 'send';
@@ -53,6 +66,8 @@ export class ConversationsController {
     private readonly conversations: ConversationsService,
     private readonly members: ConversationMembersService,
     private readonly messages: MessagesService,
+    private readonly extras: MessageExtrasService,
+    private readonly scheduled: ScheduledMessagesService,
   ) {}
 
   /** 201 when created; 200 when the direct conversation with that user already existed. */
@@ -115,10 +130,36 @@ export class ConversationsController {
     @Param('id') id: string,
     @Body(new ZodPipe(sendMessageRequestSchema)) body: SendMessageRequest,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<Message> {
+  ): Promise<Message | ScheduledMessage> {
+    if (body.scheduledAt) {
+      // Lot 3b: nothing is visible and no seq exists until the job sends it (202 new, 200 replay).
+      const { scheduled, created } = await this.scheduled.schedule(user.userId, id, body);
+      res.status(created ? 202 : 200);
+      return scheduled;
+    }
     const { message, created } = await this.messages.send(user.userId, id, body);
     res.status(created ? 201 : 200);
     return message;
+  }
+
+  @Put(':id/draft')
+  putDraft(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(new ZodPipe(draftRequestSchema)) body: DraftRequest,
+  ): Promise<Draft> {
+    return this.extras.putDraft(user.userId, id, body.body);
+  }
+
+  @Get(':id/draft')
+  getDraft(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<Draft> {
+    return this.extras.getDraft(user.userId, id);
+  }
+
+  @Delete(':id/draft')
+  @HttpCode(204)
+  async deleteDraft(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<void> {
+    await this.extras.deleteDraft(user.userId, id);
   }
 
   @Post(':id/delivered')
@@ -182,7 +223,32 @@ export class ConversationsController {
 @Controller('messages')
 @RequireFlag('messaging')
 export class MessagesController {
-  constructor(private readonly messages: MessagesService) {}
+  constructor(
+    private readonly messages: MessagesService,
+    private readonly extras: MessageExtrasService,
+  ) {}
+
+  @Post(':id/forward')
+  @HttpCode(200)
+  forward(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(new ZodPipe(forwardMessageRequestSchema)) body: ForwardMessageRequest,
+  ): Promise<ForwardMessageResponse> {
+    return this.extras.forward(user.userId, id, body);
+  }
+
+  @Put(':id/favorite')
+  @HttpCode(204)
+  async favorite(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<void> {
+    await this.extras.addFavorite(user.userId, id);
+  }
+
+  @Delete(':id/favorite')
+  @HttpCode(204)
+  async unfavorite(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<void> {
+    await this.extras.removeFavorite(user.userId, id);
+  }
 
   @Put(':id/reaction')
   react(
@@ -202,5 +268,34 @@ export class MessagesController {
     @ReqMeta() meta: RequestMeta,
   ): Promise<void> {
     await this.messages.remove(user.userId, id, query.scope, meta);
+  }
+}
+
+/** Lot 3b: the caller's favourite messages and scheduled messages. */
+@Controller('me')
+@RequireFlag('messaging')
+export class MessagingMeController {
+  constructor(
+    private readonly extras: MessageExtrasService,
+    private readonly scheduled: ScheduledMessagesService,
+  ) {}
+
+  @Get('favorites')
+  favorites(
+    @CurrentUser() user: AuthUser,
+    @Query(new ZodPipe(favoriteListQuerySchema)) query: FavoriteListQuery,
+  ): Promise<FavoriteList> {
+    return this.extras.listFavorites(user.userId, query);
+  }
+
+  @Get('scheduled-messages')
+  listScheduled(@CurrentUser() user: AuthUser): Promise<ScheduledMessageList> {
+    return this.scheduled.list(user.userId);
+  }
+
+  @Delete('scheduled-messages/:id')
+  @HttpCode(204)
+  async cancelScheduled(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<void> {
+    await this.scheduled.cancel(user.userId, id);
   }
 }

@@ -40,6 +40,9 @@ import {
 
 const SKU_CONSTRAINT = 'product_variants_org_sku_unique';
 
+const publishWithoutVariant = () =>
+  AppError.conflict('A published product needs at least one active variant', { reason: 'publish_without_variant' });
+
 export function toVariant(v: ProductVariantRow): Variant {
   return {
     id: v.id,
@@ -145,7 +148,7 @@ export class CatalogService {
     await this.checkCategory(req.categoryId ?? null);
     await this.checkMedia(this.db, orgId, req.mediaIds);
     if (req.status === 'published' && !req.variants.some((v) => v.active)) {
-      throw AppError.conflict('A published product needs at least one active variant');
+      throw publishWithoutVariant();
     }
     try {
       const id = await this.db.transaction(async (tx) => {
@@ -173,7 +176,7 @@ export class CatalogService {
       });
       return await this.get(orgId, id);
     } catch (err) {
-      throw this.mapWriteError(err);
+      throw await this.mapWriteError(err, orgId, req.variants);
     }
   }
 
@@ -226,7 +229,7 @@ export class CatalogService {
             .select({ n: sql<number>`count(*)::int` })
             .from(productVariants)
             .where(and(eq(productVariants.productId, productId), eq(productVariants.active, true)));
-          if ((n?.n ?? 0) === 0) throw AppError.conflict('A published product needs at least one active variant');
+          if ((n?.n ?? 0) === 0) throw publishWithoutVariant();
         }
 
         await tx
@@ -248,7 +251,7 @@ export class CatalogService {
         }
       });
     } catch (err) {
-      throw this.mapWriteError(err);
+      throw await this.mapWriteError(err, orgId, req.variants);
     }
     return this.get(orgId, productId);
   }
@@ -282,9 +285,9 @@ export class CatalogService {
         .for('update')
         .limit(1);
       if (!v) throw AppError.notFound('Variant not found');
-      if (!v.trackStock) throw AppError.conflict('Stock is not tracked for this variant');
+      if (!v.trackStock) throw AppError.conflict('Stock is not tracked for this variant', { reason: 'stock_not_tracked' });
       const next = v.stock + req.delta;
-      if (next < 0) throw AppError.conflict('Stock cannot become negative');
+      if (next < 0) throw AppError.conflict('Stock cannot become negative', { reason: 'stock_negative' });
       const [updated] = await tx.update(productVariants).set({ stock: next }).where(eq(productVariants.id, variantId)).returning();
       await tx.insert(stockMovements).values({
         variantId,
@@ -337,7 +340,9 @@ export class CatalogService {
       if (!this.env.COMMERCE_CURRENCIES.includes(v.currency)) {
         throw validationError(`variants.${i}.currency`, `currency must be one of ${this.env.COMMERCE_CURRENCIES.join(', ')}`);
       }
-      if (skus.has(v.sku)) throw AppError.conflict(`Duplicate SKU in the request: ${v.sku}`);
+      if (skus.has(v.sku)) {
+        throw AppError.conflict(`Duplicate SKU in the request: ${v.sku}`, { reason: 'duplicate_sku_in_request', field: 'sku', sku: v.sku });
+      }
       skus.add(v.sku);
     });
   }
@@ -374,9 +379,18 @@ export class CatalogService {
     }
   }
 
-  private mapWriteError(err: unknown): unknown {
+  /** Names the SKU of the request that collides with another variant of the org (best effort). */
+  private async mapWriteError(err: unknown, orgId: string, variants: VariantInput[] | undefined): Promise<unknown> {
     const pg = pgErrorOf(err);
-    if (pg.code === '23505' && pg.constraint === SKU_CONSTRAINT) return AppError.conflict('SKU already used in this organization');
-    return err;
+    if (pg.code !== '23505' || pg.constraint !== SKU_CONSTRAINT) return err;
+    let sku: string | undefined;
+    if (variants && variants.length > 0) {
+      const rows = await this.db
+        .select({ id: productVariants.id, sku: productVariants.sku })
+        .from(productVariants)
+        .where(and(eq(productVariants.orgId, orgId), inArray(productVariants.sku, variants.map((v) => v.sku))));
+      sku = variants.find((v) => rows.some((r) => r.sku === v.sku && r.id !== v.id))?.sku;
+    }
+    return AppError.conflict('SKU already used in this organization', { reason: 'sku_taken', field: 'sku', ...(sku ? { sku } : {}) });
   }
 }

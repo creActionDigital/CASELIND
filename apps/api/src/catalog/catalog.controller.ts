@@ -29,6 +29,10 @@ import { type AuthUser, CurrentUser, Public } from '../security/auth.guard.js';
 import { CatalogService } from './catalog.service.js';
 import { StorefrontService } from './storefront.service.js';
 
+function assertCanReadCatalog(m: OrgMembership): void {
+  if (!roleHasPermission(m.role, 'catalog.manage') && !roleHasPermission(m.role, 'inventory.manage')) throw AppError.forbidden();
+}
+
 /** Seller side. Behind the `commerce` flag; a member without the permission gets 403, a non-member 404. */
 @Controller()
 @RequireFlag('commerce')
@@ -51,18 +55,21 @@ export class CatalogController {
     return this.catalog.create(m.orgId, user.userId, body, meta);
   }
 
+  /** Reading (products and variants with exact stock): `catalog.manage` or `inventory.manage`; writing stays `catalog.manage`. */
   @Get('orgs/:orgId/products')
-  @OrgPermission('catalog.manage')
+  @OrgPermission('org.view')
   list(
     @CurrentMembership() m: OrgMembership,
     @Query(new ZodPipe(orgProductListQuerySchema)) query: OrgProductListQuery,
   ): Promise<ProductList> {
+    assertCanReadCatalog(m);
     return this.catalog.list(m.orgId, query);
   }
 
   @Get('orgs/:orgId/products/:productId')
-  @OrgPermission('catalog.manage')
+  @OrgPermission('org.view')
   get(@CurrentMembership() m: OrgMembership, @Param('productId') productId: string): Promise<Product> {
+    assertCanReadCatalog(m);
     return this.catalog.get(m.orgId, productId);
   }
 

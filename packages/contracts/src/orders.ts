@@ -130,7 +130,14 @@ export const orderEventSchema = z.object({
 });
 export type OrderEvent = z.infer<typeof orderEventSchema>;
 
-export const orderDetailSchema = orderSchema.extend({ events: z.array(orderEventSchema) });
+export const orderDetailSchema = orderSchema.extend({
+  events: z.array(orderEventSchema),
+  /**
+   * Buyer view only (null for the seller): the org member to open a direct conversation with
+   * (`POST /v1/conversations`). Null when the buyer and that member are blocked either way.
+   */
+  contactUserId: z.uuid().nullable(),
+});
 export type OrderDetail = z.infer<typeof orderDetailSchema>;
 
 export const orderListQuerySchema = z.object({
@@ -173,6 +180,7 @@ export const createCouponRequestSchema = z
     kind: z.enum(['percent', 'fixed']),
     /** percent: 1-90. fixed: minor units of `currency`. */
     value: z.number().int().min(1),
+    /** Required for a fixed amount and whenever `minOrderMinor` > 0. When set, the coupon only applies to orders in this currency. */
     currency: currencySchema.optional(),
     minOrderMinor: z.number().int().min(0).default(0),
     startsAt: z.iso.datetime().optional(),
@@ -183,9 +191,11 @@ export const createCouponRequestSchema = z
   .superRefine((v, ctx) => {
     if (v.kind === 'percent') {
       if (v.value > 90) ctx.addIssue({ code: 'custom', path: ['value'], message: 'a percentage is between 1 and 90' });
-      if (v.currency) ctx.addIssue({ code: 'custom', path: ['currency'], message: 'a percentage has no currency' });
     } else if (!v.currency) {
       ctx.addIssue({ code: 'custom', path: ['currency'], message: 'a fixed amount needs a currency' });
+    }
+    if (v.minOrderMinor > 0 && !v.currency) {
+      ctx.addIssue({ code: 'custom', path: ['currency'], message: 'a minimum order amount needs a currency' });
     }
     if (v.startsAt && v.endsAt && Date.parse(v.endsAt) <= Date.parse(v.startsAt)) {
       ctx.addIssue({ code: 'custom', path: ['endsAt'], message: 'endsAt must be after startsAt' });
@@ -274,6 +284,20 @@ export const reviewListSchema = z.object({
   }),
 });
 export type ReviewList = z.infer<typeof reviewListSchema>;
+
+/** GET /orgs/:orgId/reviews: reviews of all the organisation's products. `unanswered` = no seller reply yet. */
+export const orgReviewListQuerySchema = reviewListQuerySchema.extend({
+  status: z.enum(['all', 'unanswered']).default('all'),
+});
+export type OrgReviewListQuery = z.infer<typeof orgReviewListQuerySchema>;
+
+export const orgReviewSchema = reviewSchema.extend({
+  product: z.object({ id: z.uuid(), title: z.string(), imageAssetId: z.uuid().nullable() }),
+});
+export type OrgReview = z.infer<typeof orgReviewSchema>;
+
+export const orgReviewListSchema = z.object({ items: z.array(orgReviewSchema), nextCursor: z.string().nullable() });
+export type OrgReviewList = z.infer<typeof orgReviewListSchema>;
 
 /* ------------------------------------------------------------------ account export */
 

@@ -22,7 +22,37 @@ describe('environment validation', () => {
   });
 
   it('refuses the console OTP provider in production', () => {
-    expect(() => loadEnv({ ...base, NODE_ENV: 'production' })).toThrow(/OTP_PROVIDER/);
+    expect(() => loadEnv({ ...base, NODE_ENV: 'production' })).toThrow(/OTP_EMAIL_PROVIDER[\s\S]*OTP_PHONE_PROVIDER/);
+    expect(() => loadEnv({ ...base, NODE_ENV: 'production', OTP_PROVIDER: 'console' })).toThrow(/console OTP provider/);
+  });
+
+  const prod = { ...base, NODE_ENV: 'production', OTP_EMAIL_PROVIDER: 'brevo', OTP_PHONE_PROVIDER: 'whatsapp' };
+
+  it('requires the keys of the chosen OTP providers in production', () => {
+    expect(() => loadEnv(prod)).toThrow(/BREVO_API_KEY is required[\s\S]*WHATSAPP_ACCESS_TOKEN is required/);
+    expect(() => loadEnv(prod)).toThrow(/OTP_EMAIL_FROM[\s\S]*WHATSAPP_PHONE_NUMBER_ID[\s\S]*WHATSAPP_OTP_TEMPLATE/);
+  });
+
+  it('accepts configured providers and defaults the template language', () => {
+    const env = loadEnv({
+      ...prod,
+      NODE_ENV: 'development',
+      BREVO_API_KEY: 'k',
+      OTP_EMAIL_FROM: 'no-reply@caselind.app',
+      WHATSAPP_PHONE_NUMBER_ID: '1',
+      WHATSAPP_ACCESS_TOKEN: 't',
+      WHATSAPP_OTP_TEMPLATE: 'tpl',
+    });
+    expect(env.WHATSAPP_TEMPLATE_LANG).toBe('fr');
+    expect(env.WHATSAPP_GRAPH_VERSION).toBe('v21.0');
+  });
+
+  it('refuses console for one channel in production and keeps console as the dev default', () => {
+    const keys = { BREVO_API_KEY: 'k', OTP_EMAIL_FROM: 'a@b.cd' };
+    expect(() => loadEnv({ ...base, NODE_ENV: 'production', OTP_EMAIL_PROVIDER: 'brevo', ...keys })).toThrow(
+      /OTP_PHONE_PROVIDER/,
+    );
+    expect(loadEnv({ ...base, NODE_ENV: 'test' }).OTP_EMAIL_PROVIDER).toBeUndefined();
   });
 });
 
