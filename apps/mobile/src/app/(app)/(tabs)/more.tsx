@@ -1,7 +1,8 @@
 import { userFlagsSchema } from '@caselind/contracts';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../../auth/auth-context';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { radius, spacing } from '../../../theme/tokens';
@@ -32,6 +33,7 @@ const MODULES: { key: MessageKey; icon: Icon; flag?: string }[] = [
 export default function More() {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const router = useRouter();
   const flags = useQuery({
     queryKey: ['flags'],
     queryFn: () => api.request('/config/flags', { schema: userFlagsSchema }),
@@ -51,6 +53,17 @@ export default function More() {
         <ErrorState error={flags.error} onRetry={() => flags.refetch()} />
       ) : (
         <View style={styles.grid}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('shop.title')}
+            onPress={() => router.push('/shop')}
+            style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="bag-handle-outline" size={26} color={colors.primary} />
+            <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+              {t('shop.title')}
+            </Text>
+          </Pressable>
           {MODULES.filter((m) => !m.flag || flags.data.flags[m.flag] === true).map((m) => (
             <View
               key={m.key}

@@ -5,13 +5,14 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/auth-context';
 import { useI18n } from '../i18n';
 import { useUnreadCount } from '../notifications/hooks';
+import { useMyOrgs } from '../seller/api';
 import { spacing, TOUCH } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Avatar, Badge, Button, Text } from '../ui';
 import { SheetModal } from './SheetModal';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
-type Path = '/profile' | '/sessions' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports';
+type Path = '/profile' | '/sessions' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/orders' | '/seller' | '/seller/new';
 
 /** Menu Compte : MyProfile, Sessions, Confidentialité, Langue, Déconnexion (avec confirmation). */
 export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -20,6 +21,10 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
   const { me, signOut } = useAuth();
   const router = useRouter();
   const unread = useUnreadCount();
+  // Espace vendeur : membre actif (ou invitation en attente) -> /seller ; sinon proposition de créer sa boutique.
+  const orgs = useMyOrgs().data?.items;
+  const sellerPath: Path = orgs && orgs.length > 0 ? '/seller' : '/seller/new';
+  const hasShop = !!orgs?.some((m) => m.status === 'active');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -34,6 +39,12 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
 
   const items: { icon: Icon; label: string; path: Path }[] = [
     { icon: 'person-outline', label: t('account.profile'), path: '/profile' },
+    { icon: 'receipt-outline', label: t('orders.title'), path: '/orders' },
+    {
+      icon: 'storefront-outline',
+      label: hasShop ? t('seller.title') : orgs && orgs.length > 0 ? t('seller.invitations') : t('seller.createShop'),
+      path: sellerPath,
+    },
     { icon: 'notifications-outline', label: t('account.notifications'), path: '/notifications' },
     { icon: 'options-outline', label: t('account.notificationPreferences'), path: '/notification-preferences' },
     { icon: 'phone-portrait-outline', label: t('account.sessions'), path: '/sessions' },

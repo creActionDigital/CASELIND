@@ -8,6 +8,8 @@ import { useI18n, type MessageKey } from '../../i18n';
 import { formatListTime } from '../../messaging/api';
 import { qk } from '../../messaging/keys';
 import { fetchNotifications, useUnreadCount } from '../../notifications/hooks';
+import { commerceTarget } from '../../shop/order-logic';
+import { sellerTarget } from '../../seller/routing';
 import { socialTarget } from '../../social/routing';
 import { spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
@@ -54,6 +56,13 @@ export default function NotificationCenter() {
     if (!n.readAt) readOne.mutate(n.id);
     const conversationId = n.data.conversationId;
     if (conversationId) return router.push({ pathname: '/messages/[conversationId]', params: { conversationId } });
+    if (n.category === 'commerce') {
+      // `data.orgId` présent : commande reçue par une boutique -> route vendeur ; sinon route acheteur (M3a).
+      const seller = sellerTarget(n.data);
+      if (seller) return router.push(seller);
+      const target = commerceTarget(n.data);
+      if (target) router.push(target);
+    }
     if (n.category === 'social') {
       const target = socialTarget(n.data);
       if (target) router.push(target);

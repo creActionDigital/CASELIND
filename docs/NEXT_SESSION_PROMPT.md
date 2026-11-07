@@ -34,7 +34,7 @@ Backend → **mobile React Native + Expo** → intégration et validation du mob
 
 ## Prochaine étape
 1. Faire valider M1 par le propriétaire sur un appareil (Expo Go ou build de développement) et corriger ses retours ; contrôle visuel à 360 px (en-tête, bouton « + »).
-2. Mobile M2 fait (fil, stories, publication, profils, signalements). Suite : mobile M3 (boutique, panier, commandes, vitrine d'org) sur le lot backend 5, puis lot 6 (ledger et wallet en sandbox). Design : ADR-016 (style Apple), skills `apple-design` et `ui-ux-pro-max`.
+2. Mobile M2 fait (fil, stories, publication, profils, signalements). Mobile M3 fait (boutique, commandes, espace vendeur). Décisions du 2026-11-07 dans `docs/BACKLOG.md` (Q1 RDC/Goma USD+CDF ; Q2 e-mail Brevo + WhatsApp ; Q5 FlexPay ; Q8 connexion Expo à faire par le propriétaire). Suite : connecteurs OTP e-mail et WhatsApp, puis lot 6 (ledger et wallet en sandbox, puis FlexPay). Design : ADR-016 (style Apple), skills `apple-design` et `ui-ux-pro-max`.
 3. Points ouverts du lot 3 dans `docs/BACKLOG.md` (lot 3b) et décision Q8 (compte Expo/EAS pour le push réel).
 
 ## Méthode de travail (décisions déjà prises avec moi)

@@ -27,7 +27,15 @@ export default function AppLayout() {
       <Stack.Screen name="language" options={{ title: t('language.title') }} />
       <Stack.Screen name="search" options={{ title: t('search.title') }} />
       <Stack.Screen name="wallet" options={{ title: t('wallet.title') }} />
+      <Stack.Screen name="seller" options={{ headerShown: false }} />
       <Stack.Screen name="cart" options={{ title: t('cart.title') }} />
+      <Stack.Screen name="shop" options={{ title: t('shop.title') }} />
+      <Stack.Screen name="product/[productId]" options={{ title: t('product.title') }} />
+      <Stack.Screen name="store/[slug]" options={{ title: t('shop.title') }} />
+      <Stack.Screen name="checkout" options={{ title: t('checkout.title') }} />
+      <Stack.Screen name="orders/index" options={{ title: t('orders.title') }} />
+      <Stack.Screen name="orders/[orderId]" options={{ title: t('orders.title') }} />
+      <Stack.Screen name="review/new" options={{ presentation: 'modal', title: t('review.title') }} />
       <Stack.Screen name="messages/[conversationId]" options={{ title: t('messages.room') }} />
       <Stack.Screen name="group/[conversationId]" options={{ title: t('group.info') }} />
       <Stack.Screen name="notifications" options={{ title: t('notifications.title') }} />

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../auth/auth-context';
 import { useI18n } from '../i18n';
 import { useUnreadCount } from '../notifications/hooks';
+import { useCartCount } from '../shop/hooks';
 import { radius, spacing, TOUCH } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Avatar, Badge, IconButton, Text, Wordmark } from '../ui';
@@ -21,6 +22,7 @@ export function AppHeader() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const unread = useUnreadCount();
+  const cartCount = useCartCount();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -43,9 +45,9 @@ export function AppHeader() {
         </Pressable>
         <IconButton
           icon="cart-outline"
-          label={t('header.cart', { n: 0 })}
+          label={t('header.cart', { n: cartCount })}
           onPress={() => router.push('/cart')}
-          badge={<Badge label="0" tone="neutral" />}
+          badge={cartCount > 0 ? <Badge label={cartCount > 99 ? '99+' : String(cartCount)} /> : undefined}
         />
         <Pressable
           accessibilityRole="button"

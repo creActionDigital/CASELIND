@@ -26,7 +26,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 4 — Social | Posts, visibilité, réactions, commentaires, abonnements, stories 24 h, vidéos courtes, signalements et modération | 273 tests (voir PROGRESS) | **testé** |
 | 4b — Reste social | Listes d’amis proches et audiences personnalisées, salons, live, favoris (C-08), stickers (C-11), tableau de bord créateur (C-12), classement du flux vidéo, limite de débit des publications, accès modérateur aux médias masqués | | planifié |
 | 5 — Commerce | Catalogue, variantes, stock, panier multi-vendeurs, commandes scindées, avis vérifiés, coupons | 330 tests (voir PROGRESS) ; paiement à la livraison seulement (ADR-017) | **testé** |
-| 5b — Reste commerce | Paiement en ligne (après Q5), livraison et suivi (lot 9), promotions et ventes flash (E-05), live shopping (E-07), service client dans le chat (E-06), favoris produits, recherche plein texte avancée | | planifié |
+| 5b — Reste commerce | Contact du vendeur depuis une commande, avis par organisation, `details.reason` sur les 409 du catalogue, lecture des variantes pour le rôle `stock`, devise du minimum des coupons en pourcentage ; paiement en ligne (après Q5), livraison et suivi (lot 9), promotions et ventes flash (E-05), live shopping (E-07), service client dans le chat (E-06), favoris produits, recherche plein texte avancée | | planifié |
 | 6 — Ledger et wallet (sandbox) | Ledger en partie double append-only, wallet, transferts idempotents, QR marchand signé, KYC par niveaux, **aucun argent réel** | | planifié |
 | 7 — Lieux et recherche | Lieux, proximité (PostGIS en prod), recherche universelle | | planifié |
 | 8+ | Livraison, mini-apps (OAuth à code éphémère + scopes), IA, mobilité, services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
@@ -37,19 +37,20 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 |---|---|---|
 | M1 — Socle et messagerie | Design system, navigation imposée, en-tête, auth, sessions, confidentialité, messagerie temps réel, notifications, push | **testé** (unitaires + parcours Expo web contre l'API réelle) ; appareil réel à faire |
 | M1b — Reste | Contacts et QR, messages vocaux, recherche, archive, avatars réels, persistance de la langue, compte Expo/EAS pour le push réel | planifié |
+| M3 — Commerce | Boutique, fiche produit, panier, commande (paiement à la livraison), suivi, avis ; espace vendeur (produits, stock, commandes, coupons, avis) | **testé** (unitaires + parcours d'achat Expo web contre l'API réelle) ; espace vendeur non exercé à l'écran |
 | M2 — Social | Fil, publications, commentaires, profils, Stories, signalements ; design Apple (ADR-016) | **testé** (unitaires + parcours Expo web contre l'API réelle) |
 
 ## Décisions attendues du propriétaire (bloquantes seulement pour leur module)
 
 | # | Question | Bloque | Options / recommandation |
 |---|---|---|---|
-| Q1 | **Pays de lancement et devises** | Wallet réel, KYC, fournisseurs SMS/paiement, conformité | Ex. RDC (CDF/USD), Kenya (KES)… Le swahili suggère l'Afrique de l'Est et la RDC. |
-| Q2 | **Fournisseur SMS/OTP** (payant) | OTP en staging et en production | Africa's Talking (couverture Afrique de l'Est), Twilio (global, plus cher), Infobip. Recommandation : Africa's Talking si le lancement se fait en Afrique de l'Est. |
+| Q1 | **Pays de lancement et devises** | — | **Décidé le 2026-11-07 : RDC, ville pilote Goma ; devises USD et CDF** (défaut `COMMERCE_CURRENCIES=USD,CDF` conforme) |
+| Q2 | **Fournisseur OTP** (le propriétaire veut du gratuit) | OTP réels en staging et production | Aucun SMS gratuit en RDC. Proposition du 2026-11-07 : e-mail via Brevo (gratuit, 300/jour) + WhatsApp Cloud API (≈ 0,004–0,005 $ par code, à confirmer sur la grille Meta) ; SMS (≈ 0,03 à 0,44 $ selon l’opérateur) en secours seulement. **En attente : création des comptes Brevo et Meta Business par le propriétaire** |
 | Q3 | **Chemins des sources SaaS achetées** | Réutilisation (CDC §3) | Voir [SAAS_INVENTORY.md](SAAS_INVENTORY.md) |
 | Q4 | **Règles CSL Coins** | Module CSL (désactivé) | Ne seront pas inventées (CDC §18) |
-| Q5 | Partenaire de paiement / Mobile Money | Wallet réel | Flutterwave, Paystack, CinetPay, opérateurs directs : dépend de Q1 |
+| Q5 | Partenaire Mobile Money | Paiement en ligne, wallet réel | Recommandation du 2026-11-07 : **FlexPay** (agrégateur congolais agréé par la BCC : M-Pesa, Airtel Money, Orange Money, Afrimoney ; USD/CDF), alternative Nomba. **En attente : compte marchand (documents d’entreprise) et grille de frais du fournisseur** |
 | Q6 | Hébergement (budget) | Staging et production, TURN/SFU, stockage médias | Option bas coût : VPS + PostgreSQL managé + stockage S3-compatible |
-| Q8 | **Compte Expo / EAS** (gratuit au départ) | Push réel et builds iOS/Android | Recommandation : compte EAS gratuit pour obtenir un `projectId` |
+| Q8 | **Compte Expo / EAS** | Push réel, builds iOS/Android | Le propriétaire indique en avoir un ; la machine n’est pas connectée (`expo whoami` : non connecté) et `app.json` n’a pas de `projectId`. **En attente : `npx expo login` par le propriétaire, puis `eas init`** |
 | Q7 | Découverte de proximité type « People Nearby » (H-09) | — | Recommandation : ne pas la retenir (vie privée) |
 
 ## Risques suivis

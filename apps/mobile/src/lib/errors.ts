@@ -40,6 +40,8 @@ const KNOWN = new Set<string>([
   'error.unauthenticated', 'error.refresh_token_invalid',
   'error.contact_requests_restricted', 'error.recall_window_elapsed', 'error.group_full', 'error.last_owner',
   'error.payload_too_large', 'error.unsupported_media_type', 'error.quota_exceeded',
+  'error.not_purchased', 'error.already_reviewed', 'error.cart_full', 'error.empty_cart',
+  'error.unavailable', 'error.insufficient_stock', 'error.invalid_transition',
 ]);
 function isKnown(key: string): key is MessageKey {
   return KNOWN.has(key);

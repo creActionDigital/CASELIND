@@ -1,5 +1,21 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-07 — Mobile M3 (boutique, commandes, espace vendeur)
+
+### Réalisé (`apps/mobile`)
+- **M3a, acheteur** : boutique (catégories, recherche, filtres, tri, grille), fiche produit (galerie, sélecteur de variantes avec ruptures, quantité, avis), vitrine d'org `store/[slug]`, panier groupé par boutique et devise avec vrai compteur dans l'en-tête, commande (adresse, code promo par boutique, **paiement à la livraison seul**, `clientId`), « Mes commandes » (frise, annulation si en attente, avis sur les lignes livrées), notifications `commerce` qui ouvrent la commande.
+- **M3b, vendeur** : « Espace vendeur » dans le menu Compte (ou « Créer ma boutique », invitations), tableau de bord, éditeur de produit (10 photos réordonnables, variantes, brouillon, publication, archivage), ajustements de stock, commandes reçues (onglets, appel `tel:`, transitions autorisées seulement, annulation avec note), coupons, réponses aux avis ; boutons masqués selon le rôle. Envoi des médias factorisé (`uploadImage(uri, mime, purpose)`).
+- Correction après contrôle visuel : barres d'action du bas (fiche produit, panier, commande) rendues opaques.
+
+### Tests réellement exécutés (2026-11-07)
+- `npm run typecheck` : 0 erreur ; mobile `vitest` : **8 fichiers, 78 tests, 78 réussis**.
+- **Navigateur intégré (375 × 812) contre l'API réelle** : Bob crée « Goma Market » et publie 2 produits (USD et CDF) par l'API ; Alice voit la boutique (prix « 9,00 $US », « 25 000,00 CDF »), ajoute le café 250 g au panier, commande (paiement à la livraison) → commande `CL-EJRB4N5Q` en attente ; Bob la confirme par l'API → Alice voit « Confirmée » et la frise ; stock 25 → 24.
+
+### Limites
+- Espace vendeur et éditeur de produit : codés, non exercés à l'écran.
+- Contrats à compléter (lot 5b) : contact du vendeur depuis une commande, liste des avis par organisation, `details.reason` sur les 409 du catalogue (SKU, publication), lecture des variantes pour le rôle `stock`, devise du minimum d'un coupon en pourcentage.
+- En dev, le mode `--watch` de l'API redémarre en boucle quand Expo touche `node_modules` : lancer l'API compilée (`node --env-file=.env dist/main.js`).
+
 ## 2026-11-07 — Lot backend 5 (commerce)
 
 ### Réalisé
