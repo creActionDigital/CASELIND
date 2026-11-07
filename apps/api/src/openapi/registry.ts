@@ -101,7 +101,47 @@ import {
   storyViewerListSchema,
 } from '@caselind/contracts';
 
+// Lot 5B (cart, orders, coupons, reviews), separate import block.
+import {
+  cancelOrderRequestSchema,
+  cartSchema,
+  checkoutRequestSchema,
+  checkoutResponseSchema,
+  couponListQuerySchema,
+  couponListSchema,
+  couponSchema,
+  createCouponRequestSchema,
+  createReviewRequestSchema,
+  orderDetailSchema,
+  orderListQuerySchema,
+  orderListSchema,
+  paymentMethodListSchema,
+  reviewListQuerySchema,
+  reviewListSchema,
+  reviewReplyRequestSchema,
+  reviewSchema,
+  setCartItemRequestSchema,
+  updateCouponRequestSchema,
+  updateOrderStatusRequestSchema,
+  updateReviewRequestSchema,
+} from '@caselind/contracts';
 // Lot 4A (social), separate import block.
+// Lot 5A (catalogue), separate import block.
+import {
+  adjustStockRequestSchema,
+  createProductRequestSchema,
+  orgProductListQuerySchema,
+  orgStorefrontQuerySchema,
+  productCategoryListSchema,
+  productListSchema,
+  productSchema,
+  storefrontProductDetailSchema,
+  storefrontProductListSchema,
+  storefrontQuerySchema,
+  updateProductRequestSchema,
+  variantSchema,
+} from '@caselind/contracts';
+
 import {
   commentListSchema,
   commentSchema,
@@ -240,6 +280,7 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'put', path: '/v1/media/uploads/{id}/content', summary: 'Send the raw bytes of a pending upload (owner + X-Upload-Token; bad token 403, done 409, larger than announced or than the limit 413, type refused or mismatched 415)', tags: ['media'], auth: 'user', params: { id: z.uuid() }, headers: { 'X-Upload-Token': z.string() }, rawBody: ['application/octet-stream', ...mediaMimeSchema.options], response: mediaAssetSchema, status: 200 },
   { method: 'get', path: '/v1/media/{id}', summary: 'Media metadata (owner: full view, any state; others: reduced view of ready assets they may read, 404 otherwise)', tags: ['media'], auth: 'user', params: { id: z.uuid() }, response: z.union([mediaAssetSchema, mediaAssetPublicSchema]), status: 200 },
   { method: 'get', path: '/v1/media/{id}/content', summary: 'Media bytes with the detected Content-Type (nosniff; PDF as attachment)', tags: ['media'], auth: 'user', params: { id: z.uuid() }, rawResponse: mediaMimeSchema.options, status: 200 },
+  { method: 'get', path: '/v1/public/media/{id}/content', summary: 'Anonymous storefront image: bytes of a ready "product" image attached to a published, non-hidden product of an active public org (anything else: 404); public cache 5 min, nosniff, sandbox CSP', tags: ['media', 'catalog'], auth: 'public', params: { id: z.uuid() }, rawResponse: mediaMimeSchema.options, status: 200 },
   { method: 'delete', path: '/v1/media/{id}', summary: "Delete one of the caller's media and its file (clears the avatar using it); audited", tags: ['media'], auth: 'user', params: { id: z.uuid() }, status: 204 },
   { method: 'patch', path: '/v1/me/avatar', summary: 'Set the avatar to a ready `avatar` upload of the caller, or remove it with null; audited', tags: ['media', 'users'], auth: 'user', body: setAvatarRequestSchema, response: meSchema, status: 200 },
   // Messaging (lot 3A). Non-member or malformed id: 404. Blocked pair: 403 (direct) or 404 (group add).
@@ -287,4 +328,35 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/posts/{id}/comments', summary: 'Comments of a visible post, oldest first (cursor pagination); comments of users blocked with the caller are left out', tags: ['social'], auth: 'user', params: { id: z.string() }, query: socialPageQuerySchema, response: commentListSchema, status: 200 },
   { method: 'post', path: '/v1/posts/{id}/comments', summary: 'Comment a visible post (1-2000 chars); replyToId must be a top-level comment of the same post', tags: ['social'], auth: 'user', params: { id: z.string() }, body: createCommentRequestSchema, response: commentSchema, status: 201 },
   { method: 'delete', path: '/v1/comments/{id}', summary: 'Delete a comment (its author or the post author)', tags: ['social'], auth: 'user', params: { id: z.string() }, status: 204 },
+  // Lot 5A: catalogue. Seller routes need the org permission (non-member 404, member without it 403); flag `commerce` except the public storefront.
+  { method: 'get', path: '/v1/catalog/categories', summary: 'Platform product categories', tags: ['catalog'], auth: 'user', response: productCategoryListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/products', summary: 'Create a product with 1-50 variants (prices in minor units, currency from COMMERCE_CURRENCIES, SKU unique per org: 409), 0-10 ready "product" media of org members; permission catalog.manage', tags: ['catalog'], auth: 'user', params: { orgId: z.string() }, body: createProductRequestSchema, response: productSchema, status: 201 },
+  { method: 'get', path: '/v1/orgs/{orgId}/products', summary: 'Products of the org, all statuses (cursor pagination, filters status and q); permission catalog.manage', tags: ['catalog'], auth: 'user', params: { orgId: z.string() }, query: orgProductListQuerySchema, response: productListSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/products/{productId}', summary: 'One product with exact stock; permission catalog.manage', tags: ['catalog'], auth: 'user', params: { orgId: z.string(), productId: z.string() }, response: productSchema, status: 200 },
+  { method: 'patch', path: '/v1/orgs/{orgId}/products/{productId}', summary: 'Edit a product; listed variants are updated (with id) or added, others untouched; publishing without an active variant: 409', tags: ['catalog'], auth: 'user', params: { orgId: z.string(), productId: z.string() }, body: updateProductRequestSchema, response: productSchema, status: 200 },
+  { method: 'delete', path: '/v1/orgs/{orgId}/products/{productId}', summary: 'Archive a product (never physically deleted; idempotent)', tags: ['catalog'], auth: 'user', params: { orgId: z.string(), productId: z.string() }, status: 204 },
+  { method: 'post', path: '/v1/orgs/{orgId}/variants/{variantId}/stock', summary: 'Adjust stock by a delta (restock|adjustment|damage), journaled; never below 0 (409); permission inventory.manage or catalog.manage', tags: ['catalog'], auth: 'user', params: { orgId: z.string(), variantId: z.string() }, body: adjustStockRequestSchema, response: variantSchema, status: 200 },
+  { method: 'get', path: '/v1/products', summary: 'Marketplace search: published products of active public orgs (q, categoryId, orgId, minPrice, maxPrice, currency, sort recent|price_asc|price_desc, cursor); products of sellers blocked with the caller are hidden', tags: ['catalog'], auth: 'user', query: storefrontQuerySchema, response: storefrontProductListSchema, status: 200 },
+  { method: 'get', path: '/v1/products/{id}', summary: 'Product detail with active variants and inStock (invisible: 404)', tags: ['catalog'], auth: 'user', params: { id: z.string() }, response: storefrontProductDetailSchema, status: 200 },
+  { method: 'get', path: '/v1/public/orgs/{slug}/products', summary: 'Public storefront of an org, no token (unknown, private or suspended org: 404)', tags: ['catalog'], auth: 'public', params: { slug: z.string() }, query: orgStorefrontQuerySchema, response: storefrontProductListSchema, status: 200 },
+  // Lot 5B: cart, orders, coupons, reviews. Behind the `commerce` flag. Unknown, foreign or malformed ids: 404.
+  { method: 'get', path: '/v1/payment-methods', summary: 'Payment methods a checkout accepts (cash_on_delivery only until a payment partner is chosen)', tags: ['orders'], auth: 'user', response: paymentMethodListSchema, status: 200 },
+  { method: 'get', path: '/v1/cart', summary: 'The caller cart grouped by organisation and currency, live prices; lines no longer buyable are listed in unavailable (no stock is reserved)', tags: ['cart'], auth: 'user', response: cartSchema, status: 200 },
+  { method: 'put', path: '/v1/cart/items/{variantId}', summary: 'Set the quantity of a variant (0 removes it; max 99; max 100 lines: 409 cart_full; unknown or unbuyable variant: 404)', tags: ['cart'], auth: 'user', params: { variantId: z.string() }, body: setCartItemRequestSchema, response: cartSchema, status: 200 },
+  { method: 'delete', path: '/v1/cart', summary: 'Empty the cart', tags: ['cart'], auth: 'user', status: 204 },
+  { method: 'post', path: '/v1/orders/checkout', summary: 'One order per (organisation, currency), in one transaction with the stock reservation (refused: 409 details {reason, variantIds}; empty cart: 409). Idempotent per clientId (201 new, 200 replay). Bad coupon: 400 details {reason: expired|exhausted|min_not_reached|not_applicable, code}', tags: ['orders'], auth: 'user', body: checkoutRequestSchema, response: checkoutResponseSchema, status: 201 },
+  { method: 'get', path: '/v1/orders', summary: 'Orders of the caller, newest first (status filter, cursor pagination)', tags: ['orders'], auth: 'user', query: orderListQuerySchema, response: orderListSchema, status: 200 },
+  { method: 'get', path: '/v1/orders/{id}', summary: 'One order of the caller with its status history', tags: ['orders'], auth: 'user', params: { id: z.string() }, response: orderDetailSchema, status: 200 },
+  { method: 'post', path: '/v1/orders/{id}/cancel', summary: 'Cancel an order still pending (409 invalid_transition afterwards); gives the stock and the coupon use back', tags: ['orders'], auth: 'user', params: { id: z.string() }, body: cancelOrderRequestSchema, response: orderDetailSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/orders', summary: 'Orders received by the organisation (orders.view; status filter, cursor pagination)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, query: orderListQuerySchema, response: orderListSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/orders/{id}', summary: 'One order of the organisation with its status history (orders.view)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, response: orderDetailSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/orders/{id}/status', summary: 'Move an order forward (pending, confirmed, preparing, shipped, delivered) or cancel it before shipping; other transitions: 409 invalid_transition; audited; notifies the buyer (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: updateOrderStatusRequestSchema, response: orderDetailSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/coupons', summary: 'Create a coupon (percent 1-90 or fixed amount; code unique per org, case-insensitive: 409 code_taken; audited; orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, body: createCouponRequestSchema, response: couponSchema, status: 201 },
+  { method: 'get', path: '/v1/orgs/{orgId}/coupons', summary: 'Coupons of the organisation, newest first (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, query: couponListQuerySchema, response: couponListSchema, status: 200 },
+  { method: 'patch', path: '/v1/orgs/{orgId}/coupons/{id}', summary: 'Deactivate a coupon (idempotent; audited; orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: updateCouponRequestSchema, response: couponSchema, status: 200 },
+  { method: 'post', path: '/v1/products/{productId}/reviews', summary: 'Review a product (rating 1-5, text up to 2000). Only after a delivered order line for it (403 details.reason not_purchased); one per user and product (409 already_reviewed)', tags: ['reviews'], auth: 'user', params: { productId: z.string() }, body: createReviewRequestSchema, response: reviewSchema, status: 201 },
+  { method: 'get', path: '/v1/products/{productId}/reviews', summary: 'Reviews of a product, newest first, with average and rating distribution (moderation-hidden ones only shown to their author)', tags: ['reviews'], auth: 'user', params: { productId: z.string() }, query: reviewListQuerySchema, response: reviewListSchema, status: 200 },
+  { method: 'patch', path: '/v1/reviews/{reviewId}', summary: 'Edit own review (others: 403)', tags: ['reviews'], auth: 'user', params: { reviewId: z.string() }, body: updateReviewRequestSchema, response: reviewSchema, status: 200 },
+  { method: 'delete', path: '/v1/reviews/{reviewId}', summary: 'Delete own review (others: 403)', tags: ['reviews'], auth: 'user', params: { reviewId: z.string() }, status: 204 },
+  { method: 'post', path: '/v1/orgs/{orgId}/reviews/{reviewId}/reply', summary: 'Reply as the seller to a review of one of the organisation products (replaces a previous reply; orders.manage)', tags: ['reviews', 'orgs'], auth: 'user', params: { orgId: z.string(), reviewId: z.string() }, body: reviewReplyRequestSchema, response: reviewSchema, status: 200 },
 ];

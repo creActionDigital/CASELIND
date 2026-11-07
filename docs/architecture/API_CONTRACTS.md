@@ -202,6 +202,30 @@ Migration `0010_stories_moderation.sql` (`stories`, `story_views`, `reports`). F
 - **Compte** : l'export ajoute `stories` et `reportsFiled` ; la purge supprime stories et vues (fichiers via le circuit médias), et anonymise les signalements déposés (signaleur et détails effacés). La maintenance horaire supprime les vues des stories expirées depuis plus de 30 jours.
 - **Points ouverts** : liste « amis proches » (`closeFriends` / `private_list`) ; lecture du média d'une story par son id seulement pour qui peut voir la story ; l'audit d'une action de modération n'est pas lisible par les modérateurs (route d'audit réservée à `admin`).
 
+## Lot 5A : catalogue (produits, variantes, stock, vitrine)
+
+Migration `0011_catalog.sql` (`product_categories`, `products`, `product_media`, `product_variants`, `stock_movements`) ; flag `commerce` (actif, non réglementé) sur toutes les routes connectées, pas sur la vitrine publique ; `COMMERCE_CURRENCIES` (défaut `USD,CDF`).
+
+- **Catégories** : `GET /v1/catalog/categories` (10 catégories plateforme seedées).
+- **Produits d'une org** (`catalog.manage` ; non-membre 404, rôle sans droit 403) : `POST/GET /v1/orgs/{orgId}/products`, `GET/PATCH/DELETE /v1/orgs/{orgId}/products/{productId}`. Titre 1-140, description ≤ 5000, 0-10 médias `product` prêts d'un membre de l'org (sinon 400), statut `draft|published|archived`, 1-50 variantes `{sku, options, priceMinor (entier > 0, unités mineures), currency ∈ COMMERCE_CURRENCIES, stock initial, trackStock, active}`. SKU unique par org (409). Publier exige une variante active (409). `PATCH.variants` : avec `id` = mise à jour complète de la variante (sans toucher au stock), sans `id` = ajout ; les autres restent. `DELETE` archive (jamais de suppression physique, idempotent).
+- **Stock** : `POST /v1/orgs/{orgId}/variants/{variantId}/stock {delta, reason: restock|adjustment|damage}` (`inventory.manage` ou `catalog.manage`), verrou de ligne, jamais négatif (409), journal append-only `stock_movements` (trigger) avec raisons `initial|restock|adjustment|damage|order_reserved|order_released`.
+- **Vitrine** : `GET /v1/products?q&categoryId&orgId&minPrice&maxPrice&currency&sort=recent|price_asc|price_desc&cursor&limit` et `GET /v1/products/{id}` (publiés, non masqués, org `active` et `public`, vendeur non bloqué avec l'appelant ; sinon 404) ; `GET /v1/public/orgs/{slug}/products` sans jeton. Carte = prix de la variante la moins chère correspondant aux filtres. Recherche `q` : ILIKE titre/description ; index trigram si `pg_trgm` est disponible, sinon btree sur `lower(title)`.
+- **CatalogPort** (`src/commerce/catalog.port.ts`) implémenté par `CatalogPortImpl` : `reserve` verrouille les variantes `FOR UPDATE` triées par id, tout ou rien, `trackStock=false` ne décrémente pas.
+- **Modération** : cible `product` (`hidden`), signalable via `/v1/reports`. Audit : `product.created|published|archived`, `stock.adjusted` (sans texte libre). Export de compte : rien.
+- **Images de la vitrine publique** : `GET /v1/public/media/{id}/content` (sans jeton) sert uniquement un média `product` prêt rattaché à un produit `published`, non masqué, d'une org `active` et `public` (sinon 404) ; mêmes en-têtes que `/v1/media/{id}/content` (nosniff, CSP sandbox, `inline`), `Cache-Control: public, max-age=300`, budget de débit dédié (5 × `RATE_LIMIT_PER_MINUTE`) au lieu du défaut. `GET /v1/public/orgs/{slug}/products` renvoie des `coverUrl` pointant vers cette route ; `/v1/products*` (connecté) garde `/v1/media/{id}/content`. Tout autre média reste privé.
+- **Port** : `price`, `reserve` et `productExists` appliquent la même visibilité acheteur que la vitrine (publié, non masqué, org `active` et `public`, vendeur non bloqué avec l'acheteur) : un tel article n'entre pas au panier (404) et fait échouer le checkout (409 `unavailable`).
+
 ## Lots suivants — contrats prévus (non implémentés)
 
 Les routes sont listées dans [WECHAT_FUNCTIONAL_MAP.md](../reverse-engineering/WECHAT_FUNCTIONAL_MAP.md), colonne « API & données ». Chacune sera ajoutée ici au moment de son implémentation, avec son schéma dans `packages/contracts`.
+
+## Lot 5B : panier, commandes, coupons, avis vérifiés
+
+Tout est derrière le flag `commerce`. Montants en unités mineures. Seul mode de paiement : `cash_on_delivery` (port `PaymentMethods`, `GET /v1/payment-methods`) ; aucun montant ne transite par CASELIND.
+
+- Panier : `GET /v1/cart` (groupes par organisation et devise, prix courants, `unavailable`), `PUT /v1/cart/items/:variantId {quantity 0..99}` (max 100 lignes : 409 `cart_full`), `DELETE /v1/cart`. Aucune réservation de stock.
+- Checkout : `POST /v1/orders/checkout {clientId, address, paymentMethod, couponCodes?}` -> `{orders}` (201, 200 en rejeu). Une commande par (organisation, devise), une transaction : réservation via `CatalogPort.reserve` (échec : 409 `details {reason, variantIds}`), panier vide : 409 `empty_cart`.
+- Cycle : `pending > confirmed > preparing > shipped > delivered`, `cancelled` avant `shipped` (acheteur : `pending` seulement ; vendeur jusqu'à `preparing`). Transition interdite : 409 `details {reason: invalid_transition, from, to}`. Historique append-only `order_events`. Acheteur : `GET /v1/orders`, `GET /v1/orders/:id`, `POST /v1/orders/:id/cancel`. Vendeur : `GET /v1/orgs/:orgId/orders[/:id]` (`orders.view`), `POST .../orders/:id/status` (`orders.manage`, audité).
+- Coupons (`orders.manage`) : `POST/GET /v1/orgs/:orgId/coupons`, `PATCH .../coupons/:id {active:false}`. Coupon refusé : 400 `details {reason: expired|exhausted|min_not_reached|not_applicable, code}`. Usage libéré à l'annulation.
+- Avis : `POST/GET /v1/products/:productId/reviews`, `PATCH/DELETE /v1/reviews/:reviewId`, `POST /v1/orgs/:orgId/reviews/:reviewId/reply`. Sans commande livrée : 403 `details.reason not_purchased` ; doublon : 409 `already_reviewed`. Répondre à un avis masqué par la modération : 404. Cible de modération `review`.
+- Compte : l'export ajoute `orders`, `reviews` et `cart` ; la purge efface l'adresse des commandes, le panier et les avis.

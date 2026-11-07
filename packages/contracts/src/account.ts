@@ -6,6 +6,7 @@ import { blockedUserSchema, privacySettingsSchema } from './privacy.js';
 import { exportedConversationSchema, exportedMessageSchema } from './messaging.js';
 import { exportedCommentSchema, exportedFollowSchema, exportedPostSchema } from './social.js';
 import { exportedReportSchema, exportedStorySchema } from './stories.js';
+import { exportedCartItemSchema, exportedOrderSchema, exportedReviewSchema } from './orders.js';
 import { meSchema } from './users.js';
 
 /** A session as listed in the data export: every session, including revoked ones. */
@@ -75,6 +76,11 @@ export const accountExportSchema = z.object({
   /** Lot 4B: the user's stories (active and archived) and the reports they filed. */
   stories: z.array(exportedStorySchema),
   reportsFiled: z.array(exportedReportSchema),
+  /** Lot 5B: the user's orders (with their own address) and reviews. */
+  orders: z.array(exportedOrderSchema),
+  reviews: z.array(exportedReviewSchema),
+  /** Lot 5B: the lines of the cart (no stock is reserved by it). */
+  cart: z.array(exportedCartItemSchema),
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;
 

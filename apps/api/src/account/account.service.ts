@@ -7,7 +7,7 @@ import {
   type MediaMime,
   type ReportReason,
 } from '@caselind/contracts';
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
@@ -19,6 +19,10 @@ import {
   conversations,
   mediaAssets,
   messages,
+  cartItems,
+  orderItems,
+  orders,
+  reviews,
   organizations,
   follows,
   orgMembers,
@@ -162,6 +166,31 @@ export class AccountService {
       .where(eq(follows.followerId, auth.userId))
       .orderBy(asc(follows.createdAt), asc(follows.followeeId));
 
+    // Lot 5B: the user's orders (their own address, no data about other people) and reviews.
+    const orderRows = await this.db
+      .select()
+      .from(orders)
+      .where(eq(orders.buyerId, auth.userId))
+      .orderBy(asc(orders.createdAt), asc(orders.id));
+    const orderItemRows =
+      orderRows.length > 0
+        ? await this.db
+            .select()
+            .from(orderItems)
+            .where(inArray(orderItems.orderId, orderRows.map((o) => o.id)))
+            .orderBy(asc(orderItems.title), asc(orderItems.id))
+        : [];
+    const cartRows = await this.db
+      .select({ variantId: cartItems.variantId, quantity: cartItems.quantity, createdAt: cartItems.createdAt })
+      .from(cartItems)
+      .where(eq(cartItems.userId, auth.userId))
+      .orderBy(asc(cartItems.createdAt), asc(cartItems.variantId));
+    const reviewRows = await this.db
+      .select({ id: reviews.id, productId: reviews.productId, rating: reviews.rating, body: reviews.body, createdAt: reviews.createdAt })
+      .from(reviews)
+      .where(eq(reviews.userId, auth.userId))
+      .orderBy(asc(reviews.createdAt), asc(reviews.id));
+
     const result: AccountExport = {
       exportedAt: new Date().toISOString(),
       profile,
@@ -224,6 +253,25 @@ export class AccountService {
         reason: r.reason as ReportReason,
         details: r.details,
         status: r.status,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      orders: orderRows.map((o) => ({
+        number: o.number,
+        status: o.status,
+        totalMinor: o.totalMinor,
+        currency: o.currency.trim(),
+        createdAt: o.createdAt.toISOString(),
+        address: o.address ?? null,
+        items: orderItemRows
+          .filter((i) => i.orderId === o.id)
+          .map((i) => ({ title: i.title, variantLabel: i.variantLabel, quantity: i.quantity, unitPriceMinor: i.unitPriceMinor })),
+      })),
+      cart: cartRows.map((c) => ({ variantId: c.variantId, quantity: c.quantity, addedAt: c.createdAt.toISOString() })),
+      reviews: reviewRows.map((r) => ({
+        id: r.id,
+        productId: r.productId,
+        rating: r.rating,
+        body: r.body,
         createdAt: r.createdAt.toISOString(),
       })),
     };

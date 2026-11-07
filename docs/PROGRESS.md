@@ -1,5 +1,20 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-07 — Lot backend 5 (commerce)
+
+### Réalisé
+- **5A, catalogue** (migration 0011, `apps/api/src/catalog/*`, flag `commerce`) : 10 catégories, produits d'organisation (brouillon, publié, archivé) avec 1 à 50 variantes (options, SKU unique par org, prix en unités mineures, devise parmi `COMMERCE_CURRENCIES`, défaut `USD,CDF`), stock à mouvements append-only jamais négatif, vitrine connectée (recherche, filtres, tri) et vitrine publique d'org, cible de modération `product`.
+- **5B, commandes** (migration 0012, `src/cart/*`, `src/orders/*`, `src/reviews/*`) : panier multi-vendeurs ; checkout en une transaction → **une commande par (org, devise)**, réservation de stock tout ou rien, copies figées, idempotence `clientId` ; cycle `pending → confirmed → preparing → shipped → delivered` et annulation (stock rendu), événements append-only ; coupons d'org (pourcentage ou montant, minimum, dates, limites) ; avis réservés aux acheteurs livrés, réponse du vendeur ; notifications `commerce` sans données personnelles. **Paiement : `cash_on_delivery` seulement** (ADR-017).
+- Port `CatalogPort` entre catalogue et commandes (aucun module n'importe les tables de l'autre).
+- **Revue** : 1 défaut élevé (une variante d'org privée ou d'un vendeur bloqué pouvait être mise au panier et commandée), 2 moyens (réponse du vendeur à un avis masqué ; panier absent de l'export) ; test d'intégration réel `commerce.e2e` (2 orgs, 2 commandes, stock, rupture, annulation, livraison, avis, course sur le dernier article). Images produit des vitrines publiques servies sans connexion par `GET /v1/public/media/:id/content` (seulement produit publié d'org active et publique).
+
+### Tests réellement exécutés (2026-11-07)
+- `npm run typecheck` : 0 erreur. `npm test -w @caselind/api` : **27 fichiers, 330 tests, 330 réussis** (≈ 148 s).
+
+### Limites
+- Aucun paiement réel (Q5) ; devises à confirmer (Q1). Pas encore d'écrans mobiles commerce (M3).
+- La note d'annulation de l'acheteur reste dans les événements append-only après la purge ; une bascule de `trackStock` entre commande et annulation fausse le stock rendu.
+
 ## 2026-11-02 — Mobile M2 (fil, publications, stories, signalements) et design Apple
 
 ### Réalisé (`apps/mobile`)

@@ -440,6 +440,8 @@ export const fr = {
   'report.target.comment': 'Commentaire',
   'report.target.story': 'Story',
   'report.target.message': 'Message',
+  'report.target.product': 'Produit',
+  'report.target.review': 'Avis',
 } as const;
 
 export type MessageKey = keyof typeof fr;

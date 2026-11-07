@@ -45,7 +45,16 @@ export type AuditAction =
   | 'conversation.member_role_changed'
   | 'message.recalled'
   /** Moderation (lot 4B): metadata {targetType, targetId, action}. Never the content. */
-  | 'moderation.action';
+  | 'moderation.action'
+  /** Commerce (lot 5B): metadata {orgId, orderId, number, from, to} / {orgId, couponId, code}. */
+  | 'commerce.order_status_changed'
+  | 'commerce.coupon_created'
+  | 'commerce.coupon_deactivated'
+  /** Catalogue (lot 5A): metadata {orgId, productId[, variantId, delta, reason]}. No free text. */
+  | 'product.created'
+  | 'product.published'
+  | 'product.archived'
+  | 'stock.adjusted';
 
 export interface AuditInput {
   action: AuditAction;

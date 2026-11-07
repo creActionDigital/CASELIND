@@ -288,6 +288,10 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       // Social (lot 4A): follows and reactions are dropped, posts and comments are deleted.
       await tx.execute(sql`DELETE FROM follows WHERE follower_id = ANY(${idArray}) OR followee_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM post_reactions WHERE user_id = ANY(${idArray})`);
+      // Commerce (lot 5B): the cart and the reviews go; orders stay for the seller accounting with the address erased.
+      await tx.execute(sql`DELETE FROM cart_items WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM reviews WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE orders SET address = NULL, address_anonymized_at = now() WHERE buyer_id = ANY(${idArray}) AND address IS NOT NULL`);
       // Posts and comments are erased for good (bodies included; reactions, media links and replies cascade).
       await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM posts WHERE author_id = ANY(${idArray})`);

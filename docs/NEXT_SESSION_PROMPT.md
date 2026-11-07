@@ -23,8 +23,8 @@ CASELIND est construit en **reproduisant l'écosystème fonctionnel de WeChat/We
 4. `git log --oneline` : `1ee71ff` (lots 1 et 1b), `a30d667` (lot 2). L'identité Git est configurée localement pour ce dépôt.
 
 ## État au 2026-11-02 (fin de session)
-- Backend NestJS 12 (ESM) + PostgreSQL (Drizzle, migrations 0001–0010), contrats Zod dans `packages/contracts`, OpenAPI sur `GET /v1/openapi.json` (toute nouvelle route va dans `apps/api/src/openapi/registry.ts`).
-- Lots backend testés : 1, 1b, 2, 3 (messagerie temps réel + push), **4 (social, stories, modération)**. **273 tests sur 273** (`npm test -w @caselind/api`, à lancer **serveurs de dev arrêtés**, sinon le PostgreSQL embarqué des tests peut redémarrer).
+- Backend NestJS 12 (ESM) + PostgreSQL (Drizzle, migrations 0001–0012), contrats Zod dans `packages/contracts`, OpenAPI sur `GET /v1/openapi.json` (toute nouvelle route va dans `apps/api/src/openapi/registry.ts`).
+- Lots backend testés : 1, 1b, 2, 3 (messagerie temps réel + push), 4 (social, stories, modération), **5 (commerce : catalogue, panier, commandes, coupons, avis ; paiement à la livraison seulement, ADR-017)**. **330 tests sur 330** (`npm test -w @caselind/api`, à lancer **serveurs de dev arrêtés**, sinon le PostgreSQL embarqué des tests peut redémarrer).
 - **Mobile M1 codé** (`apps/mobile`, Expo SDK 58, expo-router) : socle, auth, navigation imposée, messagerie temps réel, notifications. 17 tests unitaires ; parcours vérifié sur Expo web contre l'API réelle. **Pas encore validé sur appareil par le propriétaire.**
 - Lancement local : `.claude/launch.json` (`db`, `api`, `mobile-web`). `apps/api/.env` est local (non versionné) ; la base de dev doit être en UTF-8 (le migrateur refuse sinon).
 - Web non commencé.
@@ -34,7 +34,7 @@ Backend → **mobile React Native + Expo** → intégration et validation du mob
 
 ## Prochaine étape
 1. Faire valider M1 par le propriétaire sur un appareil (Expo Go ou build de développement) et corriger ses retours ; contrôle visuel à 360 px (en-tête, bouton « + »).
-2. Mobile M2 fait (fil, stories, publication, profils, signalements). Suite : lot backend 5 (commerce : catalogue, panier, commandes) puis mobile M3. Design : ADR-016 (style Apple), skills `apple-design` et `ui-ux-pro-max`.
+2. Mobile M2 fait (fil, stories, publication, profils, signalements). Suite : mobile M3 (boutique, panier, commandes, vitrine d'org) sur le lot backend 5, puis lot 6 (ledger et wallet en sandbox). Design : ADR-016 (style Apple), skills `apple-design` et `ui-ux-pro-max`.
 3. Points ouverts du lot 3 dans `docs/BACKLOG.md` (lot 3b) et décision Q8 (compte Expo/EAS pour le push réel).
 
 ## Méthode de travail (décisions déjà prises avec moi)

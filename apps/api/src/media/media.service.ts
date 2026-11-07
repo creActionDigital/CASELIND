@@ -331,6 +331,31 @@ export class MediaService {
     return { asset: toDto(row), stream, filename: `${row.id}.${EXTENSIONS[row.mime as MediaMime]}` };
   }
 
+  /**
+   * Anonymous read: only a ready `product` image attached to a published, non-hidden product of an active, public
+   * organisation. Everything else (any other purpose, draft or archived product, private org...) is a 404.
+   */
+  async openPublicProductContent(id: string): Promise<{ asset: MediaAsset; stream: Readable; filename: string }> {
+    const row = UUID.test(id) ? await this.findById(id) : undefined;
+    if (!row || row.status !== 'ready' || row.purpose !== 'product') throw AppError.notFound('Media not found');
+    const res = await this.db.execute(sql`
+      SELECT 1 FROM product_media pm
+      JOIN products p ON p.id = pm.product_id
+      JOIN organizations o ON o.id = p.org_id
+      WHERE pm.media_id = ${row.id}::uuid AND p.status = 'published' AND NOT p.hidden
+        AND o.status = 'active' AND o.visibility = 'public'
+      LIMIT 1`);
+    if (res.rows.length === 0) throw AppError.notFound('Media not found');
+    let stream: Readable;
+    try {
+      stream = await this.storage.openRead(row.storageKey);
+    } catch (err) {
+      this.logger.error({ err, assetId: row.id }, 'stored media is missing');
+      throw AppError.notFound('Media not found');
+    }
+    return { asset: toDto(row), stream, filename: `${row.id}.${EXTENSIONS[row.mime as MediaMime]}` };
+  }
+
   /** Deletes an asset of the caller (any state) and its file; clears the avatar that used it. */
   async delete(auth: AuthUser, id: string, meta: RequestMeta): Promise<void> {
     const asset = await this.findOwned(auth.userId, id);

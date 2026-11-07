@@ -92,14 +92,14 @@ Disponibilité dans WeChat : **G** = globale, **R** = régionale (surtout Chine 
 
 | ID | Fonction de référence | Dispo / preuve | Équivalent CASELIND | Écart / adaptation | Écrans | API & données | Test d'acceptation | État |
 |---|---|---|---|---|---|---|---|---|
-| E-01 | Boutiques (Weixin Shop / mini-programmes marchands) | G / DP | Marketplace multi-vendeurs + vitrines (CDC §5, §7) | Natif, pas via mini-programme | `Shop`, `OrgPage` | `/v1/orgs`, `/v1/products` | — | planifié (lot 5) |
-| E-02 | Recherche, catégories, filtres | G / CG | Recherche produits/services, filtres, tri | — | `Search`, `Category` | `GET /v1/products?…` | — | planifié |
-| E-03 | Panier, commande, paiement | G / CG | Panier multi-vendeurs → commandes séparées par vendeur | — | `Cart` (icône d'en-tête), `Checkout`, `OrderDetail` | `/v1/cart`, `/v1/orders` | Une commande multi-vendeurs crée N sous-commandes | planifié |
-| E-04 | Livraison et suivi | G / CG | Statuts, suivi, preuve de livraison (CDC §9) | — | `OrderTracking` | `/v1/orders/:id/events` | — | planifié |
+| E-01 | Boutiques (Weixin Shop / mini-programmes marchands) | G / DP | Marketplace multi-vendeurs + vitrines (CDC §5, §7) | Natif, pas via mini-programme | `Shop`, `OrgPage` | `/v1/orgs`, `/v1/products` | — | **testé** (lot 5) : vitrine d'org et produits |
+| E-02 | Recherche, catégories, filtres | G / CG | Recherche produits/services, filtres, tri | — | `Search`, `Category` | `GET /v1/products?…` | — | **testé** (lot 5) : recherche, filtres, tri |
+| E-03 | Panier, commande, paiement | G / CG | Panier multi-vendeurs → commandes séparées par vendeur | — | `Cart` (icône d'en-tête), `Checkout`, `OrderDetail` | `/v1/cart`, `/v1/orders` | Une commande multi-vendeurs crée N sous-commandes | **testé** (lot 5) : panier multi-vendeurs, commandes scindées ; paiement à la livraison seulement |
+| E-04 | Livraison et suivi | G / CG | Statuts, suivi, preuve de livraison (CDC §9) | — | `OrderTracking` | `/v1/orders/:id/events` | — | **testé** (lot 5) : événements de commande ; livraison au lot 9 |
 | E-05 | Promotions, coupons, ventes flash | G / CG | Promotions configurables | — | `Promotions` | — | — | planifié |
 | E-06 | Service client dans le chat | G / CG | Chat commercial (B-17) | — | — | — | — | planifié |
 | E-07 | Live shopping | G / DP | C-06 + produits épinglés | — | `LiveRoom` | — | — | planifié |
-| E-08 | Avis et notes | partiel / CG | Avis vérifiés (achat confirmé) | Anti-faux avis | `Reviews` | `/v1/products/:id/reviews` | Seul un acheteur livré peut noter | planifié |
+| E-08 | Avis et notes | partiel / CG | Avis vérifiés (achat confirmé) | Anti-faux avis | `Reviews` | `/v1/products/:id/reviews` | Seul un acheteur livré peut noter | **testé** (lot 5) : avis d'acheteurs livrés |
 
 ## F. Mini-programmes et services
 

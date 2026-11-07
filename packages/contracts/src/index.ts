@@ -11,3 +11,5 @@ export * from './messaging.js';
 export * from './notifications.js';
 export * from './social.js';
 export * from './stories.js';
+export * from './catalog.js';
+export * from './orders.js';

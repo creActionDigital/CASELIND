@@ -442,4 +442,6 @@ export const en: Record<MessageKey, string> = {
   'report.target.comment': 'Comment',
   'report.target.story': 'Story',
   'report.target.message': 'Message',
+  'report.target.product': 'Product',
+  'report.target.review': 'Review',
 };

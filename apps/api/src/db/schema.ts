@@ -211,3 +211,5 @@ export * from './schema-messaging.js';
 export * from './schema-notifications.js';
 export * from './schema-social.js';
 export * from './schema-stories.js';
+export * from './schema-catalog.js';
+export * from './schema-orders.js';

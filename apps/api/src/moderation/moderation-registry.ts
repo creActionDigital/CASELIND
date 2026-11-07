@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-export type ModerationTargetType = 'user' | 'post' | 'comment' | 'story' | 'message';
+export type ModerationTargetType = 'user' | 'post' | 'comment' | 'story' | 'message' | 'product' | 'review';
 
 /** What a content module exposes to reports and moderation. Registered in the module's onModuleInit. */
 export interface ModerationTarget {

@@ -72,6 +72,12 @@ const envSchema = z
     REALTIME_SESSION_RECHECK_SECONDS: z.coerce.number().int().min(0).max(3600).default(60),
     /** Maximum active members of one group conversation. */
     MESSAGING_GROUP_MAX_MEMBERS: z.coerce.number().int().min(2).max(5000).default(500),
+    /** Lot 5A: currencies a variant price may use (comma-separated ISO 4217 codes). */
+    COMMERCE_CURRENCIES: z
+      .string()
+      .default('USD,CDF')
+      .transform((v) => v.split(',').map((c) => c.trim().toUpperCase()).filter((c) => c.length > 0))
+      .refine((a) => a.length > 0 && a.every((c) => /^[A-Z]{3}$/.test(c)), 'COMMERCE_CURRENCIES must be a list of ISO 4217 codes'),
     /** How long after sending the author may recall a message for everyone (409 afterwards). */
     MESSAGE_RECALL_WINDOW_SECONDS: z.coerce.number().int().min(0).max(86400).default(120),
   })

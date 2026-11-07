@@ -49,9 +49,25 @@ import { ModerationService } from './moderation/moderation.service.js';
 import { StoriesController } from './stories/stories.controller.js';
 import { StoriesService } from './stories/stories.service.js';
 import { StoryAccessService } from './stories/story-access.js';
+import { CatalogPort } from './commerce/catalog.port.js';
+// Lot 5B (cart, orders, coupons, reviews), separate import block.
+import { CartController } from './cart/cart.controller.js';
+import { CartService } from './cart/cart.service.js';
+import { CouponsService } from './orders/coupons.service.js';
+import { OrdersController, OrgOrdersController } from './orders/orders.controller.js';
+import { OrdersService } from './orders/orders.service.js';
+import { PaymentMethods } from './orders/payment-methods.js';
+import { ReviewsController } from './reviews/reviews.controller.js';
+import { ReviewsService } from './reviews/reviews.service.js';
+// Lot 5A (catalogue), separate import block.
+import { CatalogModerationTarget } from './catalog/catalog-moderation.js';
+import { CatalogPortImpl } from './catalog/catalog-port.impl.js';
+import { CatalogController, PublicCatalogController, StorefrontController } from './catalog/catalog.controller.js';
+import { CatalogService } from './catalog/catalog.service.js';
+import { StorefrontService } from './catalog/storefront.service.js';
 import { MaintenanceService } from './maintenance/maintenance.service.js';
 import { AvatarController } from './media/avatar.controller.js';
-import { MEDIA_THROTTLED_HANDLERS, MediaController } from './media/media.controller.js';
+import { MEDIA_THROTTLED_HANDLERS, MediaController, PublicMediaController } from './media/media.controller.js';
 import { MediaService } from './media/media.service.js';
 import { LocalDiskStorage, MediaStorage } from './media/storage.js';
 import { OpenApiController } from './openapi/openapi.controller.js';
@@ -117,6 +133,13 @@ export class AppModule {
                 ctx.getClass() !== MediaController || !MEDIA_THROTTLED_HANDLERS.has(ctx.getHandler().name),
             },
             {
+              // Anonymous storefront images: a catalogue page loads many, so a larger budget than the default.
+              name: 'publicMedia',
+              ttl: 60_000,
+              limit: env.RATE_LIMIT_PER_MINUTE * 5,
+              skipIf: (ctx) => ctx.getType() !== 'http' || ctx.getClass() !== PublicMediaController,
+            },
+            {
               // Message sending only: every message is a write plus a fan-out to the room and pushes.
               name: 'messaging',
               ttl: 60_000,
@@ -156,6 +179,7 @@ export class AppModule {
         MyOrgsController,
         PublicOrgsController,
         MediaController,
+        PublicMediaController,
         AvatarController,
         ConversationsController,
         MessagesController,
@@ -164,6 +188,14 @@ export class AppModule {
         StoriesController,
         ReportsController,
         ModerationController,
+        CatalogController,
+        StorefrontController,
+        PublicCatalogController,
+        // Lot 5B
+        CartController,
+        OrdersController,
+        OrgOrdersController,
+        ReviewsController,
         ...extraControllers,
       ],
       providers: [
@@ -189,6 +221,17 @@ export class AppModule {
         // Lot 4: follow graph (implemented by the social module) and moderation registry.
         RelationsService,
         ModerationRegistry,
+        // Lot 5: catalogue port used by cart, orders and reviews (replaced by the catalogue implementation).
+        { provide: CatalogPort, useClass: CatalogPortImpl },
+        CatalogService,
+        // Lot 5B
+        CartService,
+        PaymentMethods,
+        CouponsService,
+        OrdersService,
+        ReviewsService,
+        StorefrontService,
+        CatalogModerationTarget,
         FollowsService,
         PostsService,
         CommentsService,
