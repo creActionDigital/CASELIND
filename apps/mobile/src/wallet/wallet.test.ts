@@ -125,3 +125,16 @@ describe('préférences et routage', () => {
     expect(walletTarget({})).toEqual({ pathname: '/wallet' });
   });
 });
+
+import { inPeriod } from './history';
+describe('périodes d’activité', () => {
+  const now = new Date(2026, 5, 15, 12);
+  it('filtre semaine, mois, année', () => {
+    expect(inPeriod(new Date(2026, 5, 12).toISOString(), 'week', now)).toBe(true);
+    expect(inPeriod(new Date(2026, 5, 1).toISOString(), 'week', now)).toBe(false);
+    expect(inPeriod(new Date(2026, 5, 1).toISOString(), 'month', now)).toBe(true);
+    expect(inPeriod(new Date(2026, 4, 30).toISOString(), 'month', now)).toBe(false);
+    expect(inPeriod(new Date(2026, 0, 2).toISOString(), 'year', now)).toBe(true);
+    expect(inPeriod(new Date(2025, 11, 31).toISOString(), 'year', now)).toBe(false);
+  });
+});

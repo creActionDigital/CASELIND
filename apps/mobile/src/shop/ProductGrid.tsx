@@ -4,12 +4,13 @@ import { useRouter } from 'expo-router';
 import { memo, useState, type ReactElement } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useI18n } from '../i18n';
-import { radius, spacing } from '../theme/tokens';
+import { onMedia, radius, shadow, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, EmptyState, ErrorState, Text } from '../ui';
 import { formatMoney } from './format';
 
-export const ProductCard = memo(function ProductCard({ product }: { product: StorefrontProduct }) {
+/** Carte produit : image arrondie, pastille « Rupture » posée dessus (voile uni sombre), nom puis prix. */
+export const ProductCard = memo(function ProductCard({ product, width }: { product: StorefrontProduct; width?: number }) {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -19,19 +20,23 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Sto
       accessibilityRole="button"
       accessibilityLabel={t('shop.productA11y', { title: product.title, price, shop: product.org.name })}
       onPress={() => router.push({ pathname: '/product/[productId]', params: { productId: product.id } })}
-      style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
+      style={({ pressed }) => [styles.card, shadow.card, { width, backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
     >
-      <AuthImage contentUrl={product.coverUrl} label={product.title} style={styles.image} />
+      <View>
+        <AuthImage contentUrl={product.coverUrl} label={product.title} style={styles.image} />
+        {product.inStock ? null : (
+          <View style={styles.badge} importantForAccessibility="no-hide-descendants">
+            <Text variant="caption" color={onMedia}>
+              {t('shop.outOfStock')}
+            </Text>
+          </View>
+        )}
+      </View>
       <View style={styles.info}>
-        <Text variant="small" numberOfLines={2} style={{ fontWeight: '600', minHeight: 40 }}>
+        <Text variant="small" numberOfLines={2} style={styles.name}>
           {product.title}
         </Text>
-        <Text variant="bodyStrong" color={colors.primary}>
-          {t('shop.from', { price })}
-        </Text>
-        <Text variant="caption" muted numberOfLines={1}>
-          {product.inStock ? product.org.name : `${t('shop.outOfStock')} · ${product.org.name}`}
-        </Text>
+        <Text variant="bodyStrong">{price}</Text>
       </View>
     </Pressable>
   );
@@ -90,10 +95,12 @@ export function ProductGrid({ query, header, emptyTitle, emptyBody }: Props) {
 
 const styles = StyleSheet.create({
   pad: { padding: spacing.xl },
-  content: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
+  content: { padding: spacing.lg, gap: spacing.md, flexGrow: 1, paddingBottom: spacing.xxl },
   columns: { gap: spacing.md },
   cell: { flex: 1, maxWidth: '50%' },
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, overflow: 'hidden' },
-  image: { width: '100%', aspectRatio: 1, borderRadius: 0 },
-  info: { padding: spacing.md, gap: spacing.xs },
+  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.xl, padding: spacing.sm },
+  image: { width: '100%', aspectRatio: 1, borderRadius: radius.lg },
+  badge: { position: 'absolute', top: spacing.sm, left: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: 'rgba(0,0,0,0.72)' },
+  info: { paddingHorizontal: spacing.xs, paddingTop: spacing.sm, paddingBottom: spacing.xs, gap: 2 },
+  name: { fontWeight: '600', minHeight: 40 },
 });

@@ -13,6 +13,7 @@ export const orgKindSchema = z.enum([
   'restaurant',
   'hotel',
   'pharmacy',
+  'fuel_station',
   'school',
   'hospital',
   'services',

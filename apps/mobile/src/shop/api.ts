@@ -48,3 +48,7 @@ export const fetchReviews = (productId: string, cursor?: string) =>
   api.request(`/products/${productId}/reviews`, { query: { limit: PAGE, cursor }, schema: reviewListSchema });
 export const createReview = (productId: string, body: { rating: number; body?: string }) =>
   api.request(`/products/${productId}/reviews`, { method: 'POST', body, schema: reviewSchema });
+
+/** Quelques produits récents pour l'Accueil. */
+export const fetchRecentProducts = (limit = 6) =>
+  api.request('/products', { query: { sort: 'recent', limit }, schema: storefrontProductListSchema });

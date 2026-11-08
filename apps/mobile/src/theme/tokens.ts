@@ -64,10 +64,32 @@ export const dark: Palette = {
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
-export const radius = { sm: 10, md: 14, lg: 22, xl: 28, pill: 999 } as const;
+export const radius = { sm: 10, md: 14, lg: 22, xl: 28, xxl: 32, pill: 999 } as const;
+
+/**
+ * Couleur de marque UNIE (logo, bouton central, actions principales) : le propriétaire ne veut pas de
+ * dégradés. Gardé sous forme de paire pour les composants `LinearGradient` existants, qui rendent ainsi
+ * un aplat. Texte blanc dessus : 6,3:1 (AA). Ne pas réintroduire de dégradé décoratif.
+ */
+export const brandColor = '#4F46E5';
+export const brandGradient = [brandColor, brandColor] as const;
+
+/** Surfaces sombres « vitrées » posées sur une photo ou une vidéo (live, visionneuses). */
+export const glass = { dark: 'rgba(17,17,24,0.55)', light: 'rgba(255,255,255,0.18)', border: 'rgba(255,255,255,0.22)' } as const;
+
+/** Police de marque (Poppins, chargée au démarrage) ; un poids = une famille sous React Native. */
+export const fonts = {
+  regular: 'Poppins_400Regular',
+  medium: 'Poppins_500Medium',
+  semibold: 'Poppins_600SemiBold',
+  bold: 'Poppins_700Bold',
+} as const;
 
 /** Texte et icônes posés sur un média ou sur l'overlay (toujours clair, quel que soit le thème). */
 export const onMedia = '#FFFFFF';
+
+/** Marge basse des écrans d'onglets : la barre flottante (64 pt + marge + zone sûre) recouvre le contenu. */
+export const TAB_BAR_SPACE = 112;
 
 /** Taille minimale d'une cible tactile (points). */
 export const TOUCH = 44;
@@ -76,15 +98,15 @@ export const TOUCH = 44;
 export const motion = { fast: 150, base: 250 } as const;
 
 export const typography = {
-  // Polices système (SF Pro sur iOS, Roboto sur Android) : aucun téléchargement, rendu net partout.
-  family: undefined as string | undefined,
-  display: { fontSize: 34, lineHeight: 41, fontWeight: '700' as const, letterSpacing: -0.4 },
-  title: { fontSize: 28, lineHeight: 34, fontWeight: '700' as const, letterSpacing: -0.3 },
-  heading: { fontSize: 20, lineHeight: 25, fontWeight: '600' as const, letterSpacing: -0.2 },
-  body: { fontSize: 17, lineHeight: 22, fontWeight: '400' as const, letterSpacing: -0.2 },
-  bodyStrong: { fontSize: 17, lineHeight: 22, fontWeight: '600' as const, letterSpacing: -0.2 },
-  small: { fontSize: 15, lineHeight: 20, fontWeight: '400' as const, letterSpacing: -0.1 },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' as const },
+  // Poppins (géométrique, chargée au démarrage) ; le système prend le relais tant qu'elle n'est pas prête.
+  family: fonts.regular as string | undefined,
+  display: { fontFamily: fonts.bold, fontSize: 32, lineHeight: 40, fontWeight: '700' as const, letterSpacing: -0.6 },
+  title: { fontFamily: fonts.bold, fontSize: 26, lineHeight: 33, fontWeight: '700' as const, letterSpacing: -0.4 },
+  heading: { fontFamily: fonts.semibold, fontSize: 19, lineHeight: 26, fontWeight: '600' as const, letterSpacing: -0.2 },
+  body: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 23, fontWeight: '400' as const },
+  bodyStrong: { fontFamily: fonts.semibold, fontSize: 16, lineHeight: 23, fontWeight: '600' as const },
+  small: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, fontWeight: '400' as const },
+  caption: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 16, fontWeight: '500' as const },
 };
 
 export const shadow = {
@@ -101,5 +123,13 @@ export const shadow = {
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
+  },
+  /** Barre d'onglets flottante et bouton central. */
+  float: {
+    shadowColor: '#1E1B4B',
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
   },
 } as const;

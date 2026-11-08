@@ -3,20 +3,20 @@ import type { WalletTransaction } from '@caselind/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../i18n';
 import { formatMoney } from '../../shop/format';
 import { radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, EmptyState, ErrorState, Text } from '../../ui';
-import { Chips } from '../../seller/ui';
+import { AccountCard, AddCardTile } from '../../wallet/AccountCard';
 import { WALLET_CURRENCIES } from '../../wallet/amount';
 import { flattenGroups, groupByDay } from '../../wallet/history';
 import { useKyc, useTransactions, useWallet, useWalletEnabled, walletKeys } from '../../wallet/hooks';
 import { setWalletPrefs, useWalletPrefs } from '../../wallet/prefs';
 import { SandboxBanner, TxRow, TxSheet } from '../../wallet/ui';
 
-/** Wallet sandbox : solde par devise, niveau KYC, actions, historique en défilement infini. */
+/** Wallet sandbox : solde, comptes présentés comme des cartes, actions, historique en défilement infini. */
 export default function Wallet() {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
@@ -59,91 +59,139 @@ export default function Wallet() {
     void history.refetch();
   };
 
+  // Chaque compte du wallet est présenté comme une carte (aucune carte bancaire réelle n'existe).
+  const accounts: { currency: string; balanceMinor: number }[] = WALLET_CURRENCIES.map((c) => ({
+    currency: c,
+    balanceMinor: wallet.data?.balances.find((x) => x.currency === c)?.balanceMinor ?? 0,
+  }));
+  for (const b of wallet.data?.balances ?? []) {
+    if (!accounts.some((x) => x.currency === b.currency)) accounts.push({ currency: b.currency, balanceMinor: b.balanceMinor });
+  }
+
   const header = (
     <View style={styles.header}>
+      <View style={styles.topRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${t('wallet.addCard')}. ${t('wallet.getCardHint')}`}
+          onPress={() => router.push('/wallet/cards')}
+          style={[styles.cardPill, { backgroundColor: colors.text }]}
+        >
+          <Ionicons name="add-circle" size={22} color={colors.background} />
+          <Text variant="bodyStrong" color={colors.background}>
+            {t('wallet.addCard')}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('notifications.title')}
+          onPress={() => router.push('/notifications')}
+          style={[styles.bell, { backgroundColor: colors.surface }]}
+        >
+          <Ionicons name="notifications-outline" size={22} color={colors.text} />
+        </Pressable>
+      </View>
       <SandboxBanner />
-      <Chips options={WALLET_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency as 'USD' | 'CDF'} onChange={(c) => setWalletPrefs({ currency: c })} scroll={false} />
-      <View style={[styles.card, { backgroundColor: colors.primary }]}>
-        <Text variant="small" color={colors.onPrimary} style={{ opacity: 0.85 }}>
-          {t('wallet.balance')} · {currency}
-        </Text>
-        <View style={styles.balanceRow}>
-          <Text
-            variant="display"
-            color={colors.onPrimary}
-            accessibilityLabel={prefs.hidden ? t('wallet.balanceHiddenLabel') : formatMoney(balance, currency, locale)}
-            style={{ flex: 1 }}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {wallet.isPending ? '…' : prefs.hidden ? '••••••' : formatMoney(balance, currency, locale)}
+      <View style={[styles.totalCard, { backgroundColor: colors.surface }]}>
+        <View style={styles.totalTop}>
+          <Text variant="small" muted>
+            {t('wallet.totalBalance')} · {currency}
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={prefs.hidden ? t('wallet.show') : t('wallet.hide')}
-            onPress={() => setWalletPrefs({ hidden: !prefs.hidden })}
-            style={styles.eye}
-          >
-            <Ionicons name={prefs.hidden ? 'eye-outline' : 'eye-off-outline'} size={24} color={colors.onPrimary} />
-          </Pressable>
-        </View>
-        {wallet.isError ? (
-          <Text variant="small" color={colors.onPrimary}>
-            {t('wallet.loadError')}
-          </Text>
-        ) : null}
-        {level !== undefined ? (
-          <View accessible style={styles.kyc}>
-            <Text variant="small" color={colors.onPrimary} style={{ fontWeight: '600' }}>
-              {t('wallet.kyc.level', { n: level })}
+          <View style={styles.balanceRow}>
+            <Text
+              variant="display"
+              accessibilityLabel={prefs.hidden ? t('wallet.balanceHiddenLabel') : formatMoney(balance, currency, locale)}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={{ flexShrink: 1 }}
+            >
+              {wallet.isPending ? '…' : prefs.hidden ? '••••••' : formatMoney(balance, currency, locale)}
             </Text>
-            {limits ? (
-              <Text variant="caption" color={colors.onPrimary} style={{ opacity: 0.9 }}>
-                {t('wallet.kyc.limits', {
-                  single: formatMoney(limits.maxSingleTransferMinor, currency, locale),
-                  daily: formatMoney(limits.maxDailyOutgoingMinor, currency, locale),
-                  max: formatMoney(limits.maxBalanceMinor, currency, locale),
-                })}
-              </Text>
-            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={prefs.hidden ? t('wallet.show') : t('wallet.hide')}
+              onPress={() => setWalletPrefs({ hidden: !prefs.hidden })}
+              style={styles.eye}
+            >
+              <Ionicons name={prefs.hidden ? 'eye-outline' : 'eye-off-outline'} size={22} color={colors.textMuted} />
+            </Pressable>
           </View>
-        ) : null}
-      </View>
-      <View style={styles.actions}>
-        <Action icon="paper-plane-outline" label={t('wallet.action.send')} onPress={() => router.push('/wallet/send')} />
-        <Action icon="add-circle-outline" label={t('wallet.action.topup')} onPress={() => router.push('/wallet/topup')} />
-        <Action icon="qr-code-outline" label={t('wallet.action.receive')} onPress={() => router.push('/wallet/receive')} />
-        <Action icon="scan-outline" label={t('scan.action')} onPress={() => router.push('/scan')} />
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('wallet.pin.manage')}
-        onPress={() => router.push('/wallet/pin')}
-        style={[styles.pinRow, { backgroundColor: colors.surface }]}
-      >
-        <Ionicons name="keypad-outline" size={22} color={colors.primary} />
-        <View style={{ flex: 1 }}>
-          <Text>{t('wallet.pin.manage')}</Text>
-          {kyc.data ? (
-            <Text variant="caption" muted>
-              {kyc.data.hasPaymentPin ? t('wallet.pin.isSet') : t('wallet.pin.isNotSet')}
+          {wallet.isError ? (
+            <Text variant="small" color={colors.danger}>
+              {t('wallet.loadError')}
+            </Text>
+          ) : null}
+          {level !== undefined ? (
+            <Text variant="caption" muted style={{ textAlign: 'center' }}>
+              {t('wallet.kyc.level', { n: level })}
+              {limits
+                ? ` · ${t('wallet.kyc.limits', {
+                    single: formatMoney(limits.maxSingleTransferMinor, currency, locale),
+                    daily: formatMoney(limits.maxDailyOutgoingMinor, currency, locale),
+                    max: formatMoney(limits.maxBalanceMinor, currency, locale),
+                  })}`
+                : ''}
             </Text>
           ) : null}
         </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      </Pressable>
+        <View style={[styles.actions, { borderTopColor: colors.border }]}>
+          <Action icon="arrow-up" label={t('wallet.action.send')} onPress={() => router.push('/wallet/send')} />
+          <Action icon="add" label={t('wallet.action.topup')} onPress={() => router.push('/wallet/topup')} />
+          <Action icon="arrow-down" label={t('wallet.action.receive')} onPress={() => router.push('/wallet/receive')} />
+          <Action icon="scan-outline" label={t('wallet.action.scan')} onPress={() => router.push('/scan')} />
+        </View>
+      </View>
+
+      <View style={styles.sectionRow}>
+        <Text variant="bodyStrong" accessibilityRole="header">
+          {t('wallet.yourCards')}{' '}
+          <Text variant="small" muted>
+            ({accounts.length})
+          </Text>
+        </Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('wallet.manage.title')} onPress={() => router.push('/wallet/manage')} hitSlop={8}>
+          <Text variant="small" muted>
+            {t('wallet.manageLink')}
+          </Text>
+        </Pressable>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cards} style={styles.cardsBleed}>
+        <AddCardTile label={t('wallet.cardAddTile')} onPress={() => router.push('/wallet/cards')} />
+        {accounts.map((a) => (
+          <AccountCard
+            key={a.currency}
+            currency={a.currency}
+            balanceMinor={a.balanceMinor}
+            hidden={prefs.hidden}
+            selected={a.currency === currency}
+            onPress={() => setWalletPrefs({ currency: a.currency as 'USD' | 'CDF' })}
+          />
+        ))}
+      </ScrollView>
+
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={t('kyc.raiseLimits')}
-        onPress={() => router.push('/kyc')}
-        style={[styles.pinRow, { backgroundColor: colors.surface }]}
+        accessibilityLabel={`${t('wallet.getCard')}. ${t('wallet.getCardHint')}`}
+        onPress={() => router.push('/wallet/cards')}
+        style={styles.promo}
       >
-        <Ionicons name="id-card-outline" size={22} color={colors.primary} />
-        <Text style={{ flex: 1 }}>{t('kyc.raiseLimits')}</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        <View style={styles.promoBlobA} />
+        <View style={styles.promoBlobB} />
+        <View style={{ flex: 1, gap: spacing.xs }}>
+          <Text variant="bodyStrong" color="#FFFFFF">
+            {t('wallet.getCard')}
+          </Text>
+          <Text variant="small" color="#D1D1D6">
+            {t('wallet.getCardHint')}
+          </Text>
+        </View>
+        <View style={styles.promoArrow}>
+          <Ionicons name="arrow-forward" size={20} color="#111111" />
+        </View>
       </Pressable>
-      <Text variant="heading" accessibilityRole="header" style={{ marginTop: spacing.sm }}>
-        {t('wallet.history')}
+
+      <Text variant="bodyStrong" accessibilityRole="header" style={{ marginTop: spacing.sm }}>
+        {t('wallet.recent')}
       </Text>
     </View>
   );
@@ -194,14 +242,11 @@ export default function Wallet() {
 function Action({ icon, label, onPress }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void }) {
   const { colors } = useTheme();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={({ pressed }) => [styles.action, { backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 }]}
-    >
-      <Ionicons name={icon} size={24} color={colors.primary} />
-      <Text variant="caption" style={{ textAlign: 'center' }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.7 : 1 }]}>
+      <View style={[styles.actionIcon, { backgroundColor: colors.background }]}>
+        <Ionicons name={icon} size={22} color={colors.text} />
+      </View>
+      <Text variant="caption" style={{ textAlign: 'center' }} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -211,11 +256,21 @@ function Action({ icon, label, onPress }: { icon: React.ComponentProps<typeof Io
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { gap: spacing.md },
-  card: { borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
+  topRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.sm },
+  cardPill: { minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radius.pill },
+  bell: { width: TOUCH, height: TOUCH, borderRadius: TOUCH / 2, alignItems: 'center', justifyContent: 'center' },
+  totalCard: { borderRadius: radius.xl, overflow: 'hidden' },
+  totalTop: { alignItems: 'center', padding: spacing.lg, gap: spacing.xs },
   balanceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   eye: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  kyc: { gap: 2, marginTop: spacing.xs },
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  action: { flex: 1, minHeight: 76, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.sm },
-  pinRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, minHeight: TOUCH + 8 },
+  actions: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth },
+  action: { flex: 1, alignItems: 'center', gap: spacing.xs, minHeight: TOUCH },
+  actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
+  cardsBleed: { marginHorizontal: -spacing.lg },
+  cards: { gap: spacing.md, paddingHorizontal: spacing.lg },
+  promo: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.xl, backgroundColor: '#111111', overflow: 'hidden', minHeight: 96 },
+  promoBlobA: { position: 'absolute', right: 20, top: -30, width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(255,255,255,0.07)' },
+  promoBlobB: { position: 'absolute', right: -30, bottom: -40, width: 100, height: 100, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.05)' },
+  promoArrow: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
 });

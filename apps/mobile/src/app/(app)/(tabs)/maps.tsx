@@ -22,7 +22,9 @@ import { radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { AuthImage, Button, EmptyState, ErrorState, Text, TextField } from '../../../ui';
 
-const KINDS = ['', ...orgKindSchema.options] as const;
+// Catégories demandées en premier (boutiques, restaurants, pharmacies, stations-service), puis les autres.
+const FIRST = ['shop', 'restaurant', 'pharmacy', 'fuel_station'] as const;
+const KINDS = ['', ...FIRST, ...orgKindSchema.options.filter((k) => !(FIRST as readonly string[]).includes(k))] as const;
 type KindFilter = (typeof KINDS)[number];
 
 const platform: MapsPlatform = Platform.OS === 'android' ? 'android' : Platform.OS === 'ios' ? 'ios' : 'web';

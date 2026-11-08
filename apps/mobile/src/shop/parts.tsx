@@ -2,9 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import type { OrderStatus } from '@caselind/contracts';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useI18n } from '../i18n';
-import { radius, spacing, TOUCH } from '../theme/tokens';
+import { brandColor, onMedia, radius, spacing, TOUCH } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Text } from '../ui';
+
+const STAR = '#F5B301';
 
 /** Pastille sélectionnable (catégories, options, tri) : cible ≥ 44 pt, état par couleur et par le lecteur d'écran. */
 export function Chip({ label, selected, disabled, onPress }: { label: string; selected?: boolean; disabled?: boolean; onPress: () => void }) {
@@ -31,6 +33,27 @@ export function Chip({ label, selected, disabled, onPress }: { label: string; se
   );
 }
 
+/** Pastille de catégorie (boutique) : pleine en indigo quand elle est active, contour discret sinon. */
+export function CategoryPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        { backgroundColor: selected ? brandColor : colors.surface, borderColor: selected ? brandColor : colors.border, borderWidth: StyleSheet.hairlineWidth, opacity: pressed ? 0.8 : 1 },
+      ]}
+    >
+      <Text variant="small" color={selected ? onMedia : colors.text} style={{ fontWeight: '600' }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 /** Note en étoiles (lecture seule). */
 export function Stars({ value, size = 16 }: { value: number; size?: number }) {
   const { colors } = useTheme();
@@ -38,7 +61,7 @@ export function Stars({ value, size = 16 }: { value: number; size?: number }) {
   return (
     <View style={styles.row} accessible accessibilityLabel={t('product.stars', { n: value })}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <Ionicons key={n} name={n <= Math.round(value) ? 'star' : 'star-outline'} size={size} color={colors.primary} />
+        <Ionicons key={n} name={n <= Math.round(value) ? 'star' : 'star-outline'} size={size} color={STAR} />
       ))}
     </View>
   );

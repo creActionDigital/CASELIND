@@ -142,7 +142,7 @@ export const organizations = pgTable('organizations', {
   slug: citext('slug').notNull(),
   name: text('name').notNull(),
   kind: text('kind')
-    .$type<'shop' | 'restaurant' | 'hotel' | 'pharmacy' | 'school' | 'hospital' | 'services' | 'warehouse' | 'other'>()
+    .$type<'shop' | 'restaurant' | 'hotel' | 'pharmacy' | 'fuel_station' | 'school' | 'hospital' | 'services' | 'warehouse' | 'other'>()
     .notNull(),
   description: text('description'),
   logoUrl: text('logo_url'),

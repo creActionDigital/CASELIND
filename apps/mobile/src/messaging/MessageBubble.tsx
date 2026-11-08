@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useI18n } from '../i18n';
 import { radius, spacing, TOUCH } from '../theme/tokens';
+import { chatColors } from './chat-theme';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, Text } from '../ui';
 import { messagePreview, systemText } from './api';
@@ -22,7 +23,8 @@ interface Props {
 }
 
 function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPress, onRetry }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const cc = chatColors(colors, isDark);
   const { t, locale } = useI18n();
 
   if (m.kind === 'system') {
@@ -35,8 +37,9 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
     );
   }
 
-  const bg = m.recalled ? colors.surfaceAlt : mine ? colors.primary : colors.surface;
-  const fg = m.recalled ? colors.textMuted : mine ? colors.onPrimary : colors.text;
+  const bg = m.recalled ? colors.surfaceAlt : mine ? cc.mineBubble : cc.theirBubble;
+  const fg = m.recalled ? colors.textMuted : mine ? cc.onMine : cc.onTheirs;
+  const sub = mine && !m.recalled ? cc.tick : colors.textMuted;
   const time = new Date(m.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const statusLabel = status ? t(`chat.status.${status}`) : '';
   const fwd = m.forwarded && !m.recalled;
@@ -51,7 +54,7 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
         accessibilityHint={t('chat.bubbleHint')}
         onLongPress={() => onLongPress(m)}
         delayLongPress={300}
-        style={[styles.bubble, { backgroundColor: bg, borderColor: mine ? bg : colors.border }]}
+        style={[styles.bubble, mine ? styles.tailRight : styles.tailLeft, { backgroundColor: bg }]}
       >
         {senderName && !mine ? (
           <Text variant="caption" color={colors.primary} style={styles.sender}>
@@ -60,15 +63,15 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
         ) : null}
         {fwd ? (
           <View style={styles.fwd}>
-            <Ionicons name="arrow-redo-outline" size={12} color={mine ? colors.onPrimary : colors.textMuted} />
-            <Text variant="caption" color={mine ? colors.onPrimary : colors.textMuted} style={styles.italic}>
+            <Ionicons name="arrow-redo-outline" size={12} color={mine ? cc.onMine : colors.textMuted} />
+            <Text variant="caption" color={mine ? cc.onMine : colors.textMuted} style={styles.italic}>
               {t('messagesX.forwarded')}
             </Text>
           </View>
         ) : null}
         {m.replyToId ? (
-          <View style={[styles.quote, { borderLeftColor: colors.primary, backgroundColor: colors.primarySoft }]}>
-            <Text variant="caption" numberOfLines={2}>
+          <View style={[styles.quote, { borderLeftColor: mine ? cc.tick : colors.primary, backgroundColor: mine ? 'rgba(255,255,255,0.14)' : isDark ? 'rgba(255,255,255,0.07)' : colors.primarySoft }]}>
+            <Text variant="caption" color={fg} numberOfLines={2}>
               {replyTo ? messagePreview(replyTo, t, name) || t('chat.photo') : t('chat.replyUnavailable')}
             </Text>
           </View>
@@ -80,7 +83,7 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
         ) : m.kind === 'media' ? (
           <AuthImage contentUrl={m.media?.contentUrl ?? null} localUri={m.localUri} label={t('chat.photo')} style={styles.image} />
         ) : (
-          <Text color={fg}>{m.body}</Text>
+          <Text color={fg} style={styles.body}>{m.body}</Text>
         )}
         {!m.recalled && m.reactions.length > 0 ? (
           <View style={styles.reactions}>
@@ -100,12 +103,12 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
         ) : null}
         <View style={styles.meta}>
           {expiry ? (
-            <Ionicons name="timer-outline" size={13} color={mine ? colors.onPrimary : colors.textMuted} accessibilityLabel={t('messagesX.timer', { when: expiry })} />
+            <Ionicons name="timer-outline" size={13} color={sub} accessibilityLabel={t('messagesX.timer', { when: expiry })} />
           ) : null}
-          <Text variant="caption" color={mine && !m.recalled ? colors.onPrimary : colors.textMuted}>
+          <Text variant="caption" color={sub}>
             {time}
           </Text>
-          {mine && status ? <StatusIcon status={status} color={mine && !m.recalled ? colors.onPrimary : colors.textMuted} /> : null}
+          {mine && status ? <StatusIcon status={status} color={sub} tick={cc.tick} /> : null}
         </View>
       </Pressable>
       {status === 'failed' ? (
@@ -120,14 +123,14 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
   );
 }
 
-function StatusIcon({ status, color }: { status: MessageStatus; color: string }) {
+function StatusIcon({ status, color, tick }: { status: MessageStatus; color: string; tick: string }) {
   const { colors } = useTheme();
   const map = {
     sending: { name: 'time-outline', color },
     failed: { name: 'alert-circle', color: colors.danger },
     sent: { name: 'checkmark', color },
     delivered: { name: 'checkmark-done', color },
-    read: { name: 'checkmark-done', color: colors.primary },
+    read: { name: 'checkmark-done', color: tick },
   } as const;
   const s = map[status];
   return <Ionicons name={s.name} size={14} color={s.color} />;
@@ -139,7 +142,10 @@ const styles = StyleSheet.create({
   wrap: { paddingHorizontal: spacing.md, paddingVertical: 2, maxWidth: '100%' },
   right: { alignItems: 'flex-end' },
   left: { alignItems: 'flex-start' },
-  bubble: { maxWidth: '82%', minHeight: TOUCH - 8, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
+  bubble: { maxWidth: '82%', minHeight: TOUCH - 8, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
+  tailRight: { borderBottomRightRadius: 6 },
+  tailLeft: { borderBottomLeftRadius: 6 },
+  body: { fontSize: 15, lineHeight: 21 },
   sender: { fontWeight: '700' },
   fwd: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   quote: { borderLeftWidth: 3, borderRadius: radius.sm, padding: spacing.xs },

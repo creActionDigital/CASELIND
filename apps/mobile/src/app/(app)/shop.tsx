@@ -1,17 +1,18 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SheetModal } from '../../components/SheetModal';
 import { useI18n } from '../../i18n';
 import { fetchCategories, fetchProducts, type ShopFilters } from '../../shop/api';
 import { parseMajorToMinor } from '../../shop/format';
 import { shopKeys } from '../../shop/hooks';
-import { Chip } from '../../shop/parts';
+import { CategoryPill, Chip } from '../../shop/parts';
 import { ProductGrid } from '../../shop/ProductGrid';
-import { spacing } from '../../theme/tokens';
+import { brandColor, fonts, onMedia, radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
-import { Button, IconButton, TextField, Text } from '../../ui';
+import { Button, TextField, Text } from '../../ui';
 
 const CURRENCIES = ['USD', 'CDF'];
 const SORTS = ['recent', 'price_asc', 'price_desc'] as const;
@@ -60,22 +61,32 @@ export default function Shop() {
 
   const header = (
     <View style={styles.header}>
-      <View style={styles.searchRow}>
-        <View style={styles.flex}>
-          <TextField label={t('shop.search')} value={text} onChangeText={setText} returnKeyType="search" autoCapitalize="none" />
-        </View>
-        <IconButton
-          icon="options-outline"
-          label={activeFilters > 0 ? `${t('shop.filters')} (${activeFilters})` : t('shop.filters')}
-          onPress={openSheet}
-          color={activeFilters > 0 ? colors.primary : undefined}
-          style={styles.filterBtn}
+      <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Ionicons name="search" size={20} color={colors.textMuted} />
+        <TextInput
+          accessibilityLabel={t('shop.search')}
+          placeholder={t('shop.search')}
+          placeholderTextColor={colors.textMuted}
+          value={text}
+          onChangeText={setText}
+          returnKeyType="search"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={[styles.input, { color: colors.text }]}
         />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={activeFilters > 0 ? `${t('shop.filters')} (${activeFilters})` : t('shop.filters')}
+          onPress={openSheet}
+          style={[styles.filterBtn, { backgroundColor: activeFilters > 0 ? brandColor : colors.surfaceAlt }]}
+        >
+          <Ionicons name="options-outline" size={20} color={activeFilters > 0 ? onMedia : colors.text} />
+        </Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel={t('shop.categories')}>
-        <Chip label={t('shop.all')} selected={!categoryId} onPress={() => setCategoryId(undefined)} />
+        <CategoryPill label={t('shop.all')} selected={!categoryId} onPress={() => setCategoryId(undefined)} />
         {categories.data?.items.map((c) => (
-          <Chip key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)} />
+          <CategoryPill key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)} />
         ))}
       </ScrollView>
     </View>
@@ -122,9 +133,10 @@ export default function Shop() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: { gap: spacing.xs, marginBottom: spacing.sm },
-  searchRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
-  filterBtn: { marginTop: 22 },
+  header: { gap: spacing.md, marginBottom: spacing.sm },
+  search: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 56, paddingLeft: spacing.lg, paddingRight: spacing.sm, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth },
+  input: { flex: 1, minHeight: TOUCH, fontFamily: fonts.regular, fontSize: 16 },
+  filterBtn: { width: TOUCH, height: TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   chips: { gap: spacing.sm, paddingBottom: spacing.xs },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   priceRow: { flexDirection: 'row', gap: spacing.md },

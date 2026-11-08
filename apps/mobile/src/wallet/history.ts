@@ -37,3 +37,13 @@ export function flattenGroups(groups: readonly DayGroup[]): HistoryRow[] {
 /** Montant signé en unités mineures : positif en entrée, négatif en sortie. */
 export const signedMinor = (tx: Pick<WalletTransaction, 'direction' | 'amountMinor'>): number =>
   tx.direction === 'in' ? tx.amountMinor : -tx.amountMinor;
+
+export type Period = 'week' | 'month' | 'year';
+
+/** La transaction date-t-elle de la période en cours (7 jours glissants, mois ou année civils) ? */
+export function inPeriod(createdAt: string, period: Period, now: Date = new Date()): boolean {
+  const d = new Date(createdAt);
+  if (period === 'week') return now.getTime() - d.getTime() < 7 * 24 * 3600 * 1000 && d.getTime() <= now.getTime() + 60_000;
+  if (period === 'month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  return d.getFullYear() === now.getFullYear();
+}

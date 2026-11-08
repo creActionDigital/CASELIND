@@ -1,30 +1,44 @@
 import type { Conversation } from '@caselind/contracts';
+import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { SheetModal } from '../../../components/SheetModal';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { conversationTitle, fetchConversations, patchMyState } from '../../../messaging/api';
 import { isMuted, patchConversation, removeConversation, type ConversationPages } from '../../../messaging/cache';
+import { chatColors } from '../../../messaging/chat-theme';
+import { ChatStories } from '../../../messaging/ChatStories';
 import { ConversationRow } from '../../../messaging/ConversationRow';
 import { qk } from '../../../messaging/keys';
 import { NewConversationSheet } from '../../../messaging/NewConversationSheet';
 import { PushCard } from '../../../notifications/PushCard';
-import { spacing } from '../../../theme/tokens';
+import { brandColor, radius, shadow, spacing, TAB_BAR_SPACE, TOUCH, typography } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
-import { Button, EmptyState, ErrorState, Text } from '../../../ui';
+import { Button, EmptyState, ErrorState, IconButton, Text } from '../../../ui';
 
 const FOREVER = '2100-01-01T00:00:00.000Z';
 
-/** Onglet Messagerie : liste des conversations (épinglées d'abord), actions longues, nouvelle conversation. */
+type Filter = 'all' | 'unread' | 'groups' | 'archived';
+interface ListRow {
+  key: string;
+  conv?: Conversation;
+  header?: string;
+}
+
+/** Onglet Messagerie : statuts, filtres en pilules, épinglées puis le reste, actions longues, nouvelle conversation. */
 export default function Messages() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const cc = chatColors(colors, isDark);
   const { t } = useI18n();
   const router = useRouter();
   const qc = useQueryClient();
   const [archived, setArchived] = useState(false);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [searching, setSearching] = useState(false);
+  const [search, setSearch] = useState('');
   const [composing, setComposing] = useState(false);
   const [target, setTarget] = useState<Conversation | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -68,6 +82,36 @@ export default function Messages() {
     setTarget(null);
   }
 
+  const unreadN = archived ? 0 : items.filter((c) => c.unreadCount > 0).length;
+  const q = search.trim().toLowerCase();
+  const filtered = items.filter((c) => {
+    if (filter === 'unread' && c.unreadCount === 0) return false;
+    if (filter === 'groups' && c.kind !== 'group') return false;
+    return !q || conversationTitle(c, t).toLowerCase().includes(q);
+  });
+  const rows: ListRow[] = [];
+  const pinned = filtered.filter((c) => c.pinned);
+  if (pinned.length > 0) {
+    rows.push({ key: 'h-pinned', header: t('chat.section.pinned') });
+    pinned.forEach((c) => rows.push({ key: c.id, conv: c }));
+    const rest = filtered.filter((c) => !c.pinned);
+    if (rest.length > 0) rows.push({ key: 'h-others', header: t('chat.section.others') });
+    rest.forEach((c) => rows.push({ key: c.id, conv: c }));
+  } else {
+    filtered.forEach((c) => rows.push({ key: c.id, conv: c }));
+  }
+
+  const pills: { id: Filter; label: string; count?: number }[] = [
+    { id: 'all', label: t('chat.filter.all') },
+    { id: 'unread', label: t('chat.filter.unread'), count: unreadN },
+    { id: 'groups', label: t('chat.filter.groups') },
+    { id: 'archived', label: t('chat.filter.archived') },
+  ];
+  const pick = (f: Filter) => {
+    setFilter(f);
+    setArchived(f === 'archived');
+  };
+
   let content;
   if (query.isPending) {
     content = <ActivityIndicator style={styles.center} color={colors.primary} accessibilityLabel={t('common.loading')} />;
@@ -77,41 +121,108 @@ export default function Messages() {
   } else {
     content = (
       <FlatList
-        data={items}
-        keyExtractor={(c) => c.id}
-        renderItem={({ item }) => <ConversationRow conversation={item} onPress={open} onLongPress={longPress} />}
+        data={rows}
+        keyExtractor={(r) => r.key}
+        renderItem={({ item }) =>
+          item.conv ? (
+            <ConversationRow conversation={item.conv} onPress={open} onLongPress={longPress} />
+          ) : (
+            <Text variant="bodyStrong" style={styles.section} accessibilityRole="header">
+              {item.header}
+            </Text>
+          )
+        }
         onEndReached={() => query.hasNextPage && !query.isFetchingNextPage && query.fetchNextPage()}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
         ListHeaderComponent={archived ? undefined : <PushCard />}
         ListEmptyComponent={
-          <EmptyState
-            icon="chatbubbles-outline"
-            title={archived ? t('chat.emptyArchivedTitle') : t('messages.emptyTitle')}
-            body={archived ? t('chat.emptyArchivedBody') : t('messages.emptyBody')}
-            actionLabel={archived ? undefined : t('chat.new.title')}
-            onAction={() => setComposing(true)}
-          />
+          items.length > 0 ? (
+            <Text variant="small" muted style={styles.center}>
+              {t('chat.noResults')}
+            </Text>
+          ) : (
+            <EmptyState
+              icon="chatbubbles-outline"
+              title={archived ? t('chat.emptyArchivedTitle') : t('messages.emptyTitle')}
+              body={archived ? t('chat.emptyArchivedBody') : t('messages.emptyBody')}
+              actionLabel={archived ? undefined : t('chat.new.title')}
+              onAction={() => setComposing(true)}
+            />
+          )
         }
         ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator color={colors.primary} style={styles.center} /> : undefined}
-        contentContainerStyle={items.length === 0 ? styles.grow : undefined}
+        contentContainerStyle={[{ paddingBottom: TAB_BAR_SPACE + 56 }, rows.length === 0 && styles.grow]}
       />
     );
   }
 
   const denied = query.error instanceof ApiRequestError && query.error.status === 403;
   return (
-    <View style={[styles.flex, { backgroundColor: colors.background }]}>
-      <View style={[styles.bar, { borderBottomColor: colors.border }]}>
-        <Button
-          label={archived ? t('chat.showActive') : t('chat.showArchived')}
-          variant="ghost"
-          onPress={() => setArchived((v) => !v)}
-          style={styles.barBtn}
+    <View style={[styles.flex, { backgroundColor: cc.bg }]}>
+      <View style={styles.header}>
+        <Text variant="title" accessibilityRole="header" style={styles.flex}>
+          {t('chat.title')}
+        </Text>
+        <IconButton
+          icon="search"
+          label={t('chat.search')}
+          onPress={() => {
+            setSearching((v) => !v);
+            setSearch('');
+          }}
+          style={{ backgroundColor: cc.card }}
         />
-        <Button label={t('chat.new.title')} onPress={() => setComposing(true)} style={styles.barBtn} disabled={denied} />
+        <IconButton icon="create-outline" label={t('chat.newMessage')} onPress={() => setComposing(true)} disabled={denied} style={{ backgroundColor: cc.card }} />
+      </View>
+      {searching ? (
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          autoFocus
+          accessibilityLabel={t('chat.searchPlaceholder')}
+          placeholder={t('chat.searchPlaceholder')}
+          placeholderTextColor={colors.textMuted}
+          style={[styles.search, typography.small, { color: colors.text, backgroundColor: cc.card }]}
+        />
+      ) : null}
+      <ChatStories />
+      <View style={styles.pills}>
+        {pills.map((p) => {
+          const on = filter === p.id;
+          return (
+            <Pressable
+              key={p.id}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              onPress={() => pick(p.id)}
+              style={[styles.pill, { backgroundColor: on ? brandColor : cc.card }]}
+            >
+              <Text variant="caption" color={on ? '#FFFFFF' : colors.text}>
+                {p.label}
+              </Text>
+              {p.count ? (
+                <View style={[styles.count, { backgroundColor: on ? 'rgba(255,255,255,0.28)' : brandColor }]}>
+                  <Text variant="caption" color="#FFFFFF">
+                    {p.count}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        })}
       </View>
       {content}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('chat.new.title')}
+        disabled={denied}
+        onPress={() => setComposing(true)}
+        style={({ pressed }) => [styles.fab, shadow.float, { backgroundColor: brandColor, opacity: denied ? 0.5 : pressed ? 0.85 : 1 }]}
+      >
+        <Ionicons name="add" size={30} color="#FFFFFF" />
+      </Pressable>
 
       <NewConversationSheet
         visible={composing}
@@ -159,13 +270,11 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   grow: { flexGrow: 1, justifyContent: 'center' },
   center: { padding: spacing.xl },
-  bar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  barBtn: { paddingHorizontal: spacing.lg },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  search: { marginHorizontal: spacing.lg, marginTop: spacing.sm, minHeight: TOUCH, borderRadius: radius.pill, paddingHorizontal: spacing.lg },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radius.pill },
+  count: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  section: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xs },
+  fab: { position: 'absolute', right: spacing.lg, bottom: TAB_BAR_SPACE, width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,95 +1,90 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from 'expo-router/build/layouts/Tabs';
-import { useState, type ComponentProps } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n, type MessageKey } from '../i18n';
-import { shadow, spacing, TOUCH } from '../theme/tokens';
-import { useTheme } from '../theme/use-theme';
-import { Text } from '../ui';
-import { PublishSheet } from './PublishSheet';
+import { brandGradient, shadow, spacing } from '../theme/tokens';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
 
-// Ordre imposé : Accueil · Maps · + Publier · Messagerie · Plus.
+// Ordre imposé : Accueil · Maps · + (social et marketplace) · Messagerie · Plus.
 const TABS: { name: string; label: MessageKey; icon: Icon; iconOn: Icon }[] = [
   { name: 'index', label: 'tabs.home', icon: 'home-outline', iconOn: 'home' },
   { name: 'maps', label: 'tabs.maps', icon: 'map-outline', iconOn: 'map' },
-  { name: 'publish', label: 'tabs.publish', icon: 'add', iconOn: 'add' },
-  { name: 'messages', label: 'tabs.messages', icon: 'chatbubbles-outline', iconOn: 'chatbubbles' },
+  { name: 'hub', label: 'tabs.hub', icon: 'add', iconOn: 'add' },
+  { name: 'messages', label: 'tabs.messages', icon: 'chatbubble-ellipses-outline', iconOn: 'chatbubble-ellipses' },
   { name: 'more', label: 'tabs.more', icon: 'grid-outline', iconOn: 'grid' },
 ];
 
+/** Barre flottante en pilule sombre ; le bouton central en dégradé ouvre l'espace social et marketplace. */
 export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
-  const { colors } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
-  const [publishOpen, setPublishOpen] = useState(false);
   const activeName = state.routes[state.index]?.name;
 
   return (
-    <View
-      style={[
-        styles.bar,
-        { backgroundColor: colors.tabBar, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.sm) },
-      ]}
-    >
-      {TABS.map((tab) => {
-        const label = t(tab.label);
-        if (tab.name === 'publish') {
+    <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+      <View style={[styles.pill, shadow.float]}>
+        {TABS.map((tab) => {
+          const route = state.routes.find((r) => r.name === tab.name);
+          if (!route) return null;
+          const focused = activeName === tab.name;
+          const go = () => {
+            if (!focused) navigateToTab(route.key);
+          };
+          if (tab.name === 'hub') {
+            return (
+              <View key={tab.name} style={styles.centerCell}>
+                <Pressable
+                  accessibilityRole="tab"
+                  accessibilityLabel={t(tab.label)}
+                  accessibilityState={{ selected: focused }}
+                  onPress={go}
+                  style={({ pressed }) => [styles.centerBtn, shadow.float, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}
+                >
+                  <LinearGradient colors={brandGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.centerFill}>
+                    <Ionicons name="add" size={30} color="#FFFFFF" />
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            );
+          }
           return (
-            <View key={tab.name} style={styles.cell}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                onPress={() => setPublishOpen(true)}
-                style={({ pressed }) => [
-                  styles.publish,
-                  shadow.raised,
-                  { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.94 : 1 }] },
-                ]}
-              >
-                <Ionicons name="add" size={30} color={colors.onPrimary} />
-              </Pressable>
-            </View>
+            <Pressable
+              key={tab.name}
+              accessibilityRole="tab"
+              accessibilityLabel={t(tab.label)}
+              accessibilityState={{ selected: focused }}
+              onPress={go}
+              style={styles.cell}
+            >
+              <View style={[styles.iconWrap, focused && styles.iconOn]}>
+                <Ionicons name={focused ? tab.iconOn : tab.icon} size={22} color={focused ? '#FFFFFF' : 'rgba(255,255,255,0.62)'} />
+              </View>
+            </Pressable>
           );
-        }
-        const route = state.routes.find((r) => r.name === tab.name);
-        if (!route) return null;
-        const focused = activeName === tab.name;
-        const color = focused ? colors.primary : colors.textMuted;
-        return (
-          <Pressable
-            key={tab.name}
-            accessibilityRole="tab"
-            accessibilityLabel={label}
-            accessibilityState={{ selected: focused }}
-            onPress={() => {
-              if (!focused) navigateToTab(route.key);
-            }}
-            style={styles.cell}
-          >
-            <Ionicons name={focused ? tab.iconOn : tab.icon} size={24} color={color} />
-            <Text variant="caption" color={color} numberOfLines={1} style={{ fontSize: 11, fontWeight: focused ? '600' : '500' }}>
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
-      <PublishSheet visible={publishOpen} onClose={() => setPublishOpen(false)} />
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.xs },
-  cell: { flex: 1, minHeight: TOUCH + 8, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  publish: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg },
+  pill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -14,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#14141C',
+    paddingHorizontal: spacing.sm,
   },
+  cell: { flex: 1, height: 64, alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  iconOn: { backgroundColor: 'rgba(255,255,255,0.14)' },
+  centerCell: { flex: 1, alignItems: 'center' },
+  centerBtn: { width: 64, height: 64, borderRadius: 32, marginTop: -22 },
+  centerFill: { flex: 1, borderRadius: 32, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#FFFFFF' },
 });

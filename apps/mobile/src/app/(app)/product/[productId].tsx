@@ -1,21 +1,23 @@
 import type { Review } from '@caselind/contracts';
+import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { openReport } from '../../../report/open-report';
-import { fetchProduct, fetchReviews } from '../../../shop/api';
+import { fetchCategories, fetchProduct, fetchReviews } from '../../../shop/api';
 import { quantityOf } from '../../../shop/cart-logic';
 import { formatMoney } from '../../../shop/format';
 import { shopKeys, useCart, useSetCartItem } from '../../../shop/hooks';
-import { Chip, Stars, Stepper } from '../../../shop/parts';
+import { Stars, Stepper } from '../../../shop/parts';
 import { defaultSelection, findVariant, isValueAvailable, optionAxes, selectValue, type Selection } from '../../../shop/variants';
-import { radius, spacing, TOUCH } from '../../../theme/tokens';
+import { AxisPicker } from '../../../shop/VariantPickers';
+import { brandColor, onMedia, radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
-import { AuthImage, Avatar, Button, EmptyState, ErrorState, Text } from '../../../ui';
+import { AuthImage, Avatar, EmptyState, ErrorState, Text, Button } from '../../../ui';
 
 const MAX = 99;
 
@@ -35,8 +37,10 @@ export default function ProductScreen() {
     queryFn: ({ pageParam }) => fetchReviews(id, pageParam),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
+  const categories = useQuery({ queryKey: shopKeys.categories, queryFn: fetchCategories, staleTime: 10 * 60_000 });
   const cart = useCart();
   const setItem = useSetCartItem();
+  const listRef = useRef<FlatList>(null);
 
   const variants = product.data?.variants;
   const [selection, setSelection] = useState<Selection>({});
@@ -58,6 +62,7 @@ export default function ProductScreen() {
   if (product.isPending) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ headerShown: true, title: t('product.title') }} />
         <ActivityIndicator color={colors.primary} accessibilityLabel={t('common.loading')} />
       </View>
     );
@@ -65,6 +70,7 @@ export default function ProductScreen() {
   if (product.isError) {
     return (
       <View style={[styles.flex, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ headerShown: true, title: t('product.title') }} />
         <ErrorState error={product.error} onRetry={() => product.refetch()} />
       </View>
     );
@@ -74,8 +80,16 @@ export default function ProductScreen() {
   const summary = reviews.data?.pages[0]?.summary;
   const reviewItems = reviews.data?.pages.flatMap((pg) => pg.items) ?? [];
   const longDescription = (p.description?.length ?? 0) > 180;
+  const heroH = Math.round(width * 1.05);
+  const category = categories.data?.items.find((c) => c.id === p.categoryId)?.name;
 
-  function add() {
+  function go(i: number) {
+    const n = Math.max(0, Math.min(p.media.length - 1, i));
+    listRef.current?.scrollToIndex({ index: n, animated: true });
+    setPage(n);
+  }
+
+  function add(thenCheckout = false) {
     if (!variant || !canAdd) return;
     const quantity = Math.min(qty, room);
     setNotice(null);
@@ -83,8 +97,12 @@ export default function ProductScreen() {
       { variantId: variant.id, quantity: inCart + quantity },
       {
         onSuccess: () => {
-          setNotice({ text: t('product.added'), ok: true });
           setQty(1);
+          if (thenCheckout) {
+            router.push('/checkout');
+            return;
+          }
+          setNotice({ text: t('product.added'), ok: true });
         },
         onError: (e) => setNotice({ text: errorMessage(e, t, locale), ok: false }),
       },
@@ -93,44 +111,100 @@ export default function ProductScreen() {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
-      <Stack.Screen options={{ title: t('product.title') }} />
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}>
-        {p.media.length > 0 ? (
-          <View>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView contentContainerStyle={{ paddingBottom: 150 + insets.bottom }} showsVerticalScrollIndicator={false}>
+        <View style={{ width, height: heroH }}>
+          {p.media.length > 0 ? (
             <FlatList
+              ref={listRef}
               data={p.media}
               keyExtractor={(m) => m.id}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
+              getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
               onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
               renderItem={({ item, index }) => (
                 <AuthImage
                   contentUrl={item.contentUrl}
                   label={t('product.photo', { n: index + 1, total: p.media.length })}
-                  style={{ width, height: width, borderRadius: 0 }}
+                  style={{ width, height: heroH, borderRadius: 0 }}
                 />
               )}
             />
-            {p.media.length > 1 ? (
-              <View style={styles.dots} accessibilityLabel={t('product.photo', { n: page + 1, total: p.media.length })}>
-                {p.media.map((m, i) => (
-                  <View key={m.id} style={[styles.dot, { backgroundColor: i === page ? colors.primary : colors.border }]} />
-                ))}
+          ) : (
+            <AuthImage contentUrl={p.coverUrl} label={p.title} style={{ width, height: heroH, borderRadius: 0 }} />
+          )}
+          <View style={[styles.topBar, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
+            <RoundButton icon="chevron-back" label={t('product.back')} onPress={() => router.back()} />
+            <RoundButton icon="share-outline" label={t('product.share')} onPress={() => void Share.share({ message: p.title }).catch(() => undefined)} />
+          </View>
+          {p.media.length > 1 ? (
+            <View style={styles.arrows} pointerEvents="box-none">
+              <RoundButton icon="chevron-back" label={t('product.prevPhoto')} onPress={() => go(page - 1)} disabled={page === 0} />
+              <RoundButton icon="chevron-forward" label={t('product.nextPhoto')} onPress={() => go(page + 1)} disabled={page === p.media.length - 1} />
+            </View>
+          ) : null}
+        </View>
+
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          {p.media.length > 1 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
+              {p.media.map((m, i) => (
+                <Pressable
+                  key={m.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('product.photo', { n: i + 1, total: p.media.length })}
+                  accessibilityState={{ selected: i === page }}
+                  onPress={() => go(i)}
+                  style={styles.thumbHit}
+                >
+                  <AuthImage
+                    contentUrl={m.contentUrl}
+                    label=""
+                    style={[styles.thumb, { borderColor: i === page ? brandColor : colors.border, borderWidth: i === page ? 3 : 1 }]}
+                  />
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : null}
+
+          <View style={styles.wrap}>
+            {category ? (
+              <View style={[styles.tag, { backgroundColor: colors.surfaceAlt }]}>
+                <Text variant="caption" color={colors.textMuted}>
+                  {category}
+                </Text>
               </View>
             ) : null}
+            <View style={[styles.tag, { backgroundColor: colors.surfaceAlt }]}>
+              <Text variant="caption" color={colors.textMuted}>
+                {p.org.name}
+              </Text>
+            </View>
           </View>
-        ) : (
-          <AuthImage contentUrl={p.coverUrl} label={p.title} style={{ width, height: width, borderRadius: 0 }} />
-        )}
 
-        <View style={styles.body}>
-          <Text variant="title" accessibilityRole="header">
-            {p.title}
-          </Text>
-          <Text variant="heading" color={colors.primary}>
-            {price ? formatMoney(price.priceMinor, price.currency, locale) : ''}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text variant="heading" accessibilityRole="header" style={styles.flex}>
+              {p.title}
+            </Text>
+            <View style={styles.priceCol}>
+              <Text variant="title">{price ? formatMoney(price.priceMinor, price.currency, locale) : ''}</Text>
+              {summary && summary.ratingCount > 0 ? (
+                <View
+                  style={styles.avgRow}
+                  accessible
+                  accessibilityLabel={t('product.ratingA11y', { avg: (summary.averageRating ?? 0).toFixed(1), n: summary.ratingCount })}
+                >
+                  <Stars value={summary.averageRating ?? 0} size={14} />
+                  <Text variant="caption" muted>
+                    ({summary.ratingCount})
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
 
           {axes.map((axis) => (
             <View key={axis.name} style={styles.group}>
@@ -138,17 +212,12 @@ export default function ProductScreen() {
                 {axis.name}
                 {selection[axis.name] ? ` : ${selection[axis.name]}` : ''}
               </Text>
-              <View style={styles.wrap}>
-                {axis.values.map((val) => (
-                  <Chip
-                    key={val}
-                    label={val}
-                    selected={selection[axis.name] === val}
-                    disabled={!isValueAvailable(p.variants, selection, axis.name, val) && selection[axis.name] !== val}
-                    onPress={() => setSelection(selectValue(p.variants, selection, axis.name, val))}
-                  />
-                ))}
-              </View>
+              <AxisPicker
+                axis={axis}
+                selected={selection[axis.name]}
+                isDisabled={(val) => !isValueAvailable(p.variants, selection, axis.name, val)}
+                onSelect={(val) => setSelection(selectValue(p.variants, selection, axis.name, val))}
+              />
             </View>
           ))}
           {variant && !variant.inStock ? (
@@ -167,34 +236,38 @@ export default function ProductScreen() {
 
           {p.description ? (
             <View style={styles.group}>
-              <Text variant="heading" accessibilityRole="header">
-                {t('product.description')}
+              <Text numberOfLines={expanded ? undefined : 4} muted>
+                {p.description}
               </Text>
-              <Text numberOfLines={expanded ? undefined : 4}>{p.description}</Text>
               {longDescription ? (
                 <Pressable accessibilityRole="button" onPress={() => setExpanded((v) => !v)} style={styles.link}>
-                  <Text color={colors.primary}>{expanded ? t('product.less') : t('product.more')}</Text>
+                  <Text style={{ fontWeight: '600' }}>{expanded ? t('product.less') : t('product.more')}</Text>
                 </Pressable>
               ) : null}
             </View>
           ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('product.visitStore', { name: p.org.name })}
-            onPress={() => router.push({ pathname: '/store/[slug]', params: { slug: p.org.slug } })}
-            style={[styles.seller, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
+          <View style={[styles.seller, { backgroundColor: colors.surfaceAlt }]}>
             <Avatar name={p.org.name} size={44} />
             <View style={styles.flex}>
               <Text variant="small" muted>
-                {t('product.seller')}
+                {t('product.shop')}
               </Text>
               <Text variant="bodyStrong" numberOfLines={1}>
                 {p.org.name}
               </Text>
             </View>
-          </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('product.visitStore', { name: p.org.name })}
+              onPress={() => router.push({ pathname: '/store/[slug]', params: { slug: p.org.slug } })}
+              style={[styles.visit, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              <Text variant="small" style={{ fontWeight: '600' }}>
+                {t('product.viewShop')}
+              </Text>
+            </Pressable>
+          </View>
 
           <View style={styles.group}>
             <Text variant="heading" accessibilityRole="header">
@@ -237,7 +310,6 @@ export default function ProductScreen() {
         </View>
       </ScrollView>
 
-      {/* Opaque: the translucent tab-bar colour lets the description show through without a blur behind it. */}
       <View style={[styles.bottom, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom + spacing.md }]}>
         {notice ? (
           <View style={styles.noticeRow} accessibilityLiveRegion="polite">
@@ -253,9 +325,52 @@ export default function ProductScreen() {
             ) : null}
           </View>
         ) : null}
-        <Button label={t('product.add')} onPress={add} disabled={!canAdd} loading={setItem.isPending} />
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('product.add')}
+            accessibilityState={{ disabled: !canAdd || setItem.isPending }}
+            disabled={!canAdd || setItem.isPending}
+            onPress={() => add()}
+            style={[styles.action, styles.addBtn, { opacity: canAdd ? 1 : 0.45, borderColor: colors.border }]}
+          >
+            <Ionicons name="add" size={20} color={onMedia} />
+            <Text variant="bodyStrong" color={onMedia} numberOfLines={1} style={styles.actionLabel}>
+              {t('product.add')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('product.buy')}
+            accessibilityState={{ disabled: !canAdd || setItem.isPending }}
+            disabled={!canAdd || setItem.isPending}
+            onPress={() => add(true)}
+            style={[styles.action, { backgroundColor: brandColor, opacity: canAdd ? 1 : 0.45 }]}
+          >
+            <Ionicons name="bag-handle-outline" size={20} color={onMedia} />
+            <Text variant="bodyStrong" color={onMedia} numberOfLines={1} style={styles.actionLabel}>
+              {t('product.buy')}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </View>
+  );
+}
+
+/** Bouton rond translucide posé sur la photo (voile noir uni, icône blanche : contraste AA). */
+function RoundButton({ icon, label, onPress, disabled }: { icon: 'chevron-back' | 'chevron-forward' | 'share-outline'; label: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.round, { opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}
+    >
+      <Ionicons name={icon} size={22} color={onMedia} />
+    </Pressable>
   );
 }
 
@@ -299,18 +414,28 @@ function ReviewRow({ review }: { review: Review }) {
   );
 }
 
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  body: { padding: spacing.lg, gap: spacing.md },
   group: { gap: spacing.sm },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: spacing.sm },
-  dot: { width: 8, height: 8, borderRadius: radius.pill },
+  topBar: { position: 'absolute', left: spacing.lg, right: spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
+  round: { width: TOUCH, height: TOUCH, borderRadius: radius.pill, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  arrows: { position: 'absolute', bottom: 48, alignSelf: 'center', flexDirection: 'row', gap: spacing.sm },
+  sheet: { marginTop: -radius.xxl, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2 },
+  thumbs: { gap: spacing.sm, paddingVertical: spacing.xs },
+  thumbHit: { width: 60, height: 60, alignItems: 'center', justifyContent: 'center' },
+  thumb: { width: 56, height: 56, borderRadius: radius.pill },
+  tag: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  priceCol: { alignItems: 'flex-end', gap: 2 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   link: { minHeight: TOUCH, justifyContent: 'center' },
-  seller: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, minHeight: TOUCH + 20 },
-  avgRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  seller: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.xl, minHeight: TOUCH + 20 },
+  visit: { minHeight: TOUCH, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  avgRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   distRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   distLabel: { width: 14, textAlign: 'right' },
   distCount: { width: 28 },
@@ -321,4 +446,8 @@ const styles = StyleSheet.create({
   reply: { padding: spacing.md, borderRadius: radius.md, gap: 2 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, gap: spacing.sm },
   noticeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  actions: { flexDirection: 'row', gap: spacing.md },
+  action: { flex: 1, minHeight: 56, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingHorizontal: spacing.md },
+  addBtn: { backgroundColor: '#0A0A0A', borderWidth: StyleSheet.hairlineWidth },
+  actionLabel: { flexShrink: 1 },
 });

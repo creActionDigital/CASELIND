@@ -10,3 +10,4 @@ export { Text } from './Text';
 export { TextField } from './TextField';
 export { Wordmark } from './Wordmark';
 export { TextLink } from './TextLink';
+export { LogoMark } from './Logo';

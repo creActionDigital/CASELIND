@@ -1,3 +1,10 @@
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  useFonts,
+} from '@expo-google-fonts/poppins';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,7 +20,9 @@ import { Wordmark } from '../ui';
 function Gate() {
   const { status } = useAuth();
   const { colors, isDark } = useTheme();
-  if (status === 'loading') {
+  // Police de marque : on attend son chargement (ou son échec, alors police système) avant d'afficher l'app.
+  const [fontsLoaded, fontError] = useFonts({ Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold });
+  if (status === 'loading' || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: colors.background }}>
         <Wordmark size={28} />
