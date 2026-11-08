@@ -8,6 +8,7 @@ import { cancelOrder, fetchOrder } from '../../../shop/api';
 import { formatMoney } from '../../../shop/format';
 import { shopKeys } from '../../../shop/hooks';
 import { canCancel, canReview, mediaContentUrl } from '../../../shop/order-logic';
+import { BuyerDelivery } from '../../../delivery/BuyerDelivery';
 import { ContactSeller } from '../../../shop/ContactSeller';
 import { StatusPill } from '../../../shop/parts';
 import { radius, spacing, TOUCH } from '../../../theme/tokens';
@@ -106,11 +107,21 @@ export default function OrderDetail() {
           <View style={[styles.sep, { backgroundColor: colors.border }]} />
           <Line label={t('orders.subtotal')} value={money(o.subtotalMinor)} />
           {o.discountMinor > 0 ? <Line label={t('orders.discount', { code: o.couponCode ?? '' })} value={`− ${money(o.discountMinor)}`} /> : null}
+          {o.fulfillment === 'delivery' ? <Line label={t('delivery.fee')} value={o.deliveryFeeMinor > 0 ? money(o.deliveryFeeMinor) : t('delivery.free')} /> : null}
           <Line label={t('orders.total')} value={money(o.totalMinor)} strong />
         </View>
 
+        {o.delivery ? (
+          <>
+            <Text variant="heading" accessibilityRole="header">
+              {t('delivery.title')}
+            </Text>
+            <BuyerDelivery orderId={o.id} delivery={o.delivery} />
+          </>
+        ) : null}
+
         <Text variant="heading" accessibilityRole="header">
-          {t('orders.address')}
+          {o.fulfillment === 'pickup' ? t('delivery.pickup') : t('orders.address')}
         </Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {o.address ? (
@@ -123,7 +134,7 @@ export default function OrderDetail() {
               {o.address.notes ? <Text variant="small" muted>{o.address.notes}</Text> : null}
             </>
           ) : (
-            <Text muted>{t('orders.addressErased')}</Text>
+            <Text muted>{o.fulfillment === 'pickup' ? t('delivery.pickupBody') : t('orders.addressErased')}</Text>
           )}
           <Text variant="small" muted style={{ marginTop: spacing.xs }}>
             {t('orders.payment')} : {t('checkout.cod')}

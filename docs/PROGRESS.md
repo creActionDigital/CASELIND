@@ -1,5 +1,11 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-08 — Mobile M6 (livraison, services et réservations)
+
+- **M6a** : livraison ou retrait au checkout (un choix pour le panier, zone et frais par boutique), suivi acheteur (code de livraison masquable, position du livreur en direct, évaluation), zones et affectation des livreurs côté vendeur, « Mes livraisons » pour le livreur (code par pavé PIN, partage de position consenti pendant le trajet seulement).
+- **M6b** : découverte des services (catégories, recherche, distance), fiche d'offre et créneaux, réservation, « Mes réservations » (annulation, devis, avis), espace prestataire (offres, disponibilités, demandes, avis).
+- **Tests** : typecheck 0 erreur ; mobile **15 fichiers, 181 tests réussis**. Navigateur : page Services (15 catégories, état vide) et checkout (Livraison / Retrait, frais, paiement à la livraison) affichés contre l'API réelle. Parcours complets (réservation, livraison avec code) non exercés à l'écran.
+
 ## 2026-11-08 — Lots backend 8 (livraison) et 9 (services et réservations)
 
 ### Réalisé (2 agents, mode économe)

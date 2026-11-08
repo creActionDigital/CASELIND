@@ -1,4 +1,6 @@
 import type { MessageKey } from './fr';
+import { servicesEn } from '../services/messages';
+import { deliveryEn } from '../delivery/messages';
 
 export const en: Record<MessageKey, string> = {
   'common.loading': 'Loading…',
@@ -1184,4 +1186,6 @@ export const en: Record<MessageKey, string> = {
   'sellerQr.status.expired': 'Expired',
   'sellerQr.status.revoked': 'Revoked',
   'sellerQr.status.consumed': 'Used',
+  ...servicesEn,
+  ...deliveryEn,
 };

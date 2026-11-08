@@ -1,3 +1,5 @@
+import { deliveryFr } from '../delivery/messages';
+import { servicesFr } from '../services/messages';
 export const fr = {
   'common.loading': 'Chargement…',
   'common.retry': 'Réessayer',
@@ -1182,6 +1184,8 @@ export const fr = {
   'sellerQr.status.expired': 'Expiré',
   'sellerQr.status.revoked': 'Révoqué',
   'sellerQr.status.consumed': 'Utilisé',
+  ...servicesFr,
+  ...deliveryFr,
 } as const;
 
 export type MessageKey = keyof typeof fr;

@@ -6,7 +6,9 @@ import { Linking, StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../../../i18n';
 import { changeOrderStatus, fetchOrder, sk, useMembership } from '../../../../../seller/api';
 import { formatMinor } from '../../../../../seller/money';
+import { SellerDelivery } from '../../../../../delivery/SellerDelivery';
 import { allowedNext, needsConfirmation } from '../../../../../seller/order-flow';
+import { can } from '../../../../../seller/permissions';
 import { Card, Loading, OrderStatusBadge, SectionTitle, sellerErrorMessage } from '../../../../../seller/ui';
 import { spacing } from '../../../../../theme/tokens';
 import { useTheme } from '../../../../../theme/use-theme';
@@ -72,7 +74,9 @@ export default function SellerOrderDetail() {
 
       <SectionTitle>{t('seller.order.buyer')}</SectionTitle>
       <Card>
-        {o.address ? (
+        {o.fulfillment === 'pickup' && !o.address ? (
+          <Text muted>{t('delivery.pickupBody')}</Text>
+        ) : o.address ? (
           <>
             <Text variant="bodyStrong">{o.address.name}</Text>
             <Text>{o.address.line1}</Text>
@@ -97,6 +101,8 @@ export default function SellerOrderDetail() {
         )}
       </Card>
 
+      {o.delivery ? <SellerDelivery orgId={orgId} orderId={orderId} delivery={o.delivery} canManage={can(role, 'orders.manage')} /> : null}
+
       <SectionTitle>{t('seller.order.items')}</SectionTitle>
       <Card style={{ gap: spacing.md }}>
         {o.items.map((i) => (
@@ -118,6 +124,7 @@ export default function SellerOrderDetail() {
         <View style={[styles.sep, { backgroundColor: colors.border }]} />
         <Row label={t('seller.order.subtotal')} value={money(o.subtotalMinor)} />
         {o.discountMinor > 0 ? <Row label={`${t('seller.order.discount')}${o.couponCode ? ` (${o.couponCode})` : ''}`} value={`− ${money(o.discountMinor)}`} /> : null}
+        {o.fulfillment === 'delivery' ? <Row label={t('delivery.fee')} value={o.deliveryFeeMinor > 0 ? money(o.deliveryFeeMinor) : t('delivery.free')} /> : null}
         <Row label={t('seller.order.total')} value={money(o.totalMinor)} strong />
       </Card>
 

@@ -24,7 +24,6 @@ const MODULES: { key: MessageKey; icon: Icon; flag?: string }[] = [
   { key: 'more.education', icon: 'school-outline' },
   { key: 'more.travel', icon: 'airplane-outline' },
   { key: 'more.mobility', icon: 'bus-outline' },
-  { key: 'more.services', icon: 'construct-outline' },
   { key: 'more.jobs', icon: 'briefcase-outline' },
   { key: 'more.realestate', icon: 'business-outline' },
   { key: 'more.public', icon: 'business-outline' },
@@ -62,6 +61,17 @@ export default function More() {
             <Ionicons name="bag-handle-outline" size={26} color={colors.primary} />
             <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
               {t('shop.title')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('services.title')}
+            onPress={() => router.push('/services')}
+            style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="construct-outline" size={26} color={colors.primary} />
+            <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+              {t('services.title')}
             </Text>
           </Pressable>
           {MODULES.filter((m) => !m.flag || flags.data.flags[m.flag] === true).map((m) => (

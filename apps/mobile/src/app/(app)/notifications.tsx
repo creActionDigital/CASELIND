@@ -8,10 +8,12 @@ import { useI18n, type MessageKey } from '../../i18n';
 import { formatListTime } from '../../messaging/api';
 import { qk } from '../../messaging/keys';
 import { fetchNotifications, useUnreadCount } from '../../notifications/hooks';
+import { deliveryTarget } from '../../delivery/routing';
 import { commerceTarget } from '../../shop/order-logic';
 import { sellerTarget } from '../../seller/routing';
 import { socialTarget } from '../../social/routing';
 import { walletTarget } from '../../wallet/routing';
+import { bookingTarget } from '../../services/logic';
 import { spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, EmptyState, ErrorState, IconButton, Text } from '../../ui';
@@ -57,12 +59,22 @@ export default function NotificationCenter() {
     if (!n.readAt) readOne.mutate(n.id);
     const conversationId = n.data.conversationId;
     if (conversationId) return router.push({ pathname: '/messages/[conversationId]', params: { conversationId } });
+    if (n.category === 'delivery') {
+      const seller = sellerTarget(n.data);
+      if (seller) return router.push(seller);
+      const target = deliveryTarget(n.data);
+      if (target) return router.push(target);
+    }
     if (n.category === 'commerce') {
       // `data.orgId` présent : commande reçue par une boutique -> route vendeur ; sinon route acheteur (M3a).
       const seller = sellerTarget(n.data);
       if (seller) return router.push(seller);
       const target = commerceTarget(n.data);
       if (target) router.push(target);
+    }
+    if (n.category === 'booking') {
+      const target = bookingTarget(n.data);
+      if (target) return router.push(target);
     }
     if (n.category === 'payment') return router.push(walletTarget(n.data));
     if (n.category === 'social') {

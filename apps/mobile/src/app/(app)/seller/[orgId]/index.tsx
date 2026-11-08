@@ -53,8 +53,10 @@ export default function SellerDashboard() {
     { icon: 'pricetags-outline', label: 'seller.products', path: '/products', show: can(role, 'catalog.manage') },
     { icon: 'layers-outline', label: 'seller.stock', path: '/stock', show: canReadCatalog(role) },
     { icon: 'ticket-outline', label: 'seller.coupons', path: '/coupons', show: can(role, 'orders.manage') },
+    { icon: 'bicycle-outline', label: 'delivery.zones.title', path: '/zones', show: can(role, 'orders.manage') },
     { icon: 'star-outline', label: 'seller.reviews', path: '/reviews', show: canViewReviews(role) },
     { icon: 'wallet-outline', label: 'wallet.org.card', path: '/wallet', show: canViewFinance(role) },
+    { icon: 'construct-outline', label: 'services.pro.orgServices', path: '/services', show: current.org.kind === 'services' && can(role, 'catalog.manage') },
     { icon: 'location-outline', label: 'seller.location', path: '/location', show: canEditProfile(role) },
     { icon: 'qr-code-outline', label: 'sellerQr.title', path: '/qr', show: canViewFinance(role) || can(role, 'orders.manage') },
   ];

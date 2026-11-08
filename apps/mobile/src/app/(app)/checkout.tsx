@@ -1,20 +1,23 @@
+import type { DeliveryZone, Fulfillment } from '@caselind/contracts';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { deliveryKeys, fetchPublicZones } from '../../delivery/api';
+import { deliveryErrorMessage, zoneRefusal } from '../../delivery/errors';
+import { addressRequired, feeFor, plannedTotals, totalsByCurrencyWithFees, usableZones, zoneChoices, zoneCovers, zoneFee, type OrderPlan } from '../../delivery/logic';
 import { useI18n } from '../../i18n';
-import { errorMessage } from '../../lib/errors';
 import { uuidv4 } from '../../lib/uuid';
 import { loadAddress, saveAddress, type SavedAddress } from '../../shop/address-store';
 import { checkout } from '../../shop/api';
-import { canCheckout, totalsByCurrency } from '../../shop/cart-logic';
+import { canCheckout } from '../../shop/cart-logic';
 import { couponErrorCode, couponErrorKey, stockConflict, type StockConflict } from '../../shop/errors';
 import { formatMoney } from '../../shop/format';
 import { shopKeys, useCart } from '../../shop/hooks';
 import { normalizePhone } from '../../shop/order-logic';
-import { radius, spacing } from '../../theme/tokens';
+import { radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, EmptyState, ErrorState, Text, TextField } from '../../ui';
 
@@ -36,6 +39,9 @@ export default function Checkout() {
   const [couponErrors, setCouponErrors] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState<StockConflict | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [mode, setMode] = useState<Fulfillment>('delivery');
+  const [zoneSel, setZoneSel] = useState<Record<string, string | undefined>>({});
+  const [zoneErrors, setZoneErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let live = true;
@@ -50,20 +56,25 @@ export default function Checkout() {
       checkout({
         clientId: clientId.current,
         paymentMethod: 'cash_on_delivery',
-        // Delivery zones and in-store pickup (lot 8) get their own UI later; orgs without zones deliver for free.
-        fulfillment: 'delivery',
-        address: {
-          name: form.name.trim(),
-          phone: normalizePhone(form.phone)!,
-          city: form.city.trim(),
-          line1: form.line1.trim(),
-          ...(form.line2.trim() ? { line2: form.line2.trim() } : {}),
-          ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
-        },
+        fulfillment: mode,
+        // Adresse obligatoire en livraison seulement ; en retrait, jamais envoyée.
+        ...(needsAddress
+          ? {
+              address: {
+                name: form.name.trim(),
+                phone: normalizePhone(form.phone)!,
+                city: form.city.trim(),
+                line1: form.line1.trim(),
+                ...(form.line2.trim() ? { line2: form.line2.trim() } : {}),
+                ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
+              },
+            }
+          : {}),
+        ...(mode === 'delivery' && chosenZones.choices.length > 0 ? { zones: chosenZones.choices } : {}),
         couponCodes: Object.values(coupons).map((c) => c.trim()).filter(Boolean),
       }),
     onSuccess: async (res) => {
-      await saveAddress(form);
+      if (needsAddress) await saveAddress(form);
       qc.setQueryData(shopKeys.cart, { groups: [], unavailable: [], itemCount: 0 });
       void qc.invalidateQueries({ queryKey: shopKeys.orders });
       if (res.orders.length === 1) router.replace({ pathname: '/orders/[orderId]', params: { orderId: res.orders[0]!.id } });
@@ -73,6 +84,7 @@ export default function Checkout() {
       setConflict(null);
       setCouponErrors({});
       setFormError(null);
+      setZoneErrors({});
       const stock = stockConflict(e);
       if (stock) {
         setConflict(stock);
@@ -85,22 +97,44 @@ export default function Checkout() {
         const orgId = Object.keys(coupons).find((id) => coupons[id]!.trim().toUpperCase() === code) ?? Object.keys(coupons).find((id) => coupons[id]!.trim());
         if (orgId) return setCouponErrors({ [orgId]: t(key) });
       }
-      setFormError(errorMessage(e, t, locale));
+      const zone = zoneRefusal(e);
+      if (zone?.orgId) return setZoneErrors({ [zone.orgId]: deliveryErrorMessage(e, t, locale) });
+      setFormError(deliveryErrorMessage(e, t, locale));
     },
   });
 
   const groups = useMemo(() => cart.data?.groups ?? [], [cart.data]);
-  const totals = totalsByCurrency(groups);
   const orgCount = groups.length;
+
+  // Zones actives de chaque boutique (une erreur vaut « aucune zone » : le serveur tranche à l'envoi).
+  const zoneQueries = useQueries({
+    queries: groups.map((g) => ({ queryKey: deliveryKeys.publicZones(g.orgId), queryFn: () => fetchPublicZones(g.orgId), retry: false, staleTime: 60_000 })),
+  });
+  const zonesByOrg: Record<string, DeliveryZone[]> = {};
+  const zonesLoading = zoneQueries.some((q) => q.isPending);
+  groups.forEach((g, i) => {
+    zonesByOrg[g.orgId] = (zoneQueries[i]?.data?.items ?? []).filter((z) => z.active);
+  });
+  const modes = Object.fromEntries(groups.map((g) => [g.orgId, mode])) as Record<string, Fulfillment>;
+  const activeCounts = Object.fromEntries(groups.map((g) => [g.orgId, (zonesByOrg[g.orgId] ?? []).length]));
+  const plans: Record<string, OrderPlan> = Object.fromEntries(
+    groups.map((g) => [g.orgId, { fulfillment: mode, zone: zonesByOrg[g.orgId]?.find((z) => z.id === zoneSel[g.orgId]) ?? null } satisfies OrderPlan]),
+  );
+  const totals = totalsByCurrencyWithFees(plannedTotals(groups, plans));
+  const needsAddress = addressRequired(groups, modes);
+  const chosenZones = zoneChoices(groups, modes, activeCounts, zoneSel);
 
   function submit() {
     const next: typeof errors = {};
-    if (!form.name.trim()) next.name = t('field.required');
-    if (!normalizePhone(form.phone)) next.phone = t('checkout.phoneInvalid');
-    if (!form.city.trim()) next.city = t('field.required');
-    if (!form.line1.trim()) next.line1 = t('field.required');
+    if (needsAddress) {
+      if (!form.name.trim()) next.name = t('field.required');
+      if (!normalizePhone(form.phone)) next.phone = t('checkout.phoneInvalid');
+      if (!form.city.trim()) next.city = t('field.required');
+      if (!form.line1.trim()) next.line1 = t('field.required');
+    }
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    setZoneErrors(Object.fromEntries(chosenZones.missing.map((id) => [id, t('delivery.error.zone_required')])));
+    if (Object.keys(next).length > 0 || chosenZones.missing.length > 0) return;
     setFormError(null);
     place.mutate();
   }
@@ -142,6 +176,34 @@ export default function Checkout() {
         ) : null}
 
         <Text variant="heading" accessibilityRole="header">
+          {t('delivery.fulfillment')}
+        </Text>
+        <View style={styles.row} accessibilityRole="radiogroup">
+          {(['delivery', 'pickup'] as const).map((m) => (
+            <Pressable
+              key={m}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: mode === m }}
+              accessibilityLabel={t(m === 'delivery' ? 'delivery.mode.delivery' : 'delivery.mode.pickup')}
+              onPress={() => setMode(m)}
+              style={[styles.mode, { borderColor: mode === m ? colors.primary : colors.border, backgroundColor: mode === m ? colors.primarySoft : colors.surface }]}
+            >
+              <Ionicons name={m === 'delivery' ? 'bicycle-outline' : 'storefront-outline'} size={22} color={colors.primary} />
+              <Text variant="bodyStrong" style={styles.flex}>
+                {t(m === 'delivery' ? 'delivery.mode.delivery' : 'delivery.mode.pickup')}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {mode === 'pickup' ? (
+          <Text variant="small" muted>
+            {t('delivery.pickupBody')}
+          </Text>
+        ) : null}
+
+        {needsAddress ? (
+          <>
+        <Text variant="heading" accessibilityRole="header">
           {t('checkout.address')}
         </Text>
         <View>
@@ -161,6 +223,8 @@ export default function Checkout() {
           <TextField label={t('checkout.line2')} value={form.line2} onChangeText={set('line2')} maxLength={200} textContentType="streetAddressLine2" />
           <TextField label={t('checkout.notes')} value={form.notes} onChangeText={set('notes')} maxLength={500} multiline />
         </View>
+          </>
+        ) : null}
 
         <Text variant="heading" accessibilityRole="header">
           {t('checkout.payment')}
@@ -208,6 +272,31 @@ export default function Checkout() {
               </Text>
               <Text variant="bodyStrong">{formatMoney(g.subtotalMinor, g.currency, locale)}</Text>
             </View>
+            {mode === 'delivery' && (zonesByOrg[g.orgId]?.length ?? 0) > 0 ? (
+              <ZonePicker
+                zones={usableZones(zonesByOrg[g.orgId]!, g.currency, form.city, form.line2)}
+                currency={g.currency}
+                selected={zoneSel[g.orgId]}
+                onSelect={(id) => {
+                  setZoneSel((z) => ({ ...z, [g.orgId]: id }));
+                  setZoneErrors({});
+                }}
+                city={form.city}
+                line2={form.line2}
+                error={zoneErrors[g.orgId]}
+              />
+            ) : null}
+            {mode === 'delivery' && (zonesByOrg[g.orgId]?.length ?? 0) === 0 ? (
+              <Text variant="small" muted>
+                {t('delivery.freeShop')}
+              </Text>
+            ) : null}
+            <View style={styles.row}>
+              <Text variant="small" muted style={styles.flex}>
+                {t('delivery.fee')}
+              </Text>
+              <Text variant="small">{feeFor(plans[g.orgId], g.currency) > 0 ? formatMoney(feeFor(plans[g.orgId], g.currency), g.currency, locale) : t('delivery.free')}</Text>
+            </View>
             <TextField
               label={t('checkout.couponFor', { shop: g.orgName })}
               hint={t('checkout.couponHint')}
@@ -239,13 +328,78 @@ export default function Checkout() {
             <Text variant="heading">{formatMoney(x.totalMinor, x.currency, locale)}</Text>
           </View>
         ))}
-        <Button label={t('checkout.submit')} onPress={submit} loading={place.isPending} />
+        <Button label={t('checkout.submit')} onPress={submit} loading={place.isPending} disabled={zonesLoading} />
       </View>
     </View>
   );
 }
 
+function ZonePicker({
+  zones,
+  currency,
+  selected,
+  onSelect,
+  city,
+  line2,
+  error,
+}: {
+  zones: DeliveryZone[];
+  currency: string;
+  selected: string | undefined;
+  onSelect: (id: string) => void;
+  city: string;
+  line2: string;
+  error?: string;
+}) {
+  const { colors } = useTheme();
+  const { t, locale } = useI18n();
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <Text variant="small" style={{ fontWeight: '600' }}>
+        {t('delivery.zone')}
+      </Text>
+      {zones.length === 0 ? (
+        <Text variant="small" color={colors.danger}>
+          {t('delivery.error.zone_currency_unsupported')}
+        </Text>
+      ) : null}
+      {zones.map((z) => {
+        const on = selected === z.id;
+        const covers = zoneCovers(z, city, line2);
+        const fee = formatMoney(zoneFee(z, currency) ?? 0, currency, locale);
+        return (
+          <Pressable
+            key={z.id}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={`${z.name}, ${fee}, ${t('delivery.eta', { n: z.etaMinutes })}`}
+            onPress={() => onSelect(z.id)}
+            style={[styles.zone, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySoft : colors.surface }]}
+          >
+            <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={colors.primary} />
+            <View style={styles.flex}>
+              <Text variant="bodyStrong">{z.name}</Text>
+              <Text variant="caption" muted>
+                {t('delivery.eta', { n: z.etaMinutes })}
+                {(city.trim() || line2.trim()) && !covers ? ` · ${t('delivery.maybeNotCovered')}` : ''}
+              </Text>
+            </View>
+            <Text variant="small">{fee}</Text>
+          </Pressable>
+        );
+      })}
+      {error ? (
+        <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  mode: { flex: 1, minHeight: TOUCH + 8, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1.5, borderRadius: radius.lg, padding: spacing.md },
+  zone: { minHeight: TOUCH + 8, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1.5, borderRadius: radius.md, padding: spacing.md },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, gap: spacing.md },

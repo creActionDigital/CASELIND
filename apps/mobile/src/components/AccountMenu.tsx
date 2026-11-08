@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState, type ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/auth-context';
 import { useI18n } from '../i18n';
 import { useUnreadCount } from '../notifications/hooks';
+import { fetchProfile, svcKeys } from '../services/api';
+import { isCourier } from '../delivery/seller-logic';
 import { useMyOrgs } from '../seller/api';
 import { spacing, TOUCH } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
@@ -12,7 +15,7 @@ import { Avatar, Badge, Button, Text } from '../ui';
 import { SheetModal } from './SheetModal';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
-type Path = '/profile' | '/sessions' | '/security/2fa' | '/security/identifier' | '/kyc' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/seller' | '/seller/new';
+type Path = '/profile' | '/sessions' | '/security/2fa' | '/security/identifier' | '/kyc' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/deliveries' | '/bookings' | '/provider/me' | '/seller' | '/seller/new';
 
 /** Menu Compte : MyProfile, Sessions, Confidentialité, Langue, Déconnexion (avec confirmation). */
 export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -24,6 +27,7 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
   // Espace vendeur : membre actif (ou invitation en attente) -> /seller ; sinon proposition de créer sa boutique.
   const orgs = useMyOrgs().data?.items;
   const sellerPath: Path = orgs && orgs.length > 0 ? '/seller' : '/seller/new';
+  const provider = useQuery({ queryKey: svcKeys.profile, queryFn: fetchProfile, enabled: visible, retry: false });
   const hasShop = !!orgs?.some((m) => m.status === 'active');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,11 +44,14 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
   const items: { icon: Icon; label: string; path: Path }[] = [
     { icon: 'person-outline', label: t('account.profile'), path: '/profile' },
     { icon: 'receipt-outline', label: t('orders.title'), path: '/orders' },
+    { icon: 'calendar-outline', label: t('bookings.title'), path: '/bookings' },
+    { icon: 'construct-outline', label: provider.data ? t('services.pro.mine') : t('services.pro.become'), path: '/provider/me' },
     {
       icon: 'storefront-outline',
       label: hasShop ? t('seller.title') : orgs && orgs.length > 0 ? t('seller.invitations') : t('seller.createShop'),
       path: sellerPath,
     },
+    ...(isCourier(orgs) ? [{ icon: 'bicycle-outline' as Icon, label: t('delivery.mine.title'), path: '/deliveries' as Path }] : []),
     { icon: 'notifications-outline', label: t('account.notifications'), path: '/notifications' },
     { icon: 'options-outline', label: t('account.notificationPreferences'), path: '/notification-preferences' },
     { icon: 'shield-checkmark-outline', label: t('account.privacy'), path: '/privacy' },
