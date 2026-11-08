@@ -58,6 +58,10 @@ export type AuditAction =
   | 'commerce.order_status_changed'
   | 'commerce.coupon_created'
   | 'commerce.coupon_deactivated'
+  /** Services (lot 9): metadata {offerId, orgId?, fields?}. Never a booking note. */
+  | 'service.created'
+  | 'service.updated'
+  | 'service.archived'
   /** Catalogue (lot 5A): metadata {orgId, productId[, variantId, delta, reason]}. No free text. */
   | 'product.created'
   | 'product.published'
@@ -80,7 +84,13 @@ export type AuditAction =
   | 'wallet.pin_locked'
   /** Merchant QR (lot 6B): metadata {orgId, qrId[, currency, amountMinor]}. */
   | 'wallet.qr_created'
-  | 'wallet.qr_revoked';
+  | 'wallet.qr_revoked'
+  /** Delivery (lot 8): metadata {orgId, deliveryId, orderId[, courierUserId, from, to, zoneId]}. Never a code, a position or an address. */
+  | 'delivery.zone_saved'
+  | 'delivery.zone_deleted'
+  | 'delivery.assigned'
+  | 'delivery.status_changed'
+  | 'delivery.proof_reset';
 
 export interface AuditInput {
   action: AuditAction;

@@ -592,6 +592,8 @@ export const en: Record<MessageKey, string> = {
   'report.target.message': 'Message',
   'report.target.product': 'Product',
   'report.target.review': 'Review',
+  'report.target.service': 'Service',
+  'report.target.service_review': 'Service review',
 
   // Espace vendeur (M3b)
   'seller.title': 'Seller space',

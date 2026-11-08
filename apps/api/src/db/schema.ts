@@ -219,3 +219,4 @@ export * from './schema-ledger.js';
 export * from './schema-kyc.js';
 export * from './schema-messaging-extras.js';
 export * from './schema-identity.js';
+export * from './schema-delivery.js';

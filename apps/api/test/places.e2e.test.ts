@@ -134,12 +134,14 @@ describe('GET /v1/places', () => {
     expect((await places(viewer, `${around}&q=${tag}`).expect(200)).body.items).toHaveLength(1);
     await ctx.http.put(`/v1/blocks/${owner.id}`).set(bearer(viewer.token)).expect(204);
     expect((await places(viewer, `${around}&q=${tag}`).expect(200)).body.items).toHaveLength(0);
-    // Only organisations carry coordinates.
+    // Only published places carry coordinates: organisations and the service area a provider publishes
+    // (lot 9). No table stores where a user is.
     const cols = await ctx.sql.query(
-      `SELECT table_name FROM information_schema.columns
-       WHERE table_schema = 'public' AND column_name IN ('lat', 'lng', 'latitude', 'longitude')`,
+      `SELECT DISTINCT table_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND column_name IN ('lat', 'lng', 'latitude', 'longitude')
+       ORDER BY table_name`,
     );
-    expect(cols.rows.map((r) => r.table_name)).toEqual(['organizations', 'organizations']);
+    expect(cols.rows.map((r) => r.table_name)).toEqual(['organizations', 'service_offers']);
   });
 });
 

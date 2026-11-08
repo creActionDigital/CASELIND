@@ -590,6 +590,8 @@ export const fr = {
   'report.target.message': 'Message',
   'report.target.product': 'Produit',
   'report.target.review': 'Avis',
+  'report.target.service': 'Service',
+  'report.target.service_review': 'Avis sur un service',
 
   // Espace vendeur (M3b)
   'seller.title': 'Espace vendeur',

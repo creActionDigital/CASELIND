@@ -7,7 +7,7 @@ import {
   type MediaMime,
   type ReportReason,
 } from '@caselind/contracts';
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { MessageExtrasService } from '../messaging/message-extras.service.js';
 import { AppError } from '../common/app-error.js';
@@ -16,6 +16,7 @@ import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
 import {
   auditEvents,
+  deliveries,
   conversationMembers,
   conversations,
   mediaAssets,
@@ -210,7 +211,16 @@ export class AccountService {
       .where(eq(reviews.userId, auth.userId))
       .orderBy(asc(reviews.createdAt), asc(reviews.id));
 
+    // Lot 8: deliveries of the user's orders and the ones the user carried; never the proof code nor a position.
+    const deliveryRows = await this.db
+      .select({ d: deliveries, number: orders.number })
+      .from(deliveries)
+      .innerJoin(orders, eq(orders.id, deliveries.orderId))
+      .where(or(eq(deliveries.buyerId, auth.userId), eq(deliveries.courierId, auth.userId)))
+      .orderBy(asc(deliveries.createdAt), asc(deliveries.id));
+
     const wallet = await this.wallets.exportFor(auth.userId);
+    const services = await this.exportServices(auth.userId);
     // Lot 6B: KYC level and request statuses/dates; never the document number nor the files.
     const [kycProfile] = await this.db.select({ level: kycProfiles.level }).from(kycProfiles).where(eq(kycProfiles.userId, auth.userId)).limit(1);
     const kycRows = await this.db
@@ -303,6 +313,16 @@ export class AccountService {
           .filter((i) => i.orderId === o.id)
           .map((i) => ({ title: i.title, variantLabel: i.variantLabel, quantity: i.quantity, unitPriceMinor: i.unitPriceMinor })),
       })),
+      deliveries: deliveryRows.map(({ d, number }) => ({
+        orderNumber: number,
+        role: (d.buyerId === auth.userId ? 'buyer' : 'courier') as 'buyer' | 'courier',
+        status: d.status,
+        rating: d.rating,
+        ratingComment: d.ratingComment,
+        failureReason: d.failureReason,
+        createdAt: d.createdAt.toISOString(),
+        deliveredAt: d.deliveredAt?.toISOString() ?? null,
+      })),
       cart: cartRows.map((c) => ({ variantId: c.variantId, quantity: c.quantity, addedAt: c.createdAt.toISOString() })),
       kyc: {
         level: (kycProfile?.level ?? 0) as 0 | 1 | 2,
@@ -323,6 +343,7 @@ export class AccountService {
         createdAt: r.createdAt.toISOString(),
       })),
       wallet,
+      services,
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
         query: r.query,
         scope: r.scope,
@@ -336,6 +357,44 @@ export class AccountService {
       meta,
     });
     return result;
+  }
+
+  /** Lot 9: own provider profile and offers, own bookings as a client, own service reviews. */
+  private async exportServices(userId: string): Promise<AccountExport['services']> {
+    const iso = (v: string | Date): string => new Date(v).toISOString();
+    const [profile, offers, bookings, reviews] = await Promise.all([
+      this.db.execute(sql`SELECT display_name, bio, city, skills, created_at FROM service_providers WHERE user_id = ${userId}::uuid`),
+      this.db.execute(sql`SELECT id, title, status, created_at FROM service_offers WHERE provider_id = ${userId}::uuid ORDER BY created_at, id`),
+      this.db.execute(sql`
+        SELECT b.id, s.title, b.status, b.starts_at, b.note, b.created_at FROM service_bookings b
+        JOIN service_offers s ON s.id = b.offer_id WHERE b.client_id = ${userId}::uuid ORDER BY b.created_at, b.id`),
+      this.db.execute(sql`SELECT id, offer_id, rating, body, created_at FROM service_reviews WHERE client_id = ${userId}::uuid ORDER BY created_at, id`),
+    ]);
+    const p = profile.rows[0] as { display_name: string; bio: string | null; city: string | null; skills: string[]; created_at: string | Date } | undefined;
+    return {
+      profile: p ? { displayName: p.display_name, bio: p.bio, city: p.city, skills: p.skills, createdAt: iso(p.created_at) } : null,
+      offers: (offers.rows as { id: string; title: string; status: string; created_at: string | Date }[]).map((o) => ({
+        id: o.id,
+        title: o.title,
+        status: o.status,
+        createdAt: iso(o.created_at),
+      })),
+      bookings: (bookings.rows as { id: string; title: string; status: string; starts_at: string | Date; note: string | null; created_at: string | Date }[]).map((b) => ({
+        id: b.id,
+        offerTitle: b.title,
+        status: b.status,
+        startsAt: iso(b.starts_at),
+        note: b.note,
+        createdAt: iso(b.created_at),
+      })),
+      reviews: (reviews.rows as { id: string; offer_id: string; rating: number; body: string | null; created_at: string | Date }[]).map((r) => ({
+        id: r.id,
+        offerId: r.offer_id,
+        rating: r.rating,
+        body: r.body,
+        createdAt: iso(r.created_at),
+      })),
+    };
   }
 
   /**

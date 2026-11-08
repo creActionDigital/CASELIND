@@ -29,7 +29,9 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 5b — Reste commerce | Contact du vendeur depuis une commande, avis par organisation, `details.reason` sur les 409 du catalogue, lecture des variantes pour le rôle `stock`, devise du minimum des coupons en pourcentage ; paiement en ligne (après Q5), livraison et suivi (lot 9), promotions et ventes flash (E-05), live shopping (E-07), service client dans le chat (E-06), favoris produits, recherche plein texte avancée | | planifié |
 | 6 — Ledger et wallet (sandbox) | Ledger en partie double, wallet USD/CDF, transferts idempotents, QR marchand signé, KYC par niveaux, PIN ; **aucun argent réel** | 439 tests | **testé** (sandbox) ; FlexPay après contrat (Q5) |
 | 7 — Lieux et recherche | Lieux par distance (sans PostGIS), recherche universelle, historique contrôlable | 439 tests | **testé** |
-| 8+ | Livraison, mini-apps (OAuth à code éphémère + scopes), IA, mobilité, services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
+| 8 — Livraison | Zones, frais, retrait, livreur, statuts, preuve par code, position consentie, évaluation | 467 tests | **testé** (backend) ; écrans mobiles M6 |
+| 9 — Services et réservations | Offres, prestataires, créneaux, devis, réservations, avis | 467 tests | **testé** (backend) ; écrans mobiles M6 |
+| 10+ | Mini-apps (OAuth à code éphémère + scopes), IA, mobilité, services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
 
 ## Lots mobile
 

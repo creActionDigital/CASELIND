@@ -11,10 +11,14 @@ export type RealtimeEvent =
   | 'conversation.member_removed'
   | 'draft.updated'
   | 'typing'
-  | 'notification.new';
+  | 'notification.new'
+  /** Lot 8: status of a delivery (user room of the buyer and of the courier) and the courier position (room of the order). */
+  | 'delivery.updated'
+  | 'delivery.location';
 
 export const userRoom = (userId: string) => `user:${userId}`;
 export const conversationRoom = (conversationId: string) => `conversation:${conversationId}`;
+export const orderRoom = (orderId: string) => `order:${orderId}`;
 export const sessionRoom = (sessionId: string) => `session:${sessionId}`;
 
 /**
@@ -69,6 +73,16 @@ export class RealtimeService {
   }
   removeFromConversation(userId: string, conversationId: string): void {
     this.run(() => this.server?.in(userRoom(userId)).socketsLeave(conversationRoom(conversationId)));
+  }
+  emitToOrder(orderId: string, event: RealtimeEvent, payload: unknown): void {
+    this.run(() => this.server?.to(orderRoom(orderId)).emit(event, payload));
+  }
+  /** Lot 8: the users' connected sockets join the room of an order (the buyer only, for the courier position). */
+  addToOrder(userIds: string[], orderId: string): void {
+    for (const id of userIds) this.run(() => this.server?.in(userRoom(id)).socketsJoin(orderRoom(orderId)));
+  }
+  removeFromOrder(userIds: string[], orderId: string): void {
+    for (const id of userIds) this.run(() => this.server?.in(userRoom(id)).socketsLeave(orderRoom(orderId)));
   }
   /** Closes sockets authenticated with this session (session revoked, logout). */
   disconnectSession(sessionId: string): void {

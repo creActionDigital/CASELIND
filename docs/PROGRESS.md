@@ -1,5 +1,20 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-08 — Lots backend 8 (livraison) et 9 (services et réservations)
+
+### Réalisé (2 agents, mode économe)
+- **8, livraison** (migration 0019, `src/delivery/*`) : zones et frais par organisation, choix livraison ou retrait gratuit au checkout, affectation et réaffectation d'un livreur (rôle `delivery`), statuts append-only synchronisés avec la commande, preuve par code à 6 chiffres (HMAC, 5 essais puis verrou), position du livreur avec consentement pendant le trajet seulement (dernière position, effacée à la fin, visible de l'acheteur seul), évaluation du livreur.
+- **9, services et réservations** (0020, `src/services/*`, flag `services`) : 15 catégories, offres d'organisations ou de prestataires individuels (prix fixe ou sur devis, « non vérifié » affiché, « urgent » et « garanti » seulement si renseignés), disponibilités et créneaux, réservation sans double réservation (verrou + index unique), devis, annulation avec délai, paiement sur place seulement, avis vérifiés, découverte par distance.
+- Raccords : écran de commande mobile (`fulfillment`), libellés de signalement, test des lieux (les offres de service publient une zone, aucune position d'utilisateur n'est stockée).
+
+### Tests réellement exécutés (2026-11-08)
+- `npm run typecheck` : 0 erreur. API : **38 fichiers, 467 tests réussis** (466 au passage complet, puis le test des lieux corrigé et relancé seul). Mobile : 137 tests réussis.
+
+### Limites
+- Pas d'écrans mobiles pour la livraison (zones, livreur, code) ni pour les services : à faire (M6).
+- Pas de revue de code dédiée sur ces deux lots (mode économe) : suite complète seulement.
+- Photos des offres de service non testées.
+
 ## 2026-11-07 — Mobile M5 (recherche, lieux, QR, sécurité, KYC, messagerie)
 
 ### Réalisé (4 agents mobiles en parallèle, puis 1 agent API)

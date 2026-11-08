@@ -66,6 +66,10 @@ import { ReviewsService } from './reviews/reviews.service.js';
 // Lot 7 (places, universal search), separate import block.
 import { PlacesController } from './places/places.controller.js';
 import { PlacesService } from './places/places.service.js';
+// Lot 9 (services and bookings), separate import block.
+import { BookingsService } from './services/bookings.service.js';
+import { BookingsController, ServicesController } from './services/services.controller.js';
+import { ServicesService } from './services/services.service.js';
 import { SearchHistoryService } from './search/search-history.service.js';
 import { SEARCH_HANDLER, SearchController } from './search/search.controller.js';
 import { SearchService } from './search/search.service.js';
@@ -102,6 +106,11 @@ import {
 import { QrLoginService } from './auth/identity/qr-login.service.js';
 import { TotpCrypto } from './auth/identity/totp-crypto.js';
 import { TwoFactorService } from './auth/identity/two-factor.service.js';
+// Lot 8 (delivery), separate import block.
+import { BuyerDeliveryController, MyDeliveriesController, OrgDeliveryController } from './delivery/delivery.controller.js';
+import { DeliveryZonesService } from './delivery/delivery-zones.service.js';
+import { DeliveryService } from './delivery/delivery.service.js';
+import { DeliveryCodes } from './delivery/delivery.shared.js';
 import { MaintenanceService } from './maintenance/maintenance.service.js';
 import { AvatarController } from './media/avatar.controller.js';
 import { MEDIA_THROTTLED_HANDLERS, MediaController, PublicMediaController } from './media/media.controller.js';
@@ -272,6 +281,9 @@ export class AppModule {
         ReviewsController,
         // Lot 7
         PlacesController,
+        // Lot 9
+        ServicesController,
+        BookingsController,
         SearchController,
         // Lot 6A
         WalletController,
@@ -286,6 +298,10 @@ export class AppModule {
         TwoFactorController,
         IdentifierChangeController,
         QrLoginController,
+        // Lot 8
+        OrgDeliveryController,
+        BuyerDeliveryController,
+        MyDeliveriesController,
         ...extraControllers,
       ],
       providers: [
@@ -331,6 +347,10 @@ export class AppModule {
         KycCrypto,
         PaymentQrService,
         QrSigner,
+        // Lot 8
+        DeliveryCodes,
+        DeliveryZonesService,
+        DeliveryService,
         // Lot 5B
         CartService,
         PaymentMethods,
@@ -339,6 +359,9 @@ export class AppModule {
         ReviewsService,
         // Lot 7
         PlacesService,
+        // Lot 9
+        ServicesService,
+        BookingsService,
         SearchService,
         SearchHistoryService,
         StorefrontService,

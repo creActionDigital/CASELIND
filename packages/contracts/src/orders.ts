@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { checkoutZoneChoiceSchema, deliveryViewSchema, fulfillmentSchema } from './delivery.js';
 
 /* Lot 5B: cart, split orders, coupons, verified reviews. See docs/architecture/API_CONTRACTS.md.
  * Amounts are integers in minor units of the line's currency; no amount ever transits through CASELIND. */
@@ -70,14 +71,23 @@ export const orderAddressSchema = z.object({
 });
 export type OrderAddress = z.infer<typeof orderAddressSchema>;
 
-export const checkoutRequestSchema = z.object({
-  /** Idempotency key: a retry with the same clientId returns the orders already created. */
-  clientId: z.uuid(),
-  address: orderAddressSchema,
-  paymentMethod: paymentMethodSchema,
-  /** Codes are case-insensitive. A code applies to the order of the organisation that issued it. */
-  couponCodes: z.array(z.string().trim().min(1).max(32)).max(10).optional(),
-});
+export const checkoutRequestSchema = z
+  .object({
+    /** Idempotency key: a retry with the same clientId returns the orders already created. */
+    clientId: z.uuid(),
+    /** Required for a delivery; optional for a pick-up in store. */
+    address: orderAddressSchema.optional(),
+    paymentMethod: paymentMethodSchema,
+    /** Codes are case-insensitive. A code applies to the order of the organisation that issued it. */
+    couponCodes: z.array(z.string().trim().min(1).max(32)).max(10).optional(),
+    /** Lot 8: `pickup` = collected in store, free, no delivery. Default `delivery`. */
+    fulfillment: fulfillmentSchema.default('delivery'),
+    /** Lot 8: delivery zone per organisation. Required for an organisation that defines zones. */
+    zones: z.array(checkoutZoneChoiceSchema).max(20).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.fulfillment === 'delivery' && !v.address) ctx.addIssue({ code: 'custom', path: ['address'], message: 'a delivery needs an address' });
+  });
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 
 export const orderItemSchema = z.object({
@@ -105,9 +115,13 @@ export const orderSchema = z.object({
   status: orderStatusSchema,
   subtotalMinor: z.number().int(),
   discountMinor: z.number().int(),
+  /** subtotal - discount + delivery fee. */
   totalMinor: z.number().int(),
   couponCode: z.string().nullable(),
   paymentMethod: paymentMethodSchema,
+  /** Lot 8. */
+  fulfillment: fulfillmentSchema,
+  deliveryFeeMinor: z.number().int(),
   /** Null once the buyer's account was erased. */
   address: orderAddressSchema.nullable(),
   items: z.array(orderItemSchema),
@@ -137,6 +151,8 @@ export const orderDetailSchema = orderSchema.extend({
    * (`POST /v1/conversations`). Null when the buyer and that member are blocked either way.
    */
   contactUserId: z.uuid().nullable(),
+  /** Lot 8: the delivery of the order (null for a pick-up). `proofCode` is filled for the buyer only. */
+  delivery: deliveryViewSchema.nullable(),
 });
 export type OrderDetail = z.infer<typeof orderDetailSchema>;
 

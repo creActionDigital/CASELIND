@@ -343,9 +343,38 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       // Commerce (lot 5B): the cart and the reviews go; orders stay for the seller accounting with the address erased.
       await tx.execute(sql`DELETE FROM cart_items WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM reviews WHERE user_id = ANY(${idArray})`);
+      // Services (lot 9): reviews, booking notes and the provider profile go; live bookings are cancelled by the system and
+      // the offers of an individual provider are archived (bookings and offers of organisations are not personal data of the user).
+      await tx.execute(sql`DELETE FROM service_reviews WHERE client_id = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE service_bookings SET note = NULL WHERE client_id = ANY(${idArray}) AND note IS NOT NULL`);
+      await tx.execute(sql`
+        UPDATE service_bookings SET status = 'cancelled', status_changed_at = now(), status_changed_by = 'system', updated_at = now()
+        WHERE status IN ('requested', 'confirmed')
+          AND (client_id = ANY(${idArray}) OR offer_id IN (SELECT id FROM service_offers WHERE provider_id = ANY(${idArray})))`);
+      await tx.execute(sql`UPDATE service_offers SET status = 'archived', updated_at = now() WHERE provider_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM service_providers WHERE user_id = ANY(${idArray})`);
       // Ledger (lot 6A): postings are append-only and kept (retention); the user's accounts are frozen, never deleted.
       // A non-zero sandbox balance left on them is reported by the reconciliation/back-office, not erased.
       await tx.execute(sql`UPDATE ledger_accounts SET status = 'frozen' WHERE user_id = ANY(${idArray})`);
+      // Delivery (lot 8): a courier who leaves loses their open deliveries (not picked up: back to the seller queue;
+      // under way: failed), their position goes; as a buyer the position, the rating text and the failure text are erased.
+      // Events are append-only and keep no personal text beyond the actor id of the (anonymised) account.
+      await tx.execute(sql`
+        INSERT INTO delivery_events (delivery_id, kind, from_status, status, actor_kind, note)
+        SELECT id, 'status', status, CASE WHEN status = 'assigned' THEN 'pending' ELSE 'failed' END, 'system', 'courier_removed'
+        FROM deliveries WHERE courier_id = ANY(${idArray}) AND status IN ('assigned', 'picked_up', 'in_transit')`);
+      await tx.execute(sql`
+        UPDATE deliveries SET
+          failure_reason = CASE WHEN status = 'assigned' THEN failure_reason ELSE 'courier_removed' END,
+          status = CASE WHEN status = 'assigned' THEN 'pending' ELSE 'failed' END,
+          courier_id = CASE WHEN status = 'assigned' THEN NULL ELSE courier_id END,
+          assigned_at = CASE WHEN status = 'assigned' THEN NULL ELSE assigned_at END,
+          last_lat = NULL, last_lng = NULL, last_location_at = NULL, location_consent = false
+        WHERE courier_id = ANY(${idArray}) AND status IN ('assigned', 'picked_up', 'in_transit')`);
+      await tx.execute(sql`
+        UPDATE deliveries SET last_lat = NULL, last_lng = NULL, last_location_at = NULL, location_consent = false,
+          rating_comment = CASE WHEN buyer_id = ANY(${idArray}) THEN NULL ELSE rating_comment END
+        WHERE buyer_id = ANY(${idArray}) OR courier_id = ANY(${idArray})`);
       await tx.execute(sql`UPDATE orders SET address = NULL, address_anonymized_at = now() WHERE buyer_id = ANY(${idArray}) AND address IS NOT NULL`);
       // Posts and comments are erased for good (bodies included; reactions, media links and replies cascade).
       await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ANY(${idArray})`);

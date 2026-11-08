@@ -9,13 +9,16 @@ import {
   type OrderStatus,
   type ReserveConflictDetails,
 } from '@caselind/contracts';
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { CatalogPort, type PricedLine } from '../commerce/catalog.port.js';
 import { DB, type Db } from '../db/db.module.js';
-import { cartItems, orderEvents, orderItems, orgMembers, orders, type OrderRow } from '../db/schema.js';
+import { cartItems, deliveries, deliveryEvents, orderEvents, orderItems, orgMembers, orders, type OrderRow } from '../db/schema.js';
+import { DeliveryZonesService } from '../delivery/delivery-zones.service.js';
+import { DeliveryCodes, hydrateDeliveries } from '../delivery/delivery.shared.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { ORG_ROLE_PERMISSIONS } from '../orgs/org-permissions.js';
 import { resolveContactUserId } from '../orgs/org-contact.js';
@@ -32,6 +35,7 @@ import {
   orderNotFound,
   SELLER_TRANSITIONS,
   UUID_RE,
+  validationError,
 } from './orders.shared.js';
 import { PaymentMethods } from './payment-methods.js';
 
@@ -59,6 +63,8 @@ export class OrdersService {
     private readonly payments: PaymentMethods,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly zones: DeliveryZonesService,
+    private readonly codes: DeliveryCodes,
   ) {}
 
   /* ------------------------------------------------------------------ checkout */
@@ -76,6 +82,7 @@ export class OrdersService {
     }
     const replay = await this.findByClientId(this.db, buyerId, req.clientId);
     if (replay.length > 0) return { orders: await hydrateOrders(this.db, replay), created: false };
+    if (req.fulfillment === 'delivery' && !req.address) throw validationError('address', 'a delivery needs an address');
 
     let outcome: { rows: OrderRow[]; created: boolean };
     try {
@@ -141,6 +148,12 @@ export class OrdersService {
     for (const [key, g] of ordered) {
       const coupon = applied.get(key);
       const discountMinor = coupon?.discountMinor ?? 0;
+      // Lot 8: a delivery is priced by the seller's zone (free without zones); a pick-up is free.
+      const zone =
+        req.fulfillment === 'delivery' && req.address
+          ? await this.zones.resolveForCheckout(tx, g.orgId, g.currency, req.zones?.find((z) => z.orgId === g.orgId)?.zoneId, req.address)
+          : null;
+      const deliveryFeeMinor = zone?.feeMinor ?? 0;
       const [order] = await tx
         .insert(orders)
         .values({
@@ -151,11 +164,14 @@ export class OrdersService {
           currency: g.currency,
           subtotalMinor: g.subtotalMinor,
           discountMinor,
-          totalMinor: g.subtotalMinor - discountMinor,
+          totalMinor: g.subtotalMinor - discountMinor + deliveryFeeMinor,
+          fulfillment: req.fulfillment,
+          deliveryFeeMinor,
+          deliveryZoneId: zone?.zoneId ?? null,
           couponId: coupon?.coupon.id ?? null,
           couponCode: coupon?.coupon.code ?? null,
           paymentMethod: req.paymentMethod,
-          address: req.address,
+          address: req.address ?? null,
         })
         .returning();
       await tx.insert(orderItems).values(
@@ -174,6 +190,21 @@ export class OrdersService {
       );
       await tx.insert(orderEvents).values({ orderId: order!.id, fromStatus: null, status: 'pending', actorKind: 'buyer', actorUserId: buyerId });
       if (coupon) await this.coupons.redeem(tx, coupon.coupon.id, order!.id, buyerId);
+      if (req.fulfillment === 'delivery') {
+        // One delivery per order to deliver; the proof code is issued now (stored as a keyed hash).
+        const deliveryId = randomUUID();
+        const proof = this.codes.issue(deliveryId);
+        await tx.insert(deliveries).values({
+          id: deliveryId,
+          orderId: order!.id,
+          orgId: g.orgId,
+          buyerId,
+          proofNonce: proof.nonce,
+          proofHash: proof.hash,
+          estimatedMinutes: zone?.etaMinutes ?? null,
+        });
+        await tx.insert(deliveryEvents).values({ deliveryId, kind: 'status', fromStatus: null, status: 'pending', actorKind: 'buyer', actorUserId: buyerId });
+      }
       rows.push(order!);
     }
     await tx.delete(cartItems).where(eq(cartItems.userId, buyerId));
@@ -222,7 +253,15 @@ export class OrdersService {
 
   async getMine(buyerId: string, orderId: string): Promise<OrderDetail> {
     const row = await this.findOwned(orderId, eq(orders.buyerId, buyerId));
-    return this.withContact(await hydrateDetail(this.db, row), buyerId);
+    return this.withContact(await this.withDelivery(await hydrateDetail(this.db, row), 'buyer'), buyerId);
+  }
+
+  /** Lot 8: the delivery of the order; the proof code is only filled for the buyer. */
+  private async withDelivery(detail: OrderDetail, viewer: 'buyer' | 'org'): Promise<OrderDetail> {
+    const [row] = await this.db.select().from(deliveries).where(eq(deliveries.orderId, detail.id)).limit(1);
+    if (!row) return detail;
+    const [view] = await hydrateDeliveries(this.db, this.codes, [row], viewer);
+    return { ...detail, delivery: view ?? null };
   }
 
   /** Buyer view: who to talk to about the order (null when blocked with the buyer or nobody is available). */
@@ -232,7 +271,7 @@ export class OrdersService {
 
   async getForOrg(orgId: string, orderId: string): Promise<OrderDetail> {
     const row = await this.findOwned(orderId, eq(orders.orgId, orgId));
-    return hydrateDetail(this.db, row);
+    return this.withDelivery(await hydrateDetail(this.db, row), 'org');
   }
 
   private async findOwned(orderId: string, scope: ReturnType<typeof eq>): Promise<OrderRow> {
@@ -259,7 +298,7 @@ export class OrdersService {
    */
   private async transition(orderId: string, actor: Actor, to: OrderStatus, note: string | undefined): Promise<OrderDetail> {
     if (!UUID_RE.test(orderId)) throw orderNotFound();
-    const { row, from } = await this.db.transaction(async (tx) => {
+    const { row, from, orphanedCouriers } = await this.db.transaction(async (tx) => {
       const [locked] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update').limit(1);
       if (!locked || (actor.kind === 'buyer' ? locked.buyerId !== actor.userId : locked.orgId !== actor.orgId)) {
         throw orderNotFound();
@@ -284,6 +323,28 @@ export class OrdersService {
         await this.catalog.release(tx, lines);
         await this.coupons.release(tx, orderId);
       }
+      let orphaned: string[] = [];
+      if (to === 'cancelled') {
+        // Lot 8: a delivery not picked up yet ends with the order.
+        const open = await tx
+          .select()
+          .from(deliveries)
+          .where(and(eq(deliveries.orderId, orderId), inArray(deliveries.status, ['pending', 'assigned'])))
+          .for('update');
+        for (const d of open) {
+          await tx.update(deliveries).set({ status: 'failed', failureReason: 'order_cancelled' }).where(eq(deliveries.id, d.id));
+          await tx.insert(deliveryEvents).values({
+            deliveryId: d.id,
+            kind: 'status',
+            fromStatus: d.status,
+            status: 'failed',
+            actorKind: actor.kind === 'org' ? 'org' : 'buyer',
+            actorUserId: actor.userId,
+            note: 'order_cancelled',
+          });
+        }
+        orphaned = open.map((d) => d.courierId).filter((v): v is string => v !== null);
+      }
       if (actor.kind === 'org') {
         await this.audit.record(
           {
@@ -296,10 +357,19 @@ export class OrdersService {
           tx,
         );
       }
-      return { row: updated!, from: locked.status };
+      return { row: updated!, from: locked.status, orphanedCouriers: orphaned };
     });
 
-    const detail = await hydrateDetail(this.db, row);
+    const detail = await this.withDelivery(await hydrateDetail(this.db, row), actor.kind === 'org' ? 'org' : 'buyer');
+    await this.notifications.notifyMany(
+      orphanedCouriers.map((userId) => ({
+        userId,
+        category: 'delivery' as const,
+        title: `Livraison ${row.number}`,
+        body: 'La commande a été annulée : la livraison est retirée de vos tâches.',
+        data: { orderId: row.id, orderNumber: row.number },
+      })),
+    );
     if (actor.kind === 'org') {
       await this.notifications.notify({
         userId: row.buyerId,
@@ -312,6 +382,29 @@ export class OrdersService {
       await this.notifyOrgManagers(row.orgId, `Commande ${row.number}`, `Annulée par l'acheteur (était ${STATUS_LABEL[from]}).`, detail);
     }
     return detail;
+  }
+
+  /**
+   * Lot 8: the delivery moves the order along (`shipped` at pick-up, `delivered` at hand-over), inside the
+   * delivery transaction. Never goes backwards and is a no-op when the seller already did it by hand.
+   * Returns false when the order is not in a state that allows the move (cancelled, not prepared yet).
+   */
+  async syncFromDelivery(tx: Tx, orderId: string, to: 'shipped' | 'delivered', actorUserId: string): Promise<boolean> {
+    const [locked] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update').limit(1);
+    if (!locked) return false;
+    if (locked.status === to || locked.status === 'delivered') return true;
+    const ok = to === 'shipped' ? locked.status === 'preparing' : locked.status === 'shipped' || locked.status === 'preparing';
+    if (!ok) return false;
+    await tx.update(orders).set({ status: to }).where(eq(orders.id, orderId));
+    await tx.insert(orderEvents).values({
+      orderId,
+      fromStatus: locked.status,
+      status: to,
+      actorKind: 'system',
+      actorUserId,
+      note: 'delivery',
+    });
+    return true;
   }
 
   /** Members holding `orders.manage`, notified with the order number and total only. */

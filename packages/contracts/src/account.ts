@@ -8,8 +8,10 @@ import { exportedConversationSchema, exportedMessageSchema } from './messaging.j
 import { exportedFavoriteMessageSchema } from './messaging-extras.js';
 import { exportedCommentSchema, exportedFollowSchema, exportedPostSchema } from './social.js';
 import { exportedReportSchema, exportedStorySchema } from './stories.js';
+import { exportedDeliverySchema } from './delivery.js';
 import { exportedCartItemSchema, exportedOrderSchema, exportedReviewSchema } from './orders.js';
 import { exportedSearchHistorySchema } from './search.js';
+import { exportedServicesSchema } from './services.js';
 import { meSchema } from './users.js';
 import { exportedWalletSchema } from './wallet.js';
 
@@ -92,10 +94,14 @@ export const accountExportSchema = z.object({
   cart: z.array(exportedCartItemSchema),
   /** Lot 6B: KYC level and request statuses/dates (no document number, no file). */
   kyc: exportedKycSchema,
+  /** Lot 8: deliveries of the user's orders and deliveries the user carried (no location, no code). */
+  deliveries: z.array(exportedDeliverySchema),
   /** Lot 7: the search history (own queries only; empty when disabled or cleared). */
   searchHistory: z.array(exportedSearchHistorySchema),
   /** Lot 6A: sandbox wallet balances and transactions (no real money). */
   wallet: exportedWalletSchema,
+  /** Lot 9: own provider profile and offers, own bookings as a client, own service reviews. */
+  services: exportedServicesSchema,
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;
 

@@ -50,6 +50,8 @@ export default function Checkout() {
       checkout({
         clientId: clientId.current,
         paymentMethod: 'cash_on_delivery',
+        // Delivery zones and in-store pickup (lot 8) get their own UI later; orgs without zones deliver for free.
+        fulfillment: 'delivery',
         address: {
           name: form.name.trim(),
           phone: normalizePhone(form.phone)!,
