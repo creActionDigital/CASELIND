@@ -353,6 +353,30 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           AND (client_id = ANY(${idArray}) OR offer_id IN (SELECT id FROM service_offers WHERE provider_id = ANY(${idArray})))`);
       await tx.execute(sql`UPDATE service_offers SET status = 'archived', updated_at = now() WHERE provider_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM service_providers WHERE user_id = ANY(${idArray})`);
+      // Mini-apps (lot 10): authorizations, codes and tokens go; pending payment requests are cancelled (paid ones stay with the ledger).
+      await tx.execute(sql`UPDATE miniapp_payment_requests SET status = 'cancelled', decided_at = now() WHERE user_id = ANY(${idArray}) AND status = 'pending'`);
+      await tx.execute(sql`DELETE FROM miniapp_tokens WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM miniapp_auth_codes WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM miniapp_grants WHERE user_id = ANY(${idArray})`);
+      // Mobility (lot 11): favourite places, trusted contacts (both directions), quick messages, ratings' text and the driver
+      // profile go; live rides are cancelled by the system; addresses of past rides are erased (distance and fare are kept).
+      await tx.execute(sql`DELETE FROM mobility_favorite_places WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM mobility_trusted_contacts WHERE user_id = ANY(${idArray}) OR contact_user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM mobility_ride_messages WHERE sender_id = ANY(${idArray}) OR ride_id IN (SELECT id FROM mobility_rides WHERE rider_id = ANY(${idArray}) OR driver_id = ANY(${idArray}))`);
+      await tx.execute(sql`UPDATE mobility_ride_ratings SET comment = NULL WHERE rater_id = ANY(${idArray}) OR ratee_id = ANY(${idArray})`);
+      await tx.execute(sql`
+        UPDATE mobility_rides SET status = CASE WHEN rider_id = ANY(${idArray}) THEN 'cancelled_by_rider' ELSE 'cancelled_by_driver' END,
+          cancel_reason = 'other', cancelled_at = now(), updated_at = now()
+        WHERE status IN ('scheduled', 'requested', 'accepted', 'driver_arriving', 'in_progress') AND (rider_id = ANY(${idArray}) OR driver_id = ANY(${idArray}))`);
+      await tx.execute(sql`
+        UPDATE mobility_rides SET pickup_lat = 0, pickup_lng = 0, pickup_label = '', dropoff_lat = 0, dropoff_lng = 0, dropoff_label = '',
+          stop_lat = NULL, stop_lng = NULL, stop_label = NULL, track_lat = NULL, track_lng = NULL, share_hash = NULL
+        WHERE rider_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM mobility_drivers WHERE user_id = ANY(${idArray})`);
+      // AI assistant (lot 12): private conversations (messages cascade), settings and usage counters go.
+      await tx.execute(sql`DELETE FROM ai_conversations WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM ai_user_settings WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM ai_usage_daily WHERE user_id = ANY(${idArray})`);
       // Ledger (lot 6A): postings are append-only and kept (retention); the user's accounts are frozen, never deleted.
       // A non-zero sandbox balance left on them is reported by the reconciliation/back-office, not erased.
       await tx.execute(sql`UPDATE ledger_accounts SET status = 'frozen' WHERE user_id = ANY(${idArray})`);

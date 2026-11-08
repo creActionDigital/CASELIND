@@ -134,14 +134,15 @@ describe('GET /v1/places', () => {
     expect((await places(viewer, `${around}&q=${tag}`).expect(200)).body.items).toHaveLength(1);
     await ctx.http.put(`/v1/blocks/${owner.id}`).set(bearer(viewer.token)).expect(204);
     expect((await places(viewer, `${around}&q=${tag}`).expect(200)).body.items).toHaveLength(0);
-    // Only published places carry coordinates: organisations and the service area a provider publishes
-    // (lot 9). No table stores where a user is.
+    // Only places someone chose to publish or save carry `lat`/`lng`: organisations, the service area a
+    // provider publishes (lot 9) and the favourite addresses a rider saves (lot 11, exported and purged).
+    // No table tracks where a user is; ride and driver positions use their own bounded columns (lot 11).
     const cols = await ctx.sql.query(
       `SELECT DISTINCT table_name FROM information_schema.columns
        WHERE table_schema = 'public' AND column_name IN ('lat', 'lng', 'latitude', 'longitude')
        ORDER BY table_name`,
     );
-    expect(cols.rows.map((r) => r.table_name)).toEqual(['organizations', 'service_offers']);
+    expect(cols.rows.map((r) => r.table_name)).toEqual(['mobility_favorite_places', 'organizations', 'service_offers']);
   });
 });
 

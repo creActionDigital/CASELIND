@@ -10,8 +10,11 @@ import { exportedCommentSchema, exportedFollowSchema, exportedPostSchema } from 
 import { exportedReportSchema, exportedStorySchema } from './stories.js';
 import { exportedDeliverySchema } from './delivery.js';
 import { exportedCartItemSchema, exportedOrderSchema, exportedReviewSchema } from './orders.js';
+import { exportedAiConversationSchema } from './ai.js';
+import { exportedMiniAppGrantSchema } from './miniapps.js';
 import { exportedSearchHistorySchema } from './search.js';
 import { exportedServicesSchema } from './services.js';
+import { exportedMobilitySchema } from './mobility.js';
 import { meSchema } from './users.js';
 import { exportedWalletSchema } from './wallet.js';
 
@@ -102,6 +105,11 @@ export const accountExportSchema = z.object({
   wallet: exportedWalletSchema,
   /** Lot 9: own provider profile and offers, own bookings as a client, own service reviews. */
   services: exportedServicesSchema,
+  mobility: exportedMobilitySchema,
+  /** Lot 10: mini-app authorizations (never a token). */
+  miniappGrants: z.array(exportedMiniAppGrantSchema),
+  /** Lot 12: own AI assistant conversations (private to the user). */
+  aiConversations: z.array(exportedAiConversationSchema),
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;
 

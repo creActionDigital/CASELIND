@@ -1,5 +1,19 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-08 — Lots backend 10 (mini-apps), 11 (mobilité), 12 (assistant IA)
+
+- **10, mini-apps** (0021, ADR-021) : applications d'organisations validées par un admin, OAuth 2.0 avec PKCE S256 obligatoire, codes et jetons hachés, scopes, jetons d'app refusés sur les routes utilisateur, paiement sandbox toujours confirmé par le PIN de l'utilisateur, révocation, annuaire.
+- **11, mobilité** (0022) : chauffeurs approuvés par un admin avec KYC niveau 1, estimation affichée comme telle, types moto/standard/confort avec fourchette de prix, arrêt intermédiaire, course programmée, un seul chauffeur gagnant sous concurrence, code de départ, partage du trajet, alerte aux contacts de confiance, évaluations, messages rapides, lieux favoris, reçu ; paiement en espèces. Fonctions inspirées des usages publics d'une app de type Uber, implémentation originale ; REA non utilisé (non connecté, et décompiler l'app d'un tiers est exclu, ADR-009).
+- **12, assistant IA** (0023, ADR-022) : port multi-fournisseurs (Gemini par défaut, Groq, Mistral, OpenRouter, compatible OpenAI), modèles activés par l'admin et disponibles seulement avec une clé, choix de l'utilisateur, avertissement exigé pour un modèle qui entraîne sur les données, bascule seulement si acceptée, quotas, aucun contenu dans les journaux, aide à la rédaction de fiches produit (jamais publiée automatiquement). Format Gemini relu par l'orchestrateur (`v1beta/models/{model}:generateContent`, en-tête `x-goog-api-key`).
+- **Fait par l'orchestrateur** : initiales à la place d'une roue sans fin pour une image absente (`AuthImage`, test ajouté), libellé du signalement « Course », test des lieux mis à jour (adresses favorites enregistrées volontairement).
+
+### Tests réellement exécutés (2026-11-08)
+- `npm run typecheck` : 0 erreur. API : **41 fichiers, 509 tests réussis** (508 au passage complet, puis le test des lieux mis à jour et relancé seul). Mobile : **183 tests réussis**.
+
+### Limites
+- Aucune clé IA : les fournisseurs n'ont été testés qu'avec un `fetch` simulé. Pas d'écrans mobiles pour mini-apps, mobilité et IA. Pas de revue de code dédiée (mode économe).
+- Mobilité : les courses conservent départ, arrêt et arrivée ; le chauffeur ne garde que sa dernière position en ligne ; pas d'historique de trajet.
+
 ## 2026-11-08 — Mobile M6 (livraison, services et réservations)
 
 - **M6a** : livraison ou retrait au checkout (un choix pour le panier, zone et frais par boutique), suivi acheteur (code de livraison masquable, position du livreur en direct, évaluation), zones et affectation des livreurs côté vendeur, « Mes livraisons » pour le livreur (code par pavé PIN, partage de position consenti pendant le trajet seulement).

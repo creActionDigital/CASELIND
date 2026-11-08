@@ -6,8 +6,8 @@ export const LOG_REDACT_PATHS = [
   'res.headers["set-cookie"]',
 ];
 
-/** Routes whose query string holds a user's position or typed search: it is dropped from request logs. */
-const PRIVATE_QUERY_ROUTES = /^\/(?:v\d+\/)?(?:places|search)(?:\/|$)/;
+/** Routes whose query string holds a user's position, typed search or AI assistant text (defence in depth: bodies are never logged): it is dropped from request logs. */
+const PRIVATE_QUERY_ROUTES = /^\/(?:v\d+\/)?(?:places|search|ai|me\/ai-settings)(?:\/|$)/;
 
 export function scrubLogUrl(url: string | undefined): string | undefined {
   if (!url) return url;

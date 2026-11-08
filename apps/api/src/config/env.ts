@@ -1,6 +1,8 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { type AiCatalogEntry, aiCatalogEntrySchema } from '@caselind/contracts';
 import { z } from 'zod';
+import { DEFAULT_AI_MODELS } from '../ai/default-catalog.js';
 
 const MIB = 1024 * 1024;
 
@@ -16,6 +18,23 @@ const kycTierLimitsSchema = z.object({
 });
 const kycLimitsOverrideSchema = z.record(z.string().regex(/^[A-Z]{3}$/), z.record(z.enum(['0', '1', '2']), kycTierLimitsSchema));
 export type KycLimitsOverride = z.infer<typeof kycLimitsOverrideSchema>;
+
+const mobilityTariffSchema = z.object({
+  baseMinor: z.number().int().min(0),
+  perKmMinor: z.number().int().min(0),
+  perMinMinor: z.number().int().min(0),
+  minFareMinor: z.number().int().min(0),
+});
+const mobilityTariffsOverrideSchema = z.record(
+  z.string().regex(/^[A-Z]{3}$/),
+  z.record(z.enum(['moto', 'standard', 'confort']), mobilityTariffSchema),
+);
+export type MobilityTariffsOverride = z.infer<typeof mobilityTariffsOverrideSchema>;
+
+const aiCatalogSchema = z
+  .array(aiCatalogEntrySchema)
+  .min(1)
+  .refine((a) => new Set(a.map((e) => e.id)).size === a.length, 'duplicate model id');
 
 const envSchema = z
   .object({
@@ -137,6 +156,8 @@ const envSchema = z
       .refine((v) => v === undefined || decodeKeyMaterial(v).length >= 32, 'TOTP_ENCRYPTION_KEY must be hex or base64 of at least 32 bytes'),
     /** Lot 1c: polling budget of the public QR login status route (the web client polls every 1-2 s). */
     QR_POLL_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(90),
+    /** Lot 10: POST /oauth/token (per IP), on top of the default budget. */
+    OAUTH_TOKEN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
     /** Lot 6B: signs merchant payment QR payloads (HMAC-SHA256). Required in production; derived elsewhere when absent. */
     PAYMENT_QR_SECRET: z.string().min(32, 'PAYMENT_QR_SECRET must be at least 32 characters').optional(),
     /** Lot 6B: per-currency, per-KYC-tier limits as JSON, e.g. {"USD":{"1":{"maxBalanceMinor":1,"maxSingleTransferMinor":1,"maxDailyOutgoingMinor":1}}}; unlisted entries use the defaults. */
@@ -155,6 +176,51 @@ const envSchema = z
     /** Lot 6B: wrong payment PINs before the lock, and the lock duration. */
     PAYMENT_PIN_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
     PAYMENT_PIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+    /** Lot 11: tariffs per currency and ride type as JSON {CUR: {moto|standard|confort: {baseMinor, perKmMinor, perMinMinor, minFareMinor}}}; unlisted entries use the Goma defaults. */
+    MOBILITY_TARIFFS: z
+      .string()
+      .optional()
+      .transform((v, ctx) => {
+        if (v === undefined || v.trim() === '') return undefined;
+        try {
+          return mobilityTariffsOverrideSchema.parse(JSON.parse(v));
+        } catch {
+          ctx.addIssue({ code: 'custom', message: 'MOBILITY_TARIFFS must be a JSON object {CUR: {moto|standard|confort: {baseMinor, perKmMinor, perMinMinor, minFareMinor}}}' });
+          return z.NEVER;
+        }
+      }),
+    /** Lot 11: straight-line distance multiplier approximating the road distance. */
+    MOBILITY_DETOUR_FACTOR: z.coerce.number().min(1).max(3).default(1.35),
+    /** Lot 11: radius around the pick-up point in which online drivers receive a request. */
+    MOBILITY_PICKUP_RADIUS_KM: z.coerce.number().min(0.5).max(50).default(5),
+    /** Lot 12: provider keys. Without its key a provider is simply unavailable. */
+    GEMINI_API_KEY: z.string().min(1).optional(),
+    GROQ_API_KEY: z.string().min(1).optional(),
+    MISTRAL_API_KEY: z.string().min(1).optional(),
+    OPENROUTER_API_KEY: z.string().min(1).optional(),
+    /** Any other OpenAI-compatible service (model entries with provider "custom"). */
+    AI_CUSTOM_BASE_URL: z.url().optional(),
+    AI_CUSTOM_API_KEY: z.string().min(1).optional(),
+    /** Lot 12: model catalogue as a JSON array of entries; empty = built-in defaults. */
+    AI_MODELS: z
+      .string()
+      .optional()
+      .transform((v, ctx): AiCatalogEntry[] => {
+        if (v === undefined || v.trim() === '') return DEFAULT_AI_MODELS;
+        try {
+          return aiCatalogSchema.parse(JSON.parse(v));
+        } catch {
+          ctx.addIssue({ code: 'custom', message: 'AI_MODELS must be a JSON array of {id, provider, model, label, free, trainsOnData, dataPolicy} with unique ids' });
+          return z.NEVER;
+        }
+      }),
+    /** Lot 12: messages (and product descriptions) one user may ask the assistant per UTC day. */
+    AI_DAILY_MESSAGES: z.coerce.number().int().min(1).default(50),
+    /** Lot 12: per-client budget for the generating routes. */
+    AI_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(10),
+    /** Lot 12: provider call timeout (no automatic retry). */
+    AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
+    AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(16).max(8192).default(1024),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production') {

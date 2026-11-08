@@ -22,3 +22,6 @@ export * from './places.js';
 export * from './search.js';
 export * from './identity-extras.js';
 export * from './services.js';
+export * from './miniapps.js';
+export * from './mobility.js';
+export * from './ai.js';

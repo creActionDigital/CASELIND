@@ -42,6 +42,11 @@ export function AuthImage({ contentUrl, localUri, label, style }: Props) {
     <View style={[styles.box, { backgroundColor: colors.surfaceAlt }, style]}>
       {shown ? (
         <Image source={{ uri: shown }} accessibilityLabel={label} style={StyleSheet.absoluteFill} contentFit="cover" />
+      ) : !contentUrl ? (
+        // No image at all (e.g. a shop without a logo): show initials instead of an endless spinner.
+        <Text variant="bodyStrong" color={colors.primary} accessibilityLabel={label}>
+          {initialsOf(label)}
+        </Text>
       ) : failed ? (
         <Text variant="caption" muted style={styles.center}>
           {t('media.unavailable')}
@@ -51,6 +56,16 @@ export function AuthImage({ contentUrl, localUri, label, style }: Props) {
       )}
     </View>
   );
+}
+
+/** First letters of the first two words, upper case (« Goma Market » → « GM »). */
+export function initialsOf(label: string): string {
+  return label
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join('');
 }
 
 const styles = StyleSheet.create({

@@ -57,7 +57,8 @@ function buildOperation(op: ApiOperation): Record<string, unknown> {
   const description = [
     op.auth === 'admin' ? 'Requires the `admin` platform role (403 otherwise).' : undefined,
     op.auth === 'moderator' ? 'Requires the `admin` or `moderator` platform role (403 otherwise).' : undefined,
-    op.auth !== 'public' ? 'Requires a bearer access token (401 otherwise).' : undefined,
+    op.auth === 'app' ? 'Requires a mini-app OAuth access token (prefix `cla_`) carrying the scope named in the summary; a user session token is refused (401), a missing scope is 403.' : undefined,
+    op.auth !== 'public' && op.auth !== 'app' ? 'Requires a bearer access token (401 otherwise).' : undefined,
   ]
     .filter(Boolean)
     .join(' ');

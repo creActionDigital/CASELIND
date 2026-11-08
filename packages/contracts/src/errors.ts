@@ -34,6 +34,12 @@ export const ErrorCodes = {
   payloadTooLarge: 'payload_too_large',
   /** 415: the content type is not accepted, or does not match the declared one (details.reason). */
   unsupportedMediaType: 'unsupported_media_type',
+  /** 409: the selected model may train on submitted data and the user has not accepted the notice. */
+  dataNoticeRequired: 'data_notice_required',
+  /** 503: no AI model is available (none enabled with a configured key). */
+  aiUnavailable: 'ai_unavailable',
+  /** 502: the AI provider failed; details.reason is a short kind, never provider content. */
+  aiProviderError: 'ai_provider_error',
   internal: 'internal_error',
 } as const;
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

@@ -594,6 +594,7 @@ export const fr = {
   'report.target.review': 'Avis',
   'report.target.service': 'Service',
   'report.target.service_review': 'Avis sur un service',
+  'report.target.ride': 'Course',
 
   // Espace vendeur (M3b)
   'seller.title': 'Espace vendeur',

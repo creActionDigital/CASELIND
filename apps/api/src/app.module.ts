@@ -71,6 +71,12 @@ import { BookingsService } from './services/bookings.service.js';
 import { BookingsController, ServicesController } from './services/services.controller.js';
 import { ServicesService } from './services/services.service.js';
 import { SearchHistoryService } from './search/search-history.service.js';
+// Lot 10 (mini-apps), separate import block.
+import { AdminMiniAppsController, MiniAppApiController, MiniAppDirectoryController, MyMiniAppsController, OAUTH_TOKEN_HANDLER, OAuthController, OrgMiniAppsController } from './miniapps/miniapps.controller.js';
+import { MiniAppApiService } from './miniapps/miniapp-api.service.js';
+import { MiniAppTokenGuard } from './miniapps/miniapp-token.guard.js';
+import { MiniAppsService } from './miniapps/miniapps.service.js';
+import { OAuthService } from './miniapps/oauth.service.js';
 import { SEARCH_HANDLER, SearchController } from './search/search.controller.js';
 import { SearchService } from './search/search.service.js';
 // Lot 5A (catalogue), separate import block.
@@ -106,6 +112,15 @@ import {
 import { QrLoginService } from './auth/identity/qr-login.service.js';
 import { TotpCrypto } from './auth/identity/totp-crypto.js';
 import { TwoFactorService } from './auth/identity/two-factor.service.js';
+// Lot 11 (mobility), separate import block.
+import { AdminMobilityController, MobilityDriverController, MobilityJobs, RidesController } from './mobility/mobility.controller.js';
+import { MobilityService } from './mobility/mobility.service.js';
+import { RideCodes } from './mobility/mobility.shared.js';
+// Lot 12 (AI assistant), separate import block.
+import { AI_DESCRIPTION_HANDLER, AI_SEND_HANDLER, AdminAiController, AiController, OrgAiController } from './ai/ai.controller.js';
+import { AI_FETCH, AiModelsService } from './ai/ai-models.service.js';
+import { AiService } from './ai/ai.service.js';
+import type { FetchLike } from './ai/llm-provider.js';
 // Lot 8 (delivery), separate import block.
 import { BuyerDeliveryController, MyDeliveriesController, OrgDeliveryController } from './delivery/delivery.controller.js';
 import { DeliveryZonesService } from './delivery/delivery-zones.service.js';
@@ -137,11 +152,13 @@ export interface AppModuleOptions {
   extraControllers?: Type[];
   /** Overrides the push provider adapter (tests capture pushes this way; never any network). */
   pushGateway?: PushGateway;
+  /** Overrides the fetch used by the AI provider adapters (tests never touch the network). */
+  aiFetch?: FetchLike;
 }
 
 @Module({})
 export class AppModule {
-  static forRoot({ env, otpSender, extraControllers = [], pushGateway }: AppModuleOptions): DynamicModule {
+  static forRoot({ env, otpSender, extraControllers = [], pushGateway, aiFetch }: AppModuleOptions): DynamicModule {
     return {
       module: AppModule,
       imports: [
@@ -240,6 +257,28 @@ export class AppModule {
                 ctx.getClass() !== SearchController ||
                 ctx.getHandler().name !== SEARCH_HANDLER,
             },
+            {
+              // Lot 10: the OAuth token endpoint only (code exchange and refresh; secret and verifier guesses).
+              name: 'oauthToken',
+              ttl: 60_000,
+              limit: env.OAUTH_TOKEN_RATE_LIMIT_PER_MINUTE,
+              skipIf: (ctx) =>
+                ctx.getType() !== 'http' ||
+                ctx.getClass() !== OAuthController ||
+                ctx.getHandler().name !== OAUTH_TOKEN_HANDLER,
+            },
+            {
+              // Lot 12: generating routes only (each call is a paid or quota-limited provider request).
+              name: 'ai',
+              ttl: 60_000,
+              limit: env.AI_RATE_LIMIT_PER_MINUTE,
+              skipIf: (ctx) =>
+                ctx.getType() !== 'http' ||
+                !(
+                  (ctx.getClass() === AiController && ctx.getHandler().name === AI_SEND_HANDLER) ||
+                  (ctx.getClass() === OrgAiController && ctx.getHandler().name === AI_DESCRIPTION_HANDLER)
+                ),
+            },
           ],
         }),
         DbModule,
@@ -281,10 +320,20 @@ export class AppModule {
         ReviewsController,
         // Lot 7
         PlacesController,
+        // Lot 11
+        MobilityDriverController,
+        AdminMobilityController,
+        RidesController,
         // Lot 9
         ServicesController,
         BookingsController,
         SearchController,
+        OrgMiniAppsController,
+        AdminMiniAppsController,
+        MiniAppDirectoryController,
+        OAuthController,
+        MyMiniAppsController,
+        MiniAppApiController,
         // Lot 6A
         WalletController,
         OrgWalletController,
@@ -298,6 +347,10 @@ export class AppModule {
         TwoFactorController,
         IdentifierChangeController,
         QrLoginController,
+        // Lot 12
+        AiController,
+        OrgAiController,
+        AdminAiController,
         // Lot 8
         OrgDeliveryController,
         BuyerDeliveryController,
@@ -347,6 +400,10 @@ export class AppModule {
         KycCrypto,
         PaymentQrService,
         QrSigner,
+        // Lot 12
+        { provide: AI_FETCH, useValue: aiFetch },
+        AiModelsService,
+        AiService,
         // Lot 8
         DeliveryCodes,
         DeliveryZonesService,
@@ -359,10 +416,18 @@ export class AppModule {
         ReviewsService,
         // Lot 7
         PlacesService,
+        // Lot 11
+        RideCodes,
+        MobilityService,
+        MobilityJobs,
         // Lot 9
         ServicesService,
         BookingsService,
         SearchService,
+        MiniAppsService,
+        OAuthService,
+        MiniAppApiService,
+        MiniAppTokenGuard,
         SearchHistoryService,
         StorefrontService,
         CatalogModerationTarget,

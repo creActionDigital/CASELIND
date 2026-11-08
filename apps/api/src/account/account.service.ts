@@ -221,6 +221,10 @@ export class AccountService {
 
     const wallet = await this.wallets.exportFor(auth.userId);
     const services = await this.exportServices(auth.userId);
+    const mobility = await this.exportMobility(auth.userId);
+    const aiConversations = await this.exportAiConversations(auth.userId);
+    // Lot 10: mini-app authorizations (history included); never a token.
+    const miniappGrants = await this.exportMiniAppGrants(auth.userId);
     // Lot 6B: KYC level and request statuses/dates; never the document number nor the files.
     const [kycProfile] = await this.db.select({ level: kycProfiles.level }).from(kycProfiles).where(eq(kycProfiles.userId, auth.userId)).limit(1);
     const kycRows = await this.db
@@ -344,6 +348,9 @@ export class AccountService {
       })),
       wallet,
       services,
+      mobility,
+      miniappGrants,
+      aiConversations,
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
         query: r.query,
         scope: r.scope,
@@ -357,6 +364,69 @@ export class AccountService {
       meta,
     });
     return result;
+  }
+
+  /** Lot 12: own assistant conversations with their messages (private to the user; never provider keys). */
+  private async exportAiConversations(userId: string): Promise<AccountExport['aiConversations']> {
+    const iso = (v: string | Date): string => new Date(v).toISOString();
+    const convs = await this.db.execute(sql`SELECT id, title, created_at FROM ai_conversations WHERE user_id = ${userId}::uuid ORDER BY created_at, id`);
+    const msgs = await this.db.execute(sql`
+      SELECT m.conversation_id, m.role, m.content, m.model_id, m.created_at FROM ai_messages m
+      JOIN ai_conversations c ON c.id = m.conversation_id WHERE c.user_id = ${userId}::uuid ORDER BY m.created_at, m.id`);
+    type M = { conversation_id: string; role: 'user' | 'assistant'; content: string; model_id: string | null; created_at: string | Date };
+    return (convs.rows as { id: string; title: string; created_at: string | Date }[]).map((c) => ({
+      id: c.id,
+      title: c.title,
+      createdAt: iso(c.created_at),
+      messages: (msgs.rows as M[]).filter((m) => m.conversation_id === c.id).map((m) => ({ role: m.role, content: m.content, modelId: m.model_id, createdAt: iso(m.created_at) })),
+    }));
+  }
+
+  private async exportMiniAppGrants(userId: string): Promise<AccountExport['miniappGrants']> {
+    const res = await this.db.execute(sql`
+      SELECT g.app_id, a.name, g.scopes, g.created_at, g.revoked_at FROM miniapp_grants g JOIN miniapps a ON a.id = g.app_id
+      WHERE g.user_id = ${userId}::uuid ORDER BY g.created_at, g.app_id`);
+    return (res.rows as { app_id: string; name: string; scopes: string[]; created_at: string | Date; revoked_at: string | Date | null }[]).map((r) => ({
+      appId: r.app_id,
+      appName: r.name,
+      scopes: r.scopes,
+      grantedAt: new Date(r.created_at).toISOString(),
+      revokedAt: r.revoked_at ? new Date(r.revoked_at).toISOString() : null,
+    }));
+  }
+
+  /** Lot 11: own driver profile, rides (both roles), favourite places and trusted contacts. */
+  private async exportMobility(userId: string): Promise<AccountExport['mobility']> {
+    const iso = (v: string | Date): string => new Date(v).toISOString();
+    const [driver, rides, favs, trusted] = await Promise.all([
+      this.db.execute(sql`SELECT status, vehicle_kind, make, plate, color, zone, created_at FROM mobility_drivers WHERE user_id = ${userId}::uuid`),
+      this.db.execute(sql`
+        SELECT id, rider_id, status, vehicle, pickup_label, dropoff_label, fare_minor, final_fare_minor, currency, est_distance_km, actual_distance_km, created_at, completed_at
+        FROM mobility_rides WHERE rider_id = ${userId}::uuid OR driver_id = ${userId}::uuid ORDER BY created_at, id`),
+      this.db.execute(sql`SELECT kind, label, address, lat, lng FROM mobility_favorite_places WHERE user_id = ${userId}::uuid ORDER BY created_at, id`),
+      this.db.execute(sql`SELECT u.handle FROM mobility_trusted_contacts t JOIN users u ON u.id = t.contact_user_id WHERE t.user_id = ${userId}::uuid ORDER BY t.created_at`),
+    ]);
+    const d = driver.rows[0] as { status: string; vehicle_kind: string; make: string; plate: string; color: string; zone: string; created_at: string | Date } | undefined;
+    type R = { id: string; rider_id: string; status: string; vehicle: string; pickup_label: string; dropoff_label: string; fare_minor: string | number; final_fare_minor: string | number | null; currency: string; est_distance_km: number; actual_distance_km: number; created_at: string | Date; completed_at: string | Date | null };
+    return {
+      driver: d ? { status: d.status, vehicleKind: d.vehicle_kind, make: d.make, plate: d.plate, color: d.color, zone: d.zone, createdAt: iso(d.created_at) } : null,
+      rides: (rides.rows as R[]).map((r) => ({
+        id: r.id,
+        role: (r.rider_id === userId ? 'rider' : 'driver') as 'rider' | 'driver',
+        status: r.status,
+        vehicle: r.vehicle,
+        pickupLabel: r.pickup_label,
+        dropoffLabel: r.dropoff_label,
+        fareMinor: Number(r.fare_minor),
+        finalFareMinor: r.final_fare_minor === null ? null : Number(r.final_fare_minor),
+        currency: r.currency.trim(),
+        distanceKm: r.actual_distance_km >= 0.1 ? r.actual_distance_km : r.est_distance_km,
+        createdAt: iso(r.created_at),
+        completedAt: r.completed_at ? iso(r.completed_at) : null,
+      })),
+      favoritePlaces: favs.rows as { kind: string; label: string; address: string; lat: number; lng: number }[],
+      trustedContacts: (trusted.rows as { handle: string }[]).map((t) => ({ handle: t.handle })),
+    };
   }
 
   /** Lot 9: own provider profile and offers, own bookings as a client, own service reviews. */

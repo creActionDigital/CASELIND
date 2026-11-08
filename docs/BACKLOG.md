@@ -31,7 +31,10 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 7 — Lieux et recherche | Lieux par distance (sans PostGIS), recherche universelle, historique contrôlable | 439 tests | **testé** |
 | 8 — Livraison | Zones, frais, retrait, livreur, statuts, preuve par code, position consentie, évaluation | 467 tests | **testé** (backend) ; écrans mobiles M6 |
 | 9 — Services et réservations | Offres, prestataires, créneaux, devis, réservations, avis | 467 tests | **testé** (backend) ; écrans mobiles M6 |
-| 10+ | Mini-apps (OAuth à code éphémère + scopes), IA, mobilité, services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
+| 10 — Mini-apps | OAuth + PKCE, scopes, paiement confirmé par PIN | 509 tests | **testé** (backend) |
+| 11 — Mobilité | Courses type Uber, espèces | 509 tests | **testé** (backend) |
+| 12 — Assistant IA | Multi-fournisseurs, Gemini par défaut | 509 tests | **testé** (backend, sans clé réelle) |
+| 13+ | services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
 
 ## Lots mobile
 
@@ -56,6 +59,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | Q5 | Partenaire Mobile Money | Paiement en ligne, wallet réel | Recommandation du 2026-11-07 : **FlexPay** (agrégateur congolais agréé par la BCC : M-Pesa, Airtel Money, Orange Money, Afrimoney ; USD/CDF), alternative Nomba. **En attente : compte marchand (documents d’entreprise) et grille de frais du fournisseur** |
 | Q6 | Hébergement (budget) | Staging et production, TURN/SFU, stockage médias | Option bas coût : VPS + PostgreSQL managé + stockage S3-compatible |
 | Q8 | **Compte Expo / EAS** | Push réel, builds iOS/Android | Le propriétaire indique en avoir un ; la machine n’est pas connectée (`expo whoami` : non connecté) et `app.json` n’a pas de `projectId`. **En attente : `npx expo login` par le propriétaire, puis `eas init`** |
+| Q9 | **Fournisseur IA** (assistant, CDC §22) | Lot IA | **Décidé le 2026-11-08 : plusieurs fournisseurs au choix de l'utilisateur** (Gemini par défaut ; Groq, Mistral, OpenRouter, tout service compatible OpenAI), activés par l'admin quand une clé est configurée, fiche de chaque modèle (gratuit, vitesse, utilisation des données pour l'entraînement), bascule automatique seulement si l'utilisateur l'accepte. L'offre gratuite peut entraîner sur les données hors EEE : seul du contenu non sensible lui est envoyé (questions posées à l'assistant avec avertissement, textes de produits) ; jamais de messages privés, de KYC ni de paiement. **En attente : clés API créées par le propriétaire (Google AI Studio, puis Groq, Mistral, OpenRouter au choix)** |
 | Q7 | Découverte de proximité type « People Nearby » (H-09) | — | Recommandation : ne pas la retenir (vie privée) |
 
 ## Risques suivis

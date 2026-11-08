@@ -14,7 +14,11 @@ export type RealtimeEvent =
   | 'notification.new'
   /** Lot 8: status of a delivery (user room of the buyer and of the courier) and the courier position (room of the order). */
   | 'delivery.updated'
-  | 'delivery.location';
+  | 'delivery.location'
+  /** Lot 11: ride status, driver position and quick messages (user rooms of the rider and of the driver). */
+  | 'ride.updated'
+  | 'ride.location'
+  | 'ride.message';
 
 export const userRoom = (userId: string) => `user:${userId}`;
 export const conversationRoom = (conversationId: string) => `conversation:${conversationId}`;

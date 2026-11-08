@@ -90,7 +90,21 @@ export type AuditAction =
   | 'delivery.zone_deleted'
   | 'delivery.assigned'
   | 'delivery.status_changed'
-  | 'delivery.proof_reset';
+  | 'delivery.proof_reset'
+  /** Mobility (lot 11): driver decisions. metadata {driverUserId, decision}. */
+  | 'mobility.driver_decided'
+  /** Mini-apps (lot 10): metadata {orgId?, appId[, scopes, decision, from, to, kind, requestId, transferId]}. Never a secret, a code or a token. */
+  | 'miniapp.created'
+  | 'miniapp.updated'
+  | 'miniapp.submitted'
+  | 'miniapp.secret_rotated'
+  | 'miniapp.reviewed'
+  | 'miniapp.authorized'
+  | 'miniapp.grant_revoked'
+  | 'miniapp.token_replay'
+  | 'miniapp.payment_confirmed'
+  /** AI (lot 12): admin enables/disables a catalogue model. metadata {modelId, from, to}. Never a prompt, a reply or a key. */
+  | 'ai.model_toggled';
 
 export interface AuditInput {
   action: AuditAction;

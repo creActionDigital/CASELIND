@@ -64,7 +64,7 @@ export interface TestContext {
 /** Creates a fresh, migrated database and a fully wired app for one test file. */
 export async function createTestContext(
   envOverrides: Record<string, string> = {},
-  options: Pick<AppModuleOptions, 'extraControllers'> = {},
+  options: Pick<AppModuleOptions, 'extraControllers' | 'aiFetch'> = {},
   pushGateway: FakePushGateway = new FakePushGateway(),
 ): Promise<TestContext> {
   const adminUrl = inject('pgAdminUrl');
