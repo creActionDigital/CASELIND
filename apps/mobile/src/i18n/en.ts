@@ -1,4 +1,6 @@
+import { mobilityEn } from '../mobility/messages';
 import type { MessageKey } from './fr';
+import { aiEn } from '../ai/messages';
 import { servicesEn } from '../services/messages';
 import { deliveryEn } from '../delivery/messages';
 
@@ -1189,4 +1191,6 @@ export const en: Record<MessageKey, string> = {
   'sellerQr.status.consumed': 'Used',
   ...servicesEn,
   ...deliveryEn,
+  ...aiEn,
+  ...mobilityEn,
 };

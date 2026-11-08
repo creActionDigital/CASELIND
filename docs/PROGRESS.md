@@ -1,5 +1,12 @@
 # Suivi d'avancement CASELIND
 
+## 2026-11-08 — Mobile M7 (mobilité) et écrans de l'assistant IA
+
+- **Assistant IA (écrit par l'orchestrateur)** : `src/ai/*` et `app/(app)/ai/*` : conversations privées, discussion avec le modèle indiqué sous chaque réponse, suppression, réglages (choix du modèle avec gratuité, vitesse et utilisation des données, avertissement obligatoire, bascule optionnelle), tuile « Assistant IA ». Vérifié dans le navigateur sans clé : liste, création, message « assistant indisponible » avec la question conservée, réglages « aucun modèle disponible ».
+- **M7 mobilité (agent)** : commande avec estimation par type, maintenant ou programmée, course en direct (code de départ, distance du chauffeur, messages rapides, partage, alerte, annulation avec motif, reçu, évaluation), historique, lieux favoris, contacts de confiance, espace chauffeur (profil, KYC, en ligne avec consentement, demandes, code par pavé). Écran Courses vérifié dans le navigateur.
+- **Défaut corrigé par l'orchestrateur (API mobilité)** : un profil chauffeur enregistré sans `photoMediaId` effaçait la photo et, compté comme une modification, renvoyait un chauffeur approuvé en revue et hors ligne. Absent = conserver, `null` = retirer. Test ajouté ; il échoue sans le correctif (vérifié).
+- **Tests** : typecheck 0 erreur ; mobile **18 fichiers, 199 tests** ; API mobilité 16 tests (suite API complète non relancée : seul le service de mobilité a changé depuis la dernière exécution complète).
+
 ## 2026-11-08 — Lots backend 10 (mini-apps), 11 (mobilité), 12 (assistant IA)
 
 - **10, mini-apps** (0021, ADR-021) : applications d'organisations validées par un admin, OAuth 2.0 avec PKCE S256 obligatoire, codes et jetons hachés, scopes, jetons d'app refusés sur les routes utilisateur, paiement sandbox toujours confirmé par le PIN de l'utilisateur, révocation, annuaire.

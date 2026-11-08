@@ -1,3 +1,5 @@
+import { mobilityFr } from '../mobility/messages';
+import { aiFr } from '../ai/messages';
 import { deliveryFr } from '../delivery/messages';
 import { servicesFr } from '../services/messages';
 export const fr = {
@@ -1187,6 +1189,8 @@ export const fr = {
   'sellerQr.status.consumed': 'Utilisé',
   ...servicesFr,
   ...deliveryFr,
+  ...aiFr,
+  ...mobilityFr,
 } as const;
 
 export type MessageKey = keyof typeof fr;

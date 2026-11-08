@@ -175,7 +175,9 @@ export class MobilityService implements OnModuleInit {
     const comfort = body.vehicleKind === 'car' && body.comfort;
     const [existing] = await rowsOf<DriverRow>(this.db, sql`SELECT * FROM mobility_drivers WHERE user_id = ${userId}::uuid`);
     if (existing?.status === 'suspended') throw conflict('The driver profile is suspended', 'driver_suspended');
-    const photo = body.photoMediaId ?? null;
+    // Absent = keep the current photo, null = remove it. Treating absent as null used to erase the photo
+    // and, by counting it as a change, sent an approved driver back to review on any profile save.
+    const photo = body.photoMediaId === undefined ? (existing?.photo_media_id ?? null) : body.photoMediaId;
     if (!existing) {
       await this.db.execute(sql`
         INSERT INTO mobility_drivers (user_id, vehicle_kind, comfort, make, plate, color, photo_media_id, zone)

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MobilityService } from '../src/mobility/mobility.service.js';
 import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
@@ -450,5 +451,34 @@ describe('feature flag', () => {
       await ctx.sql.query(`UPDATE feature_flags SET enabled = true WHERE key = 'mobility'`);
     }
     await post(u, '/v1/rides/estimate', { pickup: PICKUP, dropoff: DROPOFF, vehicle: 'moto' }).expect(200);
+  });
+});
+
+describe('driver profile photo', () => {
+  it('keeps the photo and the approval when a profile save omits it, and removes it on explicit null', async () => {
+    const d = await driver();
+    const mediaId = randomUUID();
+    await ctx.sql.query(
+      `INSERT INTO media_assets (id, owner_user_id, purpose, declared_mime, mime, size_bytes, status, storage_key, sha256, uploaded_at)
+       VALUES ($1, $2, 'avatar', 'image/png', 'image/png', 10, 'ready', $3, repeat('0', 64), now())`,
+      [mediaId, d.id, `test/${mediaId}`],
+    );
+    const base = { vehicleKind: 'moto', comfort: false, make: 'Bajaj', color: 'rouge', zone: 'Goma' };
+    const current = ((await get(d, '/v1/mobility/driver').expect(200)).body as { vehicle: { plate: string } }).vehicle;
+    const withPhoto = { ...base, plate: current.plate, photoMediaId: mediaId };
+    // Adding a photo is a change: back to review, then approved again.
+    const added = await ctx.http.put('/v1/mobility/driver').set(bearer(d.token)).send(withPhoto);
+    expect(added.status, JSON.stringify(added.body)).toBe(200);
+    await post(admin, `/v1/admin/mobility/drivers/${d.id}/decision`, { decision: 'approve' }).expect(200);
+
+    // Same profile saved without the photo field: nothing changes.
+    const kept = await ctx.http.put('/v1/mobility/driver').set(bearer(d.token)).send({ ...base, plate: current.plate }).expect(200);
+    expect(kept.body.status).toBe('approved');
+    expect(kept.body.vehicle.photoUrl).toContain(mediaId);
+
+    // Explicit null removes it (a change, so the driver goes back to review).
+    const removed = await ctx.http.put('/v1/mobility/driver').set(bearer(d.token)).send({ ...base, plate: current.plate, photoMediaId: null }).expect(200);
+    expect(removed.body.vehicle.photoUrl).toBeNull();
+    expect(removed.body.status).toBe('pending');
   });
 });

@@ -9,6 +9,7 @@ import { formatListTime } from '../../messaging/api';
 import { qk } from '../../messaging/keys';
 import { fetchNotifications, useUnreadCount } from '../../notifications/hooks';
 import { deliveryTarget } from '../../delivery/routing';
+import { rideTarget } from '../../mobility/routing';
 import { commerceTarget } from '../../shop/order-logic';
 import { sellerTarget } from '../../seller/routing';
 import { socialTarget } from '../../social/routing';
@@ -59,6 +60,8 @@ export default function NotificationCenter() {
     if (!n.readAt) readOne.mutate(n.id);
     const conversationId = n.data.conversationId;
     if (conversationId) return router.push({ pathname: '/messages/[conversationId]', params: { conversationId } });
+    const ride = rideTarget(n.data);
+    if (ride) return router.push(ride);
     if (n.category === 'delivery') {
       const seller = sellerTarget(n.data);
       if (seller) return router.push(seller);

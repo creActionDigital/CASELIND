@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { deliveryTarget } from '../delivery/routing';
+import { rideTarget } from '../mobility/routing';
 import { bookingTarget } from '../services/logic';
 import { commerceTarget } from '../shop/order-logic';
 import { sellerTarget } from '../seller/routing';
@@ -31,6 +32,8 @@ export function PushRouting() {
       const open = (data: unknown) => {
         const id = (data as { conversationId?: unknown } | null)?.conversationId;
         if (typeof id === 'string' && id) return router.push({ pathname: '/messages/[conversationId]', params: { conversationId: id } });
+        const ride = rideTarget(data);
+        if (ride) return router.push(ride);
         // Une notification `commerce` portant `orgId` s'adresse au vendeur (nouvelle commande) : route vendeur d'abord.
         const delivery = deliveryTarget(data);
         if (delivery) return router.push(delivery);

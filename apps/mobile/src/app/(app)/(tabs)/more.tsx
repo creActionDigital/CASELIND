@@ -23,7 +23,6 @@ const MODULES: { key: MessageKey; icon: Icon; flag?: string }[] = [
   { key: 'more.health', icon: 'medkit-outline' },
   { key: 'more.education', icon: 'school-outline' },
   { key: 'more.travel', icon: 'airplane-outline' },
-  { key: 'more.mobility', icon: 'bus-outline' },
   { key: 'more.jobs', icon: 'briefcase-outline' },
   { key: 'more.realestate', icon: 'business-outline' },
   { key: 'more.public', icon: 'business-outline' },
@@ -54,6 +53,17 @@ export default function More() {
         <View style={styles.grid}>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={t('mobility.title')}
+            onPress={() => router.push('/rides')}
+            style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="car-sport-outline" size={26} color={colors.primary} />
+            <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+              {t('mobility.title')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel={t('shop.title')}
             onPress={() => router.push('/shop')}
             style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
@@ -72,6 +82,17 @@ export default function More() {
             <Ionicons name="construct-outline" size={26} color={colors.primary} />
             <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
               {t('services.title')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('ai.tile')}
+            onPress={() => router.push('/ai')}
+            style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="sparkles-outline" size={26} color={colors.primary} />
+            <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+              {t('ai.tile')}
             </Text>
           </Pressable>
           {MODULES.filter((m) => !m.flag || flags.data.flags[m.flag] === true).map((m) => (

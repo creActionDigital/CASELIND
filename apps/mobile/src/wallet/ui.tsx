@@ -129,7 +129,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'] as co
  * Pavé PIN maison à 6 chiffres. Le code n'est jamais affiché (points seulement) ni annoncé : le lecteur d'écran
  * n'entend que la progression. Chaque touche est un bouton de 44 pt minimum.
  */
-export function PinPad({ value, onChange, disabled, error }: { value: string; onChange: (v: string) => void; disabled?: boolean; error?: string | null }) {
+export function PinPad({ value, onChange, disabled, error, length = PIN_LENGTH }: { value: string; onChange: (v: string) => void; disabled?: boolean; error?: string | null; length?: number }) {
   const { colors } = useTheme();
   const { t } = useI18n();
   return (
@@ -138,10 +138,10 @@ export function PinPad({ value, onChange, disabled, error }: { value: string; on
         accessible
         accessibilityRole="progressbar"
         accessibilityLiveRegion="polite"
-        accessibilityLabel={t('wallet.pad.progress', { n: value.length, total: PIN_LENGTH })}
+        accessibilityLabel={t('wallet.pad.progress', { n: value.length, total: length })}
         style={styles.dots}
       >
-        {Array.from({ length: PIN_LENGTH }, (_, i) => (
+        {Array.from({ length }, (_, i) => (
           <View
             key={i}
             style={[
@@ -166,7 +166,7 @@ export function PinPad({ value, onChange, disabled, error }: { value: string; on
               accessibilityRole="button"
               accessibilityLabel={del ? t('wallet.pad.delete') : t('wallet.pad.digit', { n: k })}
               disabled={disabled || (del && value.length === 0)}
-              onPress={() => onChange(del ? value.slice(0, -1) : appendDigit(value, k))}
+              onPress={() => onChange(del ? value.slice(0, -1) : value.length < length ? appendDigit(value, k) : value)}
               style={({ pressed }) => [styles.key, { backgroundColor: del ? 'transparent' : pressed ? colors.primarySoft : colors.surfaceAlt, opacity: disabled ? 0.5 : 1 }]}
             >
               {del ? <Ionicons name="backspace-outline" size={26} color={colors.text} /> : <Text style={typography.title}>{k}</Text>}

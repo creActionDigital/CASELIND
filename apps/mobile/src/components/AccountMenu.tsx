@@ -15,7 +15,7 @@ import { Avatar, Badge, Button, Text } from '../ui';
 import { SheetModal } from './SheetModal';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
-type Path = '/profile' | '/sessions' | '/security/2fa' | '/security/identifier' | '/kyc' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/deliveries' | '/bookings' | '/provider/me' | '/seller' | '/seller/new';
+type Path = '/profile' | '/sessions' | '/security/2fa' | '/security/identifier' | '/kyc' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/deliveries' | '/bookings' | '/rides/history' | '/provider/me' | '/seller' | '/seller/new';
 
 /** Menu Compte : MyProfile, Sessions, Confidentialité, Langue, Déconnexion (avec confirmation). */
 export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -45,6 +45,7 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
     { icon: 'person-outline', label: t('account.profile'), path: '/profile' },
     { icon: 'receipt-outline', label: t('orders.title'), path: '/orders' },
     { icon: 'calendar-outline', label: t('bookings.title'), path: '/bookings' },
+    { icon: 'car-sport-outline', label: t('mobility.history.title'), path: '/rides/history' },
     { icon: 'construct-outline', label: provider.data ? t('services.pro.mine') : t('services.pro.become'), path: '/provider/me' },
     {
       icon: 'storefront-outline',
