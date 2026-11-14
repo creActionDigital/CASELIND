@@ -336,3 +336,5 @@ Lot 1b (feature flags par pays, confidentialité et blocages, OpenAPI, nettoyage
 - `Screen` : apparition en fondu 180 ms via `react-native-reanimated`, respecte « réduire les animations » (`ReduceMotion.System`). Retour tactile (échelle 0,97) déjà présent sur Button/TabBar. `brandGradient` = deux fois `#4F46E5` : aucun dégradé visible.
 - Typecheck OK, 208 tests mobile OK. **Non vérifié visuellement** (pas de capture dans le navigateur).
 - Reste : revue visuelle écran par écran avec les skills `apple-design` / `ui-ux-pro-max`.
+- Revue visuelle (navigateur, 375 px) : accueil, Maps, hub, Plus conformes aux règles (couleur unie, $ sans montant, IA visible). Défaut corrigé : dernières lignes de Plus et Maps masquées par la barre flottante (`Screen bottomSpace`, `TAB_BAR_SPACE`). Reste à revoir : messagerie, wallet, boutique, assistant IA, écrans de détail.
+- Note : si `npm run dev` est arrêté par un kill, les processus enfants peuvent rester actifs (ports 54329/3000/8083) ; Ctrl+C les arrête.

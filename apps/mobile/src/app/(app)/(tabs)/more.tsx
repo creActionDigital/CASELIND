@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { api } from '../../../auth/auth-context';
 import { useI18n, type MessageKey } from '../../../i18n';
-import { radius, spacing } from '../../../theme/tokens';
+import { radius, spacing, TAB_BAR_SPACE } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Badge, ErrorState, Screen, Text } from '../../../ui';
 import type { ComponentProps } from 'react';
@@ -38,7 +38,7 @@ export default function More() {
   });
 
   return (
-    <Screen edges={[]}>
+    <Screen edges={[]} bottomSpace={TAB_BAR_SPACE}>
       <Text variant="title" accessibilityRole="header">
         {t('more.title')}
       </Text>

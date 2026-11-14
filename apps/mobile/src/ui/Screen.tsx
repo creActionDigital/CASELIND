@@ -11,9 +11,11 @@ interface Props {
   /** Bords protégés par la zone sûre (par défaut : tous sauf ceux gérés par un en-tête / barre d'onglets). */
   edges?: Edge[];
   padded?: boolean;
+  /** Espace réservé en bas, par ex. sous la barre d'onglets flottante. */
+  bottomSpace?: number;
 }
 
-export function Screen({ children, scroll = true, edges = ['top', 'bottom', 'left', 'right'], padded = true }: Props) {
+export function Screen({ children, scroll = true, edges = ['top', 'bottom', 'left', 'right'], padded = true, bottomSpace = 0 }: Props) {
   const { colors } = useTheme();
   const body = scroll ? (
     <ScrollView
@@ -22,6 +24,7 @@ export function Screen({ children, scroll = true, edges = ['top', 'bottom', 'lef
       showsVerticalScrollIndicator={false}
     >
       {children}
+      {bottomSpace > 0 && <View style={{ height: bottomSpace }} />}
     </ScrollView>
   ) : (
     <View style={[styles.grow, padded && styles.padded]}>{children}</View>

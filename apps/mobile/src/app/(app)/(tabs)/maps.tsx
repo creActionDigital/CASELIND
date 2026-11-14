@@ -18,7 +18,7 @@ import {
 } from '../../../places/geo';
 import { useDebouncedValue } from '../../../search/api';
 import { Chips } from '../../../seller/ui';
-import { radius, spacing, TOUCH } from '../../../theme/tokens';
+import { radius, spacing, TAB_BAR_SPACE, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { AuthImage, Button, EmptyState, ErrorState, Text, TextField } from '../../../ui';
 
@@ -203,7 +203,7 @@ const PlaceCard = memo(function PlaceCard({ place }: { place: Place }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   pad: { padding: spacing.xl },
-  content: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
+  content: { padding: spacing.lg, gap: spacing.md, flexGrow: 1, paddingBottom: TAB_BAR_SPACE },
   header: { gap: spacing.sm },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   label: { fontWeight: '600', marginTop: spacing.sm },
