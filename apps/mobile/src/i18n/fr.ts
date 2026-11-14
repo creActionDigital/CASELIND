@@ -415,6 +415,7 @@ export const fr = {
   'chat.filter.all': 'Tous',
   'chat.filter.unread': 'Non lus',
   'chat.filter.groups': 'Groupes',
+  'chat.groups.mine': 'Mes groupes',
   'chat.filter.archived': 'Archivées',
   'chat.section.pinned': 'Épinglées',
   'chat.section.others': 'Discussions',

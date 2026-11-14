@@ -345,3 +345,10 @@ Règle : une photo de référence par écran. Seule la structure est reprise ; c
 - `kyc` → parcours KYC : intro, choix du document (carte d'identité, passeport, permis), selfie.
 - `communities` → groupes de messagerie : « Explorer les communautés », mes communautés, rejoindre.
 - `MarketPlace` → boutique : accueil, fiche produit, panier. (Boutique existe déjà : à confirmer si ce modèle remplace l'actuel.)
+
+## Point 3 — appliqué (2026-11-14, non validé par le propriétaire)
+- `card` → `wallet/cards.tsx` : carte unie `#4F46E5` au numéro masqué, solde, Recharger / Envoyer / Gérer, transactions récentes (vide). Aucun émetteur : rien d'inventé.
+- `kyc` → `kyc.tsx` : illustration + choix du document en liste avec chevron / coche (au lieu de pastilles).
+- `communities` → Messagerie, filtre Groupes : bandeau « Mes groupes » (`messaging/GroupCards.tsx`). **Pas de « Explorer / Rejoindre »** : le backend n'a pas de communautés publiques (à décider : lot dédié ?).
+- `MarketPlace` : boutique et panier suivaient déjà cette structure (recherche + filtres, catégories, grille, stepper, total, paiement) : inchangés. Pas de code promo (pas de backend).
+- Typecheck OK, 208 tests OK ; vérifié dans le navigateur : cartes et KYC.

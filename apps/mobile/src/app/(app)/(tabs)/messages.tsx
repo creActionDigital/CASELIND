@@ -11,6 +11,7 @@ import { conversationTitle, fetchConversations, patchMyState } from '../../../me
 import { isMuted, patchConversation, removeConversation, type ConversationPages } from '../../../messaging/cache';
 import { chatColors } from '../../../messaging/chat-theme';
 import { ChatStories } from '../../../messaging/ChatStories';
+import { GroupCards } from '../../../messaging/GroupCards';
 import { ConversationRow } from '../../../messaging/ConversationRow';
 import { qk } from '../../../messaging/keys';
 import { NewConversationSheet } from '../../../messaging/NewConversationSheet';
@@ -135,7 +136,14 @@ export default function Messages() {
         onEndReached={() => query.hasNextPage && !query.isFetchingNextPage && query.fetchNextPage()}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
-        ListHeaderComponent={archived ? undefined : <PushCard />}
+        ListHeaderComponent={
+          archived ? undefined : (
+            <>
+              <PushCard />
+              {filter === 'groups' && !q ? <GroupCards groups={filtered} onOpen={open} /> : null}
+            </>
+          )
+        }
         ListEmptyComponent={
           items.length > 0 ? (
             <Text variant="small" muted style={styles.center}>

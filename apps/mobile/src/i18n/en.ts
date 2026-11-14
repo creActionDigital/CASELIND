@@ -417,6 +417,7 @@ export const en: Record<MessageKey, string> = {
   'chat.filter.all': 'All',
   'chat.filter.unread': 'Unread',
   'chat.filter.groups': 'Groups',
+  'chat.groups.mine': 'My groups',
   'chat.filter.archived': 'Archived',
   'chat.section.pinned': 'Pinned',
   'chat.section.others': 'Chats',

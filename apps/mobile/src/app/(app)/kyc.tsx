@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import type { KycIdType, KycStatusView, KycSubmission } from '@caselind/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -270,6 +271,9 @@ function Level1Form() {
 
   return (
     <View style={{ gap: 4 }}>
+      <View style={[styles.hero, { backgroundColor: colors.primarySoft }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Ionicons name="person-circle-outline" size={56} color={colors.primary} />
+      </View>
       <Text variant="heading" accessibilityRole="header" style={{ marginBottom: 8 }}>
         {t('kyc.l1.title')}
       </Text>
@@ -287,7 +291,7 @@ function Level1Form() {
       <Text variant="small" style={{ fontWeight: '600', marginBottom: spacing.xs }}>
         {t('kyc.field.idType')}
       </Text>
-      <View style={styles.chips} accessibilityRole="radiogroup">
+      <View style={styles.list} accessibilityRole="radiogroup">
         {ID_TYPES.map((k) => {
           const on = idType === k;
           return (
@@ -296,11 +300,11 @@ function Level1Form() {
               accessibilityRole="radio"
               accessibilityState={{ selected: on }}
               onPress={() => setIdType(k)}
-              style={[styles.chip, { backgroundColor: on ? colors.primary : colors.surface, borderColor: on ? colors.primary : colors.border }]}
+              style={({ pressed }) => [styles.row, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primarySoft : colors.surface, opacity: pressed ? 0.8 : 1 }]}
             >
-              <Text variant="small" color={on ? colors.onPrimary : colors.text}>
-                {t(ID_LABEL[k])}
-              </Text>
+              <Ionicons name={k === 'passport' ? 'book-outline' : 'id-card-outline'} size={22} color={colors.primary} />
+              <Text style={{ flex: 1, fontWeight: '600' }}>{t(ID_LABEL[k])}</Text>
+              <Ionicons name={on ? 'checkmark-circle' : 'chevron-forward'} size={20} color={on ? colors.primary : colors.textMuted} />
             </Pressable>
           );
         })}
@@ -368,7 +372,8 @@ function Level2Form() {
 }
 
 const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  chip: { minHeight: TOUCH, paddingHorizontal: spacing.lg, borderRadius: radius.pill, borderWidth: 1, justifyContent: 'center' },
+  list: { gap: spacing.sm, marginBottom: spacing.lg },
+  row: { minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, borderRadius: radius.lg, borderWidth: 1 },
+  hero: { alignSelf: 'center', width: 96, height: 96, borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
   preview: { width: '100%', height: 180, borderRadius: radius.md },
 });
