@@ -352,3 +352,8 @@ Règle : une photo de référence par écran. Seule la structure est reprise ; c
 - `communities` → Messagerie, filtre Groupes : bandeau « Mes groupes » (`messaging/GroupCards.tsx`). **Pas de « Explorer / Rejoindre »** : le backend n'a pas de communautés publiques (à décider : lot dédié ?).
 - `MarketPlace` : boutique et panier suivaient déjà cette structure (recherche + filtres, catégories, grille, stepper, total, paiement) : inchangés. Pas de code promo (pas de backend).
 - Typecheck OK, 208 tests OK ; vérifié dans le navigateur : cartes et KYC.
+
+## Revue visuelle (2026-11-14, navigateur 375 px) — terminée
+Vérifiés : accueil, Maps, hub, Plus, Messagerie, Wallet, Cartes, KYC, Boutique, Assistant IA. Conformes aux règles (couleur unie, $ sans montant, solde masqué par défaut, IA visible). Défaut unique trouvé et corrigé : contenu sous la barre flottante (Plus, Maps).
+Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » tant qu'aucune clé n'est configurée (attendu, clé Gemini en attente). Le fondu d'entrée reste à moitié visible dans un onglet sans focus (animation suspendue par le navigateur), sans effet sur un appareil réel. Non vérifiés visuellement : groupes (bandeau), panier plein, fiche produit, écrans de détail.
+**Prochaine étape bloquée par la règle du propriétaire : validation du mobile avant lots 13+ et web.**
