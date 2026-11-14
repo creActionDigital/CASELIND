@@ -36,6 +36,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 12 — Assistant IA | Multi-fournisseurs, Gemini par défaut | 509 tests | **testé** (backend, sans clé réelle) |
 | 13+ | services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
 
+| 14 — Communautés publiques | Explorer, rejoindre, étiquettes tendance, « Mes communautés » (maquette `communities`). Le backend n’a que des groupes privés ; à cadrer : visibilité, modération, limites | | **planifié** (décision du propriétaire 2026-11-14, non codé) |
 ## Lots mobile
 
 | Lot | Contenu | Statut |
