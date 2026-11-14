@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
@@ -28,7 +29,10 @@ export function Screen({ children, scroll = true, edges = ['top', 'bottom', 'lef
   return (
     <SafeAreaView edges={edges} style={[styles.flex, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {body}
+        {/* Apparition sobre ; ignorée quand « réduire les animations » est actif. */}
+        <Animated.View entering={FadeIn.duration(180).reduceMotion(ReduceMotion.System)} style={styles.flex}>
+          {body}
+        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -330,3 +330,9 @@ Lot 2 (organisations et médias), puis lot 3 (messagerie et notifications). Le m
 
 ### Prochaine étape
 Lot 1b (feature flags par pays, confidentialité et blocages, OpenAPI, nettoyage planifié), puis les lots 2 et 3 (organisations, médias, messagerie, notifications). Ce socle permet ensuite de démarrer le mobile Expo : auth, accueil, messagerie.
+
+## 2026-11-14 — Mouvement (point 2, partiel)
+- `npm run dev` racine ajouté (commit ac24c28).
+- `Screen` : apparition en fondu 180 ms via `react-native-reanimated`, respecte « réduire les animations » (`ReduceMotion.System`). Retour tactile (échelle 0,97) déjà présent sur Button/TabBar. `brandGradient` = deux fois `#4F46E5` : aucun dégradé visible.
+- Typecheck OK, 208 tests mobile OK. **Non vérifié visuellement** (pas de capture dans le navigateur).
+- Reste : revue visuelle écran par écran avec les skills `apple-design` / `ui-ux-pro-max`.
