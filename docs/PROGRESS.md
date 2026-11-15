@@ -363,3 +363,11 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Règles : un membre retiré par un admin est interdit de rejoindre tant qu'un admin ne le rajoute pas ; partir de soi-même n'est pas un bannissement ; limite `MESSAGING_GROUP_MAX_MEMBERS` ; le nouveau membre ne voit pas les messages antérieurs ; actions auditées.
 - Tests : 5 nouveaux tests API (`communities.e2e.test.ts`), suite API complète 515 tests OK ; mobile 210 tests, typecheck OK. Vérifié dans le navigateur : Explorer, Rejoindre, Mes groupes, message système « a rejoint le groupe ».
 - Limites connues : pagination de la liste par décalage (suffisant à cette échelle) ; description et étiquettes non saisissables à l'écran (le bouton publie sans) ; pas de signalement d'une communauté dédié.
+
+## Lot 13 — Finance personnelle (2026-11-15) : testé (sandbox, aucun argent réel)
+- Périmètre choisi : budget mensuel par devise + bilan du mois lu dans le ledger du wallet sandbox. Pas de catégories libres : les dépenses sont ventilées par type de mouvement (envois à des personnes `p2p`, paiements en boutique `merchant_payment`) ; recharges de test et ajustements ne comptent pas ; un remboursement diminue la dépense nette.
+- Migration 0026 (`budgets`) ; `finance/finance.service.ts` et `.controller.ts` ; routes `GET /v1/finance/summary?month=YYYY-MM` (mois UTC), `PUT` et `DELETE /v1/finance/budget`, derrière le flag `wallet.sandbox` ; audit `finance.budget_set` / `finance.budget_removed` ; contrats `finance.ts`, OpenAPI à jour.
+- Un dépassement de budget n'empêche rien : les chiffres l'indiquent (reste négatif, pourcentage > 100).
+- Mobile : écran `wallet/finance.tsx` (Gérer → Budget) : dépensé, reçu, barre de progression, ventilation, saisie/retrait du budget.
+- Tests : `finance.e2e.test.ts` (3), API 518 tests OK ; mobile 210 OK, typecheck OK. Non vérifié à l'écran.
+- Limites : un budget global par devise (pas par catégorie) ; pas d'alertes ni de notifications de seuil ; pas d'historique multi-mois à l'écran.

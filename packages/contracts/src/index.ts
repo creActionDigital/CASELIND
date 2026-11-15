@@ -26,3 +26,4 @@ export * from './miniapps.js';
 export * from './mobility.js';
 export * from './ai.js';
 export * from './communities.js';
+export * from './finance.js';

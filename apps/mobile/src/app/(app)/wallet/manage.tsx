@@ -34,6 +34,7 @@ export default function WalletManage() {
     { icon: 'id-card-outline', label: 'wallet.manage.kyc', hint: kyc.data ? t('wallet.kyc.level', { n: kyc.data.level }) : undefined, onPress: () => router.push('/kyc') },
     { icon: 'add-circle-outline', label: 'wallet.action.topup', onPress: () => router.push('/wallet/topup') },
     { icon: 'qr-code-outline', label: 'wallet.manage.qr', onPress: () => router.push('/wallet/receive') },
+    { icon: 'pie-chart-outline', label: 'wallet.finance.title', onPress: () => router.push('/wallet/finance') },
     ...(shops.length > 0
       ? [{ icon: 'storefront-outline' as IconName, label: 'wallet.manage.shop' as MessageKey, onPress: () => (shopPath ? router.push(shopPath) : router.push('/seller')) }]
       : []),

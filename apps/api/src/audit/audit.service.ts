@@ -52,6 +52,9 @@ export type AuditAction =
   | 'community.published'
   | 'community.unpublished'
   | 'community.joined'
+  /** Personal finance (sandbox): metadata {currency, limitMinor?}. */
+  | 'finance.budget_set'
+  | 'finance.budget_removed'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'

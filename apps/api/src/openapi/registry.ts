@@ -197,6 +197,7 @@ import {
   resolvedPaymentQrSchema,
   setPaymentPinRequestSchema,
 } from '@caselind/contracts';
+import { budgetSchema, financeSummaryQuerySchema, financeSummarySchema, removeBudgetQuerySchema, setBudgetRequestSchema } from '@caselind/contracts';
 // Lot 6A (ledger, sandbox wallet), separate import block.
 import {
   adminLedgerAccountSchema,
@@ -520,6 +521,10 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/communities/{id}/join', summary: 'Join a public community (idempotent; removed by an admin: 403; full: 409 group_full; the joiner sees only later messages); audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, response: communitySchema, status: 200 },
   { method: 'put', path: '/v1/conversations/{id}/community', summary: 'Publish the group as a community (owner only; description up to 500, up to 5 tags); audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: publishCommunityRequestSchema, response: communitySchema, status: 200 },
   { method: 'delete', path: '/v1/conversations/{id}/community', summary: 'Unpublish (owner only); the group and its members stay; audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, status: 204 },
+  // Lot 13: personal finance on the sandbox wallet. Behind the `wallet.sandbox` flag.
+  { method: 'get', path: '/v1/finance/summary', summary: 'Month summary per currency (spent, received, spending by kind, budget, remaining); month=YYYY-MM UTC, default current; sandbox, no real money', tags: ['wallet'], auth: 'user', query: financeSummaryQuerySchema, response: financeSummarySchema, status: 200 },
+  { method: 'put', path: '/v1/finance/budget', summary: 'Set or replace the monthly budget of one currency (unsupported currency: 400); audited', tags: ['wallet'], auth: 'user', body: setBudgetRequestSchema, response: budgetSchema, status: 200 },
+  { method: 'delete', path: '/v1/finance/budget', summary: 'Remove the budget of a currency (query currency); idempotent; audited', tags: ['wallet'], auth: 'user', query: removeBudgetQuerySchema, status: 204 },
   { method: 'put', path: '/v1/messages/{id}/reaction', summary: 'Set, or remove with emoji null, the single reaction of the caller to a message', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: reactionRequestSchema, response: messageSchema, status: 200 },
   { method: 'delete', path: '/v1/messages/{id}', summary: 'scope=me (default): hide for the caller. scope=all: the author recalls it within the recall window (409 afterwards), wiping body and media; audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, query: recallQuerySchema, status: 204 },
   // Lot 3b: forwarding, favourites, disappearing and scheduled messages, drafts. Same 404 rule as lot 3A.
