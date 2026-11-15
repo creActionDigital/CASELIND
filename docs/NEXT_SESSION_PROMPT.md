@@ -1,40 +1,38 @@
 # Prompt de reprise — CASELIND (à coller dans une nouvelle conversation)
 
-Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShell). Le produit s'appelle CASELIND, jamais Casalind. Réponds en français, brièvement.
+Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShell). Le produit s'appelle CASELIND, jamais Casalind. Réponds en français, brièvement. Le propriétaire veut finir vite, sans erreur, et que tu avances **sans t'arrêter ni redemander le lot** : tu lis le cahier des charges et tu enchaînes.
 
 ## À lire d'abord
-1. `docs/PROGRESS.md` (état réel, tests exécutés), `docs/BACKLOG.md` (lots, décisions Q1–Q9), `docs/architecture/DECISIONS.md` (ADR-001 à 022), `docs/architecture/API_CONTRACTS.md`, `docs/CONTROLE_ET_COMPTES.md` (qui contrôle quoi).
-2. `docs/reverse-engineering/WECHAT_FUNCTIONAL_MAP.md` et `SCREEN_INVENTORY.md`. WeChat est la base fonctionnelle (on clone les fonctions, jamais l'identité ni le code). REA n'est pas connecté ici ; ne décompile aucune application tierce (ADR-009).
-3. `git log --oneline` : dernier commit de code `0484be7` (refonte design).
+1. `CASELIND_CAHIER_DES_CHARGES_DEFINITIF.md` (racine) : le cahier maître. Relis la section de chaque lot avant de le cadrer (§39.4 processus, §39.10 rapport de fin de lot, §34 règles non négociables).
+2. `docs/BACKLOG.md` : **décisions du propriétaire** et feuille de route des lots, à tenir à jour. `docs/PROGRESS.md` : état réel, tests, différés par lot. `docs/CONTROLE_ET_COMPTES.md`, `docs/architecture/DECISIONS.md`.
+3. `git log --oneline` : dernier commit de code = lot 18b santé (`61bea0d`), suivi de `e1283a5` (docs).
 
-## État (2026-11-14)
-- **Backend** NestJS 12 + PostgreSQL (migrations 0001–0024), lots 1 à 12 testés : identité, 2FA, organisations, médias, messagerie temps réel, notifications push, social, stories (« statuts »), modération, commerce, livraison, services, wallet **sandbox**, KYC, QR, mini-apps OAuth, mobilité, IA multi-fournisseurs, recherche, lieux. **509 tests API** ; mobile **208 tests**. Aucun argent réel, aucune clé de service externe active.
-- **Mobile** Expo SDK 58 (`apps/mobile`) : tous les écrans des lots codés ; refonte du design faite d'après le dossier `C:\Users\HP\Desktop\CASELIND Design\Modals` (règles ci-dessous). Planche de maquettes : `Desktop\CASELIND Design\index.html`.
-- **Web** : non commencé. Ordre imposé : backend → mobile → validation du mobile par le propriétaire → web (React + Vite, pas de Next.js).
+## Décisions du propriétaire (à respecter)
+- **Trading et paris sportifs : RETIRÉS du projet.** Ne rien développer ni proposer.
+- Santé et tout le reste : à développer intégralement ; les modules réglementés restent **coupés par défaut côté serveur** (activation par un admin avec confirmation).
+- **Lot 19 « services publics » (alertes, urgences, signalements) : reporté à la demande du propriétaire.** Le code est prêt et testé sur la branche `wip/lot19-services-publics` (commit 02bef72, migration 0033), non fusionnée. Ne pas le reprendre sans qu'il le demande ; à la reprise, fusionner, renuméroter la migration si besoin, relancer toute la suite.
+- Pas d'argent réel, pas de NFT, CSL Coins (§18) bloqué : règles non spécifiées, ne rien inventer.
+- Ne pas inventer de numéros d'urgence, d'agréments ou d'intégrations ; dire honnêtement le statut de chaque intégration (§34).
 
-## Ce qui attend, dans l'ordre
-1. **`npm run dev` à la racine ne marche pas** (« Missing script: dev »). Le propriétaire veut une seule commande qui lance base + API + application. À écrire : un script racine (base `npm run db:dev -w @caselind/api` ; API compilée `node --env-file=.env dist/main.js` depuis `apps/api` après `npm run build -w @caselind/api` ; Expo web `npx expo start --web --port 8083` dans `apps/mobile`). Le mode `--watch` de l'API redémarre en boucle quand Expo touche `node_modules` : utiliser l'API compilée.
-2. **Vérifier et améliorer les designs** (demande du propriétaire) avec les skills `apple-design` et `ui-ux-pro-max` et du mouvement. Framer Motion est du web : sous React Native, utiliser `react-native-reanimated` s'il est installé (le skill `motion` servira au futur web). Animations sobres, respect de « réduire les animations ».
-3. Images du dossier `Modals` non attribuées : `card`, `kyc`, `communities`, `MarketPlace`. Demander au propriétaire pour quels écrans.
-4. Puis lots 13+ (santé, éducation, emploi, immobilier, services publics, jeux, finance personnelle ; trading et paris sont RETIRÉS du projet (décision du propriétaire, voir BACKLOG)) et le web, **seulement après validation du mobile**.
+## État (2026-11-15)
+- **Backend** NestJS + PostgreSQL, migrations 0001–0032. **573 tests API**, **228 tests mobile**, typechecks propres. Lots livrés et testés : 1 à 12 (identité, messagerie, social, commerce, livraison, services, wallet sandbox, KYC, mini-apps, mobilité, IA, lieux), 13 finance personnelle, 14 communautés, 15 petites annonces, 16a emploi, 16b freelance (paiement externe, séquestre différé), 17a éducation (cours, quiz, certificats), 18a santé personnelle (consentement, dossier chiffré, rappels), 18b santé professionnels (agrément vérifié, rendez-vous, partage du dossier, ordonnances).
+- **Mobile** Expo SDK 58 (`apps/mobile`), mobile validé par le propriétaire. **Web** (React + Vite) : non commencé, après les lots backend.
+- Reste à faire, dans l'ordre : **20 Jeux et Play & Win (§21)** sans NFT ni argent réel ; 16c outils professionnels (§14, auditer d'abord l'existant : commandes, stock, coupons, avis, wallet) ; 17b établissements scolaires (§13, **décision du propriétaire requise sur les mineurs / consentement parental**) ; puis le web (§27). Les différés de chaque lot sont dans `docs/PROGRESS.md`.
 
 ## Règles de design décidées par le propriétaire
 - **Aucun dégradé** : couleur de marque unie `#4F46E5` (`brandColor`, `src/theme/tokens.ts`). Police Poppins. Style Apple.
-- Logo : « C » ouvert + point, indigo uni (`Desktop\CASELIND Design\Logo`).
-- Barre du bas flottante : Accueil · Maps · **+** (Live · Vidéos · Posts · Produits) · Messagerie · Plus. En-tête : logo, recherche, **IA bien visible**, **$ sans montant** (le solde n'est que dans l'écran Wallet), panier, compte.
-- « Stories » s'appellent **« Statuts »**. Maps : boutiques, restaurants, pharmacies, stations-service. Jeux : mini-application dans le menu Plus, pas dans le cœur. Trading et paris : retirés du projet.
-- **Une photo de référence par écran, rien d'autre** : n'applique pas à un écran une image qui ne lui est pas attribuée.
-
-## Lancement local (si rien ne tourne)
-Trois processus : base, API, Expo web (commandes ci-dessus). Un ancien Expo peut occuper le port 8083 : le stopper d'abord. Comptes de test (base locale) : `alice@caselind.test` et `bob@caselind.test`, mot de passe `TestPass-2026!`. La base de dev doit être en UTF-8.
+- Barre du bas flottante : Accueil · Maps · **+** · Messagerie · Plus. En-tête : logo, recherche, **IA visible**, **$ sans montant**, panier, compte. « Stories » = **« Statuts »**. Les nouveaux modules se branchent par une tuile du menu **Plus** (visible selon le drapeau).
+- **Une photo de référence par écran, rien d'autre.**
 
 ## Méthode (décisions déjà prises)
-- **Fais le travail toi-même** ; le propriétaire a reproché de tout déléguer. Au plus 1 à 2 sous-agents (modèle `sonnet`), consignes courtes, comptes rendus de 10 lignes. Il veut aussi **économiser les tokens**.
-- Machine juste en mémoire : un seul gros processus à la fois ; **jamais deux `npm install` en parallèle** (corruption de paquets) ; lancer les tests API serveurs de dev arrêtés (`npm test -w @caselind/api`).
-- Après chaque lot : typecheck + tests, mise à jour de `docs/PROGRESS.md` et `docs/BACKLOG.md`, commit. Ne dis « validé » qu'après validation du propriétaire ; distingue prévu, codé, testé.
-- Signale toujours ce dont tu as besoin pour le projet (comptes, clés, décisions).
+- **Fais le travail toi-même** ; au plus 1 à 2 sous-agents (modèle `sonnet`), consignes courtes. Économise les tokens.
+- Chaque lot : migration forward-only, contrats zod (`packages/contracts`, à reconstruire avec `npm run build -w @caselind/contracts` avant le typecheck API), service + contrôleur NestJS, **OpenAPI à jour** (`src/openapi/registry.ts`, test à double sens), test e2e (`apps/api/test`), export de compte et audit **sans contenu sensible**, signalement/masquage si contenu public, drapeau de fonctionnalité, écrans mobiles, i18n fr+en, puis **vérification à l'écran**, `PROGRESS.md` + `BACKLOG.md`, commit. Ne dis « testé » qu'avec résultats observés ; distingue prévu, codé, testé ; consigne le différé.
+- **Piège fins de ligne** : `sed -i` retire les CRLF de `app.module.ts`, `registry.ts`, `i18n/fr.ts`, `i18n/en.ts`, `more.tsx` ; vérifie `git diff --stat` (quelques lignes seulement) et rétablis avec `sed -i 's/\r//g; s/$/\r/' fichier`. Pas de Python sur la machine : scripts en Node (`/tmp/x.mjs`). Ne jamais écraser un fichier existant du même nom (le `health.controller.ts` d'origine est le contrôle de disponibilité).
+- **Machine juste en mémoire** : un seul gros processus à la fois ; jamais deux `npm install` en parallèle ; tests API **serveurs de dev arrêtés** (`npm test -w @caselind/api`, ~6 min). `npm run dev` peut manquer de mémoire à la compilation : démarrage manuel = `npm run db:dev -w @caselind/api`, puis `node --env-file=.env dist/main.js` dans `apps/api` (après `npm run build -w @caselind/api`), puis `npx expo start --web --port 8083` dans `apps/mobile`. Arrêt : `taskkill //PID <pid> //T //F` (PID via `netstat -ano`) ; un `postgres.exe` figé se tue par son PID exact.
+- Comptes de test (base locale) : `alice@caselind.test`, `bob@caselind.test`, mot de passe `TestPass-2026!`. Le navigateur intégré en vue mobile (375 px) sert à vérifier les écrans ; en cas de blocage, ouvrir un nouvel onglet (la session est à refaire).
+- Un module réglementé en dev : l'activer par SQL sur la base locale seulement le temps du test, puis le remettre à `false` et nettoyer les données de test.
 
 ## Décisions et comptes qui attendent le propriétaire
-- **Sauvegarde du code : aucune copie en ligne** (dépôt Git local seulement). Urgent : dépôt GitHub privé à son nom.
-- Q2 comptes Brevo (e-mail) et Meta WhatsApp pour les codes (`docs/OTP_SETUP.md`) ; Q5 compte marchand FlexPay (Mobile Money) ; Q8 `npx expo login` ; clé API Google AI Studio (Gemini) pour l'assistant ; Q6 hébergement et nom de domaine.
-- Des photos libres de droits (CC0) ont été ajoutées aux produits de démo de la base locale : données de test seulement, non versionnées.
+- **Sauvegarde du code : aucune copie en ligne** (Git local seulement). Urgent : dépôt GitHub privé à son nom.
+- Q2 comptes Brevo (e-mail) et Meta WhatsApp pour les codes (`docs/OTP_SETUP.md`) ; Q5 compte marchand FlexPay (Mobile Money, débloque séquestre freelance et paiements réels) ; Q8 `npx expo login` ; clé Google AI Studio (Gemini) ; Q6 hébergement, nom de domaine, WebRTC/TURN (débloque appels, entretiens et téléconsultation vidéo).
+- Mineurs et consentement parental (lot 17b) ; numéros d'urgence officiels (lot 19) ; durée de conservation des données de santé par pays ; règles CSL Coins.
