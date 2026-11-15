@@ -154,6 +154,19 @@ const envSchema = z
       .string()
       .optional()
       .refine((v) => v === undefined || decodeKeyMaterial(v).length >= 32, 'TOTP_ENCRYPTION_KEY must be hex or base64 of at least 32 bytes'),
+    /**
+     * Lot 18a: key encrypting personal health data (AES-256-GCM, bound to the user). Hex or base64 of at least 32 bytes.
+     * Required in production; elsewhere a key derived from JWT_ACCESS_SECRET is used when absent.
+     */
+    HEALTH_ENCRYPTION_KEY: z
+      .string()
+      .optional()
+      .refine((v) => v === undefined || decodeKeyMaterial(v).length >= 32, 'HEALTH_ENCRYPTION_KEY must be hex or base64 of at least 32 bytes'),
+    /** Lot 18a: minute job turning due medication reminders into doses and notifications. */
+    HEALTH_REMINDERS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
     /** Lot 1c: polling budget of the public QR login status route (the web client polls every 1-2 s). */
     QR_POLL_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(90),
     /** Lot 10: POST /oauth/token (per IP), on top of the default budget. */
@@ -224,7 +237,7 @@ const envSchema = z
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production') {
-      for (const key of ['KYC_ENCRYPTION_KEY', 'PAYMENT_QR_SECRET', 'TOTP_ENCRYPTION_KEY'] as const) {
+      for (const key of ['KYC_ENCRYPTION_KEY', 'PAYMENT_QR_SECRET', 'TOTP_ENCRYPTION_KEY', 'HEALTH_ENCRYPTION_KEY'] as const) {
         if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
       }
     }

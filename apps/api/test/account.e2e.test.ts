@@ -112,7 +112,7 @@ describe('data export', () => {
     const res = await ctx.http.get('/v1/me/export').set(bearer(a.token)).expect(200);
     const body = res.body;
     expect(Object.keys(body).sort()).toEqual(
-      ['aiConversations', 'blocks', 'budgets', 'cart', 'comments', 'conversations', 'deliveries', 'education', 'exportedAt', 'favoriteMessages', 'following', 'freelance', 'jobApplications', 'jobProfile', 'kyc', 'listings', 'media', 'messagesSent', 'messagesSentTruncated', 'miniappGrants', 'mobility', 'orders', 'orgMemberships', 'posts', 'privacy', 'profile', 'reportsFiled', 'reviews', 'searchHistory', 'securityEvents', 'services', 'sessions', 'stories', 'twoFactorEnabled', 'twoFactorEnabledAt', 'wallet'].sort(),
+      ['aiConversations', 'blocks', 'budgets', 'cart', 'comments', 'conversations', 'deliveries', 'education', 'exportedAt', 'favoriteMessages', 'following', 'freelance', 'health', 'jobApplications', 'jobProfile', 'kyc', 'listings', 'media', 'messagesSent', 'messagesSentTruncated', 'miniappGrants', 'mobility', 'orders', 'orgMemberships', 'posts', 'privacy', 'profile', 'reportsFiled', 'reviews', 'searchHistory', 'securityEvents', 'services', 'sessions', 'stories', 'twoFactorEnabled', 'twoFactorEnabledAt', 'wallet'].sort(),
     );
     expect(body.profile).toMatchObject({ id: a.id, handle: a.handle, email: a.identifier, status: 'active' });
     expect(body.privacy.readReceipts).toBe(false);

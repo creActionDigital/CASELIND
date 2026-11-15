@@ -44,6 +44,9 @@ import { AdminFreelanceController, FreelanceController } from './freelance/freel
 import { FreelanceService } from './freelance/freelance.service.js';
 import { EducationController, PublicCertificatesController } from './education/education.controller.js';
 import { EducationService } from './education/education.service.js';
+import { PersonalHealthController } from './health/personal-health.controller.js';
+import { HealthCrypto } from './health/health-crypto.js';
+import { HealthService } from './health/health.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -309,6 +312,7 @@ export class AppModule {
         AdminFreelanceController,
         EducationController,
         PublicCertificatesController,
+        PersonalHealthController,
         OpenApiController,
         AuthController,
         UsersController,
@@ -485,6 +489,8 @@ export class AppModule {
         JobsService,
         FreelanceService,
         EducationService,
+        HealthCrypto,
+        HealthService,
         MessagesService,
         // Lot 3b
         MessageExtrasService,

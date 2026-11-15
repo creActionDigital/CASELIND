@@ -97,6 +97,7 @@ export async function createTestContext(
     REPORTS_RATE_LIMIT_PER_MINUTE: '10000',
     MAINTENANCE_ENABLED: 'false',
     MESSAGING_SCHEDULER_ENABLED: 'false',
+    HEALTH_REMINDERS_ENABLED: 'false',
     ...envOverrides,
   });
   const otp = new CapturingOtpSender();

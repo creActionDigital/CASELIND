@@ -18,7 +18,6 @@ const MODULES: { key: MessageKey; icon: Icon; flag?: string }[] = [
   { key: 'more.miniapps', icon: 'apps-outline' },
   { key: 'more.games', icon: 'game-controller-outline' },
   { key: 'more.finance', icon: 'wallet-outline' },
-  { key: 'more.health', icon: 'medkit-outline' },
   { key: 'more.travel', icon: 'airplane-outline' },
   { key: 'more.public', icon: 'business-outline' },
 ];
@@ -89,6 +88,19 @@ export default function More() {
               <Ionicons name="pricetags-outline" size={26} color={colors.primary} />
               <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
                 {t('listings.title')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {flags.data.flags.health === true ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('health.title')}
+              onPress={() => router.push('/health')}
+              style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="medkit-outline" size={26} color={colors.primary} />
+              <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+                {t('health.title')}
               </Text>
             </Pressable>
           ) : null}
