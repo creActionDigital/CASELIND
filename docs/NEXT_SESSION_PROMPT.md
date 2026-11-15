@@ -36,3 +36,21 @@ Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShe
 - **Sauvegarde du code : aucune copie en ligne** (Git local seulement). Urgent : dépôt GitHub privé à son nom.
 - Q2 comptes Brevo (e-mail) et Meta WhatsApp pour les codes (`docs/OTP_SETUP.md`) ; Q5 compte marchand FlexPay (Mobile Money, débloque séquestre freelance et paiements réels) ; Q8 `npx expo login` ; clé Google AI Studio (Gemini) ; Q6 hébergement, nom de domaine, WebRTC/TURN (débloque appels, entretiens et téléconsultation vidéo).
 - Mineurs et consentement parental (lot 17b) ; numéros d'urgence officiels (lot 19) ; durée de conservation des données de santé par pays ; règles CSL Coins.
+
+## Lancer Claude Code avec les modèles gratuits d'OmniRoute (PowerShell, depuis `E:\CASELIND`)
+Prérequis : OmniRoute en marche (port 20128) et la clé dans `$env:OMNIROUTE_KEY`.
+```powershell
+$env:ANTHROPIC_BASE_URL = "http://localhost:20128"
+$env:ANTHROPIC_AUTH_TOKEN = $env:OMNIROUTE_KEY
+$env:ANTHROPIC_MODEL = "auto/coding:free"
+$env:ANTHROPIC_SMALL_FAST_MODEL = "auto/coding:free"
+claude
+```
+(`scripts/claude-omniroute.ps1` fait pareil mais ajoute `--continue`, qui reprend la **dernière** conversation : pour une nouvelle conversation, utiliser les lignes ci-dessus.) Les modèles gratuits sont moins fiables : relire chaque diff, lancer **tous** les tests avant chaque commit, ne jamais déclarer « fait » sans résultat observé.
+
+## Skills à utiliser (appel par `/nom`, ou par l'outil Skill)
+- `/graphify` : au début de la session, pour interroger l'architecture du dépôt (règle globale de l'utilisateur).
+- `/apple-design` et `/ui-ux-pro-max` : à chaque nouvel écran mobile (style Apple, accessibilité, mouvement sobre ; décidé en ADR-016). `/frontend-design` : mise en page et choix visuels. `/motion` : **seulement pour le futur web** (sous React Native on utilise `react-native-reanimated`).
+- `/ponytail` : mode « plus petit changement complet » (plugin actif sur cette machine).
+- Fin de lot : `/code-review` ; pour tout module santé, argent ou authentification : `/security-review`.
+- `/reverse-engineer-anything` : seulement pour cartographier une fonction WeChat à cloner, jamais pour décompiler une application tierce (ADR-009) ; aucun serveur REA n'est connecté.
