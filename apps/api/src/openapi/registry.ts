@@ -198,6 +198,17 @@ import {
   setPaymentPinRequestSchema,
 } from '@caselind/contracts';
 import {
+  adminGameQuestionListSchema,
+  adminGameQuestionSchema,
+  createGameQuestionRequestSchema,
+  gameQuizResultSchema,
+  leaderboardQuerySchema,
+  leaderboardSchema,
+  quizSessionSchema,
+  submitQuizAnswersRequestSchema,
+  updateGameQuestionRequestSchema,
+} from '@caselind/contracts';
+import {
   accessLogSchema,
   adminProfessionalListSchema,
   adminProfessionalsQuerySchema,
@@ -628,6 +639,13 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/me/health/doses', summary: 'The last 50 doses sent by the reminders, to tick taken or skipped. The notification never names the medicine', tags: ['health'], auth: 'user', response: doseListSchema, status: 200 },
   { method: 'post', path: '/v1/me/health/doses/{id}/taken', summary: 'Mark a dose taken', tags: ['health'], auth: 'user', params: { id: z.string() }, response: doseSchema, status: 200 },
   { method: 'post', path: '/v1/me/health/doses/{id}/skip', summary: 'Mark a dose skipped', tags: ['health'], auth: 'user', params: { id: z.string() }, response: doseSchema, status: 200 },
+  // Lot 20a: Play & Win quiz éclair (CDC §21). Behind the `games` flag. A game of skill: no money, no bet; the score is computed on the server.
+  { method: 'post', path: '/v1/games/quiz/sessions', summary: 'Start a game: 10 random active questions (without the right answers) and 120 seconds; fewer than 10 questions: 409 not_enough_questions; 20 a day: 409 daily_limit; audited', tags: ['games'], auth: 'user', response: quizSessionSchema, status: 201 },
+  { method: 'post', path: '/v1/games/quiz/sessions/{id}/answers', summary: 'Submit the 10 answers once, before the time is up (own game only, else 404; again: 409 already_finished; late: 409 expired). Score = 100 per right answer + seconds left (0 when none is right); audited', tags: ['games'], auth: 'user', params: { id: z.string() }, body: submitQuizAnswersRequestSchema, response: gameQuizResultSchema, status: 200 },
+  { method: 'get', path: '/v1/games/quiz/leaderboard', summary: 'Top 20 by best finished score, one rank per player (period week = last 7 days, or all)', tags: ['games'], auth: 'user', query: leaderboardQuerySchema, response: leaderboardSchema, status: 200 },
+  { method: 'post', path: '/v1/admin/games/questions', summary: 'Add a question with its right answer (admin role)', tags: ['games'], auth: 'admin', body: createGameQuestionRequestSchema, response: adminGameQuestionSchema, status: 201 },
+  { method: 'get', path: '/v1/admin/games/questions', summary: 'List the questions with their right answers (admin role)', tags: ['games'], auth: 'admin', response: adminGameQuestionListSchema, status: 200 },
+  { method: 'patch', path: '/v1/admin/games/questions/{id}', summary: 'Activate or retire a question (admin role)', tags: ['games'], auth: 'admin', params: { id: z.string() }, body: updateGameQuestionRequestSchema, response: adminGameQuestionSchema, status: 200 },
   // Lot 18b: health professionals, appointments, record sharing, e-prescriptions (CDC §12). Regulated `health` flag; teleconsultation and prescriptions have their own regulated flags.
   { method: 'get', path: '/v1/health-professionals', summary: 'Directory of verified professionals (approved only, never the licence number; filters kind, city, q; keyset cursor)', tags: ['health'], auth: 'user', query: professionalListQuerySchema, response: professionalListSchema, status: 200 },
   { method: 'get', path: '/v1/me/health/professional', summary: 'My own professional application and its verification status (profile null when none)', tags: ['health'], auth: 'user', response: myProfessionalSchema, status: 200 },

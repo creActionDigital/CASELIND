@@ -49,6 +49,8 @@ import { HealthCrypto } from './health/health-crypto.js';
 import { HealthService } from './health/health.service.js';
 import { AdminHealthController, HealthProController } from './health/health-pro.controller.js';
 import { HealthProService } from './health/health-pro.service.js';
+import { AdminGamesController, GamesController } from './games/games.controller.js';
+import { GamesService } from './games/games.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -317,6 +319,8 @@ export class AppModule {
         PersonalHealthController,
         HealthProController,
         AdminHealthController,
+        GamesController,
+        AdminGamesController,
         OpenApiController,
         AuthController,
         UsersController,
@@ -496,6 +500,7 @@ export class AppModule {
         HealthCrypto,
         HealthProService,
         HealthService,
+        GamesService,
         MessagesService,
         // Lot 3b
         MessageExtrasService,

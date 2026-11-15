@@ -108,6 +108,9 @@ export type AuditAction =
   | 'health.share_revoked'
   | 'health.record_read'
   | 'health.prescription_issued'
+  /** Games (lot 20a): session id and score only, never an answer. */
+  | 'games.session_started'
+  | 'games.session_finished'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'

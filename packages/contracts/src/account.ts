@@ -136,6 +136,8 @@ export const accountExportSchema = z.object({
   }),
   /** Lot 18a: own health data, decrypted (right of access). Empty when nothing was ever stored. */
   health: exportedHealthSchema,
+  /** Lot 20a: own finished quiz games (date, right answers, score). */
+  games: z.array(z.object({ startedAt: z.string(), correct: z.number().int(), score: z.number().int() })),
   /** Lot 17a: own courses as an author, own enrollments with progress and certificate codes. */
   education: z.object({
     authored: z.array(z.object({ id: z.uuid(), title: z.string(), status: z.string(), createdAt: z.string() })),

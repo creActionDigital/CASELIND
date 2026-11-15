@@ -16,7 +16,6 @@ type Icon = ComponentProps<typeof Ionicons>['name'];
 // GET /v1/config/flags l'autorise pour l'utilisateur.
 const MODULES: { key: MessageKey; icon: Icon; flag?: string }[] = [
   { key: 'more.miniapps', icon: 'apps-outline' },
-  { key: 'more.games', icon: 'game-controller-outline' },
   { key: 'more.finance', icon: 'wallet-outline' },
   { key: 'more.travel', icon: 'airplane-outline' },
   { key: 'more.public', icon: 'business-outline' },
@@ -88,6 +87,19 @@ export default function More() {
               <Ionicons name="pricetags-outline" size={26} color={colors.primary} />
               <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
                 {t('listings.title')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {flags.data.flags.games !== false ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('games.title')}
+              onPress={() => router.push('/games')}
+              style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="game-controller-outline" size={26} color={colors.primary} />
+              <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+                {t('games.title')}
               </Text>
             </Pressable>
           ) : null}

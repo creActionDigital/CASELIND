@@ -23,7 +23,8 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 18a | §12 | Santé : consentement, dossier chiffré, rappels | testé (module réglementé, coupé par défaut) |
 | 18b | §12 | Santé : professionnels vérifiés, rendez-vous, partage du dossier, ordonnances | testé (réglementé, coupé par défaut) ; pharmacie, résultats d’examens, assurance, vidéo : différés |
 | 19 | §16 | Administration publique, alertes, urgences, signalements urbains | **reporté à la demande du propriétaire (2026-11-15)** ; travail déjà codé et testé sur la branche `wip/lot19-services-publics` (migration 0033), à reprendre plus tard |
-| 20 | §21 | Jeux, Play & Win (sans NFT ni argent réel sans décision) | planifié |
+| 20a | §21 | Jeux : quiz éclair et classement (sans argent) | testé |
+| 20b | §21 | Jeux : tournois, badges non monétaires, autres jeux | planifié |
 | — | §20, paris | Trading, paris sportifs | **retiré** |
 | — | §18 | CSL Coins | bloqué : règles non spécifiées (question ouverte) |
 | Web | §27 | React + Vite, PWA | planifié, après les lots backend |

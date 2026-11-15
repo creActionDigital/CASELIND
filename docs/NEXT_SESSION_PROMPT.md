@@ -5,7 +5,7 @@ Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShe
 ## À lire d'abord
 1. `CASELIND_CAHIER_DES_CHARGES_DEFINITIF.md` (racine) : le cahier maître. Relis la section de chaque lot avant de le cadrer (§39.4 processus, §39.10 rapport de fin de lot, §34 règles non négociables).
 2. `docs/BACKLOG.md` : **décisions du propriétaire** et feuille de route des lots, à tenir à jour. `docs/PROGRESS.md` : état réel, tests, différés par lot. `docs/CONTROLE_ET_COMPTES.md`, `docs/architecture/DECISIONS.md`.
-3. `git log --oneline` : dernier commit de code = lot 18b santé (`61bea0d`), suivi de `e1283a5` (docs).
+3. `git log --oneline` : dernier lot = 20a jeux (quiz éclair).
 
 ## Décisions du propriétaire (à respecter)
 - **Trading et paris sportifs : RETIRÉS du projet.** Ne rien développer ni proposer.
@@ -15,9 +15,9 @@ Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShe
 - Ne pas inventer de numéros d'urgence, d'agréments ou d'intégrations ; dire honnêtement le statut de chaque intégration (§34).
 
 ## État (2026-11-15)
-- **Backend** NestJS + PostgreSQL, migrations 0001–0032. **573 tests API**, **228 tests mobile**, typechecks propres. Lots livrés et testés : 1 à 12 (identité, messagerie, social, commerce, livraison, services, wallet sandbox, KYC, mini-apps, mobilité, IA, lieux), 13 finance personnelle, 14 communautés, 15 petites annonces, 16a emploi, 16b freelance (paiement externe, séquestre différé), 17a éducation (cours, quiz, certificats), 18a santé personnelle (consentement, dossier chiffré, rappels), 18b santé professionnels (agrément vérifié, rendez-vous, partage du dossier, ordonnances).
+- **Backend** NestJS + PostgreSQL, migrations 0001–0034. **580 tests API**, **231 tests mobile**, typechecks propres. Lots livrés et testés : 1 à 12 (identité, messagerie, social, commerce, livraison, services, wallet sandbox, KYC, mini-apps, mobilité, IA, lieux), 13 finance personnelle, 14 communautés, 15 petites annonces, 16a emploi, 16b freelance (paiement externe, séquestre différé), 17a éducation (cours, quiz, certificats), 18a santé personnelle (consentement, dossier chiffré, rappels), 18b santé professionnels (agrément vérifié, rendez-vous, partage du dossier, ordonnances).
 - **Mobile** Expo SDK 58 (`apps/mobile`), mobile validé par le propriétaire. **Web** (React + Vite) : non commencé, après les lots backend.
-- Reste à faire, dans l'ordre : **20 Jeux et Play & Win (§21)** sans NFT ni argent réel ; 16c outils professionnels (§14, auditer d'abord l'existant : commandes, stock, coupons, avis, wallet) ; 17b établissements scolaires (§13, **décision du propriétaire requise sur les mineurs / consentement parental**) ; puis le web (§27). Les différés de chaque lot sont dans `docs/PROGRESS.md`.
+- Reste à faire, dans l'ordre : **20b jeux (tournois, badges non monétaires, §21)** ; 16c outils professionnels (§14, auditer d'abord l'existant : commandes, stock, coupons, avis, wallet) ; 17b établissements scolaires (§13, **décision du propriétaire requise sur les mineurs / consentement parental**) ; puis le web (§27). Les différés de chaque lot sont dans `docs/PROGRESS.md`.
 
 ## Règles de design décidées par le propriétaire
 - **Aucun dégradé** : couleur de marque unie `#4F46E5` (`brandColor`, `src/theme/tokens.ts`). Police Poppins. Style Apple.
@@ -54,3 +54,6 @@ claude
 - `/ponytail` : mode « plus petit changement complet » (plugin actif sur cette machine).
 - Fin de lot : `/code-review` ; pour tout module santé, argent ou authentification : `/security-review`.
 - `/reverse-engineer-anything` : seulement pour cartographier une fonction WeChat à cloner, jamais pour décompiler une application tierce (ADR-009) ; aucun serveur REA n'est connecté.
+
+## Retour d'expérience OmniRoute (modèles gratuits)
+Un essai du lot 20a avec `auto/coding:free` (`gpt-oss-120b`) a échoué : modèle de données inventé, code qui ne compile pas, compte rendu qui décrit des tables inexistantes. Avec ces modèles : tâches **courtes et fermées**, une à la fois ; vérifier soi-même `npx tsc --noEmit -p .` et les tests ; ne jamais croire un compte rendu sans lire le diff. OmniRoute met ~30 s à démarrer et manque de mémoire si le navigateur et les serveurs tournent.
