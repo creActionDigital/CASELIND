@@ -231,7 +231,17 @@ export class AccountService {
       SELECT a.id, j.title, o.name AS org_name, a.status, a.message, a.created_at FROM job_applications a
       JOIN job_postings j ON j.id = a.posting_id JOIN organizations o ON o.id = j.org_id
       WHERE a.user_id = ${auth.userId}::uuid ORDER BY a.created_at, a.id`);
-    const budgetRows =await this.db.execute<{ currency: string; limit_minor: string }>(sql`
+    const frMissions = await this.db.execute<{ id: string; title: string; budget_minor: string; currency: string; status: string; created_at: Date }>(sql`
+      SELECT id, title, budget_minor, currency, status, created_at FROM missions WHERE client_id = ${auth.userId}::uuid ORDER BY created_at, id`);
+    const frProposals = await this.db.execute<{ id: string; title: string; amount_minor: string; delivery_days: number; message: string; status: string; created_at: Date }>(sql`
+      SELECT p.id, m.title, p.amount_minor, p.delivery_days, p.message, p.status, p.created_at FROM mission_proposals p JOIN missions m ON m.id = p.mission_id
+      WHERE p.freelancer_id = ${auth.userId}::uuid ORDER BY p.created_at, p.id`);
+    const frContracts = await this.db.execute<{ id: string; title: string; client_id: string; handle: string; amount_minor: string; currency: string; status: string; created_at: Date }>(sql`
+      SELECT c.id, m.title, c.client_id, CASE WHEN c.client_id = ${auth.userId}::uuid THEN fu.handle::text ELSE cu.handle::text END AS handle,
+        c.amount_minor, c.currency, c.status, c.created_at
+      FROM freelance_contracts c JOIN missions m ON m.id = c.mission_id JOIN users cu ON cu.id = c.client_id JOIN users fu ON fu.id = c.freelancer_id
+      WHERE c.client_id = ${auth.userId}::uuid OR c.freelancer_id = ${auth.userId}::uuid ORDER BY c.created_at, c.id`);
+    const budgetRows = await this.db.execute<{ currency: string; limit_minor: string }>(sql`
       SELECT currency, limit_minor FROM budgets WHERE user_id = ${auth.userId}::uuid ORDER BY currency`);
     // Lot 10: mini-app authorizations (history included); never a token.
     const miniappGrants = await this.exportMiniAppGrants(auth.userId);
@@ -374,6 +384,11 @@ export class AccountService {
       })),
       jobProfile: cvRows.rows[0] ?? null,
       jobApplications: jobAppRows.rows.map((a) => ({ id: a.id, jobTitle: a.title, orgName: a.org_name, status: a.status, message: a.message, createdAt: new Date(a.created_at).toISOString() })),
+      freelance: {
+        missions: frMissions.rows.map((m) => ({ id: m.id, title: m.title, budgetMinor: Number(m.budget_minor), currency: m.currency.trim(), status: m.status, createdAt: new Date(m.created_at).toISOString() })),
+        proposals: frProposals.rows.map((p) => ({ id: p.id, missionTitle: p.title, amountMinor: Number(p.amount_minor), deliveryDays: p.delivery_days, message: p.message, status: p.status, createdAt: new Date(p.created_at).toISOString() })),
+        contracts: frContracts.rows.map((c) => ({ id: c.id, missionTitle: c.title, role: c.client_id === auth.userId ? 'client' : 'freelancer', counterpartyHandle: c.handle, amountMinor: Number(c.amount_minor), currency: c.currency.trim(), status: c.status, createdAt: new Date(c.created_at).toISOString() })),
+      },
       budgets: budgetRows.rows.map((b) => ({ currency: b.currency, limitMinor: Number(b.limit_minor) })),
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
         query: r.query,

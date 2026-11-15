@@ -93,6 +93,19 @@ export default function More() {
               </Text>
             </Pressable>
           ) : null}
+          {flags.data.flags.freelance !== false ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('freelance.title')}
+              onPress={() => router.push('/freelance')}
+              style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="hammer-outline" size={26} color={colors.primary} />
+              <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+                {t('freelance.title')}
+              </Text>
+            </Pressable>
+          ) : null}
           {flags.data.flags.jobs !== false ? (
             <Pressable
               accessibilityRole="button"

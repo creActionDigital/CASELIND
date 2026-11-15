@@ -5,6 +5,7 @@ import { deliveryFr } from '../delivery/messages';
 import { servicesFr } from '../services/messages';
 import { listingsFr } from '../listings/messages';
 import { jobsFr } from '../jobs/messages';
+import { freelanceFr } from '../freelance/messages';
 export const fr = {
   'common.loading': 'Chargement…',
   'common.retry': 'Réessayer',
@@ -1281,6 +1282,7 @@ export const fr = {
   ...servicesFr,
   ...listingsFr,
   ...jobsFr,
+  ...freelanceFr,
   ...deliveryFr,
   ...aiFr,
   ...walletUiFr,

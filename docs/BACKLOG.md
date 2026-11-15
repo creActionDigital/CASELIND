@@ -16,8 +16,8 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 13 | §19 | Finance personnelle (budget, bilan) | testé |
 | 15 | §15 | Petites annonces | testé |
 | 16a | §14 | Emploi : offres, CV, candidatures | testé |
-| 16b | §14 | Freelance : missions, propositions, jalons, litiges | en cours |
-| 16c | §14 | Outils pro : devis, factures, CRM, caisse | planifié (auditer l’existant) |
+| 16b | §14 | Freelance : missions, propositions, jalons, litiges | testé (paiement externe, séquestre différé) |
+| 16c | §14 | Outils pro : devis, factures, CRM, caisse | en cours (auditer l’existant) |
 | 17 | §13 | Éducation | planifié |
 | 18 | §12 | Santé et bien-être | planifié |
 | 19 | §16 | Administration publique, alertes | planifié |

@@ -40,6 +40,8 @@ import { ListingsController } from './listings/listings.controller.js';
 import { ListingsService } from './listings/listings.service.js';
 import { JobsController, OrgJobsController } from './jobs/jobs.controller.js';
 import { JobsService } from './jobs/jobs.service.js';
+import { AdminFreelanceController, FreelanceController } from './freelance/freelance.controller.js';
+import { FreelanceService } from './freelance/freelance.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -301,6 +303,8 @@ export class AppModule {
         ListingsController,
         JobsController,
         OrgJobsController,
+        FreelanceController,
+        AdminFreelanceController,
         OpenApiController,
         AuthController,
         UsersController,
@@ -475,6 +479,7 @@ export class AppModule {
         FinanceService,
         ListingsService,
         JobsService,
+        FreelanceService,
         MessagesService,
         // Lot 3b
         MessageExtrasService,
