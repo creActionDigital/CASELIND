@@ -31,3 +31,41 @@ export const todayLocal = (now = new Date()): string => `${now.getFullYear()}-${
 export const deviceUtcOffsetMinutes = (now = new Date()): number => -now.getTimezoneOffset();
 
 export const isDate = (s: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
+
+// ---- Lot 18b ----------------------------------------------------------------------------------
+
+export const PRO_KINDS = ['doctor', 'dentist', 'laboratory', 'pharmacist', 'nurse', 'psychologist', 'other'] as const;
+export const proKindKey = (k: (typeof PRO_KINDS)[number]): MessageKey => `health.pro.kind.${k}` as MessageKey;
+
+/** « 2026-12-01 », « 14:30 » -> instant ISO (heure locale de l'appareil) ; `null` si invalide ou passé. */
+export function localToIso(date: string, time: string, now = new Date()): string | null {
+  const t = /^(\d{1,2})[:hH](\d{2})$/.exec(time.trim());
+  if (!t || !isDate(date)) return null;
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const when = new Date(y, m - 1, d, Number(t[1]), Number(t[2]));
+  return Number.isNaN(when.getTime()) || Number(t[1]) > 23 || Number(t[2]) > 59 || when.getTime() <= now.getTime() ? null : when.toISOString();
+}
+
+/** Actions proposées sur un rendez-vous selon le rôle et l'état (le serveur reste la référence). */
+export type AppointmentAction = 'confirm' | 'decline' | 'cancel' | 'complete';
+export function appointmentActions(role: 'patient' | 'professional', status: string): AppointmentAction[] {
+  if (role === 'patient') return status === 'requested' || status === 'confirmed' ? ['cancel'] : [];
+  if (status === 'requested') return ['confirm', 'decline'];
+  if (status === 'confirmed') return ['complete', 'cancel'];
+  return [];
+}
+
+export function healthProErrorKey(err: unknown): MessageKey | null {
+  if (!(err instanceof ApiRequestError)) return null;
+  if (err.status === 403 && err.code === 'feature_disabled') return 'health.err.disabled';
+  const reason = err.detail<string>('reason');
+  const map: Record<string, MessageKey> = {
+    slot_taken: 'health.err.slot_taken',
+    invalid_transition: 'health.err.invalid_transition',
+    not_started: 'health.err.not_started',
+    already_registered: 'health.err.already_registered',
+    already_issued: 'health.err.already_issued',
+    appointment_not_completed: 'health.err.not_completed',
+  };
+  return reason && map[reason] ? map[reason]! : null;
+}

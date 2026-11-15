@@ -94,5 +94,9 @@ export const exportedHealthSchema = z.object({
   consent: healthConsentSchema,
   entries: z.array(z.object({ kind: healthEntryKindSchema, recordedOn: z.string(), title: z.string(), details: z.string(), severity: z.number().int().nullable() })),
   reminders: z.array(z.object({ title: z.string(), dose: z.string(), times: z.array(z.string()), startsOn: z.string(), endsOn: z.string().nullable(), active: z.boolean() })),
+  /** Lot 18b: own professional application, appointments as a patient and prescriptions received. */
+  professional: z.object({ kind: z.string(), specialty: z.string(), licenseNumber: z.string(), city: z.string(), bio: z.string(), status: z.string(), reviewNote: z.string() }).nullable(),
+  appointments: z.array(z.object({ startsAt: z.string(), mode: z.string(), status: z.string(), professional: z.string(), reason: z.string() })),
+  prescriptions: z.array(z.object({ code: z.string(), validUntil: z.string(), items: z.array(z.object({ name: z.string(), dose: z.string(), instructions: z.string() })) })),
 });
 export type ExportedHealth = z.infer<typeof exportedHealthSchema>;

@@ -32,3 +32,4 @@ export * from './jobs.js';
 export * from './freelance.js';
 export * from './education.js';
 export * from './health.js';
+export * from './health-pro.js';

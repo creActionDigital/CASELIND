@@ -21,7 +21,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 17a | §13 | Éducation : cours, quiz, certificats | testé |
 | 17b | §13 | Établissements : emplois du temps, parents, frais, bourses | planifié (consentement parental à décider) |
 | 18a | §12 | Santé : consentement, dossier chiffré, rappels | testé (module réglementé, coupé par défaut) |
-| 18b | §12 | Santé : professionnels vérifiés, rendez-vous, partage du dossier, ordonnances, pharmacie | en cours |
+| 18b | §12 | Santé : professionnels vérifiés, rendez-vous, partage du dossier, ordonnances | testé (réglementé, coupé par défaut) ; pharmacie, résultats d’examens, assurance, vidéo : différés |
 | 19 | §16 | Administration publique, alertes | planifié |
 | 20 | §21 | Jeux, Play & Win (sans NFT ni argent réel sans décision) | planifié |
 | — | §20, paris | Trading, paris sportifs | **retiré** |

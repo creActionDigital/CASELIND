@@ -47,6 +47,8 @@ import { EducationService } from './education/education.service.js';
 import { PersonalHealthController } from './health/personal-health.controller.js';
 import { HealthCrypto } from './health/health-crypto.js';
 import { HealthService } from './health/health.service.js';
+import { AdminHealthController, HealthProController } from './health/health-pro.controller.js';
+import { HealthProService } from './health/health-pro.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -313,6 +315,8 @@ export class AppModule {
         EducationController,
         PublicCertificatesController,
         PersonalHealthController,
+        HealthProController,
+        AdminHealthController,
         OpenApiController,
         AuthController,
         UsersController,
@@ -490,6 +494,7 @@ export class AppModule {
         FreelanceService,
         EducationService,
         HealthCrypto,
+        HealthProService,
         HealthService,
         MessagesService,
         // Lot 3b

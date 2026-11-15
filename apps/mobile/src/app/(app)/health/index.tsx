@@ -90,6 +90,10 @@ export default function Health() {
             ))}
             <Button variant="secondary" label={t('health.record')} onPress={() => router.push('/health/record')} />
             <Button variant="secondary" label={t('health.reminders')} onPress={() => router.push('/health/reminders')} />
+            <Button variant="secondary" label={t('health.directory')} onPress={() => router.push('/health/professionals')} />
+            <Button variant="secondary" label={t('health.appointments')} onPress={() => router.push('/health/appointments')} />
+            <Button variant="secondary" label={t('health.sharing')} onPress={() => router.push('/health/sharing')} />
+            <Button variant="ghost" label={t('health.proSpace')} onPress={() => router.push('/health/pro')} />
             <Button variant="ghost" label={t('health.consent.withdraw')} loading={revoke.isPending} onPress={() => revoke.mutate()} />
             {confirmErase ? (
               <View style={[styles.card, { backgroundColor: colors.surface }]}>

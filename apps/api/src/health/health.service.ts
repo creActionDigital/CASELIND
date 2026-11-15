@@ -23,6 +23,7 @@ import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { HealthCrypto } from './health-crypto.js';
+import { HealthProService } from './health-pro.service.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REMINDER_INTERVAL_MS = 60_000;
@@ -64,6 +65,7 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
     private readonly crypto: HealthCrypto,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly pro: HealthProService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -116,6 +118,7 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`DELETE FROM health_entries WHERE user_id = ${userId}::uuid`);
       await tx.execute(sql`DELETE FROM health_reminders WHERE user_id = ${userId}::uuid`);
+      await this.pro.eraseFor(tx, userId);
       await tx.execute(sql`DELETE FROM health_consents WHERE user_id = ${userId}::uuid`);
       await this.audit.record({ action: 'health.erased', actorUserId: userId, meta, metadata: {} }, tx);
     });
@@ -307,6 +310,7 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
     const reminders = await this.db.execute<ReminderRow>(sql`SELECT id, payload, times, utc_offset_minutes, starts_on, ends_on, active FROM health_reminders WHERE user_id = ${userId}::uuid ORDER BY created_at, id`);
     return {
       consent,
+      ...(await this.pro.exportFor(userId)),
       entries: entries.rows.map((r) => {
         const p = this.crypto.open<EntryPayload>(userId, r.payload);
         return { kind: r.kind, recordedOn: day(r.recorded_on), title: p.title, details: p.details, severity: p.severity };

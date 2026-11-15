@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDate, parseTimes, todayLocal } from './logic';
+import { appointmentActions, isDate, localToIso, parseTimes, todayLocal } from './logic';
 
 describe('health logic', () => {
   it('reads times in several spellings, sorted and de-duplicated', () => {
@@ -17,5 +17,23 @@ describe('health logic', () => {
     expect(todayLocal(new Date(2026, 10, 5))).toBe('2026-11-05');
     expect(isDate('2026-11-05')).toBe(true);
     expect(isDate('05/11/2026')).toBe(false);
+  });
+});
+
+
+describe('health appointments logic', () => {
+  it('turns a local date and time into an ISO instant, refusing the past and nonsense', () => {
+    const now = new Date(2026, 10, 15, 10, 0);
+    expect(localToIso('2026-11-16', '9:30', now)).toBe(new Date(2026, 10, 16, 9, 30).toISOString());
+    expect(localToIso('2026-11-14', '09:30', now)).toBeNull();
+    expect(localToIso('2026-11-16', '25:00', now)).toBeNull();
+    expect(localToIso('16/11/2026', '09:30', now)).toBeNull();
+  });
+  it('offers each side only the moves the server allows', () => {
+    expect(appointmentActions('patient', 'requested')).toEqual(['cancel']);
+    expect(appointmentActions('patient', 'completed')).toEqual([]);
+    expect(appointmentActions('professional', 'requested')).toEqual(['confirm', 'decline']);
+    expect(appointmentActions('professional', 'confirmed')).toEqual(['complete', 'cancel']);
+    expect(appointmentActions('professional', 'declined')).toEqual([]);
   });
 });

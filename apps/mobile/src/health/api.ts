@@ -1,4 +1,20 @@
 import {
+  accessLogSchema,
+  appointmentListSchema,
+  appointmentSchema,
+  myProfessionalSchema,
+  prescriptionListSchema,
+  prescriptionSchema,
+  professionalListSchema,
+  shareListSchema,
+  shareSchema,
+  sharedPatientsSchema,
+  sharedRecordSchema,
+  type ApplyProfessionalRequest,
+  type CreateAppointmentRequest,
+  type CreatePrescriptionRequest,
+  type CreateShareRequest,
+  type ProfessionalKind,
   doseListSchema,
   doseSchema,
   healthConsentSchema,
@@ -40,3 +56,38 @@ export const deleteReminder = (id: string) => api.request(`/me/health/reminders/
 
 export const fetchDoses = () => api.request('/me/health/doses', { schema: doseListSchema });
 export const resolveDose = (id: string, status: 'taken' | 'skip') => api.request(`/me/health/doses/${id}/${status}`, { method: 'POST', schema: doseSchema });
+
+// ---- Lot 18b : professionnels, rendez-vous, partage, ordonnances -------------------------------
+
+export const proKeys = {
+  directory: (kind: string) => ['health', 'directory', kind] as const,
+  mine: ['health', 'pro', 'mine'] as const,
+  appointments: ['health', 'appointments'] as const,
+  proAppointments: ['health', 'pro', 'appointments'] as const,
+  shares: ['health', 'shares'] as const,
+  accessLog: ['health', 'access-log'] as const,
+  patients: ['health', 'pro', 'patients'] as const,
+  record: (id: string) => ['health', 'pro', 'record', id] as const,
+  prescriptions: ['health', 'prescriptions'] as const,
+};
+
+export const fetchDirectory = (kind: ProfessionalKind | '', cursor?: string) =>
+  api.request('/health-professionals', { query: { kind: kind || undefined, limit: PAGE, cursor }, schema: professionalListSchema });
+export const fetchMyProfessional = () => api.request('/me/health/professional', { schema: myProfessionalSchema });
+export const applyAsProfessional = (body: ApplyProfessionalRequest) => api.request('/me/health/professional', { method: 'PUT', body, schema: myProfessionalSchema });
+
+export const bookAppointment = (body: CreateAppointmentRequest) => api.request('/me/health/appointments', { method: 'POST', body, schema: appointmentSchema });
+export const fetchMyAppointments = (cursor?: string) => api.request('/me/health/appointments', { query: { limit: PAGE, cursor }, schema: appointmentListSchema });
+export const fetchProAppointments = (cursor?: string) => api.request('/me/health/professional/appointments', { query: { limit: PAGE, cursor }, schema: appointmentListSchema });
+export const actOnAppointment = (id: string, action: 'confirm' | 'decline' | 'cancel' | 'complete') => api.request(`/health/appointments/${id}/${action}`, { method: 'POST', schema: appointmentSchema });
+
+export const createShare = (body: CreateShareRequest) => api.request('/me/health/shares', { method: 'POST', body, schema: shareSchema });
+export const fetchShares = () => api.request('/me/health/shares', { schema: shareListSchema });
+export const revokeShare = (id: string) => api.request(`/me/health/shares/${id}`, { method: 'DELETE', schema: shareSchema });
+export const fetchAccessLog = () => api.request('/me/health/access-log', { schema: accessLogSchema });
+export const fetchSharedPatients = () => api.request('/me/health/professional/patients', { schema: sharedPatientsSchema });
+export const fetchSharedRecord = (patientId: string) => api.request(`/me/health/professional/patients/${patientId}/record`, { schema: sharedRecordSchema });
+
+export const prescribe = (appointmentId: string, body: CreatePrescriptionRequest) =>
+  api.request(`/me/health/professional/appointments/${appointmentId}/prescription`, { method: 'POST', body, schema: prescriptionSchema });
+export const fetchPrescriptions = () => api.request('/me/health/prescriptions', { schema: prescriptionListSchema });
