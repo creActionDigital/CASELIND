@@ -124,6 +124,9 @@ export const accountExportSchema = z.object({
       createdAt: z.string(),
     }),
   ),
+  /** Lot 16a: own CV and own applications (with the message sent; never other people's data). */
+  jobProfile: z.object({ headline: z.string(), summary: z.string(), skills: z.array(z.string()), city: z.string(), experience: z.string(), education: z.string() }).nullable(),
+  jobApplications: z.array(z.object({ id: z.uuid(), jobTitle: z.string(), orgName: z.string(), status: z.string(), message: z.string(), createdAt: z.string() })),
   /** Lot 13: own monthly budgets (sandbox). */
   budgets: z.array(z.object({ currency: z.string(), limitMinor: z.number().int() })),
 });

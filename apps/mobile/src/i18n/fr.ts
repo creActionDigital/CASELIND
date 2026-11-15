@@ -4,6 +4,7 @@ import { walletUiFr } from '../wallet/messages';
 import { deliveryFr } from '../delivery/messages';
 import { servicesFr } from '../services/messages';
 import { listingsFr } from '../listings/messages';
+import { jobsFr } from '../jobs/messages';
 export const fr = {
   'common.loading': 'Chargement…',
   'common.retry': 'Réessayer',
@@ -176,8 +177,6 @@ export const fr = {
   'more.intro': 'Les services de CASELIND arrivent par étapes.',
   'more.miniapps': 'Mini-apps',
   'more.games': 'Jeux',
-  'more.trading': 'Trading (simulation)',
-  'more.betting': 'Paris',
   'more.finance': 'Finance',
   'more.health': 'Santé',
   'more.education': 'Éducation',
@@ -1281,6 +1280,7 @@ export const fr = {
   'sellerQr.status.consumed': 'Utilisé',
   ...servicesFr,
   ...listingsFr,
+  ...jobsFr,
   ...deliveryFr,
   ...aiFr,
   ...walletUiFr,

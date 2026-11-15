@@ -16,13 +16,13 @@ Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShe
 1. **`npm run dev` à la racine ne marche pas** (« Missing script: dev »). Le propriétaire veut une seule commande qui lance base + API + application. À écrire : un script racine (base `npm run db:dev -w @caselind/api` ; API compilée `node --env-file=.env dist/main.js` depuis `apps/api` après `npm run build -w @caselind/api` ; Expo web `npx expo start --web --port 8083` dans `apps/mobile`). Le mode `--watch` de l'API redémarre en boucle quand Expo touche `node_modules` : utiliser l'API compilée.
 2. **Vérifier et améliorer les designs** (demande du propriétaire) avec les skills `apple-design` et `ui-ux-pro-max` et du mouvement. Framer Motion est du web : sous React Native, utiliser `react-native-reanimated` s'il est installé (le skill `motion` servira au futur web). Animations sobres, respect de « réduire les animations ».
 3. Images du dossier `Modals` non attribuées : `card`, `kyc`, `communities`, `MarketPlace`. Demander au propriétaire pour quels écrans.
-4. Puis lots 13+ (santé, éducation, emploi, immobilier, services publics, jeux, trading simulation, finance personnelle) et le web, **seulement après validation du mobile**.
+4. Puis lots 13+ (santé, éducation, emploi, immobilier, services publics, jeux, finance personnelle ; trading et paris sont RETIRÉS du projet (décision du propriétaire, voir BACKLOG)) et le web, **seulement après validation du mobile**.
 
 ## Règles de design décidées par le propriétaire
 - **Aucun dégradé** : couleur de marque unie `#4F46E5` (`brandColor`, `src/theme/tokens.ts`). Police Poppins. Style Apple.
 - Logo : « C » ouvert + point, indigo uni (`Desktop\CASELIND Design\Logo`).
 - Barre du bas flottante : Accueil · Maps · **+** (Live · Vidéos · Posts · Produits) · Messagerie · Plus. En-tête : logo, recherche, **IA bien visible**, **$ sans montant** (le solde n'est que dans l'écran Wallet), panier, compte.
-- « Stories » s'appellent **« Statuts »**. Maps : boutiques, restaurants, pharmacies, stations-service. Paris, trading, jeux : mini-applications dans le menu Plus, pas dans le cœur.
+- « Stories » s'appellent **« Statuts »**. Maps : boutiques, restaurants, pharmacies, stations-service. Jeux : mini-application dans le menu Plus, pas dans le cœur. Trading et paris : retirés du projet.
 - **Une photo de référence par écran, rien d'autre** : n'applique pas à un écran une image qui ne lui est pas attribuée.
 
 ## Lancement local (si rien ne tourne)

@@ -4,6 +4,28 @@ Dernière mise à jour : 2026-11-02. **Règle CDC §0 : rien n'est supprimé.** 
 
 Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` · `bloqué` · `reporté`
 
+## Décisions du propriétaire (2026-11-15) — à respecter à chaque lot
+- **Trading (CDC §20) et paris sportifs : RETIRÉS du projet** (malgré le cahier des charges). Ne rien développer, ne rien proposer. Tuiles « Trading » et « Paris » supprimées du menu Plus.
+- **Santé (§12) et tout le reste : à développer intégralement.** Les modules réglementés (santé, etc.) restent coupés par défaut côté serveur (flag `regulated`, activation admin avec confirmation) ; le code est livré, l'activation reste une décision d'exploitation.
+- Suivre le cahier des charges à la lettre (`CASELIND_CAHIER_DES_CHARGES_DEFINITIF.md`), relire la section de chaque lot, consigner le différé, ne pas inventer les règles CSL Coins (§18, question ouverte).
+- Finir le projet le plus tôt possible ; aucune erreur : tests complets avant chaque commit.
+
+## Feuille de route des lots restants (mise à jour à chaque lot)
+| Lot | Cahier §| Contenu | Statut |
+|---|---|---|---|
+| 13 | §19 | Finance personnelle (budget, bilan) | testé |
+| 15 | §15 | Petites annonces | testé |
+| 16a | §14 | Emploi : offres, CV, candidatures | testé |
+| 16b | §14 | Freelance : missions, propositions, jalons, litiges | en cours |
+| 16c | §14 | Outils pro : devis, factures, CRM, caisse | planifié (auditer l’existant) |
+| 17 | §13 | Éducation | planifié |
+| 18 | §12 | Santé et bien-être | planifié |
+| 19 | §16 | Administration publique, alertes | planifié |
+| 20 | §21 | Jeux, Play & Win (sans NFT ni argent réel sans décision) | planifié |
+| — | §20, paris | Trading, paris sportifs | **retiré** |
+| — | §18 | CSL Coins | bloqué : règles non spécifiées (question ouverte) |
+| Web | §27 | React + Vite, PWA | planifié, après les lots backend |
+
 ## Ordre imposé
 
 1. Reverse engineering et cartographie WeChat : **v1 faite** (sources publiques ; à enrichir module par module)
@@ -34,7 +56,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 10 — Mini-apps | OAuth + PKCE, scopes, paiement confirmé par PIN | 509 tests | **testé** (backend) |
 | 11 — Mobilité | Courses type Uber, espèces | 509 tests | **testé** (backend) |
 | 12 — Assistant IA | Multi-fournisseurs, Gemini par défaut | 509 tests | **testé** (backend, sans clé réelle) |
-| 13+ | services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle (13, testé : budget + bilan du mois), petites annonces (15, testé) | | planifié |
+| 13+ | services, santé, éducation, emploi, immobilier, services publics, jeux, finance personnelle (13, testé : budget + bilan du mois), petites annonces (15, testé) | | planifié |
 
 | 14 — Communautés publiques | Un groupe publié par son propriétaire (description, 5 étiquettes max) : liste filtrable, étiquettes tendance, rejoindre (idempotent, sans historique antérieur), retiré par un admin = interdit de rejoindre, limite de membres respectée, audité. Mobile : « Explorer les communautés » (filtre Groupes), « Mes groupes », bouton propriétaire Publier / Retirer | 515+ tests | **testé** (backend 5 tests, OpenAPI, mobile vérifié à l'écran) ; description et étiquettes saisies à l'écran, signalement d'une communauté : à faire |
 ## Lots mobile

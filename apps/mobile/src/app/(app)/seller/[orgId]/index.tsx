@@ -10,6 +10,7 @@ import { can, canEditProfile, canReadCatalog, canViewReviews } from '../../../..
 import { Card, Chips, Loading, SectionTitle } from '../../../../seller/ui';
 import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
+import { canManageJobs } from '../../../../jobs/logic';
 import { canViewFinance } from '../../../../wallet/org-access';
 import { ErrorState, Text } from '../../../../ui';
 
@@ -57,6 +58,7 @@ export default function SellerDashboard() {
     { icon: 'star-outline', label: 'seller.reviews', path: '/reviews', show: canViewReviews(role) },
     { icon: 'wallet-outline', label: 'wallet.org.card', path: '/wallet', show: canViewFinance(role) },
     { icon: 'construct-outline', label: 'services.pro.orgServices', path: '/services', show: current.org.kind === 'services' && can(role, 'catalog.manage') },
+    { icon: 'briefcase-outline', label: 'jobs.org.title', path: '/jobs', show: canManageJobs(role) },
     { icon: 'location-outline', label: 'seller.location', path: '/location', show: canEditProfile(role) },
     { icon: 'qr-code-outline', label: 'sellerQr.title', path: '/qr', show: canViewFinance(role) || can(role, 'orders.manage') },
   ];

@@ -4,6 +4,7 @@ import { aiEn } from '../ai/messages';
 import { walletUiEn } from '../wallet/messages';
 import { servicesEn } from '../services/messages';
 import { listingsEn } from '../listings/messages';
+import { jobsEn } from '../jobs/messages';
 import { deliveryEn } from '../delivery/messages';
 
 export const en: Record<MessageKey, string> = {
@@ -178,8 +179,6 @@ export const en: Record<MessageKey, string> = {
   'more.intro': 'CASELIND services are arriving step by step.',
   'more.miniapps': 'Mini-apps',
   'more.games': 'Games',
-  'more.trading': 'Trading (simulation)',
-  'more.betting': 'Betting',
   'more.finance': 'Finance',
   'more.health': 'Health',
   'more.education': 'Education',
@@ -1283,6 +1282,7 @@ export const en: Record<MessageKey, string> = {
   'sellerQr.status.consumed': 'Used',
   ...servicesEn,
   ...listingsEn,
+  ...jobsEn,
   ...deliveryEn,
   ...aiEn,
   ...walletUiEn,

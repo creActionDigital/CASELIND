@@ -17,13 +17,10 @@ type Icon = ComponentProps<typeof Ionicons>['name'];
 const MODULES: { key: MessageKey; icon: Icon; flag?: string }[] = [
   { key: 'more.miniapps', icon: 'apps-outline' },
   { key: 'more.games', icon: 'game-controller-outline' },
-  { key: 'more.trading', icon: 'trending-up-outline' },
-  { key: 'more.betting', icon: 'dice-outline', flag: 'betting' },
   { key: 'more.finance', icon: 'wallet-outline' },
   { key: 'more.health', icon: 'medkit-outline' },
   { key: 'more.education', icon: 'school-outline' },
   { key: 'more.travel', icon: 'airplane-outline' },
-  { key: 'more.jobs', icon: 'briefcase-outline' },
   { key: 'more.public', icon: 'business-outline' },
 ];
 
@@ -93,6 +90,19 @@ export default function More() {
               <Ionicons name="pricetags-outline" size={26} color={colors.primary} />
               <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
                 {t('listings.title')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {flags.data.flags.jobs !== false ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('jobs.title')}
+              onPress={() => router.push('/jobs')}
+              style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="briefcase-outline" size={26} color={colors.primary} />
+              <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+                {t('jobs.title')}
               </Text>
             </Pressable>
           ) : null}

@@ -197,6 +197,23 @@ import {
   resolvedPaymentQrSchema,
   setPaymentPinRequestSchema,
 } from '@caselind/contracts';
+import {
+  applicationListSchema,
+  applicationSchema,
+  applyRequestSchema,
+  createJobRequestSchema,
+  jobListQuerySchema,
+  jobListSchema,
+  jobProfileInputSchema,
+  jobProfileSchema,
+  jobSchema,
+  myJobProfileSchema,
+  orgApplicationListSchema,
+  orgApplicationSchema,
+  orgApplicationsQuerySchema,
+  setApplicationStatusRequestSchema,
+  updateJobRequestSchema,
+} from '@caselind/contracts';
 import { createListingRequestSchema, listingListQuerySchema, listingListSchema, listingSchema, updateListingRequestSchema } from '@caselind/contracts';
 import { budgetSchema, financeSummaryQuerySchema, financeSummarySchema, removeBudgetQuerySchema, setBudgetRequestSchema } from '@caselind/contracts';
 // Lot 6A (ledger, sandbox wallet), separate import block.
@@ -522,6 +539,21 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/communities/{id}/join', summary: 'Join a public community (idempotent; removed by an admin: 403; full: 409 group_full; the joiner sees only later messages); audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, response: communitySchema, status: 200 },
   { method: 'put', path: '/v1/conversations/{id}/community', summary: 'Publish the group as a community (owner only; description up to 500, up to 5 tags); audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: publishCommunityRequestSchema, response: communitySchema, status: 200 },
   { method: 'delete', path: '/v1/conversations/{id}/community', summary: 'Unpublish (owner only); the group and its members stay; audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, status: 204 },
+  // Lot 16a: jobs (CDC §14). Behind the `jobs` flag; organisation routes need `hr.manage` (owner, admin, hr), a non-member gets 404.
+  { method: 'get', path: '/v1/jobs', summary: 'Open offers of active public organisations, newest first (filters q, city, contractType; keyset cursor)', tags: ['jobs'], auth: 'user', query: jobListQuerySchema, response: jobListSchema, status: 200 },
+  { method: 'get', path: '/v1/jobs/{id}', summary: 'One open offer (closed, hidden or unknown: 404)', tags: ['jobs'], auth: 'user', params: { id: z.string() }, response: jobSchema, status: 200 },
+  { method: 'post', path: '/v1/jobs/{id}/applications', summary: 'Apply with the saved CV (a snapshot is kept). No CV: 409 profile_required; again: 409 already_applied; own organisation: 403; notifies the recruiters; audited', tags: ['jobs'], auth: 'user', params: { id: z.string() }, body: applyRequestSchema, response: applicationSchema, status: 201 },
+  { method: 'get', path: '/v1/me/job-applications', summary: 'My applications with their status, newest first', tags: ['jobs'], auth: 'user', query: pageQuerySchema, response: applicationListSchema, status: 200 },
+  { method: 'post', path: '/v1/me/job-applications/{id}/withdraw', summary: 'Withdraw a live application (idempotent; already decided: 409 application_final); audited', tags: ['jobs'], auth: 'user', params: { id: z.string() }, response: applicationSchema, status: 200 },
+  { method: 'get', path: '/v1/me/job-profile', summary: 'My CV, or null. Never browsable by others: recruiters only see the snapshot of an application', tags: ['jobs'], auth: 'user', response: myJobProfileSchema, status: 200 },
+  { method: 'put', path: '/v1/me/job-profile', summary: 'Create or replace my CV; audited (no content)', tags: ['jobs'], auth: 'user', body: jobProfileInputSchema, response: jobProfileSchema, status: 200 },
+  { method: 'delete', path: '/v1/me/job-profile', summary: 'Delete my CV (past applications keep their snapshot until withdrawn or the account is deleted); idempotent', tags: ['jobs'], auth: 'user', status: 204 },
+  { method: 'post', path: '/v1/orgs/{orgId}/jobs', summary: 'Publish an offer (hr.manage); audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string() }, body: createJobRequestSchema, response: jobSchema, status: 201 },
+  { method: 'get', path: '/v1/orgs/{orgId}/jobs', summary: 'The organisation\'s offers, open and closed (hr.manage)', tags: ['jobs'], auth: 'user', params: { orgId: z.string() }, query: pageQuerySchema, response: jobListSchema, status: 200 },
+  { method: 'patch', path: '/v1/orgs/{orgId}/jobs/{jobId}', summary: 'Edit an offer (hr.manage); audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), jobId: z.string() }, body: updateJobRequestSchema, response: jobSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/jobs/{jobId}/close', summary: 'Close an offer; applications are kept; idempotent; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), jobId: z.string() }, response: jobSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/jobs/{jobId}/applications', summary: 'Applications of an offer with the CV snapshots (hr.manage; filter status)', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), jobId: z.string() }, query: orgApplicationsQuerySchema, response: orgApplicationListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/job-applications/{applicationId}/status', summary: 'Move an application along submitted > viewed > shortlisted > interview > offered > hired, or reject it; other moves: 409 invalid_transition; notifies the candidate; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), applicationId: z.string() }, body: setApplicationStatusRequestSchema, response: orgApplicationSchema, status: 200 },
   // Lot 15: classified ads (property, vehicles, used goods, lost and found). Behind the `listings` flag; contact goes through messaging.
   { method: 'get', path: '/v1/listings', summary: 'Active ads, newest first (filters kind, q, city, currency, price range; keyset cursor). Hidden ads and ads of blocked users are not listed', tags: ['listings'], auth: 'user', query: listingListQuerySchema, response: listingListSchema, status: 200 },
   { method: 'get', path: '/v1/listings/mine', summary: 'The caller\'s own ads, active and closed', tags: ['listings'], auth: 'user', query: pageQuerySchema, response: listingListSchema, status: 200 },

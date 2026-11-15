@@ -52,7 +52,7 @@ Règle à suivre : **chaque compte à ton nom et ton adresse e-mail**, avec doub
 ## 5. Ton contrôle à l'intérieur de l'application
 
 - **Compte administrateur** : le rôle `admin` donne accès à la modération, aux flags (activer ou couper un module par pays), à la validation KYC, des chauffeurs et des mini-apps, et à l'activation des modèles d'IA. Il s'attribue aujourd'hui par une commande SQL sur la base ; un écran d'administration est prévu avec le site web.
-- **Modules réglementés coupés par défaut** (argent réel, paris, santé, trading réel) : ils ne s'activent que par un admin, avec confirmation explicite.
+- **Modules réglementés coupés par défaut** (argent réel, santé ; trading et paris sont retirés du projet) : ils ne s'activent que par un admin, avec confirmation explicite.
 - **Journal d'audit** : toutes les actions sensibles (admin, sécurité, argent) sont enregistrées et non modifiables.
 
 ## 6. Logiciels utilisés

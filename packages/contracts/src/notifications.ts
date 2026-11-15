@@ -10,6 +10,7 @@ export const notificationCategorySchema = z.enum([
   'booking',
   'security',
   'reminder',
+  'job',
   'system',
 ]);
 export type NotificationCategory = z.infer<typeof notificationCategorySchema>;

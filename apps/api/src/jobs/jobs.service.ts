@@ -1,0 +1,379 @@
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import {
+  APPLICATION_TRANSITIONS,
+  ErrorCodes,
+  type ApplicationList,
+  type ApplicationStatus,
+  type ApplyRequest,
+  type CreateJobRequest,
+  type Job,
+  type JobList,
+  type JobListQuery,
+  type JobProfile,
+  type JobProfileInput,
+  type OrgApplicationList,
+  type OrgApplicationsQuery,
+  type OrgRole,
+  type UpdateJobRequest,
+} from '@caselind/contracts';
+import { sql, type SQL } from 'drizzle-orm';
+import { AuditService } from '../audit/audit.service.js';
+import { AppError } from '../common/app-error.js';
+import type { RequestMeta } from '../common/request-meta.js';
+import { DB, type Db } from '../db/db.module.js';
+import { ModerationRegistry } from '../moderation/moderation-registry.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
+import { roleHasPermission } from '../orgs/org-permissions.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const notFound = () => AppError.notFound('Job not found');
+const invalid = (path: string, message: string) => new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path, message }]);
+
+type JobRow = {
+  id: string;
+  org_id: string;
+  org_name: string;
+  org_slug: string;
+  org_verified: boolean;
+  title: string;
+  description: string;
+  city: string;
+  contract_type: Job['contractType'];
+  salary_min_minor: string | null;
+  salary_max_minor: string | null;
+  currency: string | null;
+  status: 'open' | 'closed';
+  created_at: Date;
+  applied: boolean;
+};
+
+type AppRow = {
+  id: string;
+  status: ApplicationStatus;
+  message: string;
+  cv: JobProfile;
+  created_at: Date;
+  updated_at: Date;
+  job_id: string;
+  job_title: string;
+  org_name: string;
+  user_id: string;
+  display_name: string;
+  handle: string;
+};
+
+/** Shown to everyone: open, not hidden by moderation, of an active public organisation. */
+const publicSql: SQL = sql`j.status = 'open' AND NOT j.hidden AND o.status = 'active' AND o.visibility = 'public'`;
+
+const encodeCursor = (at: Date, id: string) => Buffer.from(JSON.stringify([new Date(at).toISOString(), id])).toString('base64url');
+function decodeCursor(cursor: string): { at: string; id: string } {
+  try {
+    const v: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (Array.isArray(v) && typeof v[0] === 'string' && !Number.isNaN(Date.parse(v[0])) && typeof v[1] === 'string' && UUID_RE.test(v[1])) return { at: v[0], id: v[1] };
+  } catch {
+    // fall through
+  }
+  throw invalid('cursor', 'invalid cursor');
+}
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+const iso = (d: Date) => new Date(d).toISOString();
+
+const toJob = (r: JobRow): Job => ({
+  id: r.id,
+  org: { id: r.org_id, name: r.org_name, slug: r.org_slug, verified: r.org_verified },
+  title: r.title,
+  description: r.description,
+  city: r.city,
+  contractType: r.contract_type,
+  salary: r.currency
+    ? { minMinor: r.salary_min_minor === null ? null : Number(r.salary_min_minor), maxMinor: r.salary_max_minor === null ? null : Number(r.salary_max_minor), currency: r.currency.trim() }
+    : null,
+  status: r.status,
+  createdAt: iso(r.created_at),
+  applied: r.applied,
+});
+
+const STATUS_TEXT: Partial<Record<ApplicationStatus, string>> = {
+  viewed: 'Votre candidature a été consultée.',
+  shortlisted: 'Votre candidature a été retenue pour la suite.',
+  interview: 'Vous êtes invité à un entretien.',
+  offered: 'Une proposition vous a été faite.',
+  hired: 'Félicitations, vous êtes recruté.',
+  rejected: 'Votre candidature n’a pas été retenue.',
+};
+
+/** Jobs: offers published by organisations (permission `hr.manage`), a personal CV, applications with a controlled status flow. */
+@Injectable()
+export class JobsService implements OnModuleInit {
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
+    private readonly moderation: ModerationRegistry,
+  ) {}
+
+  onModuleInit(): void {
+    this.moderation.register('job', {
+      visibleTo: async (_viewerId, id) => {
+        if (!UUID_RE.test(id)) return false;
+        const res = await this.db.execute(sql`SELECT 1 FROM job_postings j JOIN organizations o ON o.id = j.org_id WHERE j.id = ${id}::uuid AND ${publicSql}`);
+        return res.rows.length > 0;
+      },
+      authorOf: async (id) => {
+        if (!UUID_RE.test(id)) return null;
+        const res = await this.db.execute<{ created_by: string }>(sql`SELECT created_by FROM job_postings WHERE id = ${id}::uuid`);
+        return res.rows[0]?.created_by ?? null;
+      },
+      setHidden: async (id, hidden) => {
+        if (!UUID_RE.test(id)) return;
+        await this.db.execute(sql`UPDATE job_postings SET hidden = ${hidden} WHERE id = ${id}::uuid`);
+      },
+    });
+  }
+
+  // ---- Offers (organisation side) --------------------------------------------------------------
+
+  async create(orgId: string, userId: string, body: CreateJobRequest, meta: RequestMeta): Promise<Job> {
+    const id = await this.db.transaction(async (tx) => {
+      const res = await tx.execute<{ id: string }>(sql`
+        INSERT INTO job_postings (org_id, created_by, title, description, city, contract_type, salary_min_minor, salary_max_minor, currency)
+        VALUES (${orgId}::uuid, ${userId}::uuid, ${body.title}, ${body.description}, ${body.city}, ${body.contractType}, ${body.salaryMinMinor}, ${body.salaryMaxMinor}, ${body.currency})
+        RETURNING id`);
+      const jobId = res.rows[0]!.id;
+      await this.audit.record({ action: 'job.posted', actorUserId: userId, meta, metadata: { orgId, jobId } }, tx);
+      return jobId;
+    });
+    return this.orgGet(orgId, id, userId);
+  }
+
+  async update(orgId: string, jobId: string, userId: string, body: UpdateJobRequest, meta: RequestMeta): Promise<Job> {
+    const cur = await this.orgGet(orgId, jobId, userId);
+    const min = body.salaryMinMinor !== undefined ? body.salaryMinMinor : (cur.salary?.minMinor ?? null);
+    const max = body.salaryMaxMinor !== undefined ? body.salaryMaxMinor : (cur.salary?.maxMinor ?? null);
+    const currency = body.currency !== undefined ? body.currency : (cur.salary?.currency ?? null);
+    if ((min !== null || max !== null) !== (currency !== null)) throw invalid('currency', 'a salary needs a currency, and a currency needs a salary');
+    if (min !== null && max !== null && min > max) throw invalid('salaryMaxMinor', 'salaryMaxMinor must be at least salaryMinMinor');
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE job_postings SET title = ${body.title ?? cur.title}, description = ${body.description ?? cur.description}, city = ${body.city ?? cur.city},
+          contract_type = ${body.contractType ?? cur.contractType}, salary_min_minor = ${min}, salary_max_minor = ${max}, currency = ${currency}, updated_at = now()
+        WHERE id = ${jobId}::uuid`);
+      await this.audit.record({ action: 'job.updated', actorUserId: userId, meta, metadata: { orgId, jobId } }, tx);
+    });
+    return this.orgGet(orgId, jobId, userId);
+  }
+
+  /** Closing keeps the applications. Idempotent. */
+  async close(orgId: string, jobId: string, userId: string, meta: RequestMeta): Promise<Job> {
+    const cur = await this.orgGet(orgId, jobId, userId);
+    if (cur.status === 'open') {
+      await this.db.transaction(async (tx) => {
+        await tx.execute(sql`UPDATE job_postings SET status = 'closed', updated_at = now() WHERE id = ${jobId}::uuid`);
+        await this.audit.record({ action: 'job.closed', actorUserId: userId, meta, metadata: { orgId, jobId } }, tx);
+      });
+    }
+    return this.orgGet(orgId, jobId, userId);
+  }
+
+  async orgList(orgId: string, userId: string, q: { limit: number; cursor?: string }): Promise<JobList> {
+    const f: SQL[] = [sql`j.org_id = ${orgId}::uuid`];
+    if (q.cursor) {
+      const c = decodeCursor(q.cursor);
+      f.push(sql`(j.created_at, j.id) < (${c.at}::timestamptz, ${c.id}::uuid)`);
+    }
+    return this.page(userId, f, q.limit);
+  }
+
+  private async orgGet(orgId: string, jobId: string, userId: string): Promise<Job> {
+    if (!UUID_RE.test(jobId)) throw notFound();
+    const res = await this.db.execute<JobRow>(sql`${this.base(userId)} WHERE j.id = ${jobId}::uuid AND j.org_id = ${orgId}::uuid`);
+    if (!res.rows[0]) throw notFound();
+    return toJob(res.rows[0]);
+  }
+
+  // ---- Offers (public side) ---------------------------------------------------------------------
+
+  async get(viewerId: string, jobId: string): Promise<Job> {
+    if (!UUID_RE.test(jobId)) throw notFound();
+    const res = await this.db.execute<JobRow>(sql`${this.base(viewerId)} WHERE j.id = ${jobId}::uuid AND ${publicSql}`);
+    if (!res.rows[0]) throw notFound();
+    return toJob(res.rows[0]);
+  }
+
+  async list(viewerId: string, q: JobListQuery): Promise<JobList> {
+    const f: SQL[] = [publicSql];
+    if (q.contractType) f.push(sql`j.contract_type = ${q.contractType}`);
+    if (q.city) f.push(sql`j.city ILIKE ${escapeLike(q.city)}`);
+    if (q.q) f.push(sql`(j.title ILIKE ${'%' + escapeLike(q.q) + '%'} OR j.description ILIKE ${'%' + escapeLike(q.q) + '%'} OR o.name ILIKE ${'%' + escapeLike(q.q) + '%'})`);
+    if (q.cursor) {
+      const c = decodeCursor(q.cursor);
+      f.push(sql`(j.created_at, j.id) < (${c.at}::timestamptz, ${c.id}::uuid)`);
+    }
+    return this.page(viewerId, f, q.limit);
+  }
+
+  private async page(viewerId: string, filters: SQL[], limit: number): Promise<JobList> {
+    const res = await this.db.execute<JobRow>(sql`${this.base(viewerId)} WHERE ${sql.join(filters, sql` AND `)} ORDER BY j.created_at DESC, j.id DESC LIMIT ${limit + 1}`);
+    const rows = res.rows.slice(0, limit);
+    const last = rows[rows.length - 1];
+    return { items: rows.map(toJob), nextCursor: res.rows.length > limit && last ? encodeCursor(last.created_at, last.id) : null };
+  }
+
+  private base(viewerId: string): SQL {
+    return sql`
+      SELECT j.id, j.org_id, o.name AS org_name, o.slug::text AS org_slug, (o.verification_status = 'verified') AS org_verified,
+        j.title, j.description, j.city, j.contract_type, j.salary_min_minor, j.salary_max_minor, j.currency, j.status, j.created_at,
+        EXISTS (SELECT 1 FROM job_applications a WHERE a.posting_id = j.id AND a.user_id = ${viewerId}::uuid) AS applied
+      FROM job_postings j JOIN organizations o ON o.id = j.org_id`;
+  }
+
+  // ---- CV ---------------------------------------------------------------------------------------
+
+  async getProfile(userId: string): Promise<JobProfile | null> {
+    const res = await this.db.execute<JobProfile>(sql`SELECT headline, summary, skills, city, experience, education FROM job_profiles WHERE user_id = ${userId}::uuid`);
+    return res.rows[0] ?? null;
+  }
+
+  async saveProfile(userId: string, body: JobProfileInput, meta: RequestMeta): Promise<JobProfile> {
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO job_profiles (user_id, headline, summary, skills, city, experience, education)
+        VALUES (${userId}::uuid, ${body.headline}, ${body.summary}, ARRAY(SELECT jsonb_array_elements_text(${JSON.stringify(body.skills)}::jsonb)), ${body.city}, ${body.experience}, ${body.education})
+        ON CONFLICT (user_id) DO UPDATE SET headline = EXCLUDED.headline, summary = EXCLUDED.summary, skills = EXCLUDED.skills, city = EXCLUDED.city,
+          experience = EXCLUDED.experience, education = EXCLUDED.education, updated_at = now()`);
+      await this.audit.record({ action: 'job.profile_saved', actorUserId: userId, meta, metadata: {} }, tx);
+    });
+    return (await this.getProfile(userId))!;
+  }
+
+  async deleteProfile(userId: string, meta: RequestMeta): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const del = await tx.execute(sql`DELETE FROM job_profiles WHERE user_id = ${userId}::uuid`);
+      if ((del.rowCount ?? 0) > 0) await this.audit.record({ action: 'job.profile_deleted', actorUserId: userId, meta, metadata: {} }, tx);
+    });
+  }
+
+  // ---- Applications (candidate side) ------------------------------------------------------------
+
+  async apply(userId: string, jobId: string, body: ApplyRequest, meta: RequestMeta): Promise<ApplicationList['items'][number]> {
+    if (!UUID_RE.test(jobId)) throw notFound();
+    const job = await this.db.execute<{ org_id: string; title: string }>(sql`
+      SELECT j.org_id, j.title FROM job_postings j JOIN organizations o ON o.id = j.org_id WHERE j.id = ${jobId}::uuid AND ${publicSql}`);
+    const row = job.rows[0];
+    if (!row) throw notFound();
+    const member = await this.db.execute(sql`SELECT 1 FROM org_members WHERE org_id = ${row.org_id}::uuid AND user_id = ${userId}::uuid AND status = 'active'`);
+    if (member.rows.length > 0) throw AppError.forbidden('You cannot apply to an offer of your own organisation');
+    const cv = await this.getProfile(userId);
+    if (!cv) throw AppError.conflict('Create your CV before applying', { reason: 'profile_required' });
+    const id = await this.db.transaction(async (tx) => {
+      const dup = await tx.execute(sql`SELECT 1 FROM job_applications WHERE posting_id = ${jobId}::uuid AND user_id = ${userId}::uuid`);
+      if (dup.rows.length > 0) throw AppError.conflict('You already applied', { reason: 'already_applied' });
+      const ins = await tx.execute<{ id: string }>(sql`
+        INSERT INTO job_applications (posting_id, user_id, message, cv) VALUES (${jobId}::uuid, ${userId}::uuid, ${body.message}, ${JSON.stringify(cv)}::jsonb) RETURNING id`);
+      const appId = ins.rows[0]!.id;
+      await this.audit.record({ action: 'job.applied', actorUserId: userId, meta, metadata: { orgId: row.org_id, jobId, applicationId: appId } }, tx);
+      return appId;
+    });
+    await this.notifyRecruiters(row.org_id, jobId, row.title, userId);
+    return (await this.myApplication(userId, id))!;
+  }
+
+  async myApplications(userId: string, q: { limit: number; cursor?: string }): Promise<ApplicationList> {
+    const f: SQL[] = [sql`a.user_id = ${userId}::uuid`];
+    if (q.cursor) {
+      const c = decodeCursor(q.cursor);
+      f.push(sql`(a.created_at, a.id) < (${c.at}::timestamptz, ${c.id}::uuid)`);
+    }
+    const page = await this.appPage(f, q.limit);
+    return { items: page.items.map(({ applicant: _a, cv: _c, ...app }) => app), nextCursor: page.nextCursor };
+  }
+
+  private async myApplication(userId: string, id: string) {
+    const page = await this.appPage([sql`a.id = ${id}::uuid`, sql`a.user_id = ${userId}::uuid`], 1);
+    const first = page.items[0];
+    if (!first) return undefined;
+    const { applicant: _a, cv: _c, ...app } = first;
+    return app;
+  }
+
+  /** Candidate withdraws a live application. Idempotent once withdrawn; a decided one stays as it is (409). */
+  async withdraw(userId: string, applicationId: string, meta: RequestMeta): Promise<ApplicationList['items'][number]> {
+    if (!UUID_RE.test(applicationId)) throw AppError.notFound('Application not found');
+    await this.db.transaction(async (tx) => {
+      const res = await tx.execute<{ status: ApplicationStatus; posting_id: string }>(sql`
+        SELECT status, posting_id FROM job_applications WHERE id = ${applicationId}::uuid AND user_id = ${userId}::uuid FOR UPDATE`);
+      const cur = res.rows[0];
+      if (!cur) throw AppError.notFound('Application not found');
+      if (cur.status === 'withdrawn') return;
+      if (APPLICATION_TRANSITIONS[cur.status].length === 0) throw AppError.conflict('This application is already decided', { reason: 'application_final' });
+      await tx.execute(sql`UPDATE job_applications SET status = 'withdrawn', updated_at = now() WHERE id = ${applicationId}::uuid`);
+      await this.audit.record({ action: 'job.application_withdrawn', actorUserId: userId, meta, metadata: { applicationId } }, tx);
+    });
+    return (await this.myApplication(userId, applicationId))!;
+  }
+
+  // ---- Applications (recruiter side) ------------------------------------------------------------
+
+  async orgApplications(orgId: string, jobId: string, q: OrgApplicationsQuery): Promise<OrgApplicationList> {
+    if (!UUID_RE.test(jobId)) throw notFound();
+    const f: SQL[] = [sql`j.id = ${jobId}::uuid`, sql`j.org_id = ${orgId}::uuid`];
+    if (q.status) f.push(sql`a.status = ${q.status}`);
+    if (q.cursor) {
+      const c = decodeCursor(q.cursor);
+      f.push(sql`(a.created_at, a.id) < (${c.at}::timestamptz, ${c.id}::uuid)`);
+    }
+    return this.appPage(f, q.limit);
+  }
+
+  async setStatus(orgId: string, applicationId: string, userId: string, status: ApplicationStatus, meta: RequestMeta): Promise<OrgApplicationList['items'][number]> {
+    if (!UUID_RE.test(applicationId)) throw AppError.notFound('Application not found');
+    const target = await this.db.transaction(async (tx) => {
+      const res = await tx.execute<{ status: ApplicationStatus; user_id: string; title: string; posting_id: string }>(sql`
+        SELECT a.status, a.user_id, j.title, j.id AS posting_id FROM job_applications a JOIN job_postings j ON j.id = a.posting_id
+        WHERE a.id = ${applicationId}::uuid AND j.org_id = ${orgId}::uuid FOR UPDATE OF a`);
+      const cur = res.rows[0];
+      if (!cur) throw AppError.notFound('Application not found');
+      if (!APPLICATION_TRANSITIONS[cur.status].includes(status)) {
+        throw AppError.conflict(`An application ${cur.status} cannot become ${status}`, { reason: 'invalid_transition', from: cur.status, to: status });
+      }
+      await tx.execute(sql`UPDATE job_applications SET status = ${status}, updated_at = now() WHERE id = ${applicationId}::uuid`);
+      await this.audit.record({ action: 'job.application_status', actorUserId: userId, meta, metadata: { orgId, applicationId, from: cur.status, to: status } }, tx);
+      return cur;
+    });
+    const text = STATUS_TEXT[status];
+    if (text) {
+      await this.notifications.notify({ userId: target.user_id, category: 'job', title: target.title, body: text, data: { applicationId, jobId: target.posting_id } });
+    }
+    const out = await this.appPage([sql`a.id = ${applicationId}::uuid`], 1);
+    return out.items[0]!;
+  }
+
+  private async appPage(filters: SQL[], limit: number): Promise<OrgApplicationList> {
+    const res = await this.db.execute<AppRow>(sql`
+      SELECT a.id, a.status, a.message, a.cv, a.created_at, a.updated_at, j.id AS job_id, j.title AS job_title, o.name AS org_name,
+        u.id AS user_id, u.display_name, u.handle::text AS handle
+      FROM job_applications a JOIN job_postings j ON j.id = a.posting_id JOIN organizations o ON o.id = j.org_id JOIN users u ON u.id = a.user_id
+      WHERE ${sql.join(filters, sql` AND `)} ORDER BY a.created_at DESC, a.id DESC LIMIT ${limit + 1}`);
+    const rows = res.rows.slice(0, limit);
+    const last = rows[rows.length - 1];
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        status: r.status,
+        message: r.message,
+        job: { id: r.job_id, title: r.job_title, orgName: r.org_name },
+        createdAt: iso(r.created_at),
+        updatedAt: iso(r.updated_at),
+        applicant: { id: r.user_id, displayName: r.display_name, handle: r.handle },
+        cv: r.cv,
+      })),
+      nextCursor: res.rows.length > limit && last ? encodeCursor(last.created_at, last.id) : null,
+    };
+  }
+
+  private async notifyRecruiters(orgId: string, jobId: string, title: string, applicantId: string): Promise<void> {
+    const res = await this.db.execute<{ user_id: string; role: OrgRole }>(sql`SELECT user_id, role FROM org_members WHERE org_id = ${orgId}::uuid AND status = 'active'`);
+    const recipients = res.rows.filter((m) => roleHasPermission(m.role, 'hr.manage') && m.user_id !== applicantId);
+    await this.notifications.notifyMany(recipients.map((m) => ({ userId: m.user_id, category: 'job' as const, title, body: 'Nouvelle candidature reçue.', data: { jobId } })));
+  }
+}

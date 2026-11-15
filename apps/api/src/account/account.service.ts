@@ -225,7 +225,13 @@ export class AccountService {
     const aiConversations = await this.exportAiConversations(auth.userId);
     const listingRows = await this.db.execute<{ id: string; kind: string; title: string; description: string; price_minor: string | null; currency: string | null; city: string; status: string; created_at: Date }>(sql`
       SELECT id, kind, title, description, price_minor, currency, city, status, created_at FROM listings WHERE owner_id = ${auth.userId}::uuid ORDER BY created_at, id`);
-    const budgetRows = await this.db.execute<{ currency: string; limit_minor: string }>(sql`
+    const cvRows = await this.db.execute<AccountExport['jobProfile'] & object>(sql`
+      SELECT headline, summary, skills, city, experience, education FROM job_profiles WHERE user_id = ${auth.userId}::uuid`);
+    const jobAppRows = await this.db.execute<{ id: string; title: string; org_name: string; status: string; message: string; created_at: Date }>(sql`
+      SELECT a.id, j.title, o.name AS org_name, a.status, a.message, a.created_at FROM job_applications a
+      JOIN job_postings j ON j.id = a.posting_id JOIN organizations o ON o.id = j.org_id
+      WHERE a.user_id = ${auth.userId}::uuid ORDER BY a.created_at, a.id`);
+    const budgetRows =await this.db.execute<{ currency: string; limit_minor: string }>(sql`
       SELECT currency, limit_minor FROM budgets WHERE user_id = ${auth.userId}::uuid ORDER BY currency`);
     // Lot 10: mini-app authorizations (history included); never a token.
     const miniappGrants = await this.exportMiniAppGrants(auth.userId);
@@ -366,6 +372,8 @@ export class AccountService {
         status: l.status,
         createdAt: new Date(l.created_at).toISOString(),
       })),
+      jobProfile: cvRows.rows[0] ?? null,
+      jobApplications: jobAppRows.rows.map((a) => ({ id: a.id, jobTitle: a.title, orgName: a.org_name, status: a.status, message: a.message, createdAt: new Date(a.created_at).toISOString() })),
       budgets: budgetRows.rows.map((b) => ({ currency: b.currency, limitMinor: Number(b.limit_minor) })),
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
         query: r.query,

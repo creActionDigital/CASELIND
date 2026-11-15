@@ -1,0 +1,50 @@
+import {
+  applicationListSchema,
+  applicationSchema,
+  jobListSchema,
+  jobProfileSchema,
+  jobSchema,
+  myJobProfileSchema,
+  orgApplicationListSchema,
+  orgApplicationSchema,
+  type ApplicationStatus,
+  type ContractType,
+  type CreateJobRequest,
+  type JobProfileInput,
+} from '@caselind/contracts';
+import { api } from '../auth/auth-context';
+
+const PAGE = 20;
+
+export interface JobFilters {
+  contractType?: ContractType;
+  q?: string;
+}
+
+export const jobKeys = {
+  all: ['jobs'] as const,
+  list: (f: JobFilters) => ['jobs', 'list', f] as const,
+  one: (id: string) => ['jobs', 'one', id] as const,
+  profile: ['jobs', 'profile'] as const,
+  mine: ['jobs', 'mine'] as const,
+  org: (orgId: string) => ['jobs', 'org', orgId] as const,
+  orgApps: (orgId: string, jobId: string) => ['jobs', 'org', orgId, 'apps', jobId] as const,
+};
+
+export const fetchJobs = (f: JobFilters, cursor?: string) =>
+  api.request('/jobs', { query: { contractType: f.contractType, q: f.q || undefined, limit: PAGE, cursor }, schema: jobListSchema });
+export const fetchJob = (id: string) => api.request(`/jobs/${id}`, { schema: jobSchema });
+export const applyToJob = (id: string, message: string) => api.request(`/jobs/${id}/applications`, { method: 'POST', body: { message }, schema: applicationSchema });
+export const fetchMyApplications = (cursor?: string) => api.request('/me/job-applications', { query: { limit: PAGE, cursor }, schema: applicationListSchema });
+export const withdrawApplication = (id: string) => api.request(`/me/job-applications/${id}/withdraw`, { method: 'POST', schema: applicationSchema });
+export const fetchMyJobProfile = () => api.request('/me/job-profile', { schema: myJobProfileSchema });
+export const saveJobProfile = (body: JobProfileInput) => api.request('/me/job-profile', { method: 'PUT', body, schema: jobProfileSchema });
+export const deleteJobProfile = () => api.request('/me/job-profile', { method: 'DELETE' });
+
+export const fetchOrgJobs = (orgId: string, cursor?: string) => api.request(`/orgs/${orgId}/jobs`, { query: { limit: PAGE, cursor }, schema: jobListSchema });
+export const createOrgJob = (orgId: string, body: CreateJobRequest) => api.request(`/orgs/${orgId}/jobs`, { method: 'POST', body, schema: jobSchema });
+export const closeOrgJob = (orgId: string, jobId: string) => api.request(`/orgs/${orgId}/jobs/${jobId}/close`, { method: 'POST', schema: jobSchema });
+export const fetchOrgApplications = (orgId: string, jobId: string, cursor?: string) =>
+  api.request(`/orgs/${orgId}/jobs/${jobId}/applications`, { query: { limit: PAGE, cursor }, schema: orgApplicationListSchema });
+export const setApplicationStatus = (orgId: string, applicationId: string, status: Exclude<ApplicationStatus, 'submitted' | 'withdrawn'>) =>
+  api.request(`/orgs/${orgId}/job-applications/${applicationId}/status`, { method: 'POST', body: { status }, schema: orgApplicationSchema });
