@@ -241,6 +241,9 @@ export class AccountService {
         c.amount_minor, c.currency, c.status, c.created_at
       FROM freelance_contracts c JOIN missions m ON m.id = c.mission_id JOIN users cu ON cu.id = c.client_id JOIN users fu ON fu.id = c.freelancer_id
       WHERE c.client_id = ${auth.userId}::uuid OR c.freelancer_id = ${auth.userId}::uuid ORDER BY c.created_at, c.id`);
+    const eduAuthored = await this.db.execute<{ id: string; title: string; status: string; created_at: Date }>(sql`
+      SELECT id, title, status, created_at FROM courses WHERE author_id = ${auth.userId}::uuid ORDER BY created_at, id`);
+    const eduEnrollments = await this.myEnrollmentsAll(auth.userId);
     const budgetRows = await this.db.execute<{ currency: string; limit_minor: string }>(sql`
       SELECT currency, limit_minor FROM budgets WHERE user_id = ${auth.userId}::uuid ORDER BY currency`);
     // Lot 10: mini-app authorizations (history included); never a token.
@@ -389,6 +392,10 @@ export class AccountService {
         proposals: frProposals.rows.map((p) => ({ id: p.id, missionTitle: p.title, amountMinor: Number(p.amount_minor), deliveryDays: p.delivery_days, message: p.message, status: p.status, createdAt: new Date(p.created_at).toISOString() })),
         contracts: frContracts.rows.map((c) => ({ id: c.id, missionTitle: c.title, role: c.client_id === auth.userId ? 'client' : 'freelancer', counterpartyHandle: c.handle, amountMinor: Number(c.amount_minor), currency: c.currency.trim(), status: c.status, createdAt: new Date(c.created_at).toISOString() })),
       },
+      education: {
+        authored: eduAuthored.rows.map((c) => ({ id: c.id, title: c.title, status: c.status, createdAt: new Date(c.created_at).toISOString() })),
+        enrollments: eduEnrollments,
+      },
       budgets: budgetRows.rows.map((b) => ({ currency: b.currency, limitMinor: Number(b.limit_minor) })),
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
         query: r.query,
@@ -431,6 +438,23 @@ export class AccountService {
       scopes: r.scopes,
       grantedAt: new Date(r.created_at).toISOString(),
       revokedAt: r.revoked_at ? new Date(r.revoked_at).toISOString() : null,
+    }));
+  }
+
+  /** Lot 17a: every enrollment of the user (the export is not paginated). */
+  private async myEnrollmentsAll(userId: string): Promise<AccountExport['education']['enrollments']> {
+    const res = await this.db.execute<{ title: string; done: number; total: number; completed: boolean; code: string | null; enrolled_at: Date }>(sql`
+      SELECT c.title, e.enrolled_at, (e.completed_at IS NOT NULL) AS completed,
+        (SELECT count(*)::int FROM lesson_progress p WHERE p.enrollment_id = e.id) AS done,
+        (SELECT count(*)::int FROM course_lessons l WHERE l.course_id = e.course_id) AS total,
+        (SELECT ce.code FROM certificates ce WHERE ce.enrollment_id = e.id) AS code
+      FROM course_enrollments e JOIN courses c ON c.id = e.course_id WHERE e.user_id = ${userId}::uuid ORDER BY e.enrolled_at, e.id`);
+    return res.rows.map((r) => ({
+      courseTitle: r.title,
+      progressPercent: r.total === 0 ? 0 : Math.floor((r.done * 100) / r.total),
+      completed: r.completed,
+      certificateCode: r.code,
+      enrolledAt: new Date(r.enrolled_at).toISOString(),
     }));
   }
 

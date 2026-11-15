@@ -17,8 +17,9 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 15 | §15 | Petites annonces | testé |
 | 16a | §14 | Emploi : offres, CV, candidatures | testé |
 | 16b | §14 | Freelance : missions, propositions, jalons, litiges | testé (paiement externe, séquestre différé) |
-| 16c | §14 | Outils pro : devis, factures, CRM, caisse | en cours (auditer l’existant) |
-| 17 | §13 | Éducation | planifié |
+| 16c | §14 | Outils pro : devis, factures, CRM, caisse | planifié (auditer l’existant) |
+| 17a | §13 | Éducation : cours, quiz, certificats | testé |
+| 17b | §13 | Établissements : emplois du temps, parents, frais, bourses | planifié (consentement parental à décider) |
 | 18 | §12 | Santé et bien-être | planifié |
 | 19 | §16 | Administration publique, alertes | planifié |
 | 20 | §21 | Jeux, Play & Win (sans NFT ni argent réel sans décision) | planifié |

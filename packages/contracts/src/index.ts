@@ -30,3 +30,4 @@ export * from './finance.js';
 export * from './listings.js';
 export * from './jobs.js';
 export * from './freelance.js';
+export * from './education.js';

@@ -133,6 +133,11 @@ export const accountExportSchema = z.object({
     proposals: z.array(z.object({ id: z.uuid(), missionTitle: z.string(), amountMinor: z.number().int(), deliveryDays: z.number().int(), message: z.string(), status: z.string(), createdAt: z.string() })),
     contracts: z.array(z.object({ id: z.uuid(), missionTitle: z.string(), role: z.string(), counterpartyHandle: z.string(), amountMinor: z.number().int(), currency: z.string(), status: z.string(), createdAt: z.string() })),
   }),
+  /** Lot 17a: own courses as an author, own enrollments with progress and certificate codes. */
+  education: z.object({
+    authored: z.array(z.object({ id: z.uuid(), title: z.string(), status: z.string(), createdAt: z.string() })),
+    enrollments: z.array(z.object({ courseTitle: z.string(), progressPercent: z.number().int(), completed: z.boolean(), certificateCode: z.string().nullable(), enrolledAt: z.string() })),
+  }),
   /** Lot 13: own monthly budgets (sandbox). */
   budgets: z.array(z.object({ currency: z.string(), limitMinor: z.number().int() })),
 });

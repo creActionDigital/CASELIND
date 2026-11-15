@@ -83,6 +83,13 @@ export type AuditAction =
   | 'freelance.review_left'
   | 'freelance.dispute_opened'
   | 'freelance.dispute_resolved'
+  /** Education (lot 17a): ids and scores only, never lesson text, answers or a name. */
+  | 'education.course_created'
+  | 'education.course_published'
+  | 'education.course_unpublished'
+  | 'education.enrolled'
+  | 'education.quiz_attempted'
+  | 'education.certificate_issued'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'

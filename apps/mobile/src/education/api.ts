@@ -1,0 +1,49 @@
+import {
+  certificateListSchema,
+  certificateVerificationSchema,
+  courseDetailSchema,
+  courseListSchema,
+  courseStudentsSchema,
+  enrollmentListSchema,
+  quizResultSchema,
+  quizSchema,
+  type CourseLevel,
+  type CreateCourseRequest,
+  type SetLessonsRequest,
+  type SetQuizRequest,
+} from '@caselind/contracts';
+import { api } from '../auth/auth-context';
+
+const PAGE = 20;
+
+export interface CourseFilters {
+  level?: CourseLevel;
+  q?: string;
+}
+
+export const eduKeys = {
+  all: ['education'] as const,
+  list: (f: CourseFilters) => ['education', 'list', f] as const,
+  course: (id: string) => ['education', 'course', id] as const,
+  quiz: (id: string) => ['education', 'quiz', id] as const,
+  enrollments: ['education', 'enrollments'] as const,
+  authored: ['education', 'authored'] as const,
+  certificates: ['education', 'certificates'] as const,
+  students: (id: string) => ['education', 'students', id] as const,
+};
+
+export const fetchCourses = (f: CourseFilters, cursor?: string) => api.request('/courses', { query: { level: f.level, q: f.q || undefined, limit: PAGE, cursor }, schema: courseListSchema });
+export const fetchCourse = (id: string) => api.request(`/courses/${id}`, { schema: courseDetailSchema });
+export const createCourse = (body: CreateCourseRequest) => api.request('/courses', { method: 'POST', body, schema: courseDetailSchema });
+export const saveLessons = (id: string, body: SetLessonsRequest) => api.request(`/courses/${id}/lessons`, { method: 'PUT', body, schema: courseDetailSchema });
+export const saveQuiz = (id: string, body: SetQuizRequest) => api.request(`/courses/${id}/quiz`, { method: 'PUT', body, schema: courseDetailSchema });
+export const setPublished = (id: string, published: boolean) => api.request(`/courses/${id}/${published ? 'publish' : 'unpublish'}`, { method: 'POST', schema: courseDetailSchema });
+export const fetchStudents = (id: string) => api.request(`/courses/${id}/students`, { schema: courseStudentsSchema });
+export const enrollInCourse = (id: string) => api.request(`/courses/${id}/enroll`, { method: 'POST', schema: courseDetailSchema });
+export const completeLesson = (id: string, lessonId: string) => api.request(`/courses/${id}/lessons/${lessonId}/complete`, { method: 'POST', schema: courseDetailSchema });
+export const fetchQuiz = (id: string) => api.request(`/courses/${id}/quiz`, { schema: quizSchema });
+export const submitQuiz = (id: string, answers: number[]) => api.request(`/courses/${id}/quiz/attempts`, { method: 'POST', body: { answers }, schema: quizResultSchema });
+export const fetchMyCourses = (cursor?: string) => api.request('/me/courses', { query: { limit: PAGE, cursor }, schema: courseListSchema });
+export const fetchEnrollments = (cursor?: string) => api.request('/me/enrollments', { query: { limit: PAGE, cursor }, schema: enrollmentListSchema });
+export const fetchCertificates = () => api.request('/me/certificates', { schema: certificateListSchema });
+export const verifyCertificate = (code: string) => api.request(`/public/certificates/${encodeURIComponent(code)}`, { schema: certificateVerificationSchema });

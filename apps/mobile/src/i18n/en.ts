@@ -6,6 +6,7 @@ import { servicesEn } from '../services/messages';
 import { listingsEn } from '../listings/messages';
 import { jobsEn } from '../jobs/messages';
 import { freelanceEn } from '../freelance/messages';
+import { educationEn } from '../education/messages';
 import { deliveryEn } from '../delivery/messages';
 
 export const en: Record<MessageKey, string> = {
@@ -1285,6 +1286,7 @@ export const en: Record<MessageKey, string> = {
   ...listingsEn,
   ...jobsEn,
   ...freelanceEn,
+  ...educationEn,
   ...deliveryEn,
   ...aiEn,
   ...walletUiEn,

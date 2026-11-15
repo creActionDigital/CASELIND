@@ -42,6 +42,8 @@ import { JobsController, OrgJobsController } from './jobs/jobs.controller.js';
 import { JobsService } from './jobs/jobs.service.js';
 import { AdminFreelanceController, FreelanceController } from './freelance/freelance.controller.js';
 import { FreelanceService } from './freelance/freelance.service.js';
+import { EducationController, PublicCertificatesController } from './education/education.controller.js';
+import { EducationService } from './education/education.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -305,6 +307,8 @@ export class AppModule {
         OrgJobsController,
         FreelanceController,
         AdminFreelanceController,
+        EducationController,
+        PublicCertificatesController,
         OpenApiController,
         AuthController,
         UsersController,
@@ -480,6 +484,7 @@ export class AppModule {
         ListingsService,
         JobsService,
         FreelanceService,
+        EducationService,
         MessagesService,
         // Lot 3b
         MessageExtrasService,
