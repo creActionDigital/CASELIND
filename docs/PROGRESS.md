@@ -371,3 +371,13 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : écran `wallet/finance.tsx` (Gérer → Budget) : dépensé, reçu, barre de progression, ventilation, saisie/retrait du budget.
 - Tests : `finance.e2e.test.ts` (3), API 518 tests OK ; mobile 210 OK, typecheck OK. Non vérifié à l'écran.
 - Limites : un budget global par devise (pas par catégorie) ; pas d'alertes ni de notifications de seuil ; pas d'historique multi-mois à l'écran.
+
+## Lot 15 — Petites annonces (cahier des charges §15) (2026-11-15) : testé
+- Source du périmètre : `CASELIND_CAHIER_DES_CHARGES_DEFINITIF.md` §15 (à relire avant chaque lot : §12–16 pour santé, éducation, emploi, immobilier, services publics). Aucune source SaaS achetée n'est présente dans le dépôt : tout est développé ici.
+- **Livré** : annonces de location, vente immobilière, colocation, véhicules, occasion, objets perdus / trouvés ; photos (jusqu'à 8, purpose `listing`) ; recherche et filtres (catégorie, texte, ville, devise, fourchette de prix) ; pagination par curseur ; mes annonces ; clôture par le propriétaire ; contact par la messagerie CASELIND ; signalement et masquage par un modérateur (cible `listing`) ; blocage dans les deux sens ; plafond de 20 annonces actives par personne ; export des données personnelles (annonces et budgets) ; avertissement anti-arnaque sur chaque fiche.
+- Migration 0027 (`listings`, `listing_media`, flag `listings`, cible de signalement `listing`, usage média `listing`) ; `src/listings/` ; routes `/v1/listings` (liste, `mine`, `:id`, création, PATCH, `:id/close`) ; contrats `listings.ts` ; OpenAPI à jour.
+- Mobile : Plus → Annonces ; écrans liste, fiche, publication, mes annonces ; pas encore d'écran de modification (l'API a PATCH).
+- Tests : `listings.e2e.test.ts` (7), API 526 tests OK ; mobile 213 OK ; typecheck OK ; parcours vérifié à l'écran (liste, fiche, contact, signalement, publication).
+- **Différé (consigné, non oublié)** : rendez-vous de visite, visites virtuelles/vidéos, comparaison de véhicules, négociation guidée, « vérification » d'annonce (aucun partenaire), saisie de la position sur carte, alertes de recherche, signalements de fraude avancés.
+- Note : le test de confidentialité des lieux autorise désormais `listings.latitude/longitude` (position publiée volontairement par l'auteur de l'annonce) ; l'écran n'envoie pas encore de position.
+- Santé : le cahier des charges impose licences, partenaires, consentement explicite et chiffrement avant toute donnée médicale (§12) : **ne pas démarrer sans décision du propriétaire** (annuaire de professionnels seul possible sans ces conditions).

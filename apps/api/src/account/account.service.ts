@@ -223,6 +223,10 @@ export class AccountService {
     const services = await this.exportServices(auth.userId);
     const mobility = await this.exportMobility(auth.userId);
     const aiConversations = await this.exportAiConversations(auth.userId);
+    const listingRows = await this.db.execute<{ id: string; kind: string; title: string; description: string; price_minor: string | null; currency: string | null; city: string; status: string; created_at: Date }>(sql`
+      SELECT id, kind, title, description, price_minor, currency, city, status, created_at FROM listings WHERE owner_id = ${auth.userId}::uuid ORDER BY created_at, id`);
+    const budgetRows = await this.db.execute<{ currency: string; limit_minor: string }>(sql`
+      SELECT currency, limit_minor FROM budgets WHERE user_id = ${auth.userId}::uuid ORDER BY currency`);
     // Lot 10: mini-app authorizations (history included); never a token.
     const miniappGrants = await this.exportMiniAppGrants(auth.userId);
     // Lot 6B: KYC level and request statuses/dates; never the document number nor the files.
@@ -351,6 +355,18 @@ export class AccountService {
       mobility,
       miniappGrants,
       aiConversations,
+      listings: listingRows.rows.map((l) => ({
+        id: l.id,
+        kind: l.kind,
+        title: l.title,
+        description: l.description,
+        priceMinor: l.price_minor === null ? null : Number(l.price_minor),
+        currency: l.currency,
+        city: l.city,
+        status: l.status,
+        createdAt: new Date(l.created_at).toISOString(),
+      })),
+      budgets: budgetRows.rows.map((b) => ({ currency: b.currency, limitMinor: Number(b.limit_minor) })),
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
         query: r.query,
         scope: r.scope,

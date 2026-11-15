@@ -3,6 +3,7 @@ import type { MessageKey } from './fr';
 import { aiEn } from '../ai/messages';
 import { walletUiEn } from '../wallet/messages';
 import { servicesEn } from '../services/messages';
+import { listingsEn } from '../listings/messages';
 import { deliveryEn } from '../delivery/messages';
 
 export const en: Record<MessageKey, string> = {
@@ -688,6 +689,7 @@ export const en: Record<MessageKey, string> = {
   'report.target.service': 'Service',
   'report.target.service_review': 'Service review',
   'report.target.ride': 'Ride',
+  'report.target.listing': 'Listing',
 
   // Espace vendeur (M3b)
   'seller.title': 'Seller space',
@@ -1280,6 +1282,7 @@ export const en: Record<MessageKey, string> = {
   'sellerQr.status.revoked': 'Revoked',
   'sellerQr.status.consumed': 'Used',
   ...servicesEn,
+  ...listingsEn,
   ...deliveryEn,
   ...aiEn,
   ...walletUiEn,

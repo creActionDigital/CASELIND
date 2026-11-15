@@ -34,7 +34,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 10 — Mini-apps | OAuth + PKCE, scopes, paiement confirmé par PIN | 509 tests | **testé** (backend) |
 | 11 — Mobilité | Courses type Uber, espèces | 509 tests | **testé** (backend) |
 | 12 — Assistant IA | Multi-fournisseurs, Gemini par défaut | 509 tests | **testé** (backend, sans clé réelle) |
-| 13+ | services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle (13, testé : budget + bilan du mois) | | planifié |
+| 13+ | services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle (13, testé : budget + bilan du mois), petites annonces (15, testé) | | planifié |
 
 | 14 — Communautés publiques | Un groupe publié par son propriétaire (description, 5 étiquettes max) : liste filtrable, étiquettes tendance, rejoindre (idempotent, sans historique antérieur), retiré par un admin = interdit de rejoindre, limite de membres respectée, audité. Mobile : « Explorer les communautés » (filtre Groupes), « Mes groupes », bouton propriétaire Publier / Retirer | 515+ tests | **testé** (backend 5 tests, OpenAPI, mobile vérifié à l'écran) ; description et étiquettes saisies à l'écran, signalement d'une communauté : à faire |
 ## Lots mobile

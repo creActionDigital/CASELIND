@@ -3,6 +3,7 @@ import { aiFr } from '../ai/messages';
 import { walletUiFr } from '../wallet/messages';
 import { deliveryFr } from '../delivery/messages';
 import { servicesFr } from '../services/messages';
+import { listingsFr } from '../listings/messages';
 export const fr = {
   'common.loading': 'Chargement…',
   'common.retry': 'Réessayer',
@@ -686,6 +687,7 @@ export const fr = {
   'report.target.service': 'Service',
   'report.target.service_review': 'Avis sur un service',
   'report.target.ride': 'Course',
+  'report.target.listing': 'Annonce',
 
   // Espace vendeur (M3b)
   'seller.title': 'Espace vendeur',
@@ -1278,6 +1280,7 @@ export const fr = {
   'sellerQr.status.revoked': 'Révoqué',
   'sellerQr.status.consumed': 'Utilisé',
   ...servicesFr,
+  ...listingsFr,
   ...deliveryFr,
   ...aiFr,
   ...walletUiFr,

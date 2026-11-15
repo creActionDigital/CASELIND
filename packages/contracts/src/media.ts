@@ -12,6 +12,8 @@ export const mediaPurposeSchema = z.enum([
   'document',
   /** Identity documents (lot 6B): readable by the owner and admins only. */
   'kyc_document',
+  /** Classified-ad photos (lot 15): readable by any signed-in user. */
+  'listing',
 ]);
 export type MediaPurpose = z.infer<typeof mediaPurposeSchema>;
 
@@ -53,6 +55,7 @@ export const MEDIA_ALLOWED_MIMES: Readonly<Record<MediaPurpose, readonly MediaMi
   org_logo: IMAGES,
   org_banner: IMAGES,
   product: IMAGES,
+  listing: IMAGES,
   post: [...IMAGES, ...VIDEOS],
   story: [...IMAGES, ...VIDEOS],
   message: [...IMAGES, ...VIDEOS, ...AUDIO, 'application/pdf'],

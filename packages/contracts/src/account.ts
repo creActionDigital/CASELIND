@@ -110,6 +110,22 @@ export const accountExportSchema = z.object({
   miniappGrants: z.array(exportedMiniAppGrantSchema),
   /** Lot 12: own AI assistant conversations (private to the user). */
   aiConversations: z.array(exportedAiConversationSchema),
+  /** Lot 15: own classified ads (text, place and status; never the photos' bytes). */
+  listings: z.array(
+    z.object({
+      id: z.uuid(),
+      kind: z.string(),
+      title: z.string(),
+      description: z.string(),
+      priceMinor: z.number().int().nullable(),
+      currency: z.string().nullable(),
+      city: z.string(),
+      status: z.string(),
+      createdAt: z.string(),
+    }),
+  ),
+  /** Lot 13: own monthly budgets (sandbox). */
+  budgets: z.array(z.object({ currency: z.string(), limitMinor: z.number().int() })),
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;
 

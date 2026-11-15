@@ -24,7 +24,6 @@ const MODULES: { key: MessageKey; icon: Icon; flag?: string }[] = [
   { key: 'more.education', icon: 'school-outline' },
   { key: 'more.travel', icon: 'airplane-outline' },
   { key: 'more.jobs', icon: 'briefcase-outline' },
-  { key: 'more.realestate', icon: 'business-outline' },
   { key: 'more.public', icon: 'business-outline' },
 ];
 
@@ -84,6 +83,19 @@ export default function More() {
               {t('services.title')}
             </Text>
           </Pressable>
+          {flags.data.flags.listings !== false ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('listings.title')}
+              onPress={() => router.push('/listings')}
+              style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="pricetags-outline" size={26} color={colors.primary} />
+              <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+                {t('listings.title')}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('ai.tile')}

@@ -197,6 +197,7 @@ import {
   resolvedPaymentQrSchema,
   setPaymentPinRequestSchema,
 } from '@caselind/contracts';
+import { createListingRequestSchema, listingListQuerySchema, listingListSchema, listingSchema, updateListingRequestSchema } from '@caselind/contracts';
 import { budgetSchema, financeSummaryQuerySchema, financeSummarySchema, removeBudgetQuerySchema, setBudgetRequestSchema } from '@caselind/contracts';
 // Lot 6A (ledger, sandbox wallet), separate import block.
 import {
@@ -521,6 +522,13 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/communities/{id}/join', summary: 'Join a public community (idempotent; removed by an admin: 403; full: 409 group_full; the joiner sees only later messages); audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, response: communitySchema, status: 200 },
   { method: 'put', path: '/v1/conversations/{id}/community', summary: 'Publish the group as a community (owner only; description up to 500, up to 5 tags); audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: publishCommunityRequestSchema, response: communitySchema, status: 200 },
   { method: 'delete', path: '/v1/conversations/{id}/community', summary: 'Unpublish (owner only); the group and its members stay; audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, status: 204 },
+  // Lot 15: classified ads (property, vehicles, used goods, lost and found). Behind the `listings` flag; contact goes through messaging.
+  { method: 'get', path: '/v1/listings', summary: 'Active ads, newest first (filters kind, q, city, currency, price range; keyset cursor). Hidden ads and ads of blocked users are not listed', tags: ['listings'], auth: 'user', query: listingListQuerySchema, response: listingListSchema, status: 200 },
+  { method: 'get', path: '/v1/listings/mine', summary: 'The caller\'s own ads, active and closed', tags: ['listings'], auth: 'user', query: pageQuerySchema, response: listingListSchema, status: 200 },
+  { method: 'get', path: '/v1/listings/{id}', summary: 'One ad (closed, hidden, blocked or unknown: 404, except for its owner)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingSchema, status: 200 },
+  { method: 'post', path: '/v1/listings', summary: 'Publish an ad (photos: own ready uploads with purpose listing, up to 8; at most 20 active ads per owner: 409 listing_limit; lost/found carry no price); audited', tags: ['listings'], auth: 'user', body: createListingRequestSchema, response: listingSchema, status: 201 },
+  { method: 'patch', path: '/v1/listings/{id}', summary: 'Edit an own ad (the kind cannot change); anyone else: 404; audited', tags: ['listings'], auth: 'user', params: { id: z.string() }, body: updateListingRequestSchema, response: listingSchema, status: 200 },
+  { method: 'post', path: '/v1/listings/{id}/close', summary: 'Owner closes the ad (rented, sold, found...); idempotent; audited', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingSchema, status: 200 },
   // Lot 13: personal finance on the sandbox wallet. Behind the `wallet.sandbox` flag.
   { method: 'get', path: '/v1/finance/summary', summary: 'Month summary per currency (spent, received, spending by kind, budget, remaining); month=YYYY-MM UTC, default current; sandbox, no real money', tags: ['wallet'], auth: 'user', query: financeSummaryQuerySchema, response: financeSummarySchema, status: 200 },
   { method: 'put', path: '/v1/finance/budget', summary: 'Set or replace the monthly budget of one currency (unsupported currency: 400); audited', tags: ['wallet'], auth: 'user', body: setBudgetRequestSchema, response: budgetSchema, status: 200 },

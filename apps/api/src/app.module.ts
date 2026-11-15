@@ -36,6 +36,8 @@ import { CommunitiesController, ConversationCommunityController } from './messag
 import { CommunitiesService } from './messaging/communities.service.js';
 import { FinanceController } from './finance/finance.controller.js';
 import { FinanceService } from './finance/finance.service.js';
+import { ListingsController } from './listings/listings.controller.js';
+import { ListingsService } from './listings/listings.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -294,6 +296,7 @@ export class AppModule {
         CommunitiesController,
         ConversationCommunityController,
         FinanceController,
+        ListingsController,
         OpenApiController,
         AuthController,
         UsersController,
@@ -466,6 +469,7 @@ export class AppModule {
         ConversationMembersService,
         CommunitiesService,
         FinanceService,
+        ListingsService,
         MessagesService,
         // Lot 3b
         MessageExtrasService,

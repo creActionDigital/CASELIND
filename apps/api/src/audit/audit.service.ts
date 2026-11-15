@@ -55,6 +55,10 @@ export type AuditAction =
   /** Personal finance (sandbox): metadata {currency, limitMinor?}. */
   | 'finance.budget_set'
   | 'finance.budget_removed'
+  /** Classified ads (lot 15): metadata {listingId, kind?}. Never the text or the contact. */
+  | 'listing.created'
+  | 'listing.updated'
+  | 'listing.closed'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'
