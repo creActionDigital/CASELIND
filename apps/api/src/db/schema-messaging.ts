@@ -79,3 +79,21 @@ export const messageReactions = pgTable(
   },
   (t) => [primaryKey({ columns: [t.messageId, t.userId] })],
 );
+
+// Lot 14 (0025_communities.sql).
+export const communities = pgTable('communities', {
+  conversationId: uuid('conversation_id').primaryKey(),
+  description: text('description').notNull().default(''),
+  tags: text('tags').array().notNull().default([]),
+  publishedAt: tstz('published_at').notNull().defaultNow(),
+});
+
+export const communityBans = pgTable(
+  'community_bans',
+  {
+    conversationId: uuid('conversation_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    createdAt: tstz('created_at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.conversationId, t.userId] })],
+);

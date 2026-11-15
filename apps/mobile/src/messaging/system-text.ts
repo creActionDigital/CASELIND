@@ -30,6 +30,8 @@ export function systemText(ev: SystemEvent, name: (userId: string | null) => str
     case 'group_created':
       return t('chat.system.group_created', { name: name(ev.actorId) });
     case 'member_added':
+      // Rejoindre une communauté publique : la personne s'ajoute elle-même.
+      if (ev.userId === ev.actorId) return t('chat.system.member_joined', { name: name(ev.userId) });
       return t('chat.system.member_added', { name: name(ev.userId), actor: name(ev.actorId) });
     case 'member_removed':
       return t('chat.system.member_removed', { name: name(ev.userId), actor: name(ev.actorId) });

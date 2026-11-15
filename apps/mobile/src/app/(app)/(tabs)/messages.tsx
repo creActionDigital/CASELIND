@@ -11,6 +11,7 @@ import { conversationTitle, fetchConversations, patchMyState } from '../../../me
 import { isMuted, patchConversation, removeConversation, type ConversationPages } from '../../../messaging/cache';
 import { chatColors } from '../../../messaging/chat-theme';
 import { ChatStories } from '../../../messaging/ChatStories';
+import { ExploreCommunities } from '../../../messaging/ExploreCommunities';
 import { GroupCards } from '../../../messaging/GroupCards';
 import { ConversationRow } from '../../../messaging/ConversationRow';
 import { qk } from '../../../messaging/keys';
@@ -141,6 +142,7 @@ export default function Messages() {
             <>
               <PushCard />
               {filter === 'groups' && !q ? <GroupCards groups={filtered} onOpen={open} /> : null}
+              {filter === 'groups' && !q ? <ExploreCommunities /> : null}
             </>
           )
         }

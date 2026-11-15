@@ -9,6 +9,7 @@ import { useI18n, type MessageKey } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { fetchConversation, fetchMembers, lookupHandle, startChatErrorKey } from '../../../messaging/api';
 import { DisappearingSetting } from '../../../messaging/DisappearingSetting';
+import { PublishCommunity } from '../../../messaging/PublishCommunity';
 import { qk } from '../../../messaging/keys';
 import { radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -179,6 +180,7 @@ export default function GroupInfo() {
       ))}
 
       <DisappearingSetting conversation={c} />
+      {isOwner ? <PublishCommunity conversationId={id} /> : null}
       <Button
         variant="secondary"
         label={t('messagesX.scheduled.menu')}

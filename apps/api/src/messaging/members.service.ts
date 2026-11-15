@@ -12,7 +12,7 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
-import { conversationMembers, conversations, type MessageRow, users } from '../db/schema.js';
+import { communityBans, conversationMembers, conversations, type MessageRow, users } from '../db/schema.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 import { ContactsService } from './contacts.service.js';
 import { toInfo } from './conversations.service.js';
@@ -110,6 +110,7 @@ export class ConversationMembersService {
       }
       const systems: MessageRow[] = [];
       for (const id of stillFresh) {
+        await tx.delete(communityBans).where(and(eq(communityBans.conversationId, conversationId), eq(communityBans.userId, id)));
         // A returning member starts afresh: no history from their absence, nothing unread.
         const values = {
           conversationId,
@@ -234,6 +235,7 @@ export class ConversationMembersService {
         .update(conversationMembers)
         .set({ status: 'left', leftAt: new Date(), role: 'member' })
         .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, target.userId)));
+      if (!self) await tx.insert(communityBans).values({ conversationId, userId: target.userId }).onConflictDoNothing();
       const system = await appendSystemMessage(tx, conversationId, {
         type: self ? 'member_left' : 'member_removed',
         userId: target.userId,

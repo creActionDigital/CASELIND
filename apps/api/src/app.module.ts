@@ -32,6 +32,8 @@ import { SessionVerifier } from './security/session-verifier.js';
 // Lot 3A (messaging), separate import block to limit merge conflicts with parallel work.
 import { ContactsService } from './messaging/contacts.service.js';
 import { ConversationsService } from './messaging/conversations.service.js';
+import { CommunitiesController, ConversationCommunityController } from './messaging/communities.controller.js';
+import { CommunitiesService } from './messaging/communities.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -287,6 +289,8 @@ export class AppModule {
       ],
       controllers: [
         HealthController,
+        CommunitiesController,
+        ConversationCommunityController,
         OpenApiController,
         AuthController,
         UsersController,
@@ -457,6 +461,7 @@ export class AppModule {
         ContactsService,
         ConversationsService,
         ConversationMembersService,
+        CommunitiesService,
         MessagesService,
         // Lot 3b
         MessageExtrasService,

@@ -36,7 +36,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 12 — Assistant IA | Multi-fournisseurs, Gemini par défaut | 509 tests | **testé** (backend, sans clé réelle) |
 | 13+ | services, santé, éducation, emploi, immobilier, services publics, jeux, trading (simulation), finance personnelle | | planifié |
 
-| 14 — Communautés publiques | Explorer, rejoindre, étiquettes tendance, « Mes communautés » (maquette `communities`). Le backend n’a que des groupes privés ; à cadrer : visibilité, modération, limites | | **planifié** (décision du propriétaire 2026-11-14, non codé) |
+| 14 — Communautés publiques | Un groupe publié par son propriétaire (description, 5 étiquettes max) : liste filtrable, étiquettes tendance, rejoindre (idempotent, sans historique antérieur), retiré par un admin = interdit de rejoindre, limite de membres respectée, audité. Mobile : « Explorer les communautés » (filtre Groupes), « Mes groupes », bouton propriétaire Publier / Retirer | 515+ tests | **testé** (backend 5 tests, OpenAPI, mobile vérifié à l'écran) ; description et étiquettes saisies à l'écran, signalement d'une communauté : à faire |
 ## Lots mobile
 
 | Lot | Contenu | Statut |

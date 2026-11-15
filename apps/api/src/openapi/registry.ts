@@ -63,6 +63,11 @@ import {
 // Lot 3A (messaging), separate import for the same reason.
 import {
   addConversationMembersRequestSchema,
+  communityListQuerySchema,
+  communityListSchema,
+  communitySchema,
+  publishCommunityRequestSchema,
+  trendingTagsSchema,
   conversationListQuerySchema,
   conversationListSchema,
   conversationMemberListSchema,
@@ -508,6 +513,13 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/conversations/{id}/members', summary: 'Add users to a group (admin or owner); returns the members actually added; full group: 409 group_full; audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: addConversationMembersRequestSchema, response: conversationMemberListSchema, status: 201 },
   { method: 'patch', path: '/v1/conversations/{id}/members/{userId}', summary: 'Change a member role (owner only; at least one owner must remain: 409 last_owner); audited', tags: ['messaging'], auth: 'user', params: { id: z.string(), userId: z.string() }, body: updateConversationMemberRequestSchema, response: conversationMemberSchema, status: 200 },
   { method: 'delete', path: '/v1/conversations/{id}/members/{userId}', summary: 'Leave (own id) or remove a member (admin or owner; an admin cannot remove an owner); the last owner leaving hands ownership over; audited', tags: ['messaging'], auth: 'user', params: { id: z.string(), userId: z.string() }, status: 204 },
+  // Lot 14: public communities (a published group). Publishing is owner only; joining is idempotent.
+  { method: 'get', path: '/v1/communities', summary: 'Public communities, biggest first (filters q and tag; offset cursor); flag messaging', tags: ['messaging'], auth: 'user', query: communityListQuerySchema, response: communityListSchema, status: 200 },
+  { method: 'get', path: '/v1/communities/tags', summary: 'Trending tags (top 10 by number of communities)', tags: ['messaging'], auth: 'user', response: trendingTagsSchema, status: 200 },
+  { method: 'get', path: '/v1/communities/{id}', summary: 'One public community (unpublished or unknown: 404)', tags: ['messaging'], auth: 'user', params: { id: z.string() }, response: communitySchema, status: 200 },
+  { method: 'post', path: '/v1/communities/{id}/join', summary: 'Join a public community (idempotent; removed by an admin: 403; full: 409 group_full; the joiner sees only later messages); audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, response: communitySchema, status: 200 },
+  { method: 'put', path: '/v1/conversations/{id}/community', summary: 'Publish the group as a community (owner only; description up to 500, up to 5 tags); audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: publishCommunityRequestSchema, response: communitySchema, status: 200 },
+  { method: 'delete', path: '/v1/conversations/{id}/community', summary: 'Unpublish (owner only); the group and its members stay; audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, status: 204 },
   { method: 'put', path: '/v1/messages/{id}/reaction', summary: 'Set, or remove with emoji null, the single reaction of the caller to a message', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: reactionRequestSchema, response: messageSchema, status: 200 },
   { method: 'delete', path: '/v1/messages/{id}', summary: 'scope=me (default): hide for the caller. scope=all: the author recalls it within the recall window (409 afterwards), wiping body and media; audited', tags: ['messaging'], auth: 'user', params: { id: z.string() }, query: recallQuerySchema, status: 204 },
   // Lot 3b: forwarding, favourites, disappearing and scheduled messages, drafts. Same 404 rule as lot 3A.

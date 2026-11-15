@@ -49,6 +49,9 @@ export type AuditAction =
   /** Messaging governance (lot 3A). Never the message content. */
   | 'conversation.group_created'
   | 'conversation.member_added'
+  | 'community.published'
+  | 'community.unpublished'
+  | 'community.joined'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'

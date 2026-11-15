@@ -357,3 +357,9 @@ Règle : une photo de référence par écran. Seule la structure est reprise ; c
 Vérifiés : accueil, Maps, hub, Plus, Messagerie, Wallet, Cartes, KYC, Boutique, Assistant IA. Conformes aux règles (couleur unie, $ sans montant, solde masqué par défaut, IA visible). Défaut unique trouvé et corrigé : contenu sous la barre flottante (Plus, Maps).
 Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » tant qu'aucune clé n'est configurée (attendu, clé Gemini en attente). Le fondu d'entrée reste à moitié visible dans un onglet sans focus (animation suspendue par le navigateur), sans effet sur un appareil réel. Non vérifiés visuellement : groupes (bandeau), panier plein, fiche produit, écrans de détail.
 **Prochaine étape bloquée par la règle du propriétaire : validation du mobile avant lots 13+ et web.**
+
+## Lot 14 — Communautés publiques (2026-11-15) : testé
+- Migration 0025 (`communities`, `community_bans`) ; `messaging/communities.service.ts` et `.controller.ts` ; routes `/v1/communities` (liste, `tags`, `:id`, `:id/join`) et `/v1/conversations/:id/community` (PUT publier, DELETE retirer, propriétaire seulement). Contrats `packages/contracts/src/communities.ts`, OpenAPI à jour.
+- Règles : un membre retiré par un admin est interdit de rejoindre tant qu'un admin ne le rajoute pas ; partir de soi-même n'est pas un bannissement ; limite `MESSAGING_GROUP_MAX_MEMBERS` ; le nouveau membre ne voit pas les messages antérieurs ; actions auditées.
+- Tests : 5 nouveaux tests API (`communities.e2e.test.ts`), suite API complète 515 tests OK ; mobile 210 tests, typecheck OK. Vérifié dans le navigateur : Explorer, Rejoindre, Mes groupes, message système « a rejoint le groupe ».
+- Limites connues : pagination de la liste par décalage (suffisant à cette échelle) ; description et étiquettes non saisissables à l'écran (le bouton publie sans) ; pas de signalement d'une communauté dédié.
