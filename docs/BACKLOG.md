@@ -22,7 +22,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 17b | §13 | Établissements : emplois du temps, parents, frais, bourses | planifié (consentement parental à décider) |
 | 18a | §12 | Santé : consentement, dossier chiffré, rappels | testé (module réglementé, coupé par défaut) |
 | 18b | §12 | Santé : professionnels vérifiés, rendez-vous, partage du dossier, ordonnances | testé (réglementé, coupé par défaut) ; pharmacie, résultats d’examens, assurance, vidéo : différés |
-| 19 | §16 | Administration publique, alertes | planifié |
+| 19 | §16 | Administration publique, alertes, urgences, signalements urbains | **reporté à la demande du propriétaire (2026-11-15)** ; travail déjà codé et testé sur la branche `wip/lot19-services-publics` (migration 0033), à reprendre plus tard |
 | 20 | §21 | Jeux, Play & Win (sans NFT ni argent réel sans décision) | planifié |
 | — | §20, paris | Trading, paris sportifs | **retiré** |
 | — | §18 | CSL Coins | bloqué : règles non spécifiées (question ouverte) |
