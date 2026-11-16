@@ -1,5 +1,13 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import {
+  type BusinessDocument,
+  type BusinessDocumentList,
+  type CreateDocumentRequest,
+  createDocumentRequestSchema,
+  type DocumentListQuery,
+  documentListQuerySchema,
+  type UpdateDocumentStatusRequest,
+  updateDocumentStatusRequestSchema,
   type CancelOrderRequest,
   cancelOrderRequestSchema,
   type CheckoutRequest,
@@ -31,6 +39,7 @@ import { RequireFlag } from '../flags/flag.guard.js';
 import { CurrentMembership, type OrgMembership, OrgPermission } from '../orgs/org.guard.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
 import { CouponsService } from './coupons.service.js';
+import { DocumentsService } from './documents.service.js';
 import { OrdersService } from './orders.service.js';
 import { PaymentMethods } from './payment-methods.js';
 
@@ -87,12 +96,44 @@ export class OrgOrdersController {
   constructor(
     private readonly orders: OrdersService,
     private readonly coupons: CouponsService,
+    private readonly documents: DocumentsService,
   ) {}
 
   @Get('orders')
   @OrgPermission('orders.view')
   list(@CurrentMembership() m: OrgMembership, @Query(new ZodPipe(orderListQuerySchema)) q: OrderListQuery): Promise<OrderList> {
     return this.orders.listForOrg(m.orgId, q);
+  }
+
+  @Post('documents')
+  @OrgPermission('orders.manage')
+  createDocument(@CurrentMembership() m: OrgMembership, @CurrentUser() user: AuthUser, @Body(new ZodPipe(createDocumentRequestSchema)) body: CreateDocumentRequest, @ReqMeta() meta: RequestMeta): Promise<BusinessDocument> {
+    return this.documents.create(m.orgId, user.userId, body, meta);
+  }
+
+  @Get('documents')
+  @OrgPermission('orders.view')
+  listDocuments(@CurrentMembership() m: OrgMembership, @Query(new ZodPipe(documentListQuerySchema)) q: DocumentListQuery): Promise<BusinessDocumentList> {
+    return this.documents.list(m.orgId, q);
+  }
+
+  @Get('documents/:id')
+  @OrgPermission('orders.view')
+  getDocument(@CurrentMembership() m: OrgMembership, @Param('id') id: string): Promise<BusinessDocument> {
+    return this.documents.get(m.orgId, id);
+  }
+
+  @Post('documents/:id/status')
+  @HttpCode(200)
+  @OrgPermission('orders.manage')
+  setDocumentStatus(@CurrentMembership() m: OrgMembership, @CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodPipe(updateDocumentStatusRequestSchema)) body: UpdateDocumentStatusRequest, @ReqMeta() meta: RequestMeta): Promise<BusinessDocument> {
+    return this.documents.setStatus(m.orgId, user.userId, id, body.status, meta);
+  }
+
+  @Post('documents/:id/convert')
+  @OrgPermission('orders.manage')
+  convertQuote(@CurrentMembership() m: OrgMembership, @CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<BusinessDocument> {
+    return this.documents.convert(m.orgId, user.userId, id, meta);
   }
 
   @Get('sales-summary')

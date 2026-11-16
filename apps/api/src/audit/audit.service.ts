@@ -120,6 +120,8 @@ export type AuditAction =
   /** Commerce (lot 5B): metadata {orgId, orderId, number, from, to} / {orgId, couponId, code}. */
   | 'commerce.order_status_changed'
   | 'commerce.coupon_created'
+  | 'commerce.document_created'
+  | 'commerce.document_status'
   | 'commerce.coupon_deactivated'
   /** Services (lot 9): metadata {offerId, orgId?, fields?}. Never a booking note. */
   | 'service.created'

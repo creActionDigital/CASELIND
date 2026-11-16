@@ -707,4 +707,40 @@ describe('seller contact', () => {
     await get(owner, '?days=0').expect(400);
     await get(stranger).expect(404); // non-members do not learn the organisation exists
   });
+
+  it('quotes and invoices: server total and numbering, transitions, quote to invoice once, members only (lot 16c)', async () => {
+    const [owner, other, stranger] = [await user(), await user(), await user()];
+    const orgId = await createOrg(owner);
+    const otherOrg = await createOrg(other);
+    const body = { kind: 'quote', customerName: 'Awa Diallo', customerContact: '+243810000000', currency: 'CDF', lines: [{ description: 'Coupe', quantity: 2, unitPriceMinor: 1500 }, { description: 'Teinture', quantity: 1, unitPriceMinor: 4000 }] };
+    const post = (who: TU, org: string, path: string, b?: Record<string, unknown>) => ctx.http.post(`/v1/orgs/${org}/documents${path}`).set(bearer(who.token)).send(b ?? {});
+    await post(stranger, orgId, '', body).expect(404);
+    await post(owner, orgId, '', { ...body, lines: [] }).expect(400);
+    await post(owner, orgId, '', { ...body, currency: 'EUR' }).expect(400);
+    const q = (await post(owner, orgId, '', body).expect(201)).body;
+    expect(q).toMatchObject({ kind: 'quote', status: 'draft', totalMinor: 7000, currency: 'CDF' });
+    expect(q.number).toMatch(/^DEV-\d{4}-0001$/);
+    expect((await post(owner, orgId, '', { ...body, kind: 'quote' }).expect(201)).body.number).toMatch(/-0002$/);
+    await post(owner, orgId, `/${q.id}/convert`).expect(409); // not accepted yet
+    await post(owner, orgId, `/${q.id}/status`, { status: 'accepted' }).expect(409); // draft cannot jump to accepted
+    await post(owner, orgId, `/${q.id}/status`, { status: 'paid' }).expect(409); // a quote is never paid
+    await post(owner, orgId, `/${q.id}/status`, { status: 'sent' }).expect(200);
+    await post(owner, orgId, `/${q.id}/status`, { status: 'accepted' }).expect(200);
+    const inv = (await post(owner, orgId, `/${q.id}/convert`).expect(201)).body;
+    expect(inv).toMatchObject({ kind: 'invoice', status: 'draft', totalMinor: 7000, sourceQuoteId: q.id });
+    expect(inv.number).toMatch(/^FAC-\d{4}-0001$/);
+    expect((await post(owner, orgId, `/${q.id}/convert`).expect(409)).body.error.details.reason).toBe('already_converted');
+    await post(owner, orgId, `/${inv.id}/status`, { status: 'sent' }).expect(200);
+    expect((await post(owner, orgId, `/${inv.id}/status`, { status: 'paid' }).expect(200)).body.status).toBe('paid');
+    await post(owner, orgId, `/${inv.id}/status`, { status: 'cancelled' }).expect(409); // paid is final
+
+    const list = (kind: string) => ctx.http.get(`/v1/orgs/${orgId}/documents?kind=${kind}`).set(bearer(owner.token));
+    expect((await list('invoice').expect(200)).body.items).toHaveLength(1);
+    expect((await list('quote').expect(200)).body.items).toHaveLength(2);
+    await ctx.http.get(`/v1/orgs/${orgId}/documents/${q.id}`).set(bearer(stranger.token)).expect(404);
+    await ctx.http.get(`/v1/orgs/${otherOrg}/documents/${q.id}`).set(bearer(other.token)).expect(404); // another organisation's document
+    const audits = await ctx.sql.query(`SELECT metadata::text AS md FROM audit_events WHERE action LIKE 'commerce.document_%' AND actor_user_id = $1`, [owner.id]);
+    expect(audits.rows.length).toBeGreaterThan(0);
+    expect(audits.rows.map((r: { md: string }) => r.md).join('')).not.toContain('Awa');
+  });
 });

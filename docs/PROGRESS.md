@@ -460,3 +460,9 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Résultats observés : API 582 tests, typecheck propre.
 - Écran « Ventes » (tuile du tableau de bord vendeur, 7/30/90 jours), i18n fr+en ; mobile 231 tests, typecheck propre ; rendu vérifié à 375 px, avec données seulement par le test API.
 - **Différé** : factures/devis (prochain candidat), CRM, caisse, fidélité, campagnes ; /code-review.
+
+## Lot 16c (suite) — Devis et factures (§14) (2026-11-16) : API testée, écrans mobiles à faire
+- Migration 0036 `business_documents` : devis (DEV-année-0001) et factures (FAC-…), total calculé côté serveur, devises USD/CDF, 1 à 50 lignes. Aucun paiement n'est pris ici : « payée » est seulement un état.
+- Routes `/orgs/{orgId}/documents` (création, liste, détail, statut, conversion devis accepté → une facture brouillon, une seule fois). Transitions contrôlées (409 sinon), membres seulement (404 sinon), audit sans coordonnées du client. OpenAPI + test e2e.
+- Résultats observés : API 583 tests, typecheck propre.
+- Différé : écrans mobiles (liste, création, détail) ; PDF/partage ; CRM, caisse, fidélité, campagnes ; /code-review.

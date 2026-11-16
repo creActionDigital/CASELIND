@@ -77,6 +77,7 @@ import { CatalogPort } from './commerce/catalog.port.js';
 import { CartController } from './cart/cart.controller.js';
 import { CartService } from './cart/cart.service.js';
 import { CouponsService } from './orders/coupons.service.js';
+import { DocumentsService } from './orders/documents.service.js';
 import { OrdersController, OrgOrdersController } from './orders/orders.controller.js';
 import { OrdersService } from './orders/orders.service.js';
 import { PaymentMethods } from './orders/payment-methods.js';
@@ -447,6 +448,7 @@ export class AppModule {
         CartService,
         PaymentMethods,
         CouponsService,
+        DocumentsService,
         OrdersService,
         ReviewsService,
         // Lot 7
