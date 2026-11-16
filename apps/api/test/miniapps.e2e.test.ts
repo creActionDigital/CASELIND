@@ -437,4 +437,46 @@ describe('wallet.pay: a payment request is always confirmed by the user with the
     await ctx.http.post(`/v1/me/miniapp-payment-requests/${revoked.body.id}/confirm`).set(bearer(u.token)).send({ pin: PIN }).expect(409);
     expect(await balance({ kind: 'user', userId: u.id })).toBe(50_00);
   });
+
+  it('validates the amount and currency, and refuses a clientRef reused for other money', async () => {
+    const dev = await publishedApp();
+    const u = await payer();
+    const c = await connect(u, dev);
+    for (const amountMinor of [0, -500, 12.5, 100_000_001]) await request(c.access, `bad-${amountMinor}`, amountMinor).expect(400);
+    await ctx.http.post('/v1/miniapp-api/payment-requests').set(bearer(c.access)).send({ clientRef: 'cur', amountMinor: 100, currency: 'usd' }).expect(400);
+    await ctx.http.post('/v1/miniapp-api/payment-requests').set(bearer(c.access)).send({ clientRef: ' ', amountMinor: 100, currency: 'USD' }).expect(400);
+    await request(c.access, 'same', 1_00).expect(201);
+    await ctx.http.post('/v1/miniapp-api/payment-requests').set(bearer(c.access)).send({ clientRef: 'same', amountMinor: 1_00, currency: 'CDF' }).expect(409);
+  });
+
+  it('never overdraws: confirming more than the balance fails and moves nothing', async () => {
+    const dev = await publishedApp();
+    const u = await payer();
+    const c = await connect(u, dev);
+    const big = await request(c.access, 'big', 80_00).expect(201);
+    const res = await ctx.http.post(`/v1/me/miniapp-payment-requests/${big.body.id}/confirm`).set(bearer(u.token)).send({ pin: PIN });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+    expect(await balance({ kind: 'user', userId: u.id })).toBe(50_00);
+    expect(await balance({ kind: 'org', orgId: dev.orgId })).toBe(0);
+    const seen = await ctx.http.get(`/v1/miniapp-api/payment-requests/${big.body.id}`).set(bearer(c.access)).expect(200);
+    expect(seen.body.status).not.toBe('paid');
+  });
+
+  it('charges once when two confirmations race, and a late decline cannot undo a payment', async () => {
+    const dev = await publishedApp();
+    const u = await payer();
+    const c = await connect(u, dev);
+    const r = await request(c.access, 'race', 10_00).expect(201);
+    const url = `/v1/me/miniapp-payment-requests/${r.body.id}/confirm`;
+    const both = await Promise.all([ctx.http.post(url).set(bearer(u.token)).send({ pin: PIN }), ctx.http.post(url).set(bearer(u.token)).send({ pin: PIN })]);
+    expect(both.every((x) => x.status === 200 || x.status === 409)).toBe(true);
+    expect(await balance({ kind: 'user', userId: u.id })).toBe(40_00);
+    expect(await balance({ kind: 'org', orgId: dev.orgId })).toBe(10_00);
+    const declined = await ctx.http.post(`/v1/me/miniapp-payment-requests/${r.body.id}/decline`).set(bearer(u.token));
+    expect(declined.status === 200 ? declined.body.status : 'paid').toBe('paid');
+    expect(await balance({ kind: 'user', userId: u.id })).toBe(40_00);
+    const stranger = await payer();
+    await ctx.http.post(`/v1/me/miniapp-payment-requests/${r.body.id}/decline`).set(bearer(stranger.token)).expect(404);
+  });
 });

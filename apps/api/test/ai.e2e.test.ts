@@ -290,3 +290,23 @@ describe('AI assistant (lot 12)', () => {
     }
   });
 });
+
+describe('AI input and rights guards', () => {
+  it('rejects anonymous callers, empty or invalid input, and keeps model administration to admins', async () => {
+    const u = await user();
+    await ctx.http.get('/v1/ai/models').expect(401);
+    await ctx.http.post('/v1/ai/conversations').send({}).expect(401);
+    await patchSettings(u, {}).expect(400);
+    await patchSettings(u, { allowFallback: 'yes' }).expect(400);
+    await patchSettings(u, { modelId: '' }).expect(400);
+    const id = await conversation(u);
+    await ask(u, id, '').expect(400);
+    await ask(u, id, '   ').expect(400);
+    await ctx.http.post('/v1/ai/conversations').set(bearer(u.token)).send({ title: 'x'.repeat(81) }).expect(400);
+    // Model administration: 403 for a plain user, whatever the model id.
+    await ctx.http.get('/v1/admin/ai/models').set(bearer(u.token)).expect(403);
+    await ctx.http.patch('/v1/admin/ai/models/groq-llama').set(bearer(u.token)).send({ enabled: true }).expect(403);
+    // Nothing was stored by the refused calls.
+    expect((await ctx.http.get(`/v1/ai/conversations/${id}/messages`).set(bearer(u.token)).expect(200)).body.items).toEqual([]);
+  });
+});

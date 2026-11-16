@@ -281,3 +281,22 @@ describe('rate limit', () => {
     }
   });
 });
+
+describe('query hygiene and rights', () => {
+  it('needs a session, and treats % and _ as plain characters, never as wildcards', async () => {
+    await ctx.http.get('/v1/search?q=abc').expect(401);
+    await ctx.http.get('/v1/me/search-history').expect(401);
+    const viewer = await user();
+    const tag = uniq('wild');
+    await user(`${tag}x1`);
+    const res = await search(viewer, `q=${enc('%%')}&scope=users`).expect(200);
+    expect(res.body.users.items).toEqual([]);
+    const under = await search(viewer, `q=${enc(`${tag.slice(0, 5)}_`)}&scope=users`).expect(200);
+    expect(under.body.users.items).toEqual([]);
+    // Someone else's history entry cannot be deleted.
+    const other = await user();
+    await search(other, `q=${tag}&scope=users`).expect(200);
+    const hist = (await ctx.http.get('/v1/me/search-history').set(bearer(other.token)).expect(200)).body.items as { id: string }[];
+    if (hist.length > 0) await ctx.http.delete(`/v1/me/search-history/${hist[0]!.id}`).set(bearer(viewer.token)).expect(404);
+  });
+});

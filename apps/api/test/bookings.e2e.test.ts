@@ -1,3 +1,4 @@
+import { randomUUID as randomUuid } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
 
@@ -470,5 +471,36 @@ describe('flag services', () => {
       await ctx.sql.query(`UPDATE feature_flags SET enabled = true WHERE key = 'services'`);
     }
     await ctx.http.get('/v1/services').set(bearer(u.token)).expect(200);
+  });
+});
+
+describe('booking guards and frozen price', () => {
+  it('refuses own service, past and off-grid starts, invalid transitions and strangers; the price is frozen at booking', async () => {
+    const { provider, offerId } = await individual();
+    const client = await user();
+    const slot = (await slotsOf(client, offerId, Date.now() + 3 * HOUR, Date.now() + 2 * 24 * HOUR))[0]!;
+
+    const own = await book(provider, offerId, slot.startsAt).expect(403);
+    expect(own.body.error.details.reason).toBe('own_service');
+    await book(client, offerId, new Date(Date.now() - HOUR).toISOString()).expect(400);
+    const offGrid = await book(client, offerId, new Date(new Date(slot.startsAt).getTime() + 7 * 60_000).toISOString()).expect(409);
+    expect(offGrid.body.error.details.reason).toBe('slot_unavailable');
+    await ctx.http.post(`/v1/services/${randomUuid()}/bookings`).set(bearer(client.token)).send({ startsAt: slot.startsAt }).expect(404);
+
+    const b = (await book(client, offerId, slot.startsAt).expect(201)).body;
+    expect(b).toMatchObject({ amountMinor: 2500, currency: 'USD' });
+    // Raising the price afterwards does not change an existing booking.
+    await ctx.http.patch(`/v1/me/services/${offerId}`).set(bearer(provider.token)).send({ priceMinor: 9900 }).expect(200);
+    expect((await ctx.http.get(`/v1/bookings/${b.id}`).set(bearer(client.token)).expect(200)).body.amountMinor).toBe(2500);
+
+    // The client cannot confirm; a stranger sees nothing; transitions are one-way.
+    await act(client, b.id, 'confirm').expect(403);
+    const stranger = await user();
+    await ctx.http.get(`/v1/bookings/${b.id}`).set(bearer(stranger.token)).expect(404);
+    await act(stranger, b.id, 'cancel').expect(404);
+    await act(provider, b.id, 'confirm').expect(200);
+    expect((await act(provider, b.id, 'confirm').expect(409)).body.error.details.reason).toBe('invalid_transition');
+    await act(provider, b.id, 'decline').expect(409);
+    await act(client, b.id, 'quote/accept').expect(409);
   });
 });
