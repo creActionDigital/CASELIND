@@ -28,7 +28,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 20b | §21 | Jeux : tournois et badges non monétaires (autres jeux : différé) | testé (API + mobile ; écran vérifié dans le navigateur) |
 | — | §20, paris | Trading, paris sportifs | **retiré** |
 | — | §18 | CSL Coins | bloqué : règles non spécifiées (question ouverte) |
-| Web | §27 | React + Vite, PWA | planifié, après les lots backend |
+| Web | §27 | React + Vite, PWA | première version faite (accueil, vitrine publique, PWA) ; comptes, catalogue public, swahili, SEO à faire |
 
 ## Ordre imposé
 

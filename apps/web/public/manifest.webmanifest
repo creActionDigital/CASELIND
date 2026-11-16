@@ -1,0 +1,10 @@
+{
+  "name": "CASELIND",
+  "short_name": "CASELIND",
+  "description": "Discutez, achetez, payez, tout au même endroit.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F2F2F7",
+  "theme_color": "#4F46E5",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

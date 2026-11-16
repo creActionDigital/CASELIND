@@ -1,0 +1,17 @@
+{
+  "name": "@caselind/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "tsc --noEmit -p . && vite build",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@caselind/contracts": "*",
+    "react": "*",
+    "react-dom": "*"
+  }
+}

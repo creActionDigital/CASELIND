@@ -492,3 +492,9 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Résultats observés : API 587 tests, mobile 235, typechecks propres.
 - Différé : caisse, fidélité, campagnes (règles non spécifiées au cahier : à cadrer avec le propriétaire), notes sur les clients, rendu à l'écran.
 - Lot 19 (services publics) : marqué abandonné dans BACKLOG, à la demande du propriétaire.
+
+## Web (§27) — première version : site public et PWA (2026-11-16) : testé, vérifié dans le navigateur
+- `apps/web` (React 19 + Vite 8, sans nouveau paquet) : accueil public, **page publique d'une entreprise** `/s/<adresse>` lue sur l'API publique existante (`GET /v1/public/orgs/{slug}` : nom, vérifiée, ville, description, contact, horaires, site en https seulement), français/anglais avec mémoire du choix, clair/sombre automatique, taille de texte du navigateur respectée, PWA installable (manifeste, icône, service worker qui ne met en cache que la coquille statique, jamais l'API).
+- Résultats observés : typecheck propre, 3 tests, `vite build` réussi ; vitrine « Goma Market » et adresse inconnue vérifiées à 375 px.
+- Config : `VITE_API_URL` (défaut `http://localhost:3000`) ; l'API doit autoriser l'origine du site dans `CORS_ORIGINS`.
+- Différé : swahili, catalogue produits public (aucune route publique n'existe encore, seulement les images), connexion et fonctions de compte sur le web, SEO (balises par page, rendu serveur), icônes PNG pour l'installation sur certains téléphones, `package-lock.json` à régénérer par `npm install` (non lancé ici), hébergement et domaine (en attente du propriétaire).
