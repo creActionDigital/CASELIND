@@ -9,6 +9,11 @@ import {
   type ContractList,
   type CreateMissionRequest,
   type CreateProposalRequest,
+  type Freelancer,
+  type FreelancerList,
+  type FreelancerListQuery,
+  type MyFreelanceProfile,
+  type SaveFreelanceProfileRequest,
   type Mission,
   type MissionList,
   type MissionListQuery,
@@ -61,6 +66,7 @@ type MissionRow = {
   description: string;
   budget_minor: string;
   currency: string;
+  category: Mission['category'];
   deadline: string | Date | null;
   status: Mission['status'];
   created_at: Date;
@@ -89,6 +95,7 @@ const toMission = (r: MissionRow, viewerId: string): Mission => ({
   description: r.description,
   budgetMinor: Number(r.budget_minor),
   currency: r.currency.trim(),
+  category: r.category,
   deadline: r.deadline ? iso(r.deadline).slice(0, 10) : null,
   status: r.status,
   client: { id: r.client_id, displayName: r.client_name, handle: r.client_handle },
@@ -98,6 +105,23 @@ const toMission = (r: MissionRow, viewerId: string): Mission => ({
   contractId: r.contract_id,
   createdAt: iso(r.created_at),
 });
+
+type ProfileRow = {
+  id: string; user_id: string; enabled: boolean; title: string; skills: string[]; categories: string[]; rate_minor: string | null; rate_currency: string | null;
+  bio: string; created_at: Date; updated_at: Date; display_name: string; handle: string;
+};
+const profileBase = sql`
+  SELECT p.id, p.user_id, p.enabled, p.title, p.skills, p.categories, p.rate_minor, p.rate_currency, p.bio, p.created_at, p.updated_at, u.display_name, u.handle::text AS handle
+  FROM freelance_profiles p JOIN users u ON u.id = p.user_id`;
+const toProfileFields = (r: ProfileRow) => ({
+  title: r.title,
+  skills: r.skills,
+  categories: r.categories as Mission['category'][],
+  rateMinor: r.rate_minor === null ? null : Number(r.rate_minor),
+  rateCurrency: r.rate_currency === null ? null : (r.rate_currency.trim() as 'USD' | 'CDF'),
+  bio: r.bio,
+});
+const textArray = (a: string[]): SQL => (a.length ? sql`ARRAY[${sql.join(a.map((x) => sql`${x}`), sql`, `)}]::text[]` : sql`'{}'::text[]`);
 
 /** Freelance: missions, proposals, contracts with milestones, reviews and disputes. Payments are external (no money moves here). */
 @Injectable()
@@ -139,8 +163,8 @@ export class FreelanceService implements OnModuleInit {
       const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM missions WHERE client_id = ${userId}::uuid AND status = 'open'`);
       if ((n.rows[0]?.n ?? 0) >= MAX_OPEN_MISSIONS) throw AppError.conflict(`At most ${MAX_OPEN_MISSIONS} open missions`, { reason: 'mission_limit', max: MAX_OPEN_MISSIONS });
       const res = await tx.execute<{ id: string }>(sql`
-        INSERT INTO missions (client_id, title, description, budget_minor, currency, deadline)
-        VALUES (${userId}::uuid, ${body.title}, ${body.description}, ${body.budgetMinor}, ${body.currency}, ${body.deadline}::date) RETURNING id`);
+        INSERT INTO missions (client_id, title, description, budget_minor, currency, deadline, category)
+        VALUES (${userId}::uuid, ${body.title}, ${body.description}, ${body.budgetMinor}, ${body.currency}, ${body.deadline}::date, ${body.category}) RETURNING id`);
       const missionId = res.rows[0]!.id;
       await this.audit.record({ action: 'freelance.mission_created', actorUserId: userId, meta, metadata: { missionId } }, tx);
       return missionId;
@@ -157,7 +181,7 @@ export class FreelanceService implements OnModuleInit {
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
         UPDATE missions SET title = ${body.title ?? cur.title}, description = ${body.description ?? cur.description},
-          budget_minor = ${body.budgetMinor ?? cur.budgetMinor}, deadline = ${deadline}::date, updated_at = now() WHERE id = ${id}::uuid`);
+          budget_minor = ${body.budgetMinor ?? cur.budgetMinor}, category = ${body.category ?? cur.category}, deadline = ${deadline}::date, updated_at = now() WHERE id = ${id}::uuid`);
       await this.audit.record({ action: 'freelance.mission_updated', actorUserId: userId, meta, metadata: { missionId: id } }, tx);
     });
     return this.getMission(userId, id);
@@ -188,6 +212,7 @@ export class FreelanceService implements OnModuleInit {
   async listMissions(viewerId: string, q: MissionListQuery): Promise<MissionList> {
     const f: SQL[] = [sql`m.status = 'open'`, sql`NOT m.hidden`, unblockedSql(viewerId), ...cursorFilter('m', q.cursor)];
     if (q.currency) f.push(sql`m.currency = ${q.currency}`);
+    if (q.category) f.push(sql`m.category = ${q.category}`);
     if (q.minBudgetMinor !== undefined) f.push(sql`m.budget_minor >= ${q.minBudgetMinor}`);
     if (q.maxBudgetMinor !== undefined) f.push(sql`m.budget_minor <= ${q.maxBudgetMinor}`);
     if (q.q) f.push(sql`(m.title ILIKE ${'%' + escapeLike(q.q) + '%'} OR m.description ILIKE ${'%' + escapeLike(q.q) + '%'})`);
@@ -207,12 +232,54 @@ export class FreelanceService implements OnModuleInit {
 
   private missionBase(viewerId: string): SQL {
     return sql`
-      SELECT m.id, m.title, m.description, m.budget_minor, m.currency, m.deadline, m.status, m.created_at,
+      SELECT m.id, m.title, m.description, m.budget_minor, m.currency, m.category, m.deadline, m.status, m.created_at,
         u.id AS client_id, u.display_name AS client_name, u.handle::text AS client_handle,
         CASE WHEN m.client_id = ${viewerId}::uuid THEN (SELECT count(*)::int FROM mission_proposals p WHERE p.mission_id = m.id AND p.status <> 'withdrawn') END AS proposal_count,
         (SELECT p.id FROM mission_proposals p WHERE p.mission_id = m.id AND p.freelancer_id = ${viewerId}::uuid) AS my_proposal_id,
         (SELECT c.id FROM freelance_contracts c WHERE c.mission_id = m.id AND (c.client_id = ${viewerId}::uuid OR c.freelancer_id = ${viewerId}::uuid)) AS contract_id
       FROM missions m JOIN users u ON u.id = m.client_id`;
+  }
+
+  // ---- Public freelancer profiles (lot 16e) --------------------------------------------------------
+
+  async myProfile(userId: string): Promise<MyFreelanceProfile> {
+    const res = await this.db.execute<ProfileRow>(sql`${profileBase} WHERE p.user_id = ${userId}::uuid`);
+    return res.rows[0] ? { enabled: res.rows[0].enabled, ...toProfileFields(res.rows[0]), updatedAt: iso(res.rows[0].updated_at) } : { enabled: false, title: '', skills: [], categories: [], rateMinor: null, rateCurrency: null, bio: '', updatedAt: null };
+  }
+
+  /** Create or update my profile; `enabled` publishes it or takes it down (data is kept for later). Audited without content. */
+  async saveProfile(userId: string, b: SaveFreelanceProfileRequest, meta: RequestMeta): Promise<MyFreelanceProfile> {
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO freelance_profiles (user_id, enabled, title, skills, categories, rate_minor, rate_currency, bio)
+        VALUES (${userId}::uuid, ${b.enabled}, ${b.title}, ${textArray([...new Set(b.skills)])}, ${textArray([...new Set(b.categories)])}, ${b.rateMinor}, ${b.rateCurrency}, ${b.bio})
+        ON CONFLICT (user_id) DO UPDATE SET enabled = EXCLUDED.enabled, title = EXCLUDED.title, skills = EXCLUDED.skills, categories = EXCLUDED.categories,
+          rate_minor = EXCLUDED.rate_minor, rate_currency = EXCLUDED.rate_currency, bio = EXCLUDED.bio, updated_at = now()`);
+      await this.audit.record({ action: b.enabled ? 'freelance.profile_saved' : 'freelance.profile_disabled', actorUserId: userId, meta, metadata: {} }, tx);
+    });
+    return this.myProfile(userId);
+  }
+
+  /** Enabled profiles only, not blocked either way; handle and display name are the only identity shown. */
+  async listFreelancers(viewerId: string, q: FreelancerListQuery): Promise<FreelancerList> {
+    const f: SQL[] = [
+      sql`p.enabled`,
+      sql`NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${viewerId}::uuid AND b.blocked_id = p.user_id) OR (b.blocker_id = p.user_id AND b.blocked_id = ${viewerId}::uuid))`,
+      ...cursorFilter('p', q.cursor),
+    ];
+    if (q.skill) f.push(sql`${q.skill} = ANY (p.skills)`);
+    if (q.category) f.push(sql`${q.category} = ANY (p.categories)`);
+    if (q.q) {
+      const like = '%' + escapeLike(q.q.toLowerCase()) + '%';
+      f.push(sql`(p.title ILIKE ${like} OR p.bio ILIKE ${like} OR EXISTS (SELECT 1 FROM unnest(p.skills) s WHERE s LIKE ${like}))`);
+    }
+    const res = await this.db.execute<ProfileRow>(sql`${profileBase} WHERE ${sql.join(f, sql` AND `)} ORDER BY p.created_at DESC, p.id DESC LIMIT ${q.limit + 1}`);
+    const rows = res.rows.slice(0, q.limit);
+    const last = rows[rows.length - 1];
+    return {
+      items: rows.map((r): Freelancer => ({ user: { id: r.user_id, displayName: r.display_name, handle: r.handle }, ...toProfileFields(r) })),
+      nextCursor: res.rows.length > q.limit && last ? encodeCursor(last.created_at, last.id) : null,
+    };
   }
 
   // ---- Proposals --------------------------------------------------------------------------------

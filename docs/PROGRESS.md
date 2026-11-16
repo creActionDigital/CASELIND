@@ -557,3 +557,18 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : bouton « Examen blanc » dans la fiche, écran `education/exam/[id]` (compte à rebours sur l'échéance serveur, correction, historique), durée saisie dans l'atelier de l'auteur ; textes fr+en.
 - Testé : e2e éducation + openapi + compte 26/26 ; mobile 236/236 ; tsc API et mobile sans erreur. Non testé : affichage réel à l'écran, suite API complète.
 - Différé : une tentative expirée sans copie n'apparaît pas dans l'historique (seules les copies corrigées) ; les 3 tentatives/jour sont comptées en jour UTC ; pas de sélection d'un sous-ensemble de questions (toutes les questions du quiz, en ordre aléatoire) ; pas de notification de fin de temps.
+
+## Lot 15b : alertes de recherche d'annonces
+- Migration 0046 `listing_alerts` (q, city, kind ; au moins un critère ; ON DELETE CASCADE), 5 alertes max par personne (409 `alert_limit`), privées.
+- API : `GET/POST /v1/me/listing-alerts`, `DELETE /v1/me/listing-alerts/:id` (`ListingAlertsController`), audit `listing.alert_created/deleted` sans critères, export de compte `listingAlerts`, OpenAPI à jour.
+- À la publication (`ListingsService.create`), `notifyAlerts` (même filtre que `GET /listings`, hors auteur, blocages dans les deux sens, 500 max, titre générique, catégorie `commerce`, au mieux).
+- Mobile : écran `listings/alerts.tsx`, cloche dans l'en-tête des annonces, textes fr+en ; test e2e dans `listings.e2e.test.ts`.
+- Différé : pas de notification à la réactivation par la modération ni à la modification d'une annonce ; alertes sur prix/devise non gérées ; pas de lot de plus de 500 destinataires.
+
+## Lot 16e — Freelance : catégories de missions et profils publics (2026-11-16) : testé (API et logique mobile), écrans non vérifiés dans le navigateur
+- **Catégories** : migration 0047, colonne `missions.category` (défaut `autre`), 8 slugs fixes (`design, developpement, redaction, traduction, marketing, comptabilite, formation, autre`) dans les contrats ; choisie à la création, modifiable tant que la mission est ouverte, filtre `category` sur `GET /v1/missions` ; sélecteur dans `freelance/new.tsx`, filtre en puces dans la liste.
+- **Profils publics** : table `freelance_profiles` (opt-in, désactivé par défaut ; titre 120, 15 compétences en minuscules, 1 à 5 catégories, tarif facultatif USD/CDF, bio 1000), `GET/PUT /v1/me/freelance-profile` (PUT avec `enabled` publie ou retire ; données conservées), `GET /v1/freelancers` (q, skill, category, curseur ; activés seulement, blocages respectés dans les deux sens, handle + nom affichés seulement). Même drapeau `freelance`.
+- Export de compte : `freelance.profile` ; suppression avec le compte par `ON DELETE CASCADE` ; audit `freelance.profile_saved|profile_disabled` sans contenu ; OpenAPI à jour (registry, test à double sens).
+- Mobile : `freelance/profile.tsx` (activer, modifier) et `freelance/freelancers.tsx` (recherche, accès depuis l'en-tête de la liste), textes fr+en dans `freelance/messages.ts` ; couleur de marque unie, aucun dégradé.
+- Tests : `freelance.e2e.test.ts` + openapi + account : 26 tests verts ; mobile : 237 tests verts. Non testé : suppression de compte réelle (cascade SQL seulement) ; non vérifié à l'écran.
+- **Différé** : catégorie visible sur la fiche mission, plusieurs catégories dans l'écran du profil (l'API en accepte 5, l'écran en propose une), page de profil individuelle d'un freelance, contact/invitation d'un freelance vers une mission, signalement d'un profil.

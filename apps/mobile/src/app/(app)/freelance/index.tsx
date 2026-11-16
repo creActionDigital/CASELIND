@@ -4,9 +4,11 @@ import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
+import type { MissionCategory } from '@caselind/contracts';
 import { fetchMissions, frKeys } from '../../../freelance/api';
+import { categoryKey, CATEGORY_VALUES } from '../../../freelance/logic';
 import { useDebouncedValue } from '../../../search/api';
-import { Card, PagedList } from '../../../seller/ui';
+import { Card, Chips, PagedList } from '../../../seller/ui';
 import { formatMoney } from '../../../shop/format';
 import { spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -18,11 +20,13 @@ export default function Freelance() {
   const { t, locale } = useI18n();
   const router = useRouter();
   const [text, setText] = useState('');
+  const [category, setCategory] = useState<MissionCategory | 'all'>('all');
   const q = useDebouncedValue(text.trim());
+  const cat = category === 'all' ? null : category;
   const query = useInfiniteQuery({
-    queryKey: frKeys.list(q),
+    queryKey: frKeys.list(q, category),
     initialPageParam: undefined as string | undefined,
-    queryFn: ({ pageParam }) => fetchMissions(q, pageParam),
+    queryFn: ({ pageParam }) => fetchMissions(q, cat, pageParam),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
 
@@ -33,6 +37,7 @@ export default function Freelance() {
           title: t('freelance.title'),
           headerRight: () => (
             <View style={styles.actions}>
+              <IconButton icon="people-outline" label={t('freelance.freelancers')} onPress={() => router.push('/freelance/freelancers')} />
               <IconButton icon="albums-outline" label={t('freelance.mine')} onPress={() => router.push('/freelance/mine')} />
               <IconButton icon="add-circle-outline" label={t('freelance.new')} onPress={() => router.push('/freelance/new')} />
             </View>
@@ -45,6 +50,11 @@ export default function Freelance() {
         header={
           <View style={styles.pad}>
             <TextField label={t('freelance.search')} value={text} onChangeText={setText} returnKeyType="search" autoCapitalize="none" />
+            <Chips
+              options={[{ value: 'all' as const, label: t('freelance.all') }, ...CATEGORY_VALUES.map((c) => ({ value: c, label: t(categoryKey(c)) }))]}
+              value={category}
+              onChange={setCategory}
+            />
           </View>
         }
         renderItem={({ item }) => (

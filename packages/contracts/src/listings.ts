@@ -82,3 +82,24 @@ export type Listing = z.infer<typeof listingSchema>;
 
 export const listingListSchema = z.object({ items: z.array(listingSchema), nextCursor: z.string().nullable() });
 export type ListingList = z.infer<typeof listingListSchema>;
+
+/** Listing alerts (lot 15b): up to 5 per person, private, at least one criterion. */
+export const MAX_LISTING_ALERTS = 5;
+export const createListingAlertRequestSchema = z
+  .object({
+    q: z.string().trim().min(1).max(100).optional(),
+    city: z.string().trim().min(1).max(80).optional(),
+    kind: listingKindSchema.optional(),
+  })
+  .refine((v) => v.q !== undefined || v.city !== undefined || v.kind !== undefined, { path: ['q'], message: 'at least one criterion is required' });
+export type CreateListingAlertRequest = z.infer<typeof createListingAlertRequestSchema>;
+export const listingAlertSchema = z.object({
+  id: z.uuid(),
+  q: z.string().nullable(),
+  city: z.string().nullable(),
+  kind: listingKindSchema.nullable(),
+  createdAt: z.string(),
+});
+export type ListingAlert = z.infer<typeof listingAlertSchema>;
+export const listingAlertListSchema = z.object({ items: z.array(listingAlertSchema) });
+export type ListingAlertList = z.infer<typeof listingAlertListSchema>;

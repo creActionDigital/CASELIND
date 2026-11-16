@@ -59,6 +59,8 @@ export type AuditAction =
   | 'listing.created'
   | 'listing.updated'
   | 'listing.closed'
+  | 'listing.alert_created'
+  | 'listing.alert_deleted'
   /** Jobs (lot 16a): metadata ids and statuses only, never a CV, a message or a name. */
   | 'job.posted'
   | 'job.updated'
@@ -85,6 +87,8 @@ export type AuditAction =
   | 'freelance.review_left'
   | 'freelance.dispute_opened'
   | 'freelance.dispute_resolved'
+  | 'freelance.profile_saved'
+  | 'freelance.profile_disabled'
   /** Education (lot 17a): ids and scores only, never lesson text, answers or a name. */
   | 'education.course_created'
   | 'education.course_published'

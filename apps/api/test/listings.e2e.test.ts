@@ -135,6 +135,37 @@ describe('classified ads (lot 15)', () => {
     expect(exp.budgets).toEqual([{ currency: 'USD', limitMinor: 700 }]);
   });
 
+  it('keeps up to 5 private alerts and notifies matching people on a new ad (not the author, not blocked ones)', async () => {
+    const [author, seeker, other, blocked] = [await user(), await user(), await user(), await user()];
+    const alerts = '/v1/me/listing-alerts';
+    await ctx.http.post(alerts).set(bearer(seeker.token)).send({}).expect(400);
+    const a = (await ctx.http.post(alerts).set(bearer(seeker.token)).send({ q: 'studio', city: 'goma' }).expect(201)).body;
+    expect(a).toMatchObject({ q: 'studio', city: 'goma', kind: null });
+    await ctx.http.post(alerts).set(bearer(other.token)).send({ kind: 'vehicle' }).expect(201);
+    await ctx.http.post(alerts).set(bearer(author.token)).send({ city: 'Goma' }).expect(201);
+    await ctx.http.post(alerts).set(bearer(blocked.token)).send({ city: 'Goma' }).expect(201);
+    for (let i = 0; i < 4; i++) await ctx.http.post(alerts).set(bearer(seeker.token)).send({ kind: 'lost' }).expect(201);
+    await ctx.http.post(alerts).set(bearer(seeker.token)).send({ q: 'x' }).expect(409);
+    expect((await ctx.http.get(alerts).set(bearer(other.token)).expect(200)).body.items).toHaveLength(1);
+    await ctx.http.put(`/v1/blocks/${blocked.id}`).set(bearer(author.token)).expect(204);
+
+    await create(author, ad({ description: 'Texte confidentiel' })).expect(201);
+    const count = async (u: TU) => Number((await ctx.sql.query(`SELECT count(*) AS n FROM notifications WHERE user_id = $1 AND title LIKE 'Nouvelle annonce correspondant%'`, [u.id])).rows[0].n);
+    expect([await count(seeker), await count(other), await count(author), await count(blocked)]).toEqual([1, 0, 0, 0]);
+    expect(JSON.stringify((await ctx.sql.query('SELECT title, body FROM notifications WHERE user_id = $1', [seeker.id])).rows)).not.toContain('confidentiel');
+
+    const audits = await ctx.sql.query(`SELECT metadata::text AS m FROM audit_events WHERE subject_user_id = $1 AND action = 'listing.alert_created'`, [seeker.id]);
+    expect(audits.rows.length).toBe(5);
+    expect(JSON.stringify(audits.rows)).not.toContain('studio');
+    expect((await ctx.http.get('/v1/me/export').set(bearer(seeker.token)).expect(200)).body.listingAlerts).toHaveLength(5);
+
+    await ctx.http.delete(`${alerts}/${a.id}`).set(bearer(other.token)).expect(204); // not theirs: no effect
+    expect((await ctx.http.get(alerts).set(bearer(seeker.token)).expect(200)).body.items).toHaveLength(5);
+    await ctx.http.delete(`${alerts}/${a.id}`).set(bearer(seeker.token)).expect(204);
+    await ctx.http.delete(`${alerts}/${a.id}`).set(bearer(seeker.token)).expect(204);
+    expect((await ctx.http.get(alerts).set(bearer(seeker.token)).expect(200)).body.items).toHaveLength(4);
+  });
+
   it('is off when the flag is off', async () => {
     const a = await user();
     await ctx.sql.query(`UPDATE feature_flags SET enabled = false WHERE key = 'listings'`);

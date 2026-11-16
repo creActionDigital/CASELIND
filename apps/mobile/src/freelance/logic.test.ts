@@ -23,3 +23,11 @@ describe('freelance logic', () => {
     expect(canReview({ status: 'active', myReview: null })).toBe(false);
   });
 });
+
+import { parseSkills } from './logic';
+describe('parseSkills', () => {
+  it('trims, lowercases, dedupes and caps at 15', () => {
+    expect(parseSkills(' Figma, logo ,figma,,')).toEqual(['figma', 'logo']);
+    expect(parseSkills(Array.from({ length: 20 }, (_, i) => 's' + i).join(','))).toHaveLength(15);
+  });
+});

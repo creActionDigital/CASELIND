@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { exportedKycSchema } from './kyc.js';
+import { myFreelanceProfileSchema } from './freelance.js';
 import { exportedHealthSchema } from './health.js';
 import { sessionSchema } from './auth.js';
 import { mediaMimeSchema, mediaPurposeSchema, mediaStatusSchema } from './media.js';
@@ -127,6 +128,7 @@ export const accountExportSchema = z.object({
   ),
   /** Lot 16a: own CV and own applications (with the message sent; never other people's data). */
   jobProfile: z.object({ headline: z.string(), summary: z.string(), skills: z.array(z.string()), city: z.string(), experience: z.string(), education: z.string() }).nullable(),
+  listingAlerts: z.array(z.object({ id: z.uuid(), q: z.string().nullable(), city: z.string().nullable(), kind: z.string().nullable(), createdAt: z.string() })),
   jobAlerts: z.array(z.object({ id: z.uuid(), q: z.string().nullable(), city: z.string().nullable(), contractType: z.string().nullable(), createdAt: z.string() })),
   jobApplications: z.array(z.object({ id: z.uuid(), jobTitle: z.string(), orgName: z.string(), status: z.string(), message: z.string(), createdAt: z.string() })),
   /** Lot 16b: own missions, proposals and contracts (titles, amounts, statuses; never the other party's data beyond the handle). */
@@ -134,6 +136,8 @@ export const accountExportSchema = z.object({
     missions: z.array(z.object({ id: z.uuid(), title: z.string(), budgetMinor: z.number().int(), currency: z.string(), status: z.string(), createdAt: z.string() })),
     proposals: z.array(z.object({ id: z.uuid(), missionTitle: z.string(), amountMinor: z.number().int(), deliveryDays: z.number().int(), message: z.string(), status: z.string(), createdAt: z.string() })),
     contracts: z.array(z.object({ id: z.uuid(), missionTitle: z.string(), role: z.string(), counterpartyHandle: z.string(), amountMinor: z.number().int(), currency: z.string(), status: z.string(), createdAt: z.string() })),
+    /** Lot 16e: own public freelancer profile (null if never saved). */
+    profile: myFreelanceProfileSchema.nullable(),
   }),
   /** Lot 18a: own health data, decrypted (right of access). Empty when nothing was ever stored. */
   health: exportedHealthSchema,

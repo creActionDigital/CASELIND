@@ -1,10 +1,16 @@
-import type { Contract, Milestone } from '@caselind/contracts';
+import { missionCategories, type Contract, type Milestone, type MissionCategory } from '@caselind/contracts';
 import { ApiRequestError } from '../lib/api';
 import type { MessageKey } from '../i18n';
 
 export const contractStatusKey = (s: Contract['status']): MessageKey => `freelance.contract.${s}` as MessageKey;
 export const milestoneStatusKey = (s: Milestone['status']): MessageKey => `freelance.milestone.${s}` as MessageKey;
 export const proposalStatusKey = (s: 'proposed' | 'accepted' | 'rejected' | 'withdrawn'): MessageKey => `freelance.proposal.${s}` as MessageKey;
+
+export const categoryKey = (c: MissionCategory): MessageKey => `freelance.cat.${c}` as MessageKey;
+export const CATEGORY_VALUES = missionCategories;
+
+/** Compétences saisies séparées par des virgules : minuscules, sans doublon, 15 au plus. */
+export const parseSkills = (raw: string): string[] => [...new Set(raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean))].slice(0, 15);
 
 /** Actions proposées sur un jalon selon le rôle et l'état ; le serveur reste la référence. */
 export type MilestoneAction = 'deliver' | 'approve' | 'revision';

@@ -1,6 +1,10 @@
 import {
   contractListSchema,
   contractSchema,
+  freelancerListSchema,
+  myFreelanceProfileSchema,
+  type MissionCategory,
+  type SaveFreelanceProfileRequest,
   missionListSchema,
   missionSchema,
   proposalListSchema,
@@ -14,7 +18,9 @@ const PAGE = 20;
 
 export const frKeys = {
   all: ['freelance'] as const,
-  list: (q: string) => ['freelance', 'list', q] as const,
+  list: (q: string, category: string) => ['freelance', 'list', q, category] as const,
+  freelancers: (q: string, category: string) => ['freelance', 'freelancers', q, category] as const,
+  profile: ['freelance', 'profile'] as const,
   mission: (id: string) => ['freelance', 'mission', id] as const,
   proposals: (id: string) => ['freelance', 'proposals', id] as const,
   myMissions: ['freelance', 'my-missions'] as const,
@@ -23,7 +29,12 @@ export const frKeys = {
   contract: (id: string) => ['freelance', 'contract', id] as const,
 };
 
-export const fetchMissions = (q: string, cursor?: string) => api.request('/missions', { query: { q: q || undefined, limit: PAGE, cursor }, schema: missionListSchema });
+export const fetchMissions = (q: string, category: MissionCategory | null, cursor?: string) =>
+  api.request('/missions', { query: { q: q || undefined, category: category ?? undefined, limit: PAGE, cursor }, schema: missionListSchema });
+export const fetchFreelancers = (q: string, category: MissionCategory | null, cursor?: string) =>
+  api.request('/freelancers', { query: { q: q || undefined, category: category ?? undefined, limit: PAGE, cursor }, schema: freelancerListSchema });
+export const fetchMyProfile = () => api.request('/me/freelance-profile', { schema: myFreelanceProfileSchema });
+export const saveMyProfile = (body: SaveFreelanceProfileRequest) => api.request('/me/freelance-profile', { method: 'PUT', body, schema: myFreelanceProfileSchema });
 export const fetchMission = (id: string) => api.request(`/missions/${id}`, { schema: missionSchema });
 export const createMission = (body: CreateMissionRequest) => api.request('/missions', { method: 'POST', body, schema: missionSchema });
 export const closeMission = (id: string) => api.request(`/missions/${id}/close`, { method: 'POST', schema: missionSchema });

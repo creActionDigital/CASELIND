@@ -1,5 +1,9 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import {
+  type CreateListingAlertRequest,
+  createListingAlertRequestSchema,
+  type ListingAlert,
+  type ListingAlertList,
   type CreateListingRequest,
   createListingRequestSchema,
   type Listing,
@@ -57,5 +61,28 @@ export class ListingsController {
   @HttpCode(200)
   close(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<Listing> {
     return this.listings.close(user.userId, id, meta);
+  }
+}
+
+/** Ad alerts (lot 15b): private to their owner. */
+@Controller('me/listing-alerts')
+@RequireFlag('listings')
+export class ListingAlertsController {
+  constructor(private readonly listings: ListingsService) {}
+
+  @Get()
+  list(@CurrentUser() user: AuthUser): Promise<ListingAlertList> {
+    return this.listings.listAlerts(user.userId);
+  }
+
+  @Post()
+  create(@CurrentUser() user: AuthUser, @Body(new ZodPipe(createListingAlertRequestSchema)) body: CreateListingAlertRequest, @ReqMeta() meta: RequestMeta): Promise<ListingAlert> {
+    return this.listings.createAlert(user.userId, body, meta);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  async remove(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<void> {
+    await this.listings.deleteAlert(user.userId, id, meta);
   }
 }

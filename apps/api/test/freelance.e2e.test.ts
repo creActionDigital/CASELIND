@@ -260,3 +260,95 @@ describe('freelance contracts (lot 16b)', () => {
     }
   });
 });
+
+describe('mission categories (lot 16e)', () => {
+  it('defaults to autre, validates, filters the list and can be changed while open', async () => {
+    const [client, seeker] = [await user(), await user()];
+    const a = (await postMission(client, mission({ title: 'Logo' , category: 'design' })).expect(201)).body;
+    const b = (await postMission(client, mission({ title: 'Sans catégorie' })).expect(201)).body;
+    expect(a.category).toBe('design');
+    expect(b.category).toBe('autre');
+    await postMission(client, mission({ category: 'cuisine' })).expect(400);
+    const list = (qs: string) => ctx.http.get(`/v1/missions${qs}`).set(bearer(seeker.token));
+    expect(ids(await list('?category=design').expect(200))).toEqual([a.id]);
+    const autre = ids(await list('?category=autre').expect(200));
+    expect(autre).toContain(b.id);
+    expect(autre).not.toContain(a.id);
+    await list('?category=cuisine').expect(400);
+    const upd = await ctx.http.patch(`/v1/missions/${b.id}`).set(bearer(client.token)).send({ category: 'traduction' }).expect(200);
+    expect(upd.body.category).toBe('traduction');
+    await ctx.http.post(`/v1/missions/${b.id}/close`).set(bearer(client.token)).expect(200);
+    await ctx.http.patch(`/v1/missions/${b.id}`).set(bearer(client.token)).send({ category: 'design' }).expect(409);
+  });
+});
+
+describe('public freelancer profiles (lot 16e)', () => {
+  const profile = (extra: Record<string, unknown> = {}) => ({ enabled: true, title: 'Designer graphique', skills: ['Figma', 'logo', 'figma'], categories: ['design'], rateMinor: 2_500, rateCurrency: 'USD', bio: 'Dix ans d’expérience', ...extra });
+  const save = (u: TU, body: Record<string, unknown>) => ctx.http.put('/v1/me/freelance-profile').set(bearer(u.token)).send(body);
+  const search = (u: TU, qs = '') => ctx.http.get(`/v1/freelancers${qs}`).set(bearer(u.token));
+
+  it('is off by default, opt-in, validated, searchable and removable; exposes no contact data', async () => {
+    const [fl, seeker] = [await user(), await user()];
+    const blank = (await ctx.http.get('/v1/me/freelance-profile').set(bearer(fl.token)).expect(200)).body;
+    expect(blank).toMatchObject({ enabled: false, title: '', skills: [], updatedAt: null });
+    await ctx.http.get('/v1/freelancers').expect(401);
+    expect(ids2(await search(seeker, '?skill=figma').expect(200))).not.toContain(fl.id);
+
+    await save(fl, profile({ title: 'ab' })).expect(400);
+    await save(fl, profile({ skills: Array.from({ length: 16 }, (_, i) => `s${i}`) })).expect(400);
+    await save(fl, profile({ bio: 'x'.repeat(1001) })).expect(400);
+    await save(fl, profile({ rateCurrency: 'EUR' })).expect(400);
+    await save(fl, profile({ rateCurrency: null })).expect(400);
+    await save(fl, profile({ categories: ['cuisine'] })).expect(400);
+
+    const saved = (await save(fl, profile()).expect(200)).body;
+    expect(saved).toMatchObject({ enabled: true, skills: ['figma', 'logo'], rateMinor: 2_500, rateCurrency: 'USD' });
+    const found = await search(seeker, '?skill=figma').expect(200);
+    expect(ids2(found)).toContain(fl.id);
+    const item = found.body.items.find((i: { user: { id: string } }) => i.user.id === fl.id);
+    expect(Object.keys(item.user).sort()).toEqual(['displayName', 'handle', 'id']);
+    expect(JSON.stringify(item)).not.toMatch(/email|phone/i);
+    expect(ids2(await search(seeker, '?category=design').expect(200))).toContain(fl.id);
+    expect(ids2(await search(seeker, '?category=marketing').expect(200))).not.toContain(fl.id);
+    expect(ids2(await search(seeker, '?q=graphique').expect(200))).toContain(fl.id);
+    expect(ids2(await search(seeker, '?skill=cobol').expect(200))).not.toContain(fl.id);
+    await search(seeker, '?category=cuisine').expect(400);
+
+    // Blocked either way: hidden.
+    await ctx.http.put(`/v1/blocks/${fl.id}`).set(bearer(seeker.token)).expect(204);
+    expect(ids2(await search(seeker, '?skill=figma').expect(200))).not.toContain(fl.id);
+    await ctx.http.delete(`/v1/blocks/${fl.id}`).set(bearer(seeker.token)).expect(204);
+    await ctx.http.put(`/v1/blocks/${seeker.id}`).set(bearer(fl.token)).expect(204);
+    expect(ids2(await search(seeker, '?skill=figma').expect(200))).not.toContain(fl.id);
+    await ctx.http.delete(`/v1/blocks/${seeker.id}`).set(bearer(fl.token)).expect(204);
+
+    // Disabling hides it but keeps my data; audits carry no content.
+    await save(fl, profile({ enabled: false })).expect(200);
+    expect(ids2(await search(seeker, '?skill=figma').expect(200))).not.toContain(fl.id);
+    expect((await ctx.http.get('/v1/me/freelance-profile').set(bearer(fl.token)).expect(200)).body).toMatchObject({ enabled: false, title: 'Designer graphique' });
+    const audits = await ctx.sql.query<{ action: string; metadata: unknown }>(`SELECT action, metadata FROM audit_events WHERE actor_user_id = $1 AND action LIKE 'freelance.profile_%' ORDER BY occurred_at`, [fl.id]);
+    expect(audits.rows.map((r) => r.action)).toEqual(['freelance.profile_saved', 'freelance.profile_disabled']);
+    expect(JSON.stringify(audits.rows)).not.toContain('Designer');
+  });
+
+  it('pages with a cursor, appears in the account export, and is behind the flag', async () => {
+    const [a, b, seeker] = [await user(), await user(), await user()];
+    await save(a, profile({ skills: ['pagetest'] })).expect(200);
+    await save(b, profile({ skills: ['pagetest'] })).expect(200);
+    const p1 = await search(seeker, '?skill=pagetest&limit=1').expect(200);
+    expect(p1.body.items).toHaveLength(1);
+    const p2 = await search(seeker, `?skill=pagetest&limit=1&cursor=${p1.body.nextCursor}`).expect(200);
+    expect(p2.body.items).toHaveLength(1);
+    expect(p2.body.nextCursor).toBeNull();
+    expect(new Set([p1.body.items[0].user.id, p2.body.items[0].user.id])).toEqual(new Set([a.id, b.id]));
+    const exp = await ctx.http.get('/v1/me/export').set(bearer(a.token)).expect(200);
+    expect(exp.body.freelance.profile).toMatchObject({ enabled: true, title: 'Designer graphique', skills: ['pagetest'] });
+    await ctx.sql.query(`UPDATE feature_flags SET enabled = false WHERE key = 'freelance'`);
+    try {
+      await search(seeker).expect(403);
+    } finally {
+      await ctx.sql.query(`UPDATE feature_flags SET enabled = true WHERE key = 'freelance'`);
+    }
+  });
+});
+const ids2 = (res: { body: { items: { user: { id: string } }[] } }) => res.body.items.map((i) => i.user.id);

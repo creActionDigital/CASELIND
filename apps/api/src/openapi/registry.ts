@@ -307,15 +307,19 @@ import {
   createMissionRequestSchema,
   createProposalRequestSchema,
   deliverMilestoneRequestSchema,
+  freelancerListQuerySchema,
+  freelancerListSchema,
   missionListQuerySchema,
   missionListSchema,
   missionSchema,
+  myFreelanceProfileSchema,
   openDisputeRequestSchema,
   proposalListSchema,
   proposalSchema,
   resolveDisputeRequestSchema,
   reviewContractRequestSchema,
   reviseMilestoneRequestSchema,
+  saveFreelanceProfileRequestSchema,
   updateMissionRequestSchema,
 } from '@caselind/contracts';
 import {
@@ -338,7 +342,7 @@ import {
   setApplicationStatusRequestSchema,
   updateJobRequestSchema,
 } from '@caselind/contracts';
-import { createListingRequestSchema, listingListQuerySchema, listingListSchema, listingSchema, updateListingRequestSchema } from '@caselind/contracts';
+import { createListingAlertRequestSchema, listingAlertListSchema, listingAlertSchema, createListingRequestSchema, listingListQuerySchema, listingListSchema, listingSchema, updateListingRequestSchema } from '@caselind/contracts';
 import { budgetSchema, financeSummaryQuerySchema, financeSummarySchema, removeBudgetQuerySchema, setBudgetRequestSchema } from '@caselind/contracts';
 // Lot 6A (ledger, sandbox wallet), separate import block.
 import {
@@ -758,7 +762,10 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/me/certificates', summary: 'My certificates', tags: ['education'], auth: 'user', response: certificateListSchema, status: 200 },
   { method: 'get', path: '/v1/public/certificates/{code}', summary: 'Check a certificate by its 12-character code, without a token: holder display name, course and date only; unknown code: 404', tags: ['education'], auth: 'public', params: { code: z.string() }, response: certificateVerificationSchema, status: 200 },
   // Lot 16b: freelance (CDC §14). Behind the `freelance` flag. Payments are external: no money moves, contracts say paymentMode external.
-  { method: 'get', path: '/v1/missions', summary: 'Open missions, newest first (filters q, currency, budget range; keyset cursor); hidden missions and those of blocked users are not listed', tags: ['freelance'], auth: 'user', query: missionListQuerySchema, response: missionListSchema, status: 200 },
+  { method: 'get', path: '/v1/missions', summary: 'Open missions, newest first (filters q, currency, category, budget range; keyset cursor); hidden missions and those of blocked users are not listed', tags: ['freelance'], auth: 'user', query: missionListQuerySchema, response: missionListSchema, status: 200 },
+  { method: 'get', path: '/v1/me/freelance-profile', summary: 'My public freelancer profile (a blank disabled profile if never saved)', tags: ['freelance'], auth: 'user', response: myFreelanceProfileSchema, status: 200 },
+  { method: 'put', path: '/v1/me/freelance-profile', summary: 'Create or update my freelancer profile; enabled=true publishes it (opt-in, off by default), false takes it down; audited without content', tags: ['freelance'], auth: 'user', body: saveFreelanceProfileRequestSchema, response: myFreelanceProfileSchema, status: 200 },
+  { method: 'get', path: '/v1/freelancers', summary: 'Public freelancer profiles (enabled only; filters q, skill, category; keyset cursor; blocked users either way are left out; handle and display name only, no contact data)', tags: ['freelance'], auth: 'user', query: freelancerListQuerySchema, response: freelancerListSchema, status: 200 },
   { method: 'get', path: '/v1/me/missions', summary: 'My missions as a client, any status', tags: ['freelance'], auth: 'user', query: pageQuerySchema, response: missionListSchema, status: 200 },
   { method: 'post', path: '/v1/missions', summary: 'Post a mission (budget and currency required; at most 10 open: 409 mission_limit); audited', tags: ['freelance'], auth: 'user', body: createMissionRequestSchema, response: missionSchema, status: 201 },
   { method: 'get', path: '/v1/missions/{id}', summary: 'One mission (visible to its client, to whoever proposed, and to anyone while it is open and not blocked)', tags: ['freelance'], auth: 'user', params: { id: z.string() }, response: missionSchema, status: 200 },
@@ -799,6 +806,9 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/orgs/{orgId}/job-applications/{applicationId}/status', summary: 'Move an application along submitted > viewed > shortlisted > interview > offered > hired, or reject it; other moves: 409 invalid_transition; notifies the candidate; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), applicationId: z.string() }, body: setApplicationStatusRequestSchema, response: orgApplicationSchema, status: 200 },
   // Lot 15: classified ads (property, vehicles, used goods, lost and found). Behind the `listings` flag; contact goes through messaging.
   { method: 'get', path: '/v1/listings', summary: 'Active ads, newest first (filters kind, q, city, currency, price range; keyset cursor). Hidden ads and ads of blocked users are not listed', tags: ['listings'], auth: 'user', query: listingListQuerySchema, response: listingListSchema, status: 200 },
+  { method: 'get', path: '/v1/me/listing-alerts', summary: 'My ad alerts (private)', tags: ['listings'], auth: 'user', response: listingAlertListSchema, status: 200 },
+  { method: 'post', path: '/v1/me/listing-alerts', summary: 'Create an ad alert (q, city, kind; at least one; 5 max: 409 alert_limit); audited without the criteria', tags: ['listings'], auth: 'user', body: createListingAlertRequestSchema, response: listingAlertSchema, status: 201 },
+  { method: 'delete', path: '/v1/me/listing-alerts/{id}', summary: 'Delete one of my ad alerts (idempotent)', tags: ['listings'], auth: 'user', params: { id: z.string() }, status: 204 },
   { method: 'get', path: '/v1/listings/mine', summary: 'The caller\'s own ads, active and closed', tags: ['listings'], auth: 'user', query: pageQuerySchema, response: listingListSchema, status: 200 },
   { method: 'get', path: '/v1/listings/{id}', summary: 'One ad (closed, hidden, blocked or unknown: 404, except for its owner)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingSchema, status: 200 },
   { method: 'post', path: '/v1/listings', summary: 'Publish an ad (photos: own ready uploads with purpose listing, up to 8; at most 20 active ads per owner: 409 listing_limit; lost/found carry no price); audited', tags: ['listings'], auth: 'user', body: createListingRequestSchema, response: listingSchema, status: 201 },

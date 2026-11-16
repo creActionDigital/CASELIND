@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import {
   type AcceptProposalRequest,
   acceptProposalRequestSchema,
@@ -13,6 +13,12 @@ import {
   type CreateProposalRequest,
   createProposalRequestSchema,
   type DeliverMilestoneRequest,
+  type FreelancerList,
+  type FreelancerListQuery,
+  freelancerListQuerySchema,
+  type MyFreelanceProfile,
+  type SaveFreelanceProfileRequest,
+  saveFreelanceProfileRequestSchema,
   deliverMilestoneRequestSchema,
   type Mission,
   type MissionList,
@@ -48,6 +54,21 @@ export class FreelanceController {
   @Get('missions')
   list(@CurrentUser() u: AuthUser, @Query(new ZodPipe(missionListQuerySchema)) q: MissionListQuery): Promise<MissionList> {
     return this.f.listMissions(u.userId, q);
+  }
+
+  @Get('me/freelance-profile')
+  myProfile(@CurrentUser() u: AuthUser): Promise<MyFreelanceProfile> {
+    return this.f.myProfile(u.userId);
+  }
+
+  @Put('me/freelance-profile')
+  saveProfile(@CurrentUser() u: AuthUser, @Body(new ZodPipe(saveFreelanceProfileRequestSchema)) b: SaveFreelanceProfileRequest, @ReqMeta() meta: RequestMeta): Promise<MyFreelanceProfile> {
+    return this.f.saveProfile(u.userId, b, meta);
+  }
+
+  @Get('freelancers')
+  freelancers(@CurrentUser() u: AuthUser, @Query(new ZodPipe(freelancerListQuerySchema)) q: FreelancerListQuery): Promise<FreelancerList> {
+    return this.f.listFreelancers(u.userId, q);
   }
 
   @Get('me/missions')

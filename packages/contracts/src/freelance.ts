@@ -8,7 +8,13 @@ import { pageQuerySchema } from './pagination.js';
 const currencySchema = z.string().regex(/^[A-Z]{3}$/);
 const minor = z.number().int().positive().max(1_000_000_000_000);
 
+/** Fixed list of mission categories (stable slug ids; labels live in the apps). */
+export const missionCategories = ['design', 'developpement', 'redaction', 'traduction', 'marketing', 'comptabilite', 'formation', 'autre'] as const;
+export const missionCategorySchema = z.enum(missionCategories);
+export type MissionCategory = z.infer<typeof missionCategorySchema>;
+
 const missionFields = {
+  category: missionCategorySchema,
   title: z.string().trim().min(3).max(120),
   description: z.string().trim().max(4000),
   budgetMinor: minor,
@@ -19,6 +25,7 @@ const missionFields = {
 export const createMissionRequestSchema = z.object({
   ...missionFields,
   description: missionFields.description.default(''),
+  category: missionCategorySchema.default('autre'),
   deadline: missionFields.deadline.default(null),
 });
 export type CreateMissionRequest = z.infer<typeof createMissionRequestSchema>;
@@ -30,6 +37,7 @@ export type UpdateMissionRequest = z.infer<typeof updateMissionRequestSchema>;
 export const missionListQuerySchema = pageQuerySchema.extend({
   q: z.string().trim().max(100).optional(),
   currency: currencySchema.optional(),
+  category: missionCategorySchema.optional(),
   minBudgetMinor: z.coerce.number().int().min(0).optional(),
   maxBudgetMinor: z.coerce.number().int().min(0).optional(),
 });
@@ -41,6 +49,7 @@ export const missionSchema = z.object({
   description: z.string(),
   budgetMinor: z.number().int(),
   currency: z.string(),
+  category: missionCategorySchema,
   deadline: z.string().nullable(),
   status: z.enum(['open', 'awarded', 'closed']),
   client: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }),
@@ -148,3 +157,43 @@ export const adminDisputeListSchema = z.object({ items: z.array(adminDisputeSche
 export type AdminDisputeList = z.infer<typeof adminDisputeListSchema>;
 export const adminDisputesQuerySchema = pageQuerySchema.extend({ status: z.enum(['open', 'resolved']).optional() });
 export type AdminDisputesQuery = z.infer<typeof adminDisputesQuerySchema>;
+
+/** Public freelancer profile (lot 16e): opt-in, no contact data. Skills are lowercase words (at most 15). */
+const profileFields = {
+  title: z.string().trim().min(3).max(120),
+  skills: z.array(z.string().trim().toLowerCase().min(1).max(30)).max(15),
+  categories: z.array(missionCategorySchema).max(5),
+  /** Indicative rate in minor units; rateMinor and rateCurrency go together. */
+  rateMinor: minor.nullable(),
+  rateCurrency: z.enum(['USD', 'CDF']).nullable(),
+  bio: z.string().trim().max(1000),
+};
+export const saveFreelanceProfileRequestSchema = z
+  .object({ enabled: z.boolean(), ...profileFields, categories: profileFields.categories.default([]), rateMinor: minor.nullable().default(null), rateCurrency: profileFields.rateCurrency.default(null), bio: profileFields.bio.default('') })
+  .refine((v) => (v.rateMinor === null) === (v.rateCurrency === null), { message: 'rateMinor and rateCurrency go together', path: ['rateMinor'] });
+export type SaveFreelanceProfileRequest = z.infer<typeof saveFreelanceProfileRequestSchema>;
+/** `updatedAt` is null while nothing was ever saved (the blank profile is returned, disabled). */
+export const myFreelanceProfileSchema = z.object({
+  enabled: z.boolean(),
+  title: z.string(),
+  skills: z.array(z.string()),
+  categories: z.array(missionCategorySchema),
+  rateMinor: z.number().int().nullable(),
+  rateCurrency: z.enum(['USD', 'CDF']).nullable(),
+  bio: z.string(),
+  updatedAt: z.string().nullable(),
+});
+export type MyFreelanceProfile = z.infer<typeof myFreelanceProfileSchema>;
+export const freelancerSchema = z.object({
+  user: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }),
+  ...profileFields,
+});
+export type Freelancer = z.infer<typeof freelancerSchema>;
+export const freelancerListSchema = z.object({ items: z.array(freelancerSchema), nextCursor: z.string().nullable() });
+export type FreelancerList = z.infer<typeof freelancerListSchema>;
+export const freelancerListQuerySchema = pageQuerySchema.extend({
+  q: z.string().trim().max(100).optional(),
+  skill: z.string().trim().toLowerCase().max(30).optional(),
+  category: missionCategorySchema.optional(),
+});
+export type FreelancerListQuery = z.infer<typeof freelancerListQuerySchema>;

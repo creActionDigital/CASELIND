@@ -1,7 +1,11 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   ErrorCodes,
+  type CreateListingAlertRequest,
   type CreateListingRequest,
+  type ListingAlert,
+  type ListingAlertList,
+  MAX_LISTING_ALERTS,
   type Listing,
   type ListingList,
   type ListingListQuery,
@@ -13,6 +17,7 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
 import { ModerationRegistry } from '../moderation/moderation-registry.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // shortcut: fixed cap per owner against ad flooding, make it an env setting when operations need to tune it.
@@ -67,6 +72,7 @@ export class ListingsService implements OnModuleInit {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly moderation: ModerationRegistry,
+    private readonly notifications: NotificationsService,
   ) {}
 
   onModuleInit(): void {
@@ -106,6 +112,7 @@ export class ListingsService implements OnModuleInit {
       await this.audit.record({ action: 'listing.created', actorUserId: userId, meta, metadata: { listingId, kind: body.kind } }, tx);
       return listingId;
     });
+    await this.notifyAlerts(userId, id, body).catch(() => undefined); // best effort: the ad is already published
     return this.get(userId, id);
   }
 
@@ -176,6 +183,61 @@ export class ListingsService implements OnModuleInit {
       f.push(sql`(l.created_at, l.id) < (${c.at}::timestamptz, ${c.id}::uuid)`);
     }
     return this.page(userId, f, q.limit);
+  }
+
+  // ---- Alerts (private to their owner) ----------------------------------------------------------
+
+  private toAlert = (r: { id: string; q: string | null; city: string | null; kind: ListingAlert['kind']; created_at: Date }): ListingAlert => ({
+    id: r.id,
+    q: r.q,
+    city: r.city,
+    kind: r.kind,
+    createdAt: new Date(r.created_at).toISOString(),
+  });
+
+  async listAlerts(userId: string): Promise<ListingAlertList> {
+    const res = await this.db.execute<{ id: string; q: string | null; city: string | null; kind: ListingAlert['kind']; created_at: Date }>(
+      sql`SELECT id, q, city, kind, created_at FROM listing_alerts WHERE user_id = ${userId}::uuid ORDER BY created_at, id`,
+    );
+    return { items: res.rows.map(this.toAlert) };
+  }
+
+  async createAlert(userId: string, body: CreateListingAlertRequest, meta: RequestMeta): Promise<ListingAlert> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT 1 FROM users WHERE id = ${userId}::uuid FOR NO KEY UPDATE`); // serialises the quota check
+      const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM listing_alerts WHERE user_id = ${userId}::uuid`);
+      if ((n.rows[0]?.n ?? 0) >= MAX_LISTING_ALERTS) throw AppError.conflict('Listing alert limit reached', { reason: 'alert_limit' });
+      const res = await tx.execute<{ id: string; q: string | null; city: string | null; kind: ListingAlert['kind']; created_at: Date }>(sql`
+        INSERT INTO listing_alerts (user_id, q, city, kind) VALUES (${userId}::uuid, ${body.q ?? null}, ${body.city ?? null}, ${body.kind ?? null})
+        RETURNING id, q, city, kind, created_at`);
+      const row = res.rows[0]!;
+      await this.audit.record({ action: 'listing.alert_created', actorUserId: userId, meta, metadata: { alertId: row.id } }, tx);
+      return this.toAlert(row);
+    });
+  }
+
+  /** Idempotent; only the owner can delete (anything else is a no-op 204). */
+  async deleteAlert(userId: string, id: string, meta: RequestMeta): Promise<void> {
+    if (!UUID_RE.test(id)) return;
+    await this.db.transaction(async (tx) => {
+      const res = await tx.execute(sql`DELETE FROM listing_alerts WHERE id = ${id}::uuid AND user_id = ${userId}::uuid`);
+      if (res.rowCount) await this.audit.record({ action: 'listing.alert_deleted', actorUserId: userId, meta, metadata: { alertId: id } }, tx);
+    });
+  }
+
+  /** Same filter as GET /listings (kind, city, text in title or description). Generic title: never the ad's content. Not the author, no block either way. */
+  private async notifyAlerts(ownerId: string, listingId: string, body: CreateListingRequest): Promise<void> {
+    const res = await this.db.execute<{ user_id: string }>(sql`
+      SELECT DISTINCT a.user_id FROM listing_alerts a
+      WHERE a.user_id <> ${ownerId}::uuid
+        AND (a.kind IS NULL OR a.kind = ${body.kind})
+        AND (a.city IS NULL OR lower(a.city) = lower(${body.city}))
+        AND (a.q IS NULL OR position(lower(a.q) in lower(${body.title} || ' ' || ${body.description})) > 0)
+        AND NOT EXISTS (
+          SELECT 1 FROM user_blocks b
+          WHERE (b.blocker_id = a.user_id AND b.blocked_id = ${ownerId}::uuid) OR (b.blocker_id = ${ownerId}::uuid AND b.blocked_id = a.user_id))
+        LIMIT 500`); // shortcut: 500 recipients per ad, no paging; upgrade to a batched job if alerts exceed that
+    await this.notifications.notifyMany(res.rows.map((r) => ({ userId: r.user_id, category: 'commerce' as const, title: 'Nouvelle annonce correspondant à votre alerte', body: 'Ouvrez l’annonce pour la consulter.', data: { listingId } })));
   }
 
   private async page(viewerId: string, filters: SQL[], limit: number): Promise<ListingList> {

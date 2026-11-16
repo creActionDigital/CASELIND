@@ -48,6 +48,7 @@ export default function Listings() {
           title: t('listings.title'),
           headerRight: () => (
             <View style={styles.actions}>
+              <IconButton icon="notifications-outline" label={t('listings.alerts')} onPress={() => router.push('/listings/alerts')} />
               <IconButton icon="albums-outline" label={t('listings.mine')} onPress={() => router.push('/listings/mine')} />
               <IconButton icon="add-circle-outline" label={t('listings.new')} onPress={() => router.push('/listings/new')} />
             </View>

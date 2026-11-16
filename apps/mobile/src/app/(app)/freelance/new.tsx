@@ -6,11 +6,12 @@ import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
 import { createMission, frKeys } from '../../../freelance/api';
-import { freelanceErrorKey } from '../../../freelance/logic';
+import { categoryKey, CATEGORY_VALUES, freelanceErrorKey } from '../../../freelance/logic';
 import { Chips } from '../../../seller/ui';
 import { spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { parseWalletAmount, WALLET_CURRENCIES } from '../../../wallet/amount';
+import type { MissionCategory } from '@caselind/contracts';
 import { Button, Screen, Text, TextField } from '../../../ui';
 
 /** Publier une mission : titre, description, budget, échéance facultative. */
@@ -24,13 +25,14 @@ export default function NewMission() {
   const [budget, setBudget] = useState('');
   const [currency, setCurrency] = useState<string>('USD');
   const [deadline, setDeadline] = useState('');
+  const [category, setCategory] = useState<MissionCategory>('autre');
   const [error, setError] = useState<string | null>(null);
 
   const publish = useMutation({
     mutationFn: () => {
       const p = parseWalletAmount(budget, currency);
       if ('issue' in p || p.minor <= 0) throw new Error('invalid');
-      return createMission({ title: title.trim(), description: description.trim(), budgetMinor: p.minor, currency, deadline: deadline.trim() || null });
+      return createMission({ title: title.trim(), description: description.trim(), budgetMinor: p.minor, currency, deadline: deadline.trim() || null, category });
     },
     onSuccess: (m) => {
       void qc.invalidateQueries({ queryKey: frKeys.all });
@@ -49,6 +51,10 @@ export default function NewMission() {
       <Stack.Screen options={{ title: t('freelance.new') }} />
       <View style={styles.form}>
         <TextField label={t('freelance.field.title')} value={title} onChangeText={setTitle} maxLength={120} />
+        <Text variant="small" muted>
+          {t('freelance.field.category')}
+        </Text>
+        <Chips options={CATEGORY_VALUES.map((c) => ({ value: c, label: t(categoryKey(c)) }))} value={category} onChange={setCategory} />
         <TextField label={t('freelance.field.description')} value={description} onChangeText={setDescription} multiline maxLength={4000} />
         <TextField label={t('freelance.field.budget')} value={budget} onChangeText={setBudget} keyboardType="decimal-pad" />
         <Chips options={WALLET_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency} onChange={setCurrency} scroll={false} />

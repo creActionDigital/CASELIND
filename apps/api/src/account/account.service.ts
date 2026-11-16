@@ -5,6 +5,7 @@ import {
   ErrorCodes,
   type LastOwnerConflictDetails,
   type MediaMime,
+  type MissionCategory,
   type ReportReason,
 } from '@caselind/contracts';
 import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
@@ -233,6 +234,8 @@ export class AccountService {
       SELECT id, kind, title, description, price_minor, currency, city, status, created_at FROM listings WHERE owner_id = ${auth.userId}::uuid ORDER BY created_at, id`);
     const cvRows = await this.db.execute<AccountExport['jobProfile'] & object>(sql`
       SELECT headline, summary, skills, city, experience, education FROM job_profiles WHERE user_id = ${auth.userId}::uuid`);
+    const listingAlertRows = await this.db.execute<{ id: string; q: string | null; city: string | null; kind: string | null; created_at: Date }>(sql`
+      SELECT id, q, city, kind, created_at FROM listing_alerts WHERE user_id = ${auth.userId}::uuid ORDER BY created_at`);
     const jobAlertRows = await this.db.execute<{ id: string; q: string | null; city: string | null; contract_type: string | null; created_at: Date }>(sql`
       SELECT id, q, city, contract_type, created_at FROM job_alerts WHERE user_id = ${auth.userId}::uuid ORDER BY created_at`);
     const jobAppRows = await this.db.execute<{ id: string; title: string; org_name: string; status: string; message: string; created_at: Date }>(sql`
@@ -249,6 +252,8 @@ export class AccountService {
         c.amount_minor, c.currency, c.status, c.created_at
       FROM freelance_contracts c JOIN missions m ON m.id = c.mission_id JOIN users cu ON cu.id = c.client_id JOIN users fu ON fu.id = c.freelancer_id
       WHERE c.client_id = ${auth.userId}::uuid OR c.freelancer_id = ${auth.userId}::uuid ORDER BY c.created_at, c.id`);
+    const frProfile = await this.db.execute<{ enabled: boolean; title: string; skills: string[]; categories: string[]; rate_minor: string | null; rate_currency: string | null; bio: string; updated_at: Date }>(sql`
+      SELECT enabled, title, skills, categories, rate_minor, rate_currency, bio, updated_at FROM freelance_profiles WHERE user_id = ${auth.userId}::uuid`);
     const eduAuthored = await this.db.execute<{ id: string; title: string; status: string; created_at: Date }>(sql`
       SELECT id, title, status, created_at FROM courses WHERE author_id = ${auth.userId}::uuid ORDER BY created_at, id`);
     const eduEnrollments = await this.myEnrollmentsAll(auth.userId);
@@ -394,12 +399,16 @@ export class AccountService {
         createdAt: new Date(l.created_at).toISOString(),
       })),
       jobProfile: cvRows.rows[0] ?? null,
+      listingAlerts: listingAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, kind: a.kind, createdAt: new Date(a.created_at).toISOString() })),
       jobAlerts: jobAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, contractType: a.contract_type, createdAt: new Date(a.created_at).toISOString() })),
       jobApplications: jobAppRows.rows.map((a) => ({ id: a.id, jobTitle: a.title, orgName: a.org_name, status: a.status, message: a.message, createdAt: new Date(a.created_at).toISOString() })),
       freelance: {
         missions: frMissions.rows.map((m) => ({ id: m.id, title: m.title, budgetMinor: Number(m.budget_minor), currency: m.currency.trim(), status: m.status, createdAt: new Date(m.created_at).toISOString() })),
         proposals: frProposals.rows.map((p) => ({ id: p.id, missionTitle: p.title, amountMinor: Number(p.amount_minor), deliveryDays: p.delivery_days, message: p.message, status: p.status, createdAt: new Date(p.created_at).toISOString() })),
         contracts: frContracts.rows.map((c) => ({ id: c.id, missionTitle: c.title, role: c.client_id === auth.userId ? 'client' : 'freelancer', counterpartyHandle: c.handle, amountMinor: Number(c.amount_minor), currency: c.currency.trim(), status: c.status, createdAt: new Date(c.created_at).toISOString() })),
+        profile: frProfile.rows[0]
+          ? { enabled: frProfile.rows[0].enabled, title: frProfile.rows[0].title, skills: frProfile.rows[0].skills, categories: frProfile.rows[0].categories as MissionCategory[], rateMinor: frProfile.rows[0].rate_minor === null ? null : Number(frProfile.rows[0].rate_minor), rateCurrency: frProfile.rows[0].rate_currency === null ? null : (frProfile.rows[0].rate_currency.trim() as 'USD' | 'CDF'), bio: frProfile.rows[0].bio, updatedAt: new Date(frProfile.rows[0].updated_at).toISOString() }
+          : null,
       },
       health: await this.healthData.exportFor(auth.userId),
       games: await this.games.exportFor(auth.userId),
