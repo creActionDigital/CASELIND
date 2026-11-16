@@ -57,3 +57,20 @@ claude
 
 ## Retour d'expérience OmniRoute (modèles gratuits)
 Un essai du lot 20a avec `auto/coding:free` (`gpt-oss-120b`) a échoué : modèle de données inventé, code qui ne compile pas, compte rendu qui décrit des tables inexistantes. Avec ces modèles : tâches **courtes et fermées**, une à la fois ; vérifier soi-même `npx tsc --noEmit -p .` et les tests ; ne jamais croire un compte rendu sans lire le diff. OmniRoute met ~30 s à démarrer et manque de mémoire si le navigateur et les serveurs tournent.
+
+## QUESTIONS À POSER AU PROPRIÉTAIRE DÈS LE DÉBUT DE LA CONVERSATION (il n'y a pas encore répondu)
+Pose-les **toutes tout de suite**, regroupées en une seule liste numérotée (pas une par une, pas après avoir commencé à coder), puis note les réponses dans `docs/BACKLOG.md` (section « Décisions ») et dans la mémoire. Pendant qu'il répond, enchaîne sur le travail qui ne dépend d'aucune réponse.
+1. **Dépôt GitHub privé** (urgent : le code n'existe qu'en local). A-t-il un compte GitHub ? Veut-il que je crée le dépôt privé et pousse (avec son accord explicite) ?
+2. **Mineurs et consentement parental** (bloque le lot 17b établissements scolaires §13) : la plateforme ne connaît pas l'âge des comptes. Faut-il demander une date de naissance à l'inscription, un âge minimum, un compte « parent » qui valide l'inscription d'un enfant ? Ou reporter 17b ?
+3. **Numéros d'urgence officiels** (lot 19, branche `wip/lot19-services-publics`) : quels numéros fournir (police, pompiers, ambulance, par pays) ? Je n'en invente aucun. Et veut-il reprendre le lot 19 maintenant ou plus tard ?
+4. **CSL Coins (§18)** : quelles sont les règles (création, acquisition, dépense, transfert, expiration, conversion, valeur) ? Sans elles, rien n'est codé.
+5. **Paiements réels** : compte marchand FlexPay (Mobile Money, question Q5) : l'a-t-il ouvert ? Débloque le séquestre freelance, les frais, les paiements réels (toujours coupés tant que non validés).
+6. **Codes de connexion** (Q2) : comptes Brevo (e-mail) et Meta WhatsApp Business créés ? (`docs/OTP_SETUP.md`)
+7. **Expo** (Q8) : `npx expo login` fait ? Nécessaire pour les notifications push réelles et la compilation sur téléphone.
+8. **Assistant IA** : a-t-il une clé Google AI Studio (Gemini) à configurer ? Veut-il garder OmniRoute (modèles gratuits) comme solution de repli pour l'assistant ?
+9. **Hébergement, nom de domaine, WebRTC/TURN** (Q6) : où héberger ? Quel nom de domaine ? Quel service d'appels vidéo ? Débloque appels, entretiens vidéo, téléconsultation en vidéo, le web et la mise en ligne.
+10. **Santé** : le module est codé mais coupé. Quand et dans quel pays veut-il l'activer ? Quelle durée de conservation des données de santé par pays (je n'en fixe aucune) ? Quels pays, quelles licences ?
+11. **Quiz éclair** : veut-il que je prépare une banque de questions de départ (au moins 10 sont nécessaires pour que le jeu démarre) ? Sur quels thèmes, en quelles langues ?
+12. **Outils professionnels (lot 16c, §14)** : après audit de l'existant, quels outils veut-il en priorité (devis, factures, CRM, caisse, campagnes) ?
+13. **Web (React + Vite, §27)** : veut-il commencer le web maintenant que le backend est avancé, ou finir d'abord les lots restants (20b jeux, 16c, 17b, 19) ?
+14. **Sécurité d'OmniRoute** : il écoute sur `0.0.0.0` sans clé obligatoire. Veut-il que je lui explique comment exiger une clé ou limiter à `localhost` ?
