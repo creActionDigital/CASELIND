@@ -83,7 +83,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | G1 | Aucun outil pour suspendre un compte ou vérifier une organisation | **API faite et testée** (gouvernance admin) ; écran mobile admin en cours |
 | G2 | Retours, remboursements et litiges de commande absents | planifié (lot 5c, dépend du paiement réel Q5 ; avant cela, statut « litige » sans mouvement d'argent) |
 | G3 | Double validation des opérations sensibles, remboursement wallet, audit des lectures de mini-apps, limite de débit des publications | planifié |
-| G4 | Mini-apps sans écran mobile (tuile « Plus » sans effet) | planifié (lot M8 : annuaire, consentement OAuth, applications autorisées, révocation) |
+| G4 | Mini-apps sans écran mobile (tuile « Plus » sans effet) | **écran mobile fait** (annuaire, applications autorisées + révocation, demandes de paiement par PIN) ; typecheck et 245 tests mobile OK, non vérifié à l’écran ; consentement OAuth : se fait dans le navigateur de l’application
 | G5 | Non consignés jusqu'ici : connexion sociale (Google, Apple, Facebook), biométrie, présence en ligne, sondages, recherche dans les messages, messages vocaux côté API, publications sponsorisées, preuve de livraison par photo ou signature, webhooks, actions de l'assistant IA, recherche en langage naturel | planifié |
 | G6 | Export et purge : notifications, brouillons, messages programmés à vérifier | planifié |
 | G7 | Consentements non centralisés (table `user_consents`) | planifié |
