@@ -7,7 +7,7 @@ import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
 import { acceptProposal, closeMission, fetchMission, fetchMissionProposals, frKeys, proposeOnMission, withdrawProposal } from '../../../freelance/api';
-import { freelanceErrorKey, proposalStatusKey } from '../../../freelance/logic';
+import { categoryKey, freelanceErrorKey, proposalStatusKey } from '../../../freelance/logic';
 import { openReport } from '../../../report/open-report';
 import { formatMoney } from '../../../shop/format';
 import { radius, spacing } from '../../../theme/tokens';
@@ -85,6 +85,7 @@ export default function MissionDetail() {
         <Text variant="title" accessibilityRole="header">
           {m.title}
         </Text>
+        <Text variant="small" muted>{t('freelance.field.category')} : {t(categoryKey(m.category))}</Text>
         <View style={styles.badges}>
           <Badge tone="neutral" label={t(`freelance.mission.${m.status}`)} />
         </View>
