@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  type AccountConsents,
   type AccountExport,
   type DeletionRequestResponse,
   ErrorCodes,
@@ -74,6 +75,21 @@ export class AccountService {
     private readonly games: GamesService,
     private readonly school: SchoolService,
   ) {}
+
+  /** G7: one read-only view of the consents stored by the health, loyalty and mini-app modules. */
+  async consents(userId: string): Promise<AccountConsents> {
+    const health = await this.db.execute<{ version: string; granted_at: Date }>(sql`SELECT version, granted_at FROM health_consents WHERE user_id = ${userId}::uuid`);
+    const marketing = await this.db.execute<{ opted_in: boolean }>(sql`SELECT opted_in FROM marketing_consents WHERE user_id = ${userId}::uuid`);
+    const grants = await this.db.execute<{ app_id: string; name: string; scopes: string[]; created_at: Date }>(sql`
+      SELECT g.app_id, a.name, g.scopes, g.created_at FROM miniapp_grants g JOIN miniapps a ON a.id = g.app_id
+      WHERE g.user_id = ${userId}::uuid AND g.revoked_at IS NULL ORDER BY g.created_at`);
+    const h = health.rows[0];
+    return {
+      health: h ? { version: h.version, grantedAt: new Date(h.granted_at).toISOString() } : null,
+      marketing: marketing.rows[0]?.opted_in ?? false,
+      miniapps: grants.rows.map((g) => ({ appId: g.app_id, appName: g.name, scopes: g.scopes, grantedAt: new Date(g.created_at).toISOString() })),
+    };
+  }
 
   /**
    * Everything held about the caller. Columns are selected explicitly so that password hashes,
@@ -276,6 +292,8 @@ export class AccountService {
     const eduEnrollments = await this.myEnrollmentsAll(auth.userId);
     const budgetRows = await this.db.execute<{ currency: string; limit_minor: string }>(sql`
       SELECT currency, limit_minor FROM budgets WHERE user_id = ${auth.userId}::uuid ORDER BY currency`);
+    const callRows = await this.db.execute<{ id: string; role: 'caller' | 'callee'; kind: string; status: string; created_at: Date }>(sql`SELECT id, CASE WHEN caller_id = ${auth.userId}::uuid THEN 'caller' ELSE 'callee' END AS role, kind, status, created_at FROM calls WHERE caller_id = ${auth.userId}::uuid OR callee_id = ${auth.userId}::uuid ORDER BY created_at DESC LIMIT 200`);
+    const liveRows = await this.db.execute<{ id: string; title: string; status: string; peak_viewers: number; started_at: Date }>(sql`SELECT id, title, status, peak_viewers, started_at FROM lives WHERE host_id = ${auth.userId}::uuid ORDER BY started_at DESC LIMIT 200`);
     // G6: bounded (200 latest notifications); drafts and scheduled messages are the user's own text.
     const draftRows = await this.db.execute<{ conversation_id: string; body: string; updated_at: Date }>(sql`SELECT conversation_id, body, updated_at FROM conversation_drafts WHERE user_id = ${auth.userId}::uuid ORDER BY updated_at DESC`);
     const scheduledRows = await this.db.execute<{ id: string; conversation_id: string; kind: string; body: string | null; scheduled_at: Date }>(sql`SELECT id, conversation_id, kind, body, scheduled_at FROM scheduled_messages WHERE sender_id = ${auth.userId}::uuid ORDER BY scheduled_at`);
@@ -445,6 +463,8 @@ export class AccountService {
         exams: (await this.db.execute<{ title: string; score_percent: number; used: number; started_at: Date }>(sql`SELECT c.title, x.score_percent, round(extract(epoch FROM (x.finished_at - x.started_at)))::int AS used, x.started_at FROM exam_sessions x JOIN courses c ON c.id = x.course_id WHERE x.user_id = ${auth.userId}::uuid AND x.finished_at IS NOT NULL ORDER BY x.started_at, x.id`)).rows.map((r) => ({ courseTitle: r.title, scorePercent: r.score_percent, usedSeconds: r.used, startedAt: new Date(r.started_at).toISOString() })),
       },
       budgets: budgetRows.rows.map((b) => ({ currency: b.currency, limitMinor: Number(b.limit_minor) })),
+      calls: callRows.rows.map((c) => ({ id: c.id, role: c.role, kind: c.kind, status: c.status, createdAt: new Date(c.created_at).toISOString() })),
+      livesHosted: liveRows.rows.map((l) => ({ id: l.id, title: l.title, status: l.status, peakViewers: l.peak_viewers, startedAt: new Date(l.started_at).toISOString() })),
       messaging: {
         drafts: draftRows.rows.map((d) => ({ conversationId: d.conversation_id, body: d.body, updatedAt: new Date(d.updated_at).toISOString() })),
         scheduled: scheduledRows.rows.map((r) => ({ id: r.id, conversationId: r.conversation_id, kind: r.kind, body: r.body, scheduledAt: new Date(r.scheduled_at).toISOString() })),

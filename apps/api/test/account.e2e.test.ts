@@ -112,7 +112,7 @@ describe('data export', () => {
     const res = await ctx.http.get('/v1/me/export').set(bearer(a.token)).expect(200);
     const body = res.body;
     expect(Object.keys(body).sort()).toEqual(
-      ['aiConversations', 'blocks', 'budgets', 'cart', 'comments', 'conversations', 'deliveries', 'education', 'exportedAt', 'favoriteMessages', 'following', 'freelance', 'games', 'health', 'jobAlerts', 'jobApplications', 'jobInterviews', 'jobProfile', 'kyc', 'listingAlerts', 'listingOffers', 'listingVisits', 'listings', 'loyalty', 'media', 'messaging', 'messagesSent', 'messagesSentTruncated', 'miniappGrants', 'mobility', 'orders', 'orgMemberships', 'posts', 'privacy', 'profile', 'reportsFiled', 'reviews', 'school', 'searchHistory', 'securityEvents', 'services', 'sessions', 'stories', 'twoFactorEnabled', 'twoFactorEnabledAt', 'wallet'].sort(),
+      ['aiConversations', 'blocks', 'budgets', 'calls', 'cart', 'comments', 'conversations', 'deliveries', 'education', 'exportedAt', 'favoriteMessages', 'following', 'freelance', 'games', 'health', 'jobAlerts', 'jobApplications', 'jobInterviews', 'jobProfile', 'kyc', 'listingAlerts', 'listingOffers', 'listingVisits', 'listings', 'livesHosted', 'loyalty', 'media', 'messaging', 'messagesSent', 'messagesSentTruncated', 'miniappGrants', 'mobility', 'orders', 'orgMemberships', 'posts', 'privacy', 'profile', 'reportsFiled', 'reviews', 'school', 'searchHistory', 'securityEvents', 'services', 'sessions', 'stories', 'twoFactorEnabled', 'twoFactorEnabledAt', 'wallet'].sort(),
     );
     expect(body.profile).toMatchObject({ id: a.id, handle: a.handle, email: a.identifier, status: 'active' });
     expect(body.privacy.readReceipts).toBe(false);
@@ -176,6 +176,17 @@ describe('data export', () => {
 
   it('requires authentication', async () => {
     await ctx.http.get('/v1/me/export').expect(401);
+  });
+});
+
+describe('consents overview', () => {
+  it('lists every consent in one place, requires a session', async () => {
+    const a = await user();
+    await ctx.http.get('/v1/me/consents').expect(401);
+    const none = (await ctx.http.get('/v1/me/consents').set(bearer(a.token)).expect(200)).body;
+    expect(none).toEqual({ health: null, marketing: false, miniapps: [] });
+    await ctx.http.put('/v1/me/marketing-consent').set(bearer(a.token)).send({ optIn: true }).expect(200);
+    expect((await ctx.http.get('/v1/me/consents').set(bearer(a.token)).expect(200)).body.marketing).toBe(true);
   });
 });
 

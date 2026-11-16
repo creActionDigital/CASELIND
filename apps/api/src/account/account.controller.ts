@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import {
+  type AccountConsents,
   type AccountExport,
   type DeletionRequest,
   type DeletionRequestResponse,
@@ -13,6 +14,11 @@ import { AccountService } from './account.service.js';
 @Controller()
 export class AccountController {
   constructor(private readonly account: AccountService) {}
+
+  @Get('me/consents')
+  consents(@CurrentUser() user: AuthUser): Promise<AccountConsents> {
+    return this.account.consents(user.userId);
+  }
 
   @Get('me/export')
   export(@CurrentUser() user: AuthUser, @ReqMeta() meta: RequestMeta): Promise<AccountExport> {

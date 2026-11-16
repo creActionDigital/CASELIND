@@ -420,6 +420,10 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       // fires: every table owned by the account is deleted here. Children go before parents.
       // A. owner/author rows are deleted.
       for (const [table, cols] of [
+        ['live_messages', ['user_id']],
+        ['live_viewers', ['user_id']],
+        ['lives', ['host_id']],
+        ['calls', ['caller_id', 'callee_id']],
         ['push_tokens', ['user_id']],
         ['notifications', ['user_id']],
         ['notification_preferences', ['user_id']],

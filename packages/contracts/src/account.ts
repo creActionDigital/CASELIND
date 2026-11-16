@@ -163,6 +163,9 @@ export const accountExportSchema = z.object({
   }),
   /** Lot 13: own monthly budgets (sandbox). */
   budgets: z.array(z.object({ currency: z.string(), limitMinor: z.number().int() })),
+  /** Lot M9: own call history and lives hosted (metadata only; no media, no signalling). */
+  calls: z.array(z.object({ id: z.uuid(), role: z.enum(['caller', 'callee']), kind: z.string(), status: z.string(), createdAt: z.string() })),
+  livesHosted: z.array(z.object({ id: z.uuid(), title: z.string(), status: z.string(), peakViewers: z.number().int(), startedAt: z.string() })),
   /** G6: own message drafts, scheduled messages (text only) and the latest notifications (right of access). */
   messaging: z.object({
     drafts: z.array(z.object({ conversationId: z.uuid(), body: z.string(), updatedAt: z.string() })),
@@ -193,3 +196,11 @@ export const deletionRequestResponseSchema = z.object({
   deletionScheduledFor: z.iso.datetime(),
 });
 export type DeletionRequestResponse = z.infer<typeof deletionRequestResponseSchema>;
+
+/** G7: every consent the caller has given, in one place (read-only view over the per-module consent stores). */
+export const accountConsentsSchema = z.object({
+  health: z.object({ version: z.string(), grantedAt: z.iso.datetime() }).nullable(),
+  marketing: z.boolean(),
+  miniapps: z.array(z.object({ appId: z.uuid(), appName: z.string(), scopes: z.array(z.string()), grantedAt: z.iso.datetime() })),
+});
+export type AccountConsents = z.infer<typeof accountConsentsSchema>;

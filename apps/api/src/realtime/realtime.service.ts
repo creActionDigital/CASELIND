@@ -18,7 +18,15 @@ export type RealtimeEvent =
   /** Lot 11: ride status, driver position and quick messages (user rooms of the rider and of the driver). */
   | 'ride.updated'
   | 'ride.location'
-  | 'ride.message';
+  | 'ride.message'
+  /** Lot M9: calls (user rooms of both parties) and lives (user rooms of the host and of the viewers). Signalling payloads are relayed, never stored. */
+  | 'call.ringing'
+  | 'call.updated'
+  | 'call.signal'
+  | 'live.viewers'
+  | 'live.ended'
+  | 'live.message'
+  | 'live.signal';
 
 export const userRoom = (userId: string) => `user:${userId}`;
 export const conversationRoom = (conversationId: string) => `conversation:${conversationId}`;

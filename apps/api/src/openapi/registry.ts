@@ -1,4 +1,5 @@
 import {
+  accountConsentsSchema,
   accountExportSchema,
   blockListQuerySchema,
   blockListSchema,
@@ -23,6 +24,16 @@ import {
   updatePrivacyRequestSchema,
   userFlagsSchema,
   verifyOtpRequestSchema,
+  callListSchema,
+  callSchema,
+  createCallRequestSchema,
+  liveListSchema,
+  liveMessageListSchema,
+  liveMessageSchema,
+  liveSchema,
+  sendLiveMessageRequestSchema,
+  signalRequestSchema,
+  startLiveRequestSchema,
 } from '@caselind/contracts';
 import { z } from 'zod';
 import { auditQuerySchema } from '../admin/admin.controller.js';
@@ -650,7 +661,24 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'put', path: '/v1/blocks/{userId}', summary: 'Block a user (idempotent; unknown or malformed id is 404)', tags: ['privacy'], auth: 'user', params: { userId: z.string() }, status: 204 },
   { method: 'delete', path: '/v1/blocks/{userId}', summary: 'Unblock a user (idempotent)', tags: ['privacy'], auth: 'user', params: { userId: z.string() }, status: 204 },
 
+  // Calls and lives (lot M9): signalling only, no media and no signalling payload stored. Not a participant / blocked: 404.
+  { method: 'post', path: '/v1/conversations/{conversationId}/calls', summary: 'Start a call in a direct conversation (not direct 409 not_direct; blocked 403; a call already in progress 409 busy); the callee gets call.ringing', tags: ['calls'], auth: 'user', params: { conversationId: z.uuid() }, body: createCallRequestSchema, response: callSchema, status: 201 },
+  { method: 'get', path: '/v1/me/calls', summary: 'Own call history, newest first (50); unanswered ringing calls older than 45 s become missed', tags: ['calls'], auth: 'user', response: callListSchema, status: 200 },
+  { method: 'post', path: '/v1/calls/{id}/accept', summary: 'Answer a ringing call (callee only; not ringing 409 call_closed)', tags: ['calls'], auth: 'user', params: { id: z.uuid() }, response: callSchema, status: 200 },
+  { method: 'post', path: '/v1/calls/{id}/decline', summary: 'Decline a ringing call (callee only)', tags: ['calls'], auth: 'user', params: { id: z.uuid() }, response: callSchema, status: 200 },
+  { method: 'post', path: '/v1/calls/{id}/end', summary: 'Hang up: cancels a ringing call (caller) or ends an active one (either party)', tags: ['calls'], auth: 'user', params: { id: z.uuid() }, response: callSchema, status: 200 },
+  { method: 'post', path: '/v1/calls/{id}/signal', summary: 'Relay an SDP offer/answer or ICE candidate to the other party as call.signal (never stored)', tags: ['calls'], auth: 'user', params: { id: z.uuid() }, body: signalRequestSchema, status: 204 },
+  { method: 'post', path: '/v1/lives', summary: 'Start a live (one at a time per host: 409 already_live)', tags: ['live'], auth: 'user', body: startLiveRequestSchema, response: liveSchema, status: 201 },
+  { method: 'get', path: '/v1/lives', summary: 'Lives in progress, newest first (hosts blocked either way are hidden)', tags: ['live'], auth: 'user', response: liveListSchema, status: 200 },
+  { method: 'get', path: '/v1/lives/{id}', summary: 'One live', tags: ['live'], auth: 'user', params: { id: z.uuid() }, response: liveSchema, status: 200 },
+  { method: 'post', path: '/v1/lives/{id}/join', summary: 'Join as a viewer (ended 409 live_ended); the host gets live.viewers', tags: ['live'], auth: 'user', params: { id: z.uuid() }, response: liveSchema, status: 200 },
+  { method: 'post', path: '/v1/lives/{id}/leave', summary: 'Leave the live', tags: ['live'], auth: 'user', params: { id: z.uuid() }, status: 204 },
+  { method: 'post', path: '/v1/lives/{id}/end', summary: 'End the live (host only)', tags: ['live'], auth: 'user', params: { id: z.uuid() }, response: liveSchema, status: 200 },
+  { method: 'get', path: '/v1/lives/{id}/messages', summary: 'Last 100 chat messages (host or current viewer; else 409 not_in_live)', tags: ['live'], auth: 'user', params: { id: z.uuid() }, response: liveMessageListSchema, status: 200 },
+  { method: 'post', path: '/v1/lives/{id}/messages', summary: 'Send a chat message (host or current viewer), pushed as live.message', tags: ['live'], auth: 'user', params: { id: z.uuid() }, body: sendLiveMessageRequestSchema, response: liveMessageSchema, status: 201 },
+  { method: 'post', path: '/v1/lives/{id}/signal', summary: 'WebRTC signalling: viewer → host, host → viewer (`to` required)', tags: ['live'], auth: 'user', params: { id: z.uuid() }, body: signalRequestSchema, status: 204 },
   // Account (data rights)
+  { method: 'get', path: '/v1/me/consents', summary: 'Every consent the caller has given (health, marketing, authorized mini-apps), read-only', tags: ['account'], auth: 'user', response: accountConsentsSchema, status: 200 },
   { method: 'get', path: '/v1/me/export', summary: 'Export everything held about the caller (right of access); audited', tags: ['account'], auth: 'user', response: accountExportSchema, status: 200 },
   { method: 'post', path: '/v1/me/deletion-request', summary: 'Schedule account deletion (password required; last active owner of an organisation: 409 last_owner); signing in again cancels it', tags: ['account'], auth: 'user', body: deletionRequestSchema, response: deletionRequestResponseSchema, status: 202 },
 
