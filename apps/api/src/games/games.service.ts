@@ -4,6 +4,11 @@ import {
   QUIZ_QUESTIONS_PER_SESSION,
   type AdminGameQuestion,
   type AdminGameQuestionList,
+  type CreateTournamentRequest,
+  type GameBadgeList,
+  type Tournament,
+  type TournamentList,
+  type TournamentRanking,
   type CreateGameQuestionRequest,
   type Leaderboard,
   type LeaderboardQuery,
@@ -23,6 +28,9 @@ const SESSION_SECONDS = 120;
 const MAX_SESSIONS_PER_DAY = 20;
 const LEADERBOARD_SIZE = 20;
 const invalid = (path: string, message: string) => new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path, message }]);
+type TournamentRow = { id: string; title: string; starts_at: Date; ends_at: Date; status: Tournament['status'] };
+const toTournament = (r: TournamentRow): Tournament => ({ id: r.id, title: r.title, startsAt: iso(r.starts_at), endsAt: iso(r.ends_at), status: r.status });
+const TOURNAMENT_COLS = sql`id, title, starts_at, ends_at, CASE WHEN now() < starts_at THEN 'upcoming' WHEN now() < ends_at THEN 'live' ELSE 'ended' END AS status`;
 const iso = (d: Date | string) => new Date(d).toISOString();
 
 type QuestionRow = { id: string; prompt: string; options: string[]; correct_index: number; category: string; active: boolean };
@@ -98,6 +106,35 @@ export class GamesService {
     return { period: q.period, items: res.rows.map((r, i) => ({ rank: i + 1, displayName: r.display_name, handle: r.handle, bestScore: r.best, me: r.user_id === viewerId })) };
   }
 
+  /** Badges earned by playing; derived from the finished games, nothing is stored. */
+  async badges(userId: string): Promise<GameBadgeList> {
+    const r = await this.db.execute<{ played: number; perfect: number }>(sql`
+      SELECT count(*)::int AS played, count(*) FILTER (WHERE correct_count = ${QUIZ_QUESTIONS_PER_SESSION})::int AS perfect
+      FROM game_sessions WHERE user_id = ${userId}::uuid AND finished_at IS NOT NULL`);
+    const { played, perfect } = r.rows[0]!;
+    const b = (key: 'first_game' | 'ten_games' | 'perfect', progress: number, target: number) => ({ key, earned: progress >= target, progress: Math.min(progress, target), target });
+    return { items: [b('first_game', played, 1), b('ten_games', played, 10), b('perfect', perfect, 1)] };
+  }
+
+  async listTournaments(): Promise<TournamentList> {
+    const res = await this.db.execute<TournamentRow>(sql`SELECT ${TOURNAMENT_COLS} FROM game_tournaments ORDER BY ends_at DESC, id LIMIT 50`);
+    return { items: res.rows.map(toTournament) };
+  }
+
+  /** Best finished score of each player inside the window, best first. */
+  async tournamentRanking(viewerId: string, id: string): Promise<TournamentRanking> {
+    if (!UUID_RE.test(id)) throw AppError.notFound('Tournament not found');
+    const t = await this.db.execute<TournamentRow>(sql`SELECT ${TOURNAMENT_COLS} FROM game_tournaments WHERE id = ${id}::uuid`);
+    if (!t.rows[0]) throw AppError.notFound('Tournament not found');
+    const res = await this.db.execute<{ display_name: string; handle: string; best: number; user_id: string }>(sql`
+      SELECT u.display_name, u.handle::text AS handle, b.best, b.user_id
+      FROM (SELECT s.user_id, max(s.score)::int AS best FROM game_sessions s, game_tournaments g
+            WHERE g.id = ${id}::uuid AND s.finished_at >= g.starts_at AND s.finished_at < g.ends_at GROUP BY s.user_id) b
+      JOIN users u ON u.id = b.user_id
+      ORDER BY b.best DESC, u.handle LIMIT ${LEADERBOARD_SIZE}`);
+    return { tournament: toTournament(t.rows[0]), items: res.rows.map((r, i) => ({ rank: i + 1, displayName: r.display_name, handle: r.handle, bestScore: r.best, me: r.user_id === viewerId })) };
+  }
+
   /** Finished games of the user, for the personal data export. */
   async exportFor(userId: string): Promise<{ startedAt: string; correct: number; score: number }[]> {
     const res = await this.db.execute<{ started_at: Date; correct_count: number; score: number }>(sql`
@@ -117,6 +154,17 @@ export class GamesService {
   async listQuestions(): Promise<AdminGameQuestionList> {
     const res = await this.db.execute<QuestionRow>(sql`SELECT id, prompt, options, correct_index, category, active FROM game_questions ORDER BY created_at DESC, id LIMIT 500`);
     return { items: res.rows.map(toAdmin) };
+  }
+
+  async createTournament(adminId: string, body: CreateTournamentRequest, meta: RequestMeta): Promise<Tournament> {
+    const res = await this.db.transaction(async (tx) => {
+      const ins = await tx.execute<TournamentRow>(sql`
+        INSERT INTO game_tournaments (title, starts_at, ends_at) VALUES (${body.title}, ${body.startsAt}::timestamptz, ${body.endsAt}::timestamptz)
+        RETURNING ${TOURNAMENT_COLS}`);
+      await this.audit.record({ action: 'games.tournament_created', actorUserId: adminId, meta, metadata: { tournamentId: ins.rows[0]!.id } }, tx);
+      return ins.rows[0]!;
+    });
+    return toTournament(res);
   }
 
   async setActive(id: string, active: boolean): Promise<AdminGameQuestion> {

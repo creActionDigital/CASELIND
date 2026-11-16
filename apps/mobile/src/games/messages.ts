@@ -19,6 +19,17 @@ export const gamesFr = {
   'games.err.daily_limit': 'Vous avez atteint 20 parties aujourd’hui. Revenez demain.',
   'games.err.expired': 'Le temps était écoulé : cette partie n’est pas comptée.',
   'games.err.finished': 'Cette partie est déjà terminée.',
+  'games.badges': 'Badges',
+  'games.badge.first_game': 'Première partie',
+  'games.badge.ten_games': '10 parties jouées',
+  'games.badge.perfect': 'Sans faute (10/10)',
+  'games.badge.earned': 'Obtenu',
+  'games.tournaments': 'Tournois',
+  'games.tournaments.empty': 'Aucun tournoi pour le moment.',
+  'games.tournaments.note': 'Sans prix ni frais : seul le classement compte.',
+  'games.tournament.upcoming': 'À venir',
+  'games.tournament.live': 'En cours',
+  'games.tournament.ended': 'Terminé',
 } as const;
 
 export const gamesEn = {
@@ -41,4 +52,15 @@ export const gamesEn = {
   'games.err.daily_limit': 'You reached 20 games today. Come back tomorrow.',
   'games.err.expired': 'Time was up: this game does not count.',
   'games.err.finished': 'This game is already finished.',
+  'games.badges': 'Badges',
+  'games.badge.first_game': 'First game',
+  'games.badge.ten_games': '10 games played',
+  'games.badge.perfect': 'Perfect score (10/10)',
+  'games.badge.earned': 'Earned',
+  'games.tournaments': 'Tournaments',
+  'games.tournaments.empty': 'No tournament for now.',
+  'games.tournaments.note': 'No prize, no fee: only the ranking counts.',
+  'games.tournament.upcoming': 'Upcoming',
+  'games.tournament.live': 'Live',
+  'games.tournament.ended': 'Ended',
 } as const;

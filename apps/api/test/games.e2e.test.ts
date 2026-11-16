@@ -161,4 +161,32 @@ describe('quiz éclair (lot 20a)', () => {
       await ctx.sql.query(`UPDATE feature_flags SET enabled = true WHERE key = 'games'`);
     }
   });
+
+  it('badges are earned by playing and tournaments rank only games finished inside their window (lot 20b)', async () => {
+    await seedQuestions(10);
+    const [admin, a, b] = [await user(['user', 'admin']), await user(), await user()];
+    const badges = async (u: TU) => Object.fromEntries((await api('get', u, '/games/quiz/badges').expect(200)).body.items.map((x: { key: string; earned: boolean }) => [x.key, x.earned]));
+    expect(await badges(a)).toEqual({ first_game: false, ten_games: false, perfect: false });
+    const s1 = (await start(a).expect(201)).body;
+    await submit(a, s1.id, [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]).expect(200);
+    expect(await badges(a)).toEqual({ first_game: true, ten_games: false, perfect: false });
+    const s2 = (await start(a).expect(201)).body;
+    await submit(a, s2.id, correctAnswers()).expect(200);
+    expect(await badges(a)).toMatchObject({ perfect: true });
+
+    const win = { title: 'Semaine 1', startsAt: new Date(Date.now() - 3600_000).toISOString(), endsAt: new Date(Date.now() + 3600_000).toISOString() };
+    await api('post', a, '/admin/games/tournaments', win).expect(403);
+    await api('post', admin, '/admin/games/tournaments', { ...win, endsAt: win.startsAt }).expect(400);
+    const t = (await api('post', admin, '/admin/games/tournaments', win).expect(201)).body;
+    expect(t.status).toBe('live');
+    const sb = (await start(b).expect(201)).body;
+    await submit(b, sb.id, correctAnswers()).expect(200);
+    await ctx.sql.query(`UPDATE game_sessions SET finished_at = now() - interval '5 hours' WHERE user_id = $1`, [b.id]); // outside the window
+    const ranking = (await api('get', a, `/games/quiz/tournaments/${t.id}`).expect(200)).body;
+    expect(ranking.items).toHaveLength(1);
+    expect(ranking.items[0]).toMatchObject({ rank: 1, me: true });
+    expect((await api('get', a, '/games/quiz/tournaments').expect(200)).body.items.map((x: { id: string }) => x.id)).toContain(t.id);
+    await api('get', a, '/games/quiz/tournaments/00000000-0000-4000-8000-000000000000').expect(404);
+    await api('get', a, '/games/quiz/tournaments/nope').expect(404);
+  });
 });

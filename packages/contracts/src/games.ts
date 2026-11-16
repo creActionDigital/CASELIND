@@ -52,3 +52,21 @@ export const leaderboardSchema = z.object({
   items: z.array(z.object({ rank: z.number().int(), displayName: z.string(), handle: z.string(), bestScore: z.number().int(), me: z.boolean() })),
 });
 export type Leaderboard = z.infer<typeof leaderboardSchema>;
+
+/** Badges (lot 20b): earned by playing, never bought, no value. Derived from the finished games, nothing is stored. */
+export const gameBadgeSchema = z.object({ key: z.enum(['first_game', 'ten_games', 'perfect']), earned: z.boolean(), progress: z.number().int(), target: z.number().int() });
+export type GameBadge = z.infer<typeof gameBadgeSchema>;
+export const gameBadgeListSchema = z.object({ items: z.array(gameBadgeSchema) });
+export type GameBadgeList = z.infer<typeof gameBadgeListSchema>;
+
+/** Tournaments (lot 20b): a time window opened by an administrator; the ranking is the best score finished inside it. No prize, no entry fee. */
+export const createTournamentRequestSchema = z
+  .object({ title: z.string().trim().min(1).max(80), startsAt: z.iso.datetime(), endsAt: z.iso.datetime() })
+  .refine((t) => Date.parse(t.endsAt) > Date.parse(t.startsAt), { path: ['endsAt'], message: 'endsAt must be after startsAt' });
+export type CreateTournamentRequest = z.infer<typeof createTournamentRequestSchema>;
+export const tournamentSchema = z.object({ id: z.uuid(), title: z.string(), startsAt: z.string(), endsAt: z.string(), status: z.enum(['upcoming', 'live', 'ended']) });
+export type Tournament = z.infer<typeof tournamentSchema>;
+export const tournamentListSchema = z.object({ items: z.array(tournamentSchema) });
+export type TournamentList = z.infer<typeof tournamentListSchema>;
+export const tournamentRankingSchema = z.object({ tournament: tournamentSchema, items: leaderboardSchema.shape.items });
+export type TournamentRanking = z.infer<typeof tournamentRankingSchema>;

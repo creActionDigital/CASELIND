@@ -111,6 +111,7 @@ export type AuditAction =
   /** Games (lot 20a): session id and score only, never an answer. */
   | 'games.session_started'
   | 'games.session_finished'
+  | 'games.tournament_created'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'

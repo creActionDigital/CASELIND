@@ -3,6 +3,12 @@ import {
   type AdminGameQuestion,
   type AdminGameQuestionList,
   type CreateGameQuestionRequest,
+  type CreateTournamentRequest,
+  createTournamentRequestSchema,
+  type GameBadgeList,
+  type Tournament,
+  type TournamentList,
+  type TournamentRanking,
   createGameQuestionRequestSchema,
   type Leaderboard,
   type LeaderboardQuery,
@@ -41,6 +47,21 @@ export class GamesController {
   leaderboard(@CurrentUser() u: AuthUser, @Query(new ZodPipe(leaderboardQuerySchema)) q: LeaderboardQuery): Promise<Leaderboard> {
     return this.games.leaderboard(u.userId, q);
   }
+
+  @Get('badges')
+  badges(@CurrentUser() u: AuthUser): Promise<GameBadgeList> {
+    return this.games.badges(u.userId);
+  }
+
+  @Get('tournaments')
+  tournaments(): Promise<TournamentList> {
+    return this.games.listTournaments();
+  }
+
+  @Get('tournaments/:id')
+  ranking(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<TournamentRanking> {
+    return this.games.tournamentRanking(u.userId, id);
+  }
 }
 
 /** Administrators maintain the questions. */
@@ -63,5 +84,18 @@ export class AdminGamesController {
   @Patch(':id')
   update(@Param('id') id: string, @Body(new ZodPipe(updateGameQuestionRequestSchema)) b: UpdateGameQuestionRequest): Promise<AdminGameQuestion> {
     return this.games.setActive(id, b.active);
+  }
+}
+
+/** Administrators open tournaments. */
+@Controller('admin/games/tournaments')
+@RequireFlag('games')
+@Roles('admin')
+export class AdminTournamentsController {
+  constructor(private readonly games: GamesService) {}
+
+  @Post()
+  create(@CurrentUser() u: AuthUser, @Body(new ZodPipe(createTournamentRequestSchema)) b: CreateTournamentRequest, @ReqMeta() meta: RequestMeta): Promise<Tournament> {
+    return this.games.createTournament(u.userId, b, meta);
   }
 }
