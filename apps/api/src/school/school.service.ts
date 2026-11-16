@@ -145,6 +145,14 @@ export class SchoolService {
     };
   }
 
+  /** Anyone can leave a class they were put in (a school cannot keep someone enrolled against their will). */
+  async leave(userId: string, classId: string, meta: RequestMeta): Promise<void> {
+    if (!UUID_RE.test(classId)) throw AppError.notFound('Class not found');
+    const r = await this.db.execute(sql`DELETE FROM school_enrollments WHERE class_id = ${classId}::uuid AND user_id = ${userId}::uuid RETURNING class_id`);
+    if (r.rows.length === 0) throw AppError.notFound('Class not found');
+    await this.audit.record({ action: 'school.left', actorUserId: userId, meta, metadata: { classId } });
+  }
+
   /** The user's own enrolments, for the personal data export. */
   async exportFor(userId: string): Promise<{ schoolName: string; className: string; role: SchoolRole }[]> {
     const r = await this.myClasses(userId);

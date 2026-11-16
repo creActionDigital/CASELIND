@@ -30,3 +30,4 @@ export const enroll = (orgId: string, id: string, body: { handle: string; role: 
 export const unenroll = (orgId: string, id: string, handle: string) => api.request(`${base(orgId)}/${id}/members/${encodeURIComponent(handle)}`, { method: 'DELETE' });
 export const addLesson = (orgId: string, id: string, body: CreateLessonRequest) => api.request(`${base(orgId)}/${id}/lessons`, { method: 'POST', body, schema: schoolLessonSchema });
 export const announce = (orgId: string, id: string, body: CreateAnnouncementRequest) => api.request(`${base(orgId)}/${id}/announcements`, { method: 'POST', body, schema: announcementSchema });
+export const leaveClass = (id: string) => api.request(`/me/school/classes/${id}`, { method: 'DELETE' });

@@ -480,3 +480,9 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : « Mes classes » (tuile du menu Plus quand le drapeau est actif), détail (emploi du temps par jour, annonces), et côté école : classes, inscription par identifiant, cours, annonces.
 - Résultats observés : API 586 tests, mobile 235, typechecks propres ; parcours complet vérifié à 375 px (création de classe, inscription, cours, annonce, vue de l'inscrit), puis données de test et drapeau remis.
 - Différé : frais scolaires, bourses, recherche d'établissements, notifications aux inscrits, messagerie école-parents (la messagerie existante peut servir), /security-review non lancé.
+
+## Revue de sécurité du lot 17b (faite à la main, le skill /security-review exige un dépôt distant absent) (2026-11-16)
+- Vérifié : toutes les routes du personnel exigent `org.members.manage` (propriétaire/administrateur) ; chaque classe, cours et inscrit est limité à l'organisation de l'appelant (404 sinon) ; un non-inscrit reçoit 404 ; le drapeau réglementé coupe tout par défaut ; l'audit ne contient ni noms ni texte d'annonce.
+- Risque trouvé et corrigé : un propriétaire d'organisation « école » pouvait inscrire quelqu'un sans son accord, sans issue pour lui. Ajout de `DELETE /me/school/classes/{id}` (quitter la classe) et du bouton dans l'application.
+- Risques restants, à connaître : la plateforme ne vérifie pas qu'une organisation de type « école » en est vraiment une (à brancher sur la vérification d'organisation si elle existe) ; l'inscription par identifiant révèle si un identifiant existe (404) au personnel de l'école.
+- Résultats observés : API 586 tests, mobile 235, typechecks propres.

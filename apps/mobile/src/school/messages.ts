@@ -39,6 +39,7 @@ export const schoolFr = {
   'school.staff.consent': 'L’établissement est responsable du consentement des parents pour les élèves mineurs.',
   'school.staff.notSchool': 'Cette organisation n’est pas un établissement.',
   'school.err.invalid': 'Vérifiez les champs.',
+  'school.leave': 'Quitter cette classe',
 } as const;
 
 export const schoolEn = {
@@ -81,4 +82,5 @@ export const schoolEn = {
   'school.staff.consent': 'The school is responsible for parental consent for underage pupils.',
   'school.staff.notSchool': 'This organisation is not a school.',
   'school.err.invalid': 'Check the fields.',
+  'school.leave': 'Leave this class',
 } as const;

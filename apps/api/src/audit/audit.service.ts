@@ -115,6 +115,7 @@ export type AuditAction =
   | 'school.class_created'
   | 'school.enrolled'
   | 'school.unenrolled'
+  | 'school.left'
   | 'school.announced'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'

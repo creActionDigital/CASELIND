@@ -1,17 +1,26 @@
-import { useQuery } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { useI18n } from '../../../i18n';
-import { fetchMyClass, schk } from '../../../school/api';
+import { fetchMyClass, leaveClass, schk } from '../../../school/api';
 import { Card, Loading, SectionTitle } from '../../../seller/ui';
 import { spacing } from '../../../theme/tokens';
-import { ErrorState, Text } from '../../../ui';
+import { Button, ErrorState, Text } from '../../../ui';
 
 /** Une classe vue par un inscrit : emploi du temps par jour, puis annonces. */
 export default function ClassDetail() {
   const { t, locale } = useI18n();
   const { classId } = useLocalSearchParams<{ classId: string }>();
   const q = useQuery({ queryKey: schk.one(classId), queryFn: () => fetchMyClass(classId) });
+  const router = useRouter();
+  const qc = useQueryClient();
+  const leave = useMutation({
+    mutationFn: () => leaveClass(classId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: schk.mine });
+      router.replace('/school' as never);
+    },
+  });
   const d = q.data;
   return (
     <>
@@ -48,6 +57,7 @@ export default function ClassDetail() {
                 <Text>{a.body}</Text>
               </Card>
             ))}
+            <Button variant="ghost" label={t('school.leave')} loading={leave.isPending} onPress={() => leave.mutate()} />
           </>
         ) : null}
       </ScrollView>

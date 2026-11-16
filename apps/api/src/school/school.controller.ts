@@ -92,6 +92,12 @@ export class MySchoolController {
     return this.school.myClasses(u.userId);
   }
 
+  @Delete('classes/:classId')
+  @HttpCode(204)
+  leave(@CurrentUser() u: AuthUser, @Param('classId') classId: string, @ReqMeta() meta: RequestMeta): Promise<void> {
+    return this.school.leave(u.userId, classId, meta);
+  }
+
   @Get('classes/:classId')
   one(@CurrentUser() u: AuthUser, @Param('classId') classId: string): Promise<MyClassDetail> {
     return this.school.myClass(u.userId, classId);

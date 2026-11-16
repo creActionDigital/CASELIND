@@ -81,8 +81,10 @@ describe('schools (lot 17b)', () => {
       expect(all).not.toContain('Réunion');
       expect(all).not.toContain('Vendredi');
 
-      await call('delete', head, `/orgs/${school}/school/classes/${cls.id}/members/${pupil.handle}`).expect(204);
+      await call('delete', outsider, `/me/school/classes/${cls.id}`).expect(404); // not enrolled
+      await call('delete', pupil, `/me/school/classes/${cls.id}`).expect(204); // leaving is always possible
       await call('get', pupil, `/me/school/classes/${cls.id}`).expect(404);
+      await call('delete', head, `/orgs/${school}/school/classes/${cls.id}/members/${pupil.handle}`).expect(404); // already gone
     });
   });
 });
