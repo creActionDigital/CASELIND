@@ -645,3 +645,6 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : « Frais scolaires » (écran inscrit) et « Frais de la classe » (personnel : énoncer un frais, voir les élèves, marquer payé).
 - Résultats observés : API ciblé 18 tests, mobile 243 ; types propres.
 - Différé : lien parent-enfant (un parent ne voit pas le statut d'un élève), rappel avant échéance, export de compte des frais, paiement réel.
+
+## Gouvernance de la plateforme (écart G1 de l'audit de conformité) (2026-11-16) : API testée, écran mobile à faire
+- L'audit (`docs/AUDIT_CONFORMITE_LOTS_1_12.md`) a relevé qu'aucune route admin ne suspendait un compte ni ne vérifiait une organisation (constat vérifié dans le code). Ajouté : `GET /admin/users`, `PUT /admin/users/{id}/status` (actif ou suspendu, motif obligatoire, ni soi-même ni un autre administrateur), `GET /admin/orgs`, `PUT /admin/orgs/{id}/status`, `PUT /admin/orgs/{id}/verification` (non vérifiée, en attente, vérifiée ; un motif est exigé pour « vérifiée »). La suspension coupe la session immédiatement et la connexion ; une organisation suspendue quitte les pages publiques ; le badge « vérifiée » de la vitrine suit. Audit avec le motif. OpenAPI + test e2e (7 tests avec OpenAPI).

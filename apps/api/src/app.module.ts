@@ -7,6 +7,8 @@ import { LoggerModule } from 'nestjs-pino';
 import { AccountController } from './account/account.controller.js';
 import { AccountService } from './account/account.service.js';
 import { AdminController } from './admin/admin.controller.js';
+import { GovernanceController } from './admin/governance.controller.js';
+import { GovernanceService } from './admin/governance.service.js';
 import { AuditService } from './audit/audit.service.js';
 import { AuthController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
@@ -344,6 +346,7 @@ export class AppModule {
         AuthController,
         UsersController,
         AdminController,
+        GovernanceController,
         ConfigController,
         AdminFlagsController,
         PrivacyController,
@@ -525,6 +528,7 @@ export class AppModule {
         HealthService,
         GamesService,
         SchoolService,
+        GovernanceService,
         FeesService,
         ScholarshipsService,
         MessagesService,

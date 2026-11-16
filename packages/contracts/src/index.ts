@@ -34,6 +34,7 @@ export * from './education.js';
 export * from './health.js';
 export * from './health-pro.js';
 export * from './documents.js';
+export * from './admin-governance.js';
 export * from './games.js';
 export * from './school.js';
 export * from './school-fees.js';
