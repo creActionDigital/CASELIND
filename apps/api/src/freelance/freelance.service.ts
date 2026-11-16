@@ -469,7 +469,7 @@ export class FreelanceService implements OnModuleInit {
         WHERE c.id = ${contractId}::uuid AND ms.id = ${milestoneId}::uuid FOR UPDATE OF c, ms`);
       const row = res.rows[0];
       if (!row || row.freelancer_id !== userId) throw contractNotFound();
-      if (row.status !== 'active' || row.m_status === 'approved') throw AppError.conflict('Files can no longer be changed on this milestone', { reason: 'invalid_transition' });
+      if (row.status !== 'active' || (row.m_status !== 'pending' && row.m_status !== 'revision')) throw AppError.conflict('Files can no longer be changed on this milestone', { reason: 'invalid_transition' });
       const removed = await replaceFiles(tx, MILESTONE_FILES, userId, 'delivery', milestoneId, assetIds);
       await this.audit.record({ action: 'freelance.delivery_files_set', actorUserId: userId, meta, metadata: { contractId, milestoneId, count: assetIds.length } }, tx);
       return removed;

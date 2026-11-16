@@ -168,7 +168,7 @@ export class MobilityService implements OnModuleInit {
     if (body.photoMediaId) {
       const ok = await rowsOf(
         this.db,
-        sql`SELECT 1 FROM media_assets WHERE id = ${body.photoMediaId}::uuid AND owner_user_id = ${userId}::uuid AND status = 'ready' AND purpose <> 'kyc_document'`,
+        sql`SELECT 1 FROM media_assets WHERE id = ${body.photoMediaId}::uuid AND owner_user_id = ${userId}::uuid AND status = 'ready' AND purpose IN ('product', 'avatar')`,
       );
       if (ok.length === 0) throw validation('photoMediaId', 'must be a ready upload of yours', 'media_not_found');
     }

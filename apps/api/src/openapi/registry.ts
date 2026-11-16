@@ -517,6 +517,18 @@ import {
   updateAiSettingsRequestSchema,
 } from '@caselind/contracts';
 
+// Lot 16h (loyalty, campaigns), separate import block.
+import {
+  campaignListSchema,
+  campaignSchema,
+  createCampaignRequestSchema,
+  loyaltyProgramSchema,
+  marketingConsentRequestSchema,
+  marketingConsentSchema,
+  myLoyaltySchema,
+  updateLoyaltyProgramRequestSchema,
+} from '@caselind/contracts';
+
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 /** app: a mini-app OAuth access token (lot 10), never a user session. public: no token; user: any authenticated account; admin: the `admin` platform role; moderator: the `admin` or `moderator` platform role. */
 export type AuthLevel = 'public' | 'user' | 'admin' | 'moderator' | 'app';
@@ -693,8 +705,8 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/me/health/doses/{id}/taken', summary: 'Mark a dose taken', tags: ['health'], auth: 'user', params: { id: z.string() }, response: doseSchema, status: 200 },
   { method: 'post', path: '/v1/me/health/doses/{id}/skip', summary: 'Mark a dose skipped', tags: ['health'], auth: 'user', params: { id: z.string() }, response: doseSchema, status: 200 },
   // Lot 20a: Play & Win quiz éclair (CDC §21). Behind the `games` flag. A game of skill: no money, no bet; the score is computed on the server.
-  { method: 'post', path: '/v1/games/quiz/sessions', summary: 'Start a game: 10 random active questions (without the right answers) and 120 seconds; fewer than 10 questions: 409 not_enough_questions; 20 a day: 409 daily_limit; audited', tags: ['games'], auth: 'user', response: quizSessionSchema, status: 201 },
-  { method: 'post', path: '/v1/games/quiz/sessions/{id}/answers', summary: 'Submit the 10 answers once, before the time is up (own game only, else 404; again: 409 already_finished; late: 409 expired). Score = 100 per right answer + seconds left (0 when none is right); audited', tags: ['games'], auth: 'user', params: { id: z.string() }, body: submitQuizAnswersRequestSchema, response: gameQuizResultSchema, status: 200 },
+  { method: 'post', path: '/v1/games/quiz/sessions', summary: 'Start a game: 10 random active questions (without the right answers) and 120 seconds; fewer than 10 questions: 409 not_enough_questions; 20 a day: 409 daily_limit; 5 suspicious games today: 409 cooldown; audited', tags: ['games'], auth: 'user', response: quizSessionSchema, status: 201 },
+  { method: 'post', path: '/v1/games/quiz/sessions/{id}/answers', summary: 'Submit the 10 answers once, before the time is up (own game only, else 404; again: 409 already_finished; late: 409 expired). Score = 100 per right answer + seconds left (0 when none is right). A game returned in under 8 seconds is implausible: score 0, counted false, kept out of rankings and badges; audited', tags: ['games'], auth: 'user', params: { id: z.string() }, body: submitQuizAnswersRequestSchema, response: gameQuizResultSchema, status: 200 },
   { method: 'get', path: '/v1/games/quiz/leaderboard', summary: 'Top 20 by best finished score, one rank per player (period week = last 7 days, or all)', tags: ['games'], auth: 'user', query: leaderboardQuerySchema, response: leaderboardSchema, status: 200 },
   { method: 'post', path: '/v1/admin/games/questions', summary: 'Add a question with its right answer (admin role)', tags: ['games'], auth: 'admin', body: createGameQuestionRequestSchema, response: adminGameQuestionSchema, status: 201 },
   { method: 'get', path: '/v1/admin/games/questions', summary: 'List the questions with their right answers (admin role)', tags: ['games'], auth: 'admin', response: adminGameQuestionListSchema, status: 200 },
@@ -829,7 +841,7 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/orgs/{orgId}/job-applications/{applicationId}/interviews', summary: 'Propose an interview (hr.manage; future UTC start, 15 to 180 min, place up to 200 characters; one pending or confirmed per application: 409 interview_exists; decided application: 409 application_final); notifies the candidate; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), applicationId: z.string() }, body: proposeInterviewRequestSchema, response: interviewSchema, status: 201 },
   { method: 'post', path: '/v1/orgs/{orgId}/job-interviews/{interviewId}/cancel', summary: 'Cancel a pending or confirmed interview that has not taken place (hr.manage); notifies the candidate; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), interviewId: z.string() }, response: interviewSchema, status: 200 },
   // Lot 15: classified ads (property, vehicles, used goods, lost and found). Behind the `listings` flag; contact goes through messaging.
-  { method: 'get', path: '/v1/listings', summary: 'Active ads, newest first (filters kind, q, city, currency, price range; keyset cursor). Hidden ads and ads of blocked users are not listed', tags: ['listings'], auth: 'user', query: listingListQuerySchema, response: listingListSchema, status: 200 },
+  { method: 'get', path: '/v1/listings', summary: 'Active ads, newest first (filters kind, q, city, currency, price range, vehicle yearMin / yearMax / mileageMax / fuel; keyset cursor). Hidden ads and ads of blocked users are not listed', tags: ['listings'], auth: 'user', query: listingListQuerySchema, response: listingListSchema, status: 200 },
   { method: 'get', path: '/v1/me/listing-alerts', summary: 'My ad alerts (private)', tags: ['listings'], auth: 'user', response: listingAlertListSchema, status: 200 },
   { method: 'post', path: '/v1/me/listing-alerts', summary: 'Create an ad alert (q, city, kind; at least one; 5 max: 409 alert_limit); audited without the criteria', tags: ['listings'], auth: 'user', body: createListingAlertRequestSchema, response: listingAlertSchema, status: 201 },
   { method: 'delete', path: '/v1/me/listing-alerts/{id}', summary: 'Delete one of my ad alerts (idempotent)', tags: ['listings'], auth: 'user', params: { id: z.string() }, status: 204 },
@@ -838,7 +850,7 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/visits/{id}', summary: 'One visit appointment (visible to the visitor and the ad owner only: 404 otherwise)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingVisitSchema, status: 200 },
   { method: 'post', path: '/v1/visits/{id}/confirm', summary: 'Owner confirms a pending visit, optionally giving a precise place (200 chars); 409 if not pending', tags: ['listings'], auth: 'user', params: { id: z.string() }, body: confirmVisitRequestSchema, response: listingVisitSchema, status: 200 },
   { method: 'post', path: '/v1/visits/{id}/decline', summary: 'Owner declines a pending visit', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingVisitSchema, status: 200 },
-  { method: 'get', path: '/v1/listings/compare', summary: 'Compare 2 to 3 active vehicle ads side by side (ids=a,b,c; 400 for a bad list, 404 if any is not an active, visible vehicle ad)', tags: ['listings'], auth: 'user', query: compareListingsQuerySchema, response: compareListingsResponseSchema, status: 200 },
+  { method: 'get', path: '/v1/listings/compare', summary: 'Compare 2 to 3 active vehicle ads side by side (ids=a,b,c; 400 for a bad list, 404 if any is not an active, visible vehicle ad); each item carries the vehicle fields', tags: ['listings'], auth: 'user', query: compareListingsQuerySchema, response: compareListingsResponseSchema, status: 200 },
   { method: 'post', path: '/v1/listings/{id}/offers', summary: 'Guided negotiation: one price offer (10% to 100% of the asking price, in the ad currency; message 300 max) on an active priced ad; indicative only, nothing is sold or paid; 409 offer_exists / offer_limit (5); notifies the owner without amounts', tags: ['listings'], auth: 'user', params: { id: z.string() }, body: createOfferRequestSchema, response: listingOfferSchema, status: 201 },
   { method: 'get', path: '/v1/me/offers', summary: 'My negotiations, as buyer and as ad owner', tags: ['listings'], auth: 'user', response: listingOfferListSchema, status: 200 },
   { method: 'get', path: '/v1/offers/{id}', summary: 'One negotiation (buyer and ad owner only: 404 otherwise)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingOfferSchema, status: 200 },
@@ -849,7 +861,7 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/visits/{id}/cancel', summary: 'Either party cancels an open visit (the visitor until 1 hour before: 409 too_late)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingVisitSchema, status: 200 },
   { method: 'get', path: '/v1/listings/mine', summary: 'The caller\'s own ads, active and closed', tags: ['listings'], auth: 'user', query: pageQuerySchema, response: listingListSchema, status: 200 },
   { method: 'get', path: '/v1/listings/{id}', summary: 'One ad (closed, hidden, blocked or unknown: 404, except for its owner)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingSchema, status: 200 },
-  { method: 'post', path: '/v1/listings', summary: 'Publish an ad (photos: own ready uploads with purpose listing, up to 8; at most 20 active ads per owner: 409 listing_limit; lost/found carry no price); audited', tags: ['listings'], auth: 'user', body: createListingRequestSchema, response: listingSchema, status: 201 },
+  { method: 'post', path: '/v1/listings', summary: 'Publish an ad (photos: own ready uploads with purpose listing, up to 8; at most 20 active ads per owner: 409 listing_limit; lost/found carry no price; optional make, model, year, mileageKm, fuel, transmission for vehicle ads only: 400 otherwise); audited', tags: ['listings'], auth: 'user', body: createListingRequestSchema, response: listingSchema, status: 201 },
   { method: 'patch', path: '/v1/listings/{id}', summary: 'Edit an own ad (the kind cannot change); anyone else: 404; audited', tags: ['listings'], auth: 'user', params: { id: z.string() }, body: updateListingRequestSchema, response: listingSchema, status: 200 },
   { method: 'post', path: '/v1/listings/{id}/close', summary: 'Owner closes the ad (rented, sold, found...); idempotent; audited', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingSchema, status: 200 },
   // Lot 13: personal finance on the sandbox wallet. Behind the `wallet.sandbox` flag.
@@ -1088,5 +1100,12 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/ai/conversations/{id}/messages', summary: 'Messages of an own conversation (others: 404)', tags: ['ai'], auth: 'user', params: { id: z.string() }, response: aiMessageListSchema, status: 200 },
   { method: 'post', path: '/v1/ai/conversations/{id}/messages', summary: 'Ask the assistant (content max 4000): returns the reply and the model that really answered; falls back to another model only if allowFallback. Errors: 409 data_notice_required, 429 daily quota or rate limit, 503 ai_unavailable, 502 ai_provider_error (no provider detail)', tags: ['ai'], auth: 'user', params: { id: z.string() }, body: sendAiMessageRequestSchema, response: sendAiMessageResultSchema, status: 201 },
   { method: 'delete', path: '/v1/ai/conversations/{id}', summary: 'Delete an own conversation and its messages', tags: ['ai'], auth: 'user', params: { id: z.string() }, status: 204 },
+  // Lot 16h: loyalty points (a counter, no monetary value, not transferable, not redeemable) and opt-in campaigns. Behind the `commerce` flag.
+  { method: 'get', path: '/v1/orgs/{orgId}/loyalty', summary: 'Loyalty programme of the organisation with member count and points issued (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: loyaltyProgramSchema, status: 200 },
+  { method: 'put', path: '/v1/orgs/{orgId}/loyalty', summary: 'Enable or disable the programme and set pointsPerUnit (1-100, USD or CDF) and the reward text (200 max); audited (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, body: updateLoyaltyProgramRequestSchema, response: loyaltyProgramSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/campaigns', summary: 'Send a campaign (title 80, text 300) to the shop customers who opted in, not blocked with the author; 1 per 24 h (409 campaign_rate_limited), 500 recipients max; audited without the text (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, body: createCampaignRequestSchema, response: campaignSchema, status: 201 },
+  { method: 'get', path: '/v1/orgs/{orgId}/campaigns', summary: 'Campaign history (title, date, recipient count; never the people) (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: campaignListSchema, status: 200 },
+  { method: 'get', path: '/v1/me/loyalty', summary: 'My points per shop and my marketing consent', tags: ['orders'], auth: 'user', response: myLoyaltySchema, status: 200 },
+  { method: 'put', path: '/v1/me/marketing-consent', summary: 'Opt in or out of shop offers (off by default; audited)', tags: ['orders'], auth: 'user', body: marketingConsentRequestSchema, response: marketingConsentSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/ai/product-description', summary: 'Seller help (permission catalog.manage): draft product description from a title and facts typed by the seller; aiGenerated is always true, nothing is stored or published', tags: ['ai', 'catalog'], auth: 'user', params: { orgId: z.string() }, body: productDescriptionRequestSchema, response: productDescriptionResultSchema, status: 200 },
 ];

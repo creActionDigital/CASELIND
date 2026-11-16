@@ -2,12 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import { useI18n } from '../../../i18n';
+import { useI18n, type MessageKey } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { ApiRequestError } from '../../../lib/api';
 import { closeListing, fetchListing, listingKeys, makeOffer, requestVisit } from '../../../listings/api';
 import { toggleCompareId, useCompareIds } from '../../../listings/compare-store';
-import { kindKey, offerBounds, offerErrorKey, parseVisitTime, priceLabel, visitErrorKey } from '../../../listings/logic';
+import { kindKey, offerBounds, offerErrorKey, parseVisitTime, priceLabel, vehicleRows, visitErrorKey } from '../../../listings/logic';
 import { formatMoney, parseMajorToMinor } from '../../../shop/format';
 import { createDirect, startChatErrorKey } from '../../../messaging/api';
 import { openReport } from '../../../report/open-report';
@@ -114,6 +114,11 @@ export default function ListingDetail() {
           {l.city} · {t('listings.by', { name: l.owner.displayName })}
         </Text>
         {l.status === 'closed' ? <Badge tone="neutral" label={t('listings.closed')} /> : null}
+        {vehicleRows(l, t as (k: MessageKey) => string).map(([k, v]) => (
+          <Text key={k}>
+            {t(k)} : {v}
+          </Text>
+        ))}
         {l.description ? <Text>{l.description}</Text> : null}
         <View style={[styles.safety, { backgroundColor: colors.surface }]}>
           <Text variant="small" muted>

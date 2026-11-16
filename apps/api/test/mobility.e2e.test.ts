@@ -481,4 +481,19 @@ describe('driver profile photo', () => {
     expect(removed.body.vehicle.photoUrl).toBeNull();
     expect(removed.body.status).toBe('pending');
   });
+
+  it('refuses a photo whose purpose is not an image purpose (delivery, cv, lesson)', async () => {
+    const d = await driver();
+    const base = { vehicleKind: 'moto', comfort: false, make: 'Bajaj', color: 'rouge', zone: 'Goma' };
+    const current = ((await get(d, '/v1/mobility/driver').expect(200)).body as { vehicle: { plate: string } }).vehicle;
+    for (const purpose of ['delivery', 'cv', 'lesson']) {
+      const mediaId = randomUUID();
+      await ctx.sql.query(
+        `INSERT INTO media_assets (id, owner_user_id, purpose, declared_mime, mime, size_bytes, status, storage_key, sha256, uploaded_at)
+         VALUES ($1, $2, $3, 'image/png', 'image/png', 10, 'ready', $4, repeat('0', 64), now())`,
+        [mediaId, d.id, purpose, `test/${mediaId}`],
+      );
+      await ctx.http.put('/v1/mobility/driver').set(bearer(d.token)).send({ ...base, plate: current.plate, photoMediaId: mediaId }).expect(400);
+    }
+  });
 });

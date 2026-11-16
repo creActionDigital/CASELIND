@@ -131,6 +131,8 @@ export const accountExportSchema = z.object({
   listingAlerts: z.array(z.object({ id: z.uuid(), q: z.string().nullable(), city: z.string().nullable(), kind: z.string().nullable(), createdAt: z.string() })),
   /** Lot 15c: visit appointments, as visitor or as ad owner. */
   listingVisits: z.array(z.object({ id: z.uuid(), listingId: z.uuid(), role: z.string(), status: z.string(), scheduledAt: z.string(), message: z.string(), place: z.string().nullable(), createdAt: z.string() })),
+  /** Lot 16h: marketing consent and loyalty point balances per shop (no monetary value). */
+  loyalty: z.object({ marketingConsent: z.boolean(), balances: z.array(z.object({ orgName: z.string(), points: z.number().int() })) }),
   /** Lot 15d: price negotiations, as buyer or as ad owner. */
   listingOffers: z.array(z.object({ id: z.uuid(), listingId: z.uuid(), role: z.string(), status: z.string(), offerMinor: z.number().int(), counterMinor: z.number().int().nullable(), currency: z.string(), message: z.string(), createdAt: z.string() })),
   jobAlerts: z.array(z.object({ id: z.uuid(), q: z.string().nullable(), city: z.string().nullable(), contractType: z.string().nullable(), createdAt: z.string() })),

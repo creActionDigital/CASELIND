@@ -44,6 +44,19 @@ export function offerErrorKey(details: unknown): MessageKey | null {
   return null;
 }
 
+/** Lignes « champ : valeur » d'un véhicule (lot 15e) ; `all` garde les champs vides (tableau de comparaison). */
+export function vehicleRows(l: Pick<Listing, 'make' | 'model' | 'year' | 'mileageKm' | 'fuel' | 'transmission'>, t: (k: MessageKey) => string, all = false): [MessageKey, string][] {
+  const rows: [MessageKey, string | null][] = [
+    ['listings.vehicle.make' as MessageKey, l.make],
+    ['listings.vehicle.model' as MessageKey, l.model],
+    ['listings.vehicle.year' as MessageKey, l.year === null ? null : String(l.year)],
+    ['listings.vehicle.mileage' as MessageKey, l.mileageKm === null ? null : `${l.mileageKm} km`],
+    ['listings.vehicle.fuel' as MessageKey, l.fuel === null ? null : t(`listings.vehicle.fuel.${l.fuel}` as MessageKey)],
+    ['listings.vehicle.transmission' as MessageKey, l.transmission === null ? null : t(`listings.vehicle.transmission.${l.transmission}` as MessageKey)],
+  ];
+  return rows.filter(([, v]) => all || v !== null).map(([k, v]) => [k, v ?? '-']);
+}
+
 export const MAX_COMPARE = 3;
 /** Ajoute ou retire une annonce de la liste à comparer (3 au plus : la plus ancienne sort). */
 export const toggleCompare = (ids: string[], id: string): string[] => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id].slice(-MAX_COMPARE));

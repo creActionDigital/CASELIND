@@ -92,6 +92,7 @@ export default function Play() {
         {result ? (
           <View style={[styles.card, { backgroundColor: colors.surface }]} accessibilityLiveRegion="polite">
             <Text variant="heading">{t('games.result', { correct: result.correct, total: result.total, score: result.score })}</Text>
+            {result.counted ? null : <Text muted>{t('games.notCounted')}</Text>}
           </View>
         ) : null}
         {result || over || (error && !session) ? <Button variant="secondary" label={t('games.again')} loading={start.isPending} onPress={() => { submit.reset(); start.mutate(); }} /> : null}

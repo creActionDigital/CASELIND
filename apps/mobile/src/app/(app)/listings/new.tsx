@@ -1,11 +1,11 @@
-import type { ListingKind } from '@caselind/contracts';
+import type { CreateListingRequest, ListingKind } from '@caselind/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
-import { useI18n } from '../../../i18n';
+import { useI18n, type MessageKey } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
 import { createListing, listingKeys } from '../../../listings/api';
@@ -18,6 +18,8 @@ import { Button, Screen, Text, TextField } from '../../../ui';
 import { useTheme } from '../../../theme/use-theme';
 
 const MAX_PHOTOS = 8;
+const FUELS = ['petrol', 'diesel', 'hybrid', 'electric', 'other'] as const;
+const TRANSMISSIONS = ['manual', 'automatic'] as const;
 
 /** Publier une annonce : catégorie, titre, description, prix (sauf perdu/trouvé), ville, photos. */
 export default function NewListing() {
@@ -31,6 +33,8 @@ export default function NewListing() {
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState<string>('USD');
   const [city, setCity] = useState('Goma');
+  const [vehicle, setVehicle] = useState({ make: '', model: '', year: '', mileage: '', fuel: '', transmission: '' });
+  const setV = (k: keyof typeof vehicle) => (v: string) => setVehicle((cur) => ({ ...cur, [k]: v }));
   const [photos, setPhotos] = useState<{ uri: string; mime: string | null | undefined }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,7 +67,20 @@ export default function NewListing() {
       } catch {
         throw new Error('photos');
       }
+      const num = (s: string): number | null => {
+        if (!s.trim()) return null;
+        const n = Number(s.trim());
+        if (!Number.isInteger(n)) throw new Error('invalid_price');
+        return n;
+      };
+      const isVehicle = kind === 'vehicle';
       return createListing({
+        make: isVehicle ? vehicle.make.trim() || null : null,
+        model: isVehicle ? vehicle.model.trim() || null : null,
+        year: isVehicle ? num(vehicle.year) : null,
+        mileageKm: isVehicle ? num(vehicle.mileage) : null,
+        fuel: isVehicle ? ((vehicle.fuel || null) as CreateListingRequest['fuel']) : null,
+        transmission: isVehicle ? ((vehicle.transmission || null) as CreateListingRequest['transmission']) : null,
         kind,
         title: title.trim(),
         description: description.trim(),
@@ -99,6 +116,18 @@ export default function NewListing() {
           <>
             <TextField label={t('listings.field.price')} value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
             <Chips options={WALLET_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency} onChange={setCurrency} scroll={false} />
+          </>
+        ) : null}
+        {kind === 'vehicle' ? (
+          <>
+            <TextField label={t('listings.vehicle.make')} value={vehicle.make} onChangeText={setV('make')} maxLength={40} />
+            <TextField label={t('listings.vehicle.model')} value={vehicle.model} onChangeText={setV('model')} maxLength={40} />
+            <TextField label={t('listings.vehicle.year')} value={vehicle.year} onChangeText={setV('year')} keyboardType="number-pad" maxLength={4} />
+            <TextField label={t('listings.vehicle.mileage')} value={vehicle.mileage} onChangeText={setV('mileage')} keyboardType="number-pad" maxLength={7} />
+            <Text variant="bodyStrong">{t('listings.vehicle.fuel')}</Text>
+            <Chips options={[{ value: '', label: '-' }, ...FUELS.map((f) => ({ value: f, label: t(`listings.vehicle.fuel.${f}` as MessageKey) }))]} value={vehicle.fuel} onChange={setV('fuel')} />
+            <Text variant="bodyStrong">{t('listings.vehicle.transmission')}</Text>
+            <Chips options={[{ value: '', label: '-' }, ...TRANSMISSIONS.map((f) => ({ value: f, label: t(`listings.vehicle.transmission.${f}` as MessageKey) }))]} value={vehicle.transmission} onChange={setV('transmission')} />
           </>
         ) : null}
         <TextField label={t('listings.field.city')} value={city} onChangeText={setCity} maxLength={80} />

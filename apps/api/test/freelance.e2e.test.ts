@@ -204,8 +204,8 @@ describe('freelance contracts (lot 16b)', () => {
     const audit = await ctx.sql.query(`SELECT metadata FROM audit_events WHERE action = 'freelance.delivery_files_set' AND actor_user_id = $1 ORDER BY id`, [freelancer.id]);
     expect(audit.rows.map((r: { metadata: { count: number } }) => r.metadata.count)).toEqual([2, 1]);
     await step(freelancer, c.id, m1, 'deliver').expect(200);
-    await put(freelancer, []).expect(200); // still allowed once delivered, until approved
-    await read(client, png).expect(404);
+    await put(freelancer, []).expect(409); // delivered: the client reviews these files, they are frozen
+    await read(client, png).expect(200);
     await step(client, c.id, m1, 'approve').expect(200);
     await put(freelancer, []).expect(409);
   });

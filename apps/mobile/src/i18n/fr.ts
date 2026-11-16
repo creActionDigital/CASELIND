@@ -14,6 +14,7 @@ import { docsFr } from '../seller/documents-messages';
 import { schoolFr } from '../school/messages';
 import { scholarshipsFr } from '../school/messages-scholarships';
 import { salesFr } from '../seller/sales-messages';
+import { loyaltyFr } from '../loyalty/messages';
 export const fr = {
   'common.loading': 'Chargement…',
   'common.retry': 'Réessayer',
@@ -1296,6 +1297,7 @@ export const fr = {
   ...healthProFr,
   ...gamesFr,
   ...salesFr,
+  ...loyaltyFr,
   ...schoolFr,
   ...scholarshipsFr,
   ...docsFr,

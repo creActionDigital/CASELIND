@@ -1,10 +1,12 @@
 import { type AttachedFile, ErrorCodes, type MediaMime, type MediaPurpose } from '@caselind/contracts';
+import { Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
 import type { Db } from '../db/db.module.js';
 import { contentUrlOf } from './media.service.js';
 import type { MediaStorage } from './storage.js';
 
+const logger = new Logger('MediaStorage');
 type Exec = Pick<Db, 'execute'>;
 /** A link table between one object (milestone, lesson) and its attached media (lot 19m). Names are constants, never user input. */
 export type FileLink = { table: 'milestone_files' | 'lesson_files'; col: 'milestone_id' | 'lesson_id' };
@@ -64,5 +66,8 @@ export async function replaceFiles(tx: Exec, link: FileLink, userId: string, pur
 
 /** Best effort after commit: a missing object is not an error, a leftover is cleaned with the account. */
 export async function deleteObjects(storage: MediaStorage, keys: string[]): Promise<void> {
-  for (const k of keys) await storage.delete(k).catch(() => undefined);
+  const res = await Promise.allSettled(keys.map((k) => storage.delete(k)));
+  res.forEach((r, i) => {
+    if (r.status === 'rejected') logger.warn(`Storage delete failed for ${keys[i]}: ${String(r.reason)}`);
+  });
 }

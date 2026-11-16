@@ -245,6 +245,10 @@ export class AccountService {
       SELECT o.id, o.listing_id, CASE WHEN o.buyer_id = ${auth.userId}::uuid THEN 'buyer' ELSE 'owner' END AS role, o.status, o.offer_minor, o.counter_minor, o.currency, o.message, o.created_at
       FROM listing_offers o JOIN listings l ON l.id = o.listing_id
       WHERE o.buyer_id = ${auth.userId}::uuid OR l.owner_id = ${auth.userId}::uuid ORDER BY o.created_at, o.id`);
+    const loyaltyRows = await this.db.execute<{ org_name: string; points: string }>(sql`
+      SELECT org.name AS org_name, sum(m.points) AS points FROM loyalty_movements m JOIN organizations org ON org.id = m.org_id
+      WHERE m.user_id = ${auth.userId}::uuid GROUP BY org.name ORDER BY org.name`);
+    const consentRows = await this.db.execute<{ opted_in: boolean }>(sql`SELECT opted_in FROM marketing_consents WHERE user_id = ${auth.userId}::uuid`);
     const jobAlertRows = await this.db.execute<{ id: string; q: string | null; city: string | null; contract_type: string | null; created_at: Date }>(sql`
       SELECT id, q, city, contract_type, created_at FROM job_alerts WHERE user_id = ${auth.userId}::uuid ORDER BY created_at`);
     const jobAppRows = await this.db.execute<{ id: string; title: string; org_name: string; status: string; message: string; created_at: Date }>(sql`
@@ -414,6 +418,7 @@ export class AccountService {
       jobProfile: cvRows.rows[0] ?? null,
       listingAlerts: listingAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, kind: a.kind, createdAt: new Date(a.created_at).toISOString() })),
       listingVisits: visitRows.rows.map((v) => ({ id: v.id, listingId: v.listing_id, role: v.role, status: v.status, scheduledAt: new Date(v.scheduled_at).toISOString(), message: v.message, place: v.place, createdAt: new Date(v.created_at).toISOString() })),
+      loyalty: { marketingConsent: consentRows.rows[0]?.opted_in ?? false, balances: loyaltyRows.rows.map((l) => ({ orgName: l.org_name, points: Number(l.points) })) },
       listingOffers: offerRows.rows.map((o) => ({ id: o.id, listingId: o.listing_id, role: o.role, status: o.status, offerMinor: Number(o.offer_minor), counterMinor: o.counter_minor === null ? null : Number(o.counter_minor), currency: o.currency, message: o.message, createdAt: new Date(o.created_at).toISOString() })),
       jobAlerts: jobAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, contractType: a.contract_type, createdAt: new Date(a.created_at).toISOString() })),
       jobApplications: jobAppRows.rows.map((a) => ({ id: a.id, jobTitle: a.title, orgName: a.org_name, status: a.status, message: a.message, createdAt: new Date(a.created_at).toISOString() })),

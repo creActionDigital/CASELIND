@@ -149,6 +149,21 @@ describe('jobs (lot 16a)', () => {
     expect(app.id).toBeTruthy();
   });
 
+  it('deletes a CV file once neither the profile nor any application carries it (withdraw)', async () => {
+    const [owner, seeker] = [await user(), await user()];
+    const org = await createOrg(owner);
+    const j = (await post(org, owner, job()).expect(201)).body;
+    const read = (id: string) => ctx.http.get(`/v1/media/${id}/content`).set(bearer(seeker.token));
+    await saveCv(seeker).expect(200);
+    const a1 = await uploadAsset(ctx, seeker.token, 'cv', 'application/pdf', TINY_PDF);
+    await ctx.http.put('/v1/me/job-profile/cv').set(bearer(seeker.token)).send({ assetId: a1 }).expect(200);
+    const app = (await apply(seeker, j.id).expect(201)).body;
+    await ctx.http.put('/v1/me/job-profile/cv').set(bearer(seeker.token)).send({ assetId: null }).expect(200);
+    await read(a1).expect(200); // the application still carries it
+    await ctx.http.post(`/v1/me/job-applications/${app.id}/withdraw`).set(bearer(seeker.token)).expect(200);
+    await read(a1).expect(404);
+  });
+
   it('applies once with a CV snapshot, never to its own organisation, and recruiters see the snapshot not the live CV', async () => {
     const [owner, hr, seeker, other] = [await user(), await user(), await user(), await user()];
     const org = await createOrg(owner);

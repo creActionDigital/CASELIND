@@ -23,6 +23,7 @@ import { DeliveryZonesService } from '../delivery/delivery-zones.service.js';
 import { DeliveryCodes, hydrateDeliveries } from '../delivery/delivery.shared.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { ORG_ROLE_PERMISSIONS } from '../orgs/org-permissions.js';
+import { LoyaltyService } from '../loyalty/loyalty.service.js';
 import { resolveContactUserId } from '../orgs/org-contact.js';
 import { pgErrorOf, type Tx } from '../orgs/orgs.service.js';
 import { CouponsService } from './coupons.service.js';
@@ -67,6 +68,7 @@ export class OrdersService {
     private readonly notifications: NotificationsService,
     private readonly zones: DeliveryZonesService,
     private readonly codes: DeliveryCodes,
+    private readonly loyalty: LoyaltyService,
   ) {}
 
   /* ------------------------------------------------------------------ checkout */
@@ -398,6 +400,8 @@ export class OrdersService {
       return { row: updated!, from: locked.status, orphanedCouriers: orphaned };
     });
 
+    // Lot 16h: loyalty points are best effort, an error here must never break the status change.
+    if (to === 'delivered') await this.loyalty.awardForOrder(orderId).catch(() => undefined);
     const detail = await this.withDelivery(await hydrateDetail(this.db, row), actor.kind === 'org' ? 'org' : 'buyer');
     await this.notifications.notifyMany(
       orphanedCouriers.map((userId) => ({
@@ -442,6 +446,8 @@ export class OrdersService {
       actorUserId,
       note: 'delivery',
     });
+    // Lot 16h: best effort in a savepoint (a failure must not abort the delivery transaction).
+    if (to === 'delivered') await tx.transaction((t) => this.loyalty.awardForOrder(orderId, t)).catch(() => undefined);
     return true;
   }
 

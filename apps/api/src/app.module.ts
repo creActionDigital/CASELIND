@@ -83,6 +83,8 @@ import { CartService } from './cart/cart.service.js';
 import { CouponsService } from './orders/coupons.service.js';
 import { DocumentsService } from './orders/documents.service.js';
 import { OrdersController, OrgOrdersController } from './orders/orders.controller.js';
+import { MyLoyaltyController, OrgLoyaltyController } from './loyalty/loyalty.controller.js';
+import { LoyaltyService } from './loyalty/loyalty.service.js';
 import { OrdersService } from './orders/orders.service.js';
 import { PaymentMethods } from './orders/payment-methods.js';
 import { ReviewsController } from './reviews/reviews.controller.js';
@@ -365,6 +367,8 @@ export class AppModule {
         OrdersController,
         OrgOrdersController,
         ReviewsController,
+        MyLoyaltyController,
+        OrgLoyaltyController,
         // Lot 7
         PlacesController,
         // Lot 11
@@ -462,6 +466,7 @@ export class AppModule {
         DocumentsService,
         OrdersService,
         ReviewsService,
+        LoyaltyService,
         // Lot 7
         PlacesService,
         // Lot 11

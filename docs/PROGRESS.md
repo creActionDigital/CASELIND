@@ -618,3 +618,23 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - API : `PUT /v1/me/job-profile/cv`, `PUT /v1/freelance-contracts/{id}/milestones/{mid}/files`, `PUT /v1/courses/{id}/lessons/{lessonId}/files` (remplacement, fichiers retirés supprimés ; ancien CV conservé tant qu'une candidature le porte). Accès dans `media/access.ts` : CV = propriétaire + membres hr.manage des organisations candidatées ; livraison = les deux parties ; leçon = auteur + inscrits ; sinon 404. Audit sans contenu (nombre seulement). Export de compte : la liste média existante donne déjà purpose/type/taille (jamais le fichier) ; suppression du compte purge les fichiers (maintenance).
 - Mobile : `media/FileLinks.tsx` (ouverture du fichier protégé) affiché sur la candidature côté recruteur, le jalon du contrat et la leçon. Tests : jobs 16, freelance 14, education 15, media+openapi+account 35 ; mobile 243.
 - Différé : boutons « Joindre un fichier » (aucun sélecteur de documents installé, seul expo-image-picker : à ajouter avec expo-document-picker après accord) ; zip de livraison ; ouverture native des PDF (Linking sur fichier local à vérifier sur appareil) ; vidéos de leçon non testées en lecture ; CV visible par le candidat dans la liste de ses candidatures.
+
+## Correctifs revue 19m
+- CV orphelin supprime (retrait de candidature, remplacement, suppression du profil) ; apply verrouille le profil en FOR SHARE.
+- Livraison figee des que le jalon est delivered/approved (409) ; photo de mobilite en liste blanche (product, avatar).
+- deleteObjects : Promise.allSettled + avertissement journalise par echec de suppression.
+
+## Lot 16h - Fidelite et campagnes (2026-11-16) : teste (API e2e), ecrans non verifies
+- Migration 0055 (loyalty_programs, loyalty_movements unique par commande, marketing_consents, marketing_campaigns, CASCADE compte/organisation) ; module apps/api/src/loyalty ; drapeau commerce. Points = compteur sans valeur monetaire, non transferable, rien ne s echange : total de la commande hors livraison divise par 100 (arrondi inferieur) x pointsPerUnit (1 a 100), devise du programme (USD ou CDF), une fois par commande, accroche au passage a delivered (OrdersService.transition et syncFromDelivery, au mieux, sans casser le statut).
+- Routes : GET/PUT /v1/orgs/{orgId}/loyalty (orders.manage : actif, pointsPerUnit, devise, rewardText 200 car., membres et points distribues), GET /v1/me/loyalty (soldes par boutique + consentement), PUT /v1/me/marketing-consent (opt-in, desactive par defaut, journalise), POST/GET /v1/orgs/{orgId}/campaigns (titre 80, texte 300 ; clients non annules ayant accepte, hors blocages, 500 max, 1 par 24 h : 409 campaign_rate_limited ; notifyMany categorie commerce ; historique sans liste de personnes ; audit sans texte).
+- Contrats loyalty.ts, OpenAPI a jour, export de compte (cle loyalty : consentement et soldes). Mobile : tuiles Fidelite et Campagnes du tableau vendeur, ecran Mes points (consentement) ouvert depuis Mes commandes, textes fr+en (loyalty/messages.ts).
+- Tests : loyalty.e2e 3, avec orders, openapi, account : 50 OK ; typecheck API et mobile sans erreur de ce lot.
+- Differe : retrait des points si la commande est annulee apres livraison, echange des points (reduction ou autre) hors perimetre, ecrans non verifies a l ecran, campagnes au-dela de 500 clients (file d envoi), segments et planification, desinscription depuis la notification, ecrans non verifies.
+
+## Lot 15e - champs vehicule structures des annonces (migration 0056)
+- Annonces `vehicle` : `make`, `model`, `year` (1950 a annee courante + 1), `mileageKm` (0 a 2 000 000), `fuel`, `transmission`, tous facultatifs ; 400 si fournis pour un autre type ; filtres `yearMin`, `yearMax`, `mileageMax`, `fuel` sur `GET /listings` ; renvoyes par `GET /listings/compare` ; fiche, formulaire de creation et tableau `compare.tsx` mobiles.
+- Teste : 1 nouveau test e2e (listings). Differe : ecran mobile d edition d annonce (aucun n existe, seul `PATCH` API accepte les champs), filtres vehicule dans l ecran de liste mobile, tri par annee ou kilometrage.
+
+## Lot 20c - anti-triche du quiz eclair (migration 0056)
+- Partie rendue en moins de 8 s : score 0, `suspicious = true`, reponse `counted: false` ; 5 parties suspectes le meme jour UTC : 409 `cooldown` au demarrage ; exclues du classement, des tournois et du badge perfect ; message neutre sur l ecran de resultat. Teste : 1 nouveau test e2e, les autres aident le test a vieillir `started_at`.
+- Differe : seuil par question (temps de lecture), detection de motifs (memes reponses en rafale), revue administrateur des parties suspectes, parties suspectes toujours comptees dans `played` des badges.

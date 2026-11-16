@@ -9,7 +9,7 @@ import { shopKeys } from '../../../shop/hooks';
 import { StatusPill } from '../../../shop/parts';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
-import { EmptyState, ErrorState, Text } from '../../../ui';
+import { Button, EmptyState, ErrorState, Text } from '../../../ui';
 
 export default function Orders() {
   const { colors } = useTheme();
@@ -44,6 +44,7 @@ export default function Orders() {
             }}
           />
         }
+        ListHeaderComponent={<Button variant="secondary" label={t('loyalty.title')} onPress={() => router.push('/loyalty' as never)} />}
         ListEmptyComponent={<EmptyState icon="receipt-outline" title={t('orders.emptyTitle')} body={t('orders.emptyBody')} />}
         ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator style={styles.pad} color={colors.primary} accessibilityLabel={t('common.loading')} /> : undefined}
         onEndReached={() => query.hasNextPage && !query.isFetchingNextPage && query.fetchNextPage()}

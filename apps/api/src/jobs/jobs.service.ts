@@ -315,11 +315,12 @@ export class JobsService implements OnModuleInit {
     return { profile: await this.getProfile(userId), cvFile: await fileOf(this.db, cv.rows[0]?.cv_media_id ?? null) };
   }
 
-  /** Deletes a CV file unless an application still carries it (the recruiter keeps the snapshot). Returns the storage keys to remove. */
+  /** Deletes a CV file unless the profile or an application still carries it (the recruiter keeps the snapshot). Returns the storage keys to remove. */
   private async dropCvFile(tx: Pick<Db, 'execute'>, mediaId: string | null): Promise<string[]> {
     if (!mediaId) return [];
     const res = await tx.execute<{ storage_key: string }>(sql`
-      DELETE FROM media_assets WHERE id = ${mediaId}::uuid AND NOT EXISTS (SELECT 1 FROM job_applications WHERE cv_media_id = ${mediaId}::uuid) RETURNING storage_key`);
+      DELETE FROM media_assets WHERE id = ${mediaId}::uuid AND NOT EXISTS (SELECT 1 FROM job_applications WHERE cv_media_id = ${mediaId}::uuid)
+        AND NOT EXISTS (SELECT 1 FROM job_profiles WHERE cv_media_id = ${mediaId}::uuid) RETURNING storage_key`);
     return res.rows.map((r) => r.storage_key);
   }
 
@@ -375,6 +376,8 @@ export class JobsService implements OnModuleInit {
     const id = await this.db.transaction(async (tx) => {
       const dup = await tx.execute(sql`SELECT 1 FROM job_applications WHERE posting_id = ${jobId}::uuid AND user_id = ${userId}::uuid`);
       if (dup.rows.length > 0) throw AppError.conflict('You already applied', { reason: 'already_applied' });
+      // Shared lock: a concurrent CV replacement waits, so the media cannot be deleted before the insert.
+      await tx.execute(sql`SELECT 1 FROM job_profiles WHERE user_id = ${userId}::uuid FOR SHARE`);
       const ins = await tx.execute<{ id: string }>(sql`
         INSERT INTO job_applications (posting_id, user_id, message, cv, cv_media_id)
         SELECT ${jobId}::uuid, ${userId}::uuid, ${body.message}, ${JSON.stringify(cv)}::jsonb, (SELECT cv_media_id FROM job_profiles WHERE user_id = ${userId}::uuid) RETURNING id`);
@@ -407,16 +410,18 @@ export class JobsService implements OnModuleInit {
   /** Candidate withdraws a live application. Idempotent once withdrawn; a decided one stays as it is (409). */
   async withdraw(userId: string, applicationId: string, meta: RequestMeta): Promise<ApplicationList['items'][number]> {
     if (!UUID_RE.test(applicationId)) throw AppError.notFound('Application not found');
-    await this.db.transaction(async (tx) => {
-      const res = await tx.execute<{ status: ApplicationStatus; posting_id: string }>(sql`
-        SELECT status, posting_id FROM job_applications WHERE id = ${applicationId}::uuid AND user_id = ${userId}::uuid FOR UPDATE`);
+    const keys = await this.db.transaction(async (tx) => {
+      const res = await tx.execute<{ status: ApplicationStatus; posting_id: string; cv_media_id: string | null }>(sql`
+        SELECT status, posting_id, cv_media_id FROM job_applications WHERE id = ${applicationId}::uuid AND user_id = ${userId}::uuid FOR UPDATE`);
       const cur = res.rows[0];
       if (!cur) throw AppError.notFound('Application not found');
-      if (cur.status === 'withdrawn') return;
+      if (cur.status === 'withdrawn') return [];
       if (APPLICATION_TRANSITIONS[cur.status].length === 0) throw AppError.conflict('This application is already decided', { reason: 'application_final' });
-      await tx.execute(sql`UPDATE job_applications SET status = 'withdrawn', updated_at = now() WHERE id = ${applicationId}::uuid`);
+      await tx.execute(sql`UPDATE job_applications SET status = 'withdrawn', cv_media_id = NULL, updated_at = now() WHERE id = ${applicationId}::uuid`);
       await this.audit.record({ action: 'job.application_withdrawn', actorUserId: userId, meta, metadata: { applicationId } }, tx);
+      return this.dropCvFile(tx, cur.cv_media_id);
     });
+    await deleteObjects(this.storage, keys);
     return (await this.myApplication(userId, applicationId))!;
   }
 

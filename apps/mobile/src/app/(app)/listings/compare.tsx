@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import { useI18n } from '../../../i18n';
+import { useI18n, type MessageKey } from '../../../i18n';
 import { fetchCompare, listingKeys } from '../../../listings/api';
 import { toggleCompareId, useCompareIds } from '../../../listings/compare-store';
-import { priceLabel } from '../../../listings/logic';
+import { priceLabel, vehicleRows } from '../../../listings/logic';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Button, ErrorState, Screen, Text } from '../../../ui';
@@ -38,6 +38,7 @@ export default function Compare() {
             {q.data.items.map((l) => {
               const rows: [string, string][] = [
                 ['listings.compare.row.price', priceLabel(l, locale) ?? '-'],
+                ...vehicleRows(l, t as (k: MessageKey) => string, true),
                 ['listings.compare.row.city', l.city],
                 ['listings.compare.row.seller', l.owner.displayName],
                 ['listings.compare.row.photos', String(l.mediaIds.length)],

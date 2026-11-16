@@ -21,6 +21,7 @@ import {
   type ListingList,
   type ListingListQuery,
   type UpdateListingRequest,
+  VEHICLE_KEYS,
 } from '@caselind/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
@@ -53,6 +54,12 @@ type Row = {
   owner_name: string;
   owner_handle: string;
   media_ids: string[] | null;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  mileage_km: number | null;
+  fuel: Listing['fuel'];
+  transmission: Listing['transmission'];
 };
 
 /** Visible to the viewer: active, not hidden by moderation, and no block either way with the owner. The owner always sees their own. */
@@ -115,8 +122,9 @@ export class ListingsService implements OnModuleInit {
         throw AppError.conflict(`At most ${MAX_ACTIVE_PER_OWNER} active listings`, { reason: 'listing_limit', max: MAX_ACTIVE_PER_OWNER });
       }
       const res = await tx.execute<{ id: string }>(sql`
-        INSERT INTO listings (owner_id, kind, title, description, price_minor, currency, city, latitude, longitude)
-        VALUES (${userId}::uuid, ${body.kind}, ${body.title}, ${body.description}, ${body.priceMinor}, ${body.currency}, ${body.city}, ${body.latitude}, ${body.longitude})
+        INSERT INTO listings (owner_id, kind, title, description, price_minor, currency, city, latitude, longitude, make, model, year, mileage_km, fuel, transmission)
+        VALUES (${userId}::uuid, ${body.kind}, ${body.title}, ${body.description}, ${body.priceMinor}, ${body.currency}, ${body.city}, ${body.latitude}, ${body.longitude},
+          ${body.make}, ${body.model}, ${body.year}, ${body.mileageKm}, ${body.fuel}, ${body.transmission})
         RETURNING id`);
       const listingId = res.rows[0]!.id;
       await this.setMedia(tx, listingId, body.mediaIds);
@@ -138,9 +146,11 @@ export class ListingsService implements OnModuleInit {
     const lat = body.latitude !== undefined ? body.latitude : current.latitude;
     const lng = body.longitude !== undefined ? body.longitude : current.longitude;
     if ((lat === null) !== (lng === null)) throw invalid('longitude', 'latitude and longitude go together');
+    const v = Object.fromEntries(VEHICLE_KEYS.map((k) => [k, body[k] !== undefined ? body[k] : current[k]])) as Pick<Listing, (typeof VEHICLE_KEYS)[number]>;
+    if (current.kind !== 'vehicle' && VEHICLE_KEYS.some((k) => v[k] !== null)) throw invalid('make', 'vehicle fields are only for vehicle ads');
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
-        UPDATE listings SET title = ${body.title ?? current.title}, description = ${body.description ?? current.description},
+        UPDATE listings SET make = ${v.make}, model = ${v.model}, year = ${v.year}, mileage_km = ${v.mileageKm}, fuel = ${v.fuel}, transmission = ${v.transmission}, title = ${body.title ?? current.title}, description = ${body.description ?? current.description},
           price_minor = ${priceMinor}, currency = ${currency}, city = ${body.city ?? current.city},
           latitude = ${lat}, longitude = ${lng}, updated_at = now()
         WHERE id = ${id}::uuid`);
@@ -179,6 +189,10 @@ export class ListingsService implements OnModuleInit {
     if (q.currency) f.push(sql`l.currency = ${q.currency}`);
     if (q.minPriceMinor !== undefined) f.push(sql`l.price_minor >= ${q.minPriceMinor}`);
     if (q.maxPriceMinor !== undefined) f.push(sql`l.price_minor <= ${q.maxPriceMinor}`);
+    if (q.yearMin !== undefined) f.push(sql`l.year >= ${q.yearMin}`);
+    if (q.yearMax !== undefined) f.push(sql`l.year <= ${q.yearMax}`);
+    if (q.mileageMax !== undefined) f.push(sql`l.mileage_km <= ${q.mileageMax}`);
+    if (q.fuel) f.push(sql`l.fuel = ${q.fuel}`);
     if (q.cursor) {
       const c = decodeCursor(q.cursor);
       f.push(sql`(l.created_at, l.id) < (${c.at}::timestamptz, ${c.id}::uuid)`);
@@ -350,6 +364,9 @@ export class ListingsService implements OnModuleInit {
       await tx.execute(sql`SELECT 1 FROM users WHERE id = ${userId}::uuid FOR NO KEY UPDATE`); // serialises the quotas
       const open = await tx.execute(sql`SELECT 1 FROM listing_offers WHERE listing_id = ${listingId}::uuid AND buyer_id = ${userId}::uuid AND status IN ('offered', 'countered')`);
       if (open.rows.length > 0) throw AppError.conflict('A negotiation is already open for this listing', { reason: 'offer_exists' });
+      // At most 3 offers ever per buyer and listing: no offer, cancel, offer loop to spam the owner.
+      const ever = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM listing_offers WHERE listing_id = ${listingId}::uuid AND buyer_id = ${userId}::uuid`);
+      if ((ever.rows[0]?.n ?? 0) >= 3) throw AppError.conflict('Too many offers on this listing', { reason: 'offer_cap', max: 3 });
       const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM listing_offers WHERE buyer_id = ${userId}::uuid AND status IN ('offered', 'countered')`);
       if ((n.rows[0]?.n ?? 0) >= MAX_OPEN_OFFERS) throw AppError.conflict('Too many open negotiations', { reason: 'offer_limit', max: MAX_OPEN_OFFERS });
       const res = await tx.execute<{ id: string }>(sql`
@@ -389,6 +406,10 @@ export class ListingsService implements OnModuleInit {
       if (o.role !== turn || (action === 'counter' && o.status !== 'offered')) throw AppError.conflict('It is not your turn to answer', { reason: 'not_your_turn' });
       const live = await this.db.execute(sql`SELECT 1 FROM listings WHERE id = ${o.listingId}::uuid AND status = 'active' AND NOT hidden`);
       if (live.rows.length === 0) throw AppError.conflict('The listing is no longer active', { reason: 'listing_inactive' });
+    }
+    // The owner may have lowered the price since: an agreement above the current asking price is refused.
+    if (action === 'accept' && o.askingMinor !== null && (o.status === 'countered' ? (o.counterMinor ?? 0) : o.offerMinor) > o.askingMinor) {
+      throw AppError.conflict('The asking price changed', { reason: 'price_changed' });
     }
     if (action === 'counter' && (amountMinor === undefined || amountMinor <= o.offerMinor || o.askingMinor === null || amountMinor > o.askingMinor)) {
       throw invalid('amountMinor', 'must be above the offer and not above the asking price');
@@ -431,6 +452,7 @@ export class ListingsService implements OnModuleInit {
   private base(): SQL {
     return sql`
       SELECT l.id, l.kind, l.title, l.description, l.price_minor, l.currency, l.city, l.latitude, l.longitude, l.status, l.created_at,
+        l.make, l.model, l.year, l.mileage_km, l.fuel, l.transmission,
         u.id AS owner_id, u.display_name AS owner_name, u.handle::text AS owner_handle,
         (SELECT array_agg(m.media_id ORDER BY m.position) FROM listing_media m WHERE m.listing_id = l.id) AS media_ids
       FROM listings l JOIN users u ON u.id = l.owner_id`;
@@ -467,6 +489,12 @@ function toListing(r: Row, viewerId: string): Listing {
     longitude: r.longitude,
     status: r.status,
     mediaIds: r.media_ids ?? [],
+    make: r.make,
+    model: r.model,
+    year: r.year,
+    mileageKm: r.mileage_km,
+    fuel: r.fuel,
+    transmission: r.transmission,
     owner: { id: r.owner_id, displayName: r.owner_name, handle: r.owner_handle },
     mine: r.owner_id === viewerId,
     createdAt: new Date(r.created_at).toISOString(),

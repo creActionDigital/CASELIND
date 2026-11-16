@@ -325,6 +325,23 @@ describe('classified ads (lot 15)', () => {
     expect(Number((await ctx.sql.query('SELECT count(*) AS n FROM listing_offers WHERE listing_id = $1', [l.id])).rows[0].n)).toBe(0);
   });
 
+  it('offers: 3 ever per buyer and ad, and an agreement above a lowered asking price is refused (review fixes)', async () => {
+    const [owner, b] = [await user(), await user()];
+    const l = (await create(owner, ad()).expect(201)).body; // 25 000
+    const offer = (u: TU, id: string, amountMinor: number) => ctx.http.post(`/v1/listings/${id}/offers`).set(bearer(u.token)).send({ amountMinor });
+    const act = (u: TU, id: string, a: string) => ctx.http.post(`/v1/offers/${id}/${a}`).set(bearer(u.token)).send({});
+    for (let i = 0; i < 3; i++) {
+      const o = (await offer(b, l.id, 20_000).expect(201)).body;
+      await act(b, o.id, 'cancel').expect(200);
+    }
+    expect((await offer(b, l.id, 20_000).expect(409)).body.error.details.reason).toBe('offer_cap');
+
+    const c = await user();
+    const o = (await offer(c, l.id, 20_000).expect(201)).body;
+    await ctx.sql.query('UPDATE listings SET price_minor = 15000 WHERE id = $1', [l.id]); // the owner lowers the price
+    expect((await act(owner, o.id, 'accept').expect(409)).body.error.details.reason).toBe('price_changed');
+  });
+
   it('compares 2 to 3 active vehicle ads', async () => {
     const [owner, viewer, other] = [await user(), await user(), await user()];
     const car = async (title: string, extra: Record<string, unknown> = {}) => (await create(owner, ad({ kind: 'vehicle', title, ...extra })).expect(201)).body;
@@ -348,6 +365,44 @@ describe('classified ads (lot 15)', () => {
     await ctx.http.put(`/v1/blocks/${other.id}`).set(bearer(owner.token)).expect(204);
     await cmp(other, `${a.id},${c.id}`).expect(404); // blocked
     await cmp(viewer, `${a.id},${c.id}`).expect(200);
+  });
+
+  it('structured vehicle fields (lot 15e): vehicle ads only, validated, filterable, returned by compare', async () => {
+    const [owner, viewer] = [await user(), await user()];
+    const veh = { make: 'Toyota', model: 'RAV4', year: 2018, mileageKm: 90_000, fuel: 'diesel', transmission: 'automatic' };
+    const a = (await create(owner, ad({ kind: 'vehicle', title: 'RAV4 diesel', ...veh })).expect(201)).body;
+    expect(a).toMatchObject(veh);
+    const b = (await create(owner, ad({ kind: 'vehicle', title: 'Jimny essence', make: 'Suzuki', year: 2005, mileageKm: 250_000, fuel: 'petrol' })).expect(201)).body;
+    expect(b).toMatchObject({ model: null, transmission: null });
+    const plain = (await create(owner, ad({ kind: 'vehicle', title: 'Sans details' })).expect(201)).body;
+    expect(plain).toMatchObject({ make: null, year: null, mileageKm: null, fuel: null });
+    await create(owner, ad({ make: 'Toyota' })).expect(400); // not a vehicle
+    await create(owner, ad({ year: 2018 })).expect(400);
+    await create(owner, ad({ kind: 'vehicle', year: 1949 })).expect(400);
+    await create(owner, ad({ kind: 'vehicle', year: new Date().getFullYear() + 2 })).expect(400);
+    await create(owner, ad({ kind: 'vehicle', mileageKm: -1 })).expect(400);
+    await create(owner, ad({ kind: 'vehicle', mileageKm: 2_000_001 })).expect(400);
+    await create(owner, ad({ kind: 'vehicle', fuel: 'coal' })).expect(400);
+    await create(owner, ad({ kind: 'vehicle', transmission: 'cvt' })).expect(400);
+    await create(owner, ad({ kind: 'vehicle', make: 'x'.repeat(41) })).expect(400);
+
+    const patch = (id: string, body: Record<string, unknown>) => ctx.http.patch(`/v1/listings/${id}`).set(bearer(owner.token)).send(body);
+    expect((await patch(b.id, { model: 'Jimny', year: 2006 }).expect(200)).body).toMatchObject({ make: 'Suzuki', model: 'Jimny', year: 2006, mileageKm: 250_000 });
+    expect((await patch(b.id, { mileageKm: null }).expect(200)).body.mileageKm).toBeNull();
+    await patch(b.id, { year: 3000 }).expect(400);
+    const house = (await create(owner, ad()).expect(201)).body;
+    await patch(house.id, { fuel: 'diesel' }).expect(400);
+
+    const found = async (qs: string) => ids(await list(viewer, `?kind=vehicle&${qs}`));
+    expect(await found('yearMin=2010')).toEqual([a.id]);
+    expect(await found('yearMax=2010')).toEqual([b.id]);
+    expect(await found('mileageMax=100000')).toEqual([a.id]);
+    expect(await found('fuel=petrol')).toEqual([b.id]);
+    await list(viewer, '?fuel=coal').expect(400);
+
+    const cmp = (await ctx.http.get(`/v1/listings/compare?ids=${a.id},${b.id}`).set(bearer(viewer.token)).expect(200)).body.items;
+    expect(cmp[0]).toMatchObject(veh);
+    expect(cmp[1]).toMatchObject({ make: 'Suzuki', fuel: 'petrol' });
   });
 
   it('is off when the flag is off', async () => {

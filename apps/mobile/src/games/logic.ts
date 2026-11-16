@@ -20,6 +20,7 @@ export function gameErrorKey(err: unknown): MessageKey | null {
     daily_limit: 'games.err.daily_limit',
     expired: 'games.err.expired',
     already_finished: 'games.err.finished',
+    cooldown: 'games.err.cooldown',
   };
   const reason = err.detail<string>('reason');
   return reason && map[reason] ? map[reason]! : null;

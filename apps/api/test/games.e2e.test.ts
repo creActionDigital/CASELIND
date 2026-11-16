@@ -21,7 +21,14 @@ async function user(roles?: string[]): Promise<TU> {
 }
 const api = (method: 'get' | 'post' | 'patch', u: TU, path: string, body?: Record<string, unknown>) => ctx.http[method](`/v1${path}`).set(bearer(u.token)).send(body ?? {});
 const start = (u: TU) => api('post', u, '/games/quiz/sessions');
-const submit = (u: TU, id: string, answers: number[]) => api('post', u, `/games/quiz/sessions/${id}/answers`, { answers });
+const submitRaw = (u: TU, id: string, answers: number[]) => api('post', u, `/games/quiz/sessions/${id}/answers`, { answers });
+/** Ages the game by 20 seconds first, otherwise an instant answer sheet is judged implausible (lot 20c). */
+const submit = (u: TU, id: string, answers: number[]) => ({
+  expect: async (code: number) => {
+    await ctx.sql.query(`UPDATE game_sessions SET started_at = started_at - interval '20 seconds' WHERE id::text = $1`, [id]);
+    return submitRaw(u, id, answers).expect(code);
+  },
+});
 
 /** Gives the quiz 10 active questions (answer = option 1 for all) so it can start; other tests' questions are retired first. */
 async function seedQuestions(count = 10): Promise<void> {
@@ -91,7 +98,7 @@ describe('quiz éclair (lot 20a)', () => {
     expect(half.score).toBeLessThan(full.score);
 
     const sc = (await start(c).expect(201)).body;
-    expect((await submit(c, sc.id, Array.from({ length: 10 }, () => 0)).expect(200)).body).toEqual({ correct: 0, total: 10, score: 0 });
+    expect((await submit(c, sc.id, Array.from({ length: 10 }, () => 0)).expect(200)).body).toEqual({ correct: 0, total: 10, score: 0, counted: true });
   });
 
   it('keeps sessions private and refuses a late answer', async () => {
@@ -196,5 +203,26 @@ describe('quiz éclair (lot 20a)', () => {
     expect((await api('get', a, '/games/quiz/tournaments').expect(200)).body.items.map((x: { id: string }) => x.id)).toContain(t.id);
     await api('get', a, '/games/quiz/tournaments/00000000-0000-4000-8000-000000000000').expect(404);
     await api('get', a, '/games/quiz/tournaments/nope').expect(404);
+  });
+
+  it('anti-cheat (lot 20c): an instant game is not counted, 5 of them stop the day, and they stay out of rankings and badges', async () => {
+    await seedQuestions(10);
+    const [cheat, honest] = [await user(), await user()];
+    const sh = (await start(honest).expect(201)).body;
+    await submit(honest, sh.id, [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]).expect(200);
+    const first = (await start(cheat).expect(201)).body;
+    const res = (await submitRaw(cheat, first.id, correctAnswers()).expect(200)).body;
+    expect(res).toEqual({ correct: 10, total: 10, score: 0, counted: false });
+    expect((await ctx.sql.query('SELECT suspicious, score FROM game_sessions WHERE id = $1', [first.id])).rows[0]).toEqual({ suspicious: true, score: 0 });
+    const handle = (await ctx.http.get('/v1/me').set(bearer(cheat.token))).body.handle;
+    const board = (await api('get', honest, '/games/quiz/leaderboard?period=all').expect(200)).body.items.map((i: { handle: string }) => i.handle);
+    expect(board).not.toContain(handle);
+    expect((await api('get', cheat, '/games/quiz/badges').expect(200)).body.items.find((b: { key: string }) => b.key === 'perfect').earned).toBe(false);
+    for (let i = 0; i < 4; i += 1) {
+      const x = (await start(cheat).expect(201)).body;
+      await submitRaw(cheat, x.id, correctAnswers()).expect(200);
+    }
+    expect((await start(cheat).expect(409)).body.error.details.reason).toBe('cooldown');
+    await start(honest).expect(201);
   });
 });

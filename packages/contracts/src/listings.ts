@@ -20,8 +20,39 @@ const listingFields = {
   mediaIds: z.array(z.uuid()).max(8),
 };
 
-const refine = <T extends z.ZodType<{ kind?: ListingKind; priceMinor?: number | null; currency?: string | null; latitude?: number | null; longitude?: number | null }>>(s: T) =>
+/** Vehicle ads only (lot 15e), all optional. */
+export const vehicleFuelSchema = z.enum(['petrol', 'diesel', 'hybrid', 'electric', 'other']);
+export const vehicleTransmissionSchema = z.enum(['manual', 'automatic']);
+export const VEHICLE_YEAR_MIN = 1950;
+const vehicleFields = {
+  make: z.string().trim().min(1).max(40).nullable(),
+  model: z.string().trim().min(1).max(40).nullable(),
+  year: z.number().int().min(VEHICLE_YEAR_MIN).max(new Date().getFullYear() + 1).nullable(),
+  mileageKm: z.number().int().min(0).max(2_000_000).nullable(),
+  fuel: vehicleFuelSchema.nullable(),
+  transmission: vehicleTransmissionSchema.nullable(),
+};
+export const VEHICLE_KEYS = ['make', 'model', 'year', 'mileageKm', 'fuel', 'transmission'] as const;
+
+type RefinedShape = {
+  kind?: ListingKind;
+  priceMinor?: number | null;
+  currency?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  make?: unknown;
+  model?: unknown;
+  year?: unknown;
+  mileageKm?: unknown;
+  fuel?: unknown;
+  transmission?: unknown;
+};
+const refine = <T extends z.ZodType<RefinedShape>>(s: T) =>
   s
+    .refine((v) => v.kind === undefined || v.kind === 'vehicle' || VEHICLE_KEYS.every((k) => v[k] === null || v[k] === undefined), {
+      path: ['make'],
+      message: 'vehicle fields are only for vehicle ads',
+    })
     .refine((v) => (v.priceMinor === null || v.priceMinor === undefined) === (v.currency === null || v.currency === undefined), {
       path: ['currency'],
       message: 'priceMinor and currency go together',
@@ -44,12 +75,18 @@ export const createListingRequestSchema = refine(
     latitude: listingFields.latitude.default(null),
     longitude: listingFields.longitude.default(null),
     mediaIds: listingFields.mediaIds.default([]),
+    make: vehicleFields.make.default(null),
+    model: vehicleFields.model.default(null),
+    year: vehicleFields.year.default(null),
+    mileageKm: vehicleFields.mileageKm.default(null),
+    fuel: vehicleFields.fuel.default(null),
+    transmission: vehicleFields.transmission.default(null),
   }),
 );
 export type CreateListingRequest = z.infer<typeof createListingRequestSchema>;
 
 /** Owner edit: the kind cannot change; every other field is optional. */
-export const updateListingRequestSchema = refine(z.object(listingFields).omit({ kind: true }).partial());
+export const updateListingRequestSchema = refine(z.object({ ...listingFields, ...vehicleFields }).omit({ kind: true }).partial());
 export type UpdateListingRequest = z.infer<typeof updateListingRequestSchema>;
 
 export const listingListQuerySchema = pageQuerySchema.extend({
@@ -59,6 +96,10 @@ export const listingListQuerySchema = pageQuerySchema.extend({
   currency: currencySchema.optional(),
   minPriceMinor: z.coerce.number().int().min(0).optional(),
   maxPriceMinor: z.coerce.number().int().min(0).optional(),
+  yearMin: z.coerce.number().int().min(VEHICLE_YEAR_MIN).optional(),
+  yearMax: z.coerce.number().int().optional(),
+  mileageMax: z.coerce.number().int().min(0).optional(),
+  fuel: vehicleFuelSchema.optional(),
 });
 export type ListingListQuery = z.infer<typeof listingListQuerySchema>;
 
@@ -74,6 +115,12 @@ export const listingSchema = z.object({
   longitude: z.number().nullable(),
   status: z.enum(['active', 'closed']),
   mediaIds: z.array(z.uuid()),
+  make: vehicleFields.make,
+  model: vehicleFields.model,
+  year: vehicleFields.year,
+  mileageKm: vehicleFields.mileageKm,
+  fuel: vehicleFields.fuel,
+  transmission: vehicleFields.transmission,
   owner: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }),
   mine: z.boolean(),
   createdAt: z.string(),

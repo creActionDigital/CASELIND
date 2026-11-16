@@ -27,6 +27,9 @@ const SESSION_SECONDS = 120;
 // shortcut: fixed daily cap against score farming, make it an env setting when operations need to tune it.
 const MAX_SESSIONS_PER_DAY = 20;
 const LEADERBOARD_SIZE = 20;
+// Lot 20c anti-cheat: 10 questions in under 8 seconds is not humanly plausible; 5 such games in a UTC day block new games that day.
+const MIN_PLAUSIBLE_SECONDS = 8;
+const MAX_SUSPICIOUS_PER_DAY = 5;
 const invalid = (path: string, message: string) => new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path, message }]);
 type TournamentRow = { id: string; title: string; starts_at: Date; ends_at: Date; status: Tournament['status'] };
 const toTournament = (r: TournamentRow): Tournament => ({ id: r.id, title: r.title, startsAt: iso(r.starts_at), endsAt: iso(r.ends_at), status: r.status });
@@ -53,6 +56,9 @@ export class GamesService {
       const n = await tx.execute<{ n: number }>(sql`
         SELECT count(*)::int AS n FROM game_sessions WHERE user_id = ${userId}::uuid AND started_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
       if ((n.rows[0]?.n ?? 0) >= MAX_SESSIONS_PER_DAY) throw AppError.conflict(`At most ${MAX_SESSIONS_PER_DAY} games a day`, { reason: 'daily_limit', max: MAX_SESSIONS_PER_DAY });
+      const sus = await tx.execute<{ n: number }>(sql`
+        SELECT count(*)::int AS n FROM game_sessions WHERE user_id = ${userId}::uuid AND suspicious AND started_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
+      if ((sus.rows[0]?.n ?? 0) >= MAX_SUSPICIOUS_PER_DAY) throw AppError.conflict('Too many implausible games today, try again tomorrow', { reason: 'cooldown' });
       const picked = await tx.execute<{ id: string; prompt: string; options: string[] }>(sql`
         SELECT id, prompt, options FROM game_questions WHERE active ORDER BY random() LIMIT ${QUIZ_QUESTIONS_PER_SESSION}`);
       if (picked.rows.length < QUIZ_QUESTIONS_PER_SESSION) throw AppError.conflict('Not enough questions yet', { reason: 'not_enough_questions' });
@@ -71,8 +77,8 @@ export class GamesService {
   async submit(userId: string, sessionId: string, body: SubmitQuizAnswersRequest, meta: RequestMeta): Promise<GameQuizResult> {
     if (!UUID_RE.test(sessionId)) throw AppError.notFound('Game not found');
     return this.db.transaction(async (tx) => {
-      const res = await tx.execute<{ question_ids: string[]; finished_at: Date | null; seconds_left: number }>(sql`
-        SELECT question_ids, finished_at, floor(extract(epoch FROM (expires_at - now())))::int AS seconds_left
+      const res = await tx.execute<{ question_ids: string[]; finished_at: Date | null; seconds_left: number; elapsed: number }>(sql`
+        SELECT question_ids, finished_at, extract(epoch FROM (now() - started_at))::float8 AS elapsed, floor(extract(epoch FROM (expires_at - now())))::int AS seconds_left
         FROM game_sessions WHERE id = ${sessionId}::uuid AND user_id = ${userId}::uuid FOR UPDATE`);
       const s = res.rows[0];
       if (!s) throw AppError.notFound('Game not found');
@@ -88,10 +94,11 @@ export class GamesService {
         if (key && answer >= key.n) throw invalid('answers', 'an answer points to an option that does not exist');
         if (key && answer === key.correct_index) correct += 1;
       }
-      const score = correct === 0 ? 0 : correct * 100 + s.seconds_left;
-      await tx.execute(sql`UPDATE game_sessions SET finished_at = now(), correct_count = ${correct}, score = ${score} WHERE id = ${sessionId}::uuid`);
-      await this.audit.record({ action: 'games.session_finished', actorUserId: userId, meta, metadata: { sessionId, score } }, tx);
-      return { correct, total: s.question_ids.length, score };
+      const suspicious = Number(s.elapsed) < MIN_PLAUSIBLE_SECONDS;
+      const score = suspicious || correct === 0 ? 0 : correct * 100 + s.seconds_left;
+      await tx.execute(sql`UPDATE game_sessions SET finished_at = now(), correct_count = ${correct}, score = ${score}, suspicious = ${suspicious} WHERE id = ${sessionId}::uuid`);
+      await this.audit.record({ action: 'games.session_finished', actorUserId: userId, meta, metadata: { sessionId, score, suspicious } }, tx);
+      return { correct, total: s.question_ids.length, score, counted: !suspicious };
     });
   }
 
@@ -100,7 +107,7 @@ export class GamesService {
     const since = q.period === 'week' ? sql`AND s.finished_at > now() - interval '7 days'` : sql``;
     const res = await this.db.execute<{ display_name: string; handle: string; best: number; user_id: string }>(sql`
       SELECT u.display_name, u.handle::text AS handle, b.best, b.user_id
-      FROM (SELECT s.user_id, max(s.score)::int AS best FROM game_sessions s WHERE s.finished_at IS NOT NULL ${since} GROUP BY s.user_id) b
+      FROM (SELECT s.user_id, max(s.score)::int AS best FROM game_sessions s WHERE s.finished_at IS NOT NULL AND NOT s.suspicious ${since} GROUP BY s.user_id) b
       JOIN users u ON u.id = b.user_id
       ORDER BY b.best DESC, u.handle LIMIT ${LEADERBOARD_SIZE}`);
     return { period: q.period, items: res.rows.map((r, i) => ({ rank: i + 1, displayName: r.display_name, handle: r.handle, bestScore: r.best, me: r.user_id === viewerId })) };
@@ -109,7 +116,7 @@ export class GamesService {
   /** Badges earned by playing; derived from the finished games, nothing is stored. */
   async badges(userId: string): Promise<GameBadgeList> {
     const r = await this.db.execute<{ played: number; perfect: number }>(sql`
-      SELECT count(*)::int AS played, count(*) FILTER (WHERE correct_count = ${QUIZ_QUESTIONS_PER_SESSION})::int AS perfect
+      SELECT count(*)::int AS played, count(*) FILTER (WHERE correct_count = ${QUIZ_QUESTIONS_PER_SESSION} AND NOT suspicious)::int AS perfect
       FROM game_sessions WHERE user_id = ${userId}::uuid AND finished_at IS NOT NULL`);
     const { played, perfect } = r.rows[0]!;
     const b = (key: 'first_game' | 'ten_games' | 'perfect', progress: number, target: number) => ({ key, earned: progress >= target, progress: Math.min(progress, target), target });
@@ -129,7 +136,7 @@ export class GamesService {
     const res = await this.db.execute<{ display_name: string; handle: string; best: number; user_id: string }>(sql`
       SELECT u.display_name, u.handle::text AS handle, b.best, b.user_id
       FROM (SELECT s.user_id, max(s.score)::int AS best FROM game_sessions s, game_tournaments g
-            WHERE g.id = ${id}::uuid AND s.finished_at >= g.starts_at AND s.finished_at < g.ends_at GROUP BY s.user_id) b
+            WHERE g.id = ${id}::uuid AND NOT s.suspicious AND s.finished_at >= g.starts_at AND s.finished_at < g.ends_at GROUP BY s.user_id) b
       JOIN users u ON u.id = b.user_id
       ORDER BY b.best DESC, u.handle LIMIT ${LEADERBOARD_SIZE}`);
     return { tournament: toTournament(t.rows[0]), items: res.rows.map((r, i) => ({ rank: i + 1, displayName: r.display_name, handle: r.handle, bestScore: r.best, me: r.user_id === viewerId })) };
