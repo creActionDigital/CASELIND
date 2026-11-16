@@ -276,6 +276,10 @@ export class AccountService {
     const eduEnrollments = await this.myEnrollmentsAll(auth.userId);
     const budgetRows = await this.db.execute<{ currency: string; limit_minor: string }>(sql`
       SELECT currency, limit_minor FROM budgets WHERE user_id = ${auth.userId}::uuid ORDER BY currency`);
+    // G6: bounded (200 latest notifications); drafts and scheduled messages are the user's own text.
+    const draftRows = await this.db.execute<{ conversation_id: string; body: string; updated_at: Date }>(sql`SELECT conversation_id, body, updated_at FROM conversation_drafts WHERE user_id = ${auth.userId}::uuid ORDER BY updated_at DESC`);
+    const scheduledRows = await this.db.execute<{ id: string; conversation_id: string; kind: string; body: string | null; scheduled_at: Date }>(sql`SELECT id, conversation_id, kind, body, scheduled_at FROM scheduled_messages WHERE sender_id = ${auth.userId}::uuid ORDER BY scheduled_at`);
+    const notificationRows = await this.db.execute<{ id: string; category: string; title: string; body: string; read_at: Date | null; created_at: Date }>(sql`SELECT id, category, title, body, read_at, created_at FROM notifications WHERE user_id = ${auth.userId}::uuid ORDER BY created_at DESC LIMIT 200`);
     // Lot 10: mini-app authorizations (history included); never a token.
     const miniappGrants = await this.exportMiniAppGrants(auth.userId);
     // Lot 6B: KYC level and request statuses/dates; never the document number nor the files.
@@ -441,6 +445,11 @@ export class AccountService {
         exams: (await this.db.execute<{ title: string; score_percent: number; used: number; started_at: Date }>(sql`SELECT c.title, x.score_percent, round(extract(epoch FROM (x.finished_at - x.started_at)))::int AS used, x.started_at FROM exam_sessions x JOIN courses c ON c.id = x.course_id WHERE x.user_id = ${auth.userId}::uuid AND x.finished_at IS NOT NULL ORDER BY x.started_at, x.id`)).rows.map((r) => ({ courseTitle: r.title, scorePercent: r.score_percent, usedSeconds: r.used, startedAt: new Date(r.started_at).toISOString() })),
       },
       budgets: budgetRows.rows.map((b) => ({ currency: b.currency, limitMinor: Number(b.limit_minor) })),
+      messaging: {
+        drafts: draftRows.rows.map((d) => ({ conversationId: d.conversation_id, body: d.body, updatedAt: new Date(d.updated_at).toISOString() })),
+        scheduled: scheduledRows.rows.map((r) => ({ id: r.id, conversationId: r.conversation_id, kind: r.kind, body: r.body, scheduledAt: new Date(r.scheduled_at).toISOString() })),
+        notifications: notificationRows.rows.map((n) => ({ id: n.id, category: n.category, title: n.title, body: n.body, readAt: n.read_at ? new Date(n.read_at).toISOString() : null, createdAt: new Date(n.created_at).toISOString() })),
+      },
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
         query: r.query,
         scope: r.scope,

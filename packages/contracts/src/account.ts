@@ -163,6 +163,12 @@ export const accountExportSchema = z.object({
   }),
   /** Lot 13: own monthly budgets (sandbox). */
   budgets: z.array(z.object({ currency: z.string(), limitMinor: z.number().int() })),
+  /** G6: own message drafts, scheduled messages (text only) and the latest notifications (right of access). */
+  messaging: z.object({
+    drafts: z.array(z.object({ conversationId: z.uuid(), body: z.string(), updatedAt: z.string() })),
+    scheduled: z.array(z.object({ id: z.uuid(), conversationId: z.uuid(), kind: z.string(), body: z.string().nullable(), scheduledAt: z.string() })),
+    notifications: z.array(z.object({ id: z.uuid(), category: z.string(), title: z.string(), body: z.string(), readAt: z.string().nullable(), createdAt: z.string() })),
+  }),
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;
 
