@@ -286,11 +286,11 @@ describe('account deletion', () => {
     expect((await userRow(a.id)).status).toBe('deleted');
 
     for (const [t, c] of [['budgets', 'user_id'], ['job_profiles', 'user_id'], ['health_consents', 'user_id'], ['health_entries', 'user_id'],
-      ['listing_alerts', 'user_id'], ['notifications', 'user_id'], ['listings', 'owner_id'], ['push_tokens', 'user_id']]) {
+      ['listing_alerts', 'user_id'], ['notifications', 'user_id'], ['listings', 'owner_id'], ['push_tokens', 'user_id']] as const) {
       expect(await n(t, c, a.id), `${t} of the deleted account`).toBe(0);
     }
     for (const [t, c] of [['budgets', 'user_id'], ['job_profiles', 'user_id'], ['health_consents', 'user_id'], ['health_entries', 'user_id'],
-      ['listing_alerts', 'user_id'], ['notifications', 'user_id'], ['listings', 'owner_id']]) {
+      ['listing_alerts', 'user_id'], ['notifications', 'user_id'], ['listings', 'owner_id']] as const) {
       expect(await n(t, c, b.id), `${t} of the other account`).toBe(1);
     }
     expect((await q(`SELECT title, description FROM missions WHERE id = $1`, [mid]))[0]).toEqual({ title: '[supprimé]', description: '' });
