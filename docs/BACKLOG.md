@@ -87,7 +87,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | G5 | Non consignés jusqu'ici : connexion sociale (Google, Apple, Facebook), biométrie, présence en ligne, sondages, recherche dans les messages, messages vocaux côté API, publications sponsorisées, preuve de livraison par photo ou signature, webhooks, actions de l'assistant IA, recherche en langage naturel | planifié |
 | G6 | Export et purge : notifications, brouillons, messages programmés à vérifier | planifié |
 | G7 | Consentements non centralisés (table `user_consents`) | planifié |
-| G8 | Swahili absent du mobile, langue non persistée (§27) | planifié |
+| G8 | Swahili absent du mobile, langue non persistée (§27) | **swahili de base fait** (navigation, connexion, menu Plus ; le reste retombe sur l’anglais, relecture par un locuteur natif à faire) ; la langue est déjà rechargée depuis le profil serveur à la connexion |
 
 ## Décisions attendues du propriétaire (bloquantes seulement pour leur module)
 

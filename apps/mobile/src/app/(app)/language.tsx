@@ -6,7 +6,7 @@ import { radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Screen, Text } from '../../ui';
 
-const LOCALES: Locale[] = ['fr', 'en'];
+const LOCALES: Locale[] = ['fr', 'en', 'sw'];
 
 /** Langue : change l'interface immédiatement et enregistre la préférence via PATCH /v1/me (sans bloquer l'écran). */
 export default function Language() {
@@ -29,7 +29,7 @@ export default function Language() {
           const selected = locale === value;
           return (
             <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => choose(value)} style={styles.row}>
-              <Text style={{ flex: 1 }}>{t(value === 'fr' ? 'language.fr' : 'language.en')}</Text>
+              <Text style={{ flex: 1 }}>{t(`language.${value}`)}</Text>
               <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.border }]}>
                 {selected ? <View style={[styles.dot, { backgroundColor: colors.primary }]} /> : null}
               </View>

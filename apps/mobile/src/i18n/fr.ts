@@ -383,6 +383,7 @@ export const fr = {
   'language.title': 'Langue',
   'language.fr': 'Français',
   'language.en': 'English',
+  'language.sw': 'Kiswahili',
   'signOut.confirmTitle': 'Se déconnecter ?',
   'signOut.confirmBody': 'Vous devrez vous reconnecter pour accéder à votre compte.',
 

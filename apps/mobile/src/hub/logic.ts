@@ -1,3 +1,4 @@
+import type { Locale } from '../i18n';
 /** Logique pure du hub (onglet central) : ordre des onglets et formatage des compteurs. */
 export const HUB_TABS = ['live', 'videos', 'posts', 'products'] as const;
 export type HubTab = (typeof HUB_TABS)[number];
@@ -9,7 +10,7 @@ export function tabIndexFromOffset(offsetX: number, pageWidth: number): number {
 }
 
 /** Compteur compact : « 999 », « 1,2 k », « 2 M » (fr) ou « 1.2k », « 2M » (en). Arrondi vers le bas. */
-export function formatCount(n: number, locale: 'fr' | 'en' = 'fr'): string {
+export function formatCount(n: number, locale: Locale = 'fr'): string {
   const v = Math.max(0, Math.floor(Number.isFinite(n) ? n : 0));
   const unit = (x: number, suffix: string) => {
     const t = Math.floor(x * 10) / 10;

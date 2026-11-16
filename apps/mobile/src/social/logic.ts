@@ -1,3 +1,4 @@
+import type { Locale } from '../i18n';
 import type { Post, PostAuthor, PostVisibility, ReactionCounts, ReactionType } from './types';
 
 export const REACTION_TYPES: ReactionType[] = ['like', 'love', 'haha', 'wow', 'sad', 'angry'];
@@ -18,7 +19,7 @@ export interface PostPages {
 // ---- date relative ---------------------------------------------------------------------------
 
 /** « à l'instant », « 5 min », « 3 h », « 2 j », puis la date courte au-delà de 7 jours. */
-export function formatRelativeTime(iso: string, locale: 'fr' | 'en', now: Date = new Date()): string {
+export function formatRelativeTime(iso: string, locale: Locale, now: Date = new Date()): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const diff = Math.max(0, now.getTime() - d.getTime());

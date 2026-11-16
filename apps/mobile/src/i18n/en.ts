@@ -385,6 +385,7 @@ export const en: Record<MessageKey, string> = {
   'language.title': 'Language',
   'language.fr': 'Français',
   'language.en': 'English',
+  'language.sw': 'Kiswahili',
   'signOut.confirmTitle': 'Sign out?',
   'signOut.confirmBody': 'You will need to sign in again to access your account.',
 

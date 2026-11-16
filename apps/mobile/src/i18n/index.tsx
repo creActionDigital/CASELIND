@@ -1,14 +1,15 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { en } from './en';
 import { fr, type MessageKey } from './fr';
+import { sw } from './sw';
 
-export type Locale = 'fr' | 'en';
+export type Locale = 'fr' | 'en' | 'sw';
 export type { MessageKey };
 
-const dictionaries: Record<Locale, Record<MessageKey, string>> = { fr, en };
+const dictionaries: Record<Locale, Record<MessageKey, string>> = { fr, en, sw: { ...en, ...sw } as Record<MessageKey, string> };
 
 export function isLocale(value: string): value is Locale {
-  return value === 'fr' || value === 'en';
+  return value === 'fr' || value === 'en' || value === 'sw';
 }
 
 type Params = Record<string, string | number>;
