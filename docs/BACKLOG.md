@@ -9,6 +9,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 - **Santé (§12) et tout le reste : à développer intégralement.** Les modules réglementés (santé, etc.) restent coupés par défaut côté serveur (flag `regulated`, activation admin avec confirmation) ; le code est livré, l'activation reste une décision d'exploitation.
 - Suivre le cahier des charges à la lettre (`CASELIND_CAHIER_DES_CHARGES_DEFINITIF.md`), relire la section de chaque lot, consigner le différé, ne pas inventer les règles CSL Coins (§18, question ouverte).
 - Finir le projet le plus tôt possible ; aucune erreur : tests complets avant chaque commit.
+- **Réponses du 2026-11-16 :** (1) dépôt GitHub privé : accord donné, je le crée via son navigateur connecté. (2) Mineurs : c'est à l'établissement de gérer le consentement (lot 17b : pas de compte parent côté plateforme). (3) Services publics : retirés, lot 19 abandonné. (4) CSL Coins : plus tard, je peux proposer des règles. (5) FlexPay : plus tard. (6) Brevo/WhatsApp : pas encore. (7) Expo : je peux tester quand je veux. (8) IA : Gemini non, OmniRoute d'abord. (9) Pas d'hébergement ni de domaine ; le reste (WebRTC/TURN) à ma charge. (10) Santé : pays = RDC. (11) Banque de quiz : à moi de décider. (12) Outils pro 16c : à moi de décider. (13) Web après le mobile. (14) OmniRoute : seulement si vraiment nécessaire. Consigne : coder avec OmniRoute plutôt qu'avec les tokens Claude si possible.
 
 ## Feuille de route des lots restants (mise à jour à chaque lot)
 | Lot | Cahier §| Contenu | Statut |
