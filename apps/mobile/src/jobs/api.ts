@@ -10,6 +10,7 @@ import {
   type ApplicationStatus,
   type ContractType,
   type CreateJobRequest,
+  type UpdateJobRequest,
   type JobProfileInput,
 } from '@caselind/contracts';
 import { api } from '../auth/auth-context';
@@ -42,6 +43,7 @@ export const saveJobProfile = (body: JobProfileInput) => api.request('/me/job-pr
 export const deleteJobProfile = () => api.request('/me/job-profile', { method: 'DELETE' });
 
 export const fetchOrgJobs = (orgId: string, cursor?: string) => api.request(`/orgs/${orgId}/jobs`, { query: { limit: PAGE, cursor }, schema: jobListSchema });
+export const updateOrgJob = (orgId: string, jobId: string, body: UpdateJobRequest) => api.request(`/orgs/${orgId}/jobs/${jobId}`, { method: 'PATCH', body, schema: jobSchema });
 export const createOrgJob = (orgId: string, body: CreateJobRequest) => api.request(`/orgs/${orgId}/jobs`, { method: 'POST', body, schema: jobSchema });
 export const closeOrgJob = (orgId: string, jobId: string) => api.request(`/orgs/${orgId}/jobs/${jobId}/close`, { method: 'POST', schema: jobSchema });
 export const fetchOrgApplications = (orgId: string, jobId: string, cursor?: string) =>

@@ -62,6 +62,7 @@ export default function OrgJobs() {
             </Text>
             <View style={styles.row}>
               <Badge tone="neutral" label={item.status === 'open' ? t('jobs.org.applicants') : t('jobs.closed')} />
+              {item.status === 'open' ? <Button variant="ghost" label={t('jobs.org.editAction')} onPress={() => router.push({ pathname: '/seller/[orgId]/jobs/new', params: { orgId: String(orgId), jobId: item.id } })} /> : null}
               {item.status === 'open' ? <Button variant="ghost" label={t('jobs.org.close')} loading={close.isPending && close.variables === item.id} onPress={() => close.mutate(item.id)} /> : null}
             </View>
           </Card>

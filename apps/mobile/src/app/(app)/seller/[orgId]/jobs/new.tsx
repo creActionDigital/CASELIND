@@ -1,22 +1,23 @@
 import type { ContractType } from '@caselind/contracts';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../../../i18n';
 import { ApiRequestError } from '../../../../../lib/api';
 import { errorMessage } from '../../../../../lib/errors';
-import { createOrgJob, jobKeys } from '../../../../../jobs/api';
+import { createOrgJob, fetchJob, jobKeys, updateOrgJob } from '../../../../../jobs/api';
 import { CONTRACT_TYPES, contractKey } from '../../../../../jobs/logic';
+import { minorToDecimalString } from '../../../../../seller/money';
 import { Chips } from '../../../../../seller/ui';
 import { spacing } from '../../../../../theme/tokens';
 import { useTheme } from '../../../../../theme/use-theme';
 import { parseWalletAmount, WALLET_CURRENCIES } from '../../../../../wallet/amount';
 import { Button, Screen, Text, TextField } from '../../../../../ui';
 
-/** Publier une offre : poste, description, ville, contrat, salaire facultatif. */
+/** Publier ou modifier (paramètre `jobId`) une offre : poste, description, ville, contrat, salaire facultatif. */
 export default function NewJob() {
-  const { orgId } = useLocalSearchParams<{ orgId: string }>();
+  const { orgId, jobId } = useLocalSearchParams<{ orgId: string; jobId?: string }>();
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -30,6 +31,21 @@ export default function NewJob() {
   const [currency, setCurrency] = useState<string>('USD');
   const [error, setError] = useState<string | null>(null);
 
+  const existing = useQuery({ queryKey: jobKeys.one(String(jobId)), queryFn: () => fetchJob(String(jobId)), enabled: !!jobId });
+  useEffect(() => {
+    const j = existing.data;
+    if (!j) return;
+    setTitle(j.title);
+    setDescription(j.description);
+    setCity(j.city);
+    setContract(j.contractType);
+    if (j.salary) {
+      setCurrency(j.salary.currency);
+      setMin(j.salary.minMinor === null ? '' : minorToDecimalString(j.salary.minMinor, j.salary.currency));
+      setMax(j.salary.maxMinor === null ? '' : minorToDecimalString(j.salary.maxMinor, j.salary.currency));
+    }
+  }, [existing.data]);
+
   const publish = useMutation({
     mutationFn: () => {
       const parse = (v: string) => {
@@ -40,7 +56,7 @@ export default function NewJob() {
       };
       const salaryMinMinor = parse(min);
       const salaryMaxMinor = parse(max);
-      return createOrgJob(String(orgId), {
+      const body = {
         title: title.trim(),
         description: description.trim(),
         city: city.trim(),
@@ -48,7 +64,8 @@ export default function NewJob() {
         salaryMinMinor,
         salaryMaxMinor,
         currency: salaryMinMinor === null && salaryMaxMinor === null ? null : currency,
-      });
+      };
+      return jobId ? updateOrgJob(String(orgId), String(jobId), body) : createOrgJob(String(orgId), body);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: jobKeys.all });
@@ -62,7 +79,7 @@ export default function NewJob() {
 
   return (
     <Screen edges={['bottom']}>
-      <Stack.Screen options={{ title: t('jobs.org.new') }} />
+      <Stack.Screen options={{ title: jobId ? t('jobs.org.edit') : t('jobs.org.new') }} />
       <View style={styles.form}>
         <TextField label={t('jobs.org.field.title')} value={title} onChangeText={setTitle} maxLength={120} />
         <TextField label={t('jobs.org.field.description')} value={description} onChangeText={setDescription} multiline maxLength={4000} />
@@ -76,7 +93,7 @@ export default function NewJob() {
             {error}
           </Text>
         ) : null}
-        <Button label={t('jobs.org.publish')} loading={publish.isPending} disabled={title.trim().length < 3 || city.trim().length < 2} onPress={() => publish.mutate()} />
+        <Button label={jobId ? t('jobs.org.save') : t('jobs.org.publish')} loading={publish.isPending} disabled={title.trim().length < 3 || city.trim().length < 2 || (!!jobId && !existing.data)} onPress={() => publish.mutate()} />
       </View>
     </Screen>
   );
