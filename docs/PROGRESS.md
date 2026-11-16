@@ -540,3 +540,13 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - 10 constats, 7 corrigés (3 par l'agent principal : un avis masqué par la modération ne peut plus être supprimé puis republié comme neuf ; le formulaire d'édition d'offre ne se remplit qu'une fois ; l'annonce d'école n'échoue plus si la notification échoue. 4 par un sous-agent : blocages respectés par les alertes d'offres, bourse fermée ou expirée invisible du public, fuseau de la RDC pour les dates limites, pagination des avis).
 - Non corrigés, notés : helpers dupliqués (UUID_RE, curseurs, échappement LIKE) à extraire dans un module commun ; moyenne des avis calculée par deux sous-requêtes par cours (index ou jointure à prévoir si la liste grossit) ; requête d'export des avis à écrire comme les autres.
 - Résultats observés : API 596 tests, mobile 235, typechecks propres.
+
+## Lot 17g — Bourses : modification et signalement (2026-11-16) : testé, non vérifié à l'écran
+- `PATCH /v1/orgs/:orgId/school/scholarships/:id` (`org.members.manage`) : titre, description, date limite, lien https (au moins un champ) ; bourse fermée : 409 `closed` ; audit `school.scholarship_updated` sans texte. Bouton « Modifier » dans l'écran de gestion mobile.
+- Cible de signalement `scholarship` (migration 0045 : colonne `hidden` + contrainte `reports_target_type_check` redéfinie avec la liste complète de 0041 + `scholarship`) ; une bourse masquée disparaît des listes et du détail public (404), reste visible du personnel de l'école ; bouton « Signaler » dans le détail mobile.
+- Contrats, OpenAPI et textes fr+en à jour ; test e2e : modification, signalement, masquage par un modérateur.
+- Différé : candidature en ligne, fiche détaillée d'établissement, tri par proximité, export de compte, notification à l'école d'une bourse masquée (l'auteur modéré est le plus ancien propriétaire actif de l'école), vérification à l'écran.
+
+## Vérification à l'écran (2026-11-16) : écrans des lots 16d, 17e et modification d'offre
+- Vérifiés à 375 px avec l'API locale : modification d'offre (prérempli, enregistrement, liste mise à jour), avis de cours (4/5, suppression), alertes d'offres (création, liste, suppression), recherche d'établissements, bourses (publication côté école, liste publique). Données de test supprimées, drapeau `school` remis à `false`.
+- Observé, antérieur à ces lots : sur le web, la carte d'offre (cliquable) contient des boutons, d'où l'avertissement « button cannot contain a nested button » ; sans effet sur mobile natif. Après chaque redémarrage de l'API, les jetons de session de dev sont invalides (reconnexion nécessaire).
