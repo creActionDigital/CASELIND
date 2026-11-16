@@ -416,6 +416,59 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       await tx.delete(sessions).where(inArray(sessions.userId, ids));
       await tx.delete(otpChallenges).where(inArray(otpChallenges.userId, ids));
       await tx.delete(userBlocks).where(or(inArray(userBlocks.blockerId, ids), inArray(userBlocks.blockedId, ids)));
+      // Lots 13+ (right to erasure, docs/POLITIQUE_PURGE_COMPTES.md). The user row stays, so ON DELETE CASCADE never
+      // fires: every table owned by the account is deleted here. Children go before parents.
+      // A. owner/author rows are deleted.
+      for (const [table, cols] of [
+        ['push_tokens', ['user_id']],
+        ['notifications', ['user_id']],
+        ['notification_preferences', ['user_id']],
+        ['message_hidden', ['user_id']],
+        ['community_bans', ['user_id']],
+        ['budgets', ['user_id']],
+        ['listing_offers', ['buyer_id']],
+        ['listing_visits', ['visitor_id']],
+        ['listing_alerts', ['user_id']],
+        ['listings', ['owner_id']],
+        ['job_alerts', ['user_id']],
+        ['job_interviews', ['proposed_by']],
+        ['job_applications', ['user_id']],
+        ['job_profiles', ['user_id']],
+        ['freelance_profiles', ['user_id']],
+        ['course_reviews', ['user_id']],
+        ['course_enrollments', ['user_id']],
+        ['exam_sessions', ['user_id']],
+        ['certificates', ['user_id']],
+        ['courses', ['author_id']],
+        ['health_consents', ['user_id']],
+        ['health_entries', ['user_id']],
+        ['health_reminders', ['user_id']],
+        ['health_doses', ['user_id']],
+        ['health_shares', ['patient_id']],
+        ['health_access_log', ['patient_id', 'accessor_id']],
+        ['health_prescriptions', ['patient_id']],
+        ['health_appointments', ['patient_id', 'professional_id']],
+        ['health_professionals', ['user_id']],
+        ['game_sessions', ['user_id']],
+        ['school_enrollments', ['user_id']],
+        ['school_fee_payments', ['user_id']],
+        ['loyalty_movements', ['user_id']],
+        ['marketing_consents', ['user_id']],
+      ] as const) {
+        const cond = sql.join(
+          cols.map((c) => sql`${sql.identifier(c)} = ANY(${idArray})`),
+          sql` OR `,
+        );
+        await tx.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE ${cond}`);
+      }
+      // B. agreements with a counterparty are kept; the free text the deleted user wrote is neutralised
+      // (title/reason have a 3 / 5 character minimum).
+      await tx.execute(sql`UPDATE missions SET title = '[supprimé]', description = '' WHERE client_id = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE mission_proposals SET message = '' WHERE freelancer_id = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE freelance_reviews SET body = '' WHERE reviewer_id = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE contract_disputes SET reason = '[supprimé]' WHERE opened_by = ANY(${idArray})`);
+      // C. kept as is: coupons, coupon_redemptions (usage counter tied to kept orders), journal_entries, miniapps,
+      // ai_model_settings, job_postings, business_documents, school_announcements, school_fees, marketing_campaigns.
       // System action: no actor. Only the id is referenced.
       await tx.insert(auditEvents).values(
         ids.map((id) => ({ action: 'user.deleted', subjectUserId: id, metadata: { reason: 'deletion_grace_elapsed' } })),

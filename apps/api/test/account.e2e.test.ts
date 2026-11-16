@@ -251,6 +251,56 @@ describe('account deletion', () => {
     expect((await userRow(a.id)).deletion_requested_at).not.toBeNull();
   });
 
+  it('purge erases lots 13+ data of the deleted account, neutralises shared agreements, spares the rest', async () => {
+    const a = await user();
+    const b = await user();
+    const q = async (text: string, params: unknown[] = []) => (await ctx.sql.query(text, params)).rows;
+    const n = async (table: string, col: string, id: string) =>
+      Number((await q(`SELECT count(*) AS n FROM ${table} WHERE ${col} = $1`, [id]))[0].n);
+    // Same rows for the deleted account (a) and for another account (b).
+    for (const u of [a, b]) {
+      await q(`INSERT INTO budgets (user_id, currency, limit_minor) VALUES ($1, 'USD', 1000)`, [u.id]);
+      await q(`INSERT INTO job_profiles (user_id, headline) VALUES ($1, 'Dev')`, [u.id]);
+      await q(`INSERT INTO health_consents (user_id, version) VALUES ($1, 'v1')`, [u.id]);
+      await q(`INSERT INTO health_entries (user_id, kind, recorded_on, payload) VALUES ($1, 'note', '2026-01-01', 'enc')`, [u.id]);
+      await q(`INSERT INTO listing_alerts (user_id, q) VALUES ($1, 'velo')`, [u.id]);
+      await q(`INSERT INTO notifications (user_id, category, title, body) VALUES ($1, 'system', 't', 'b')`, [u.id]);
+      await q(`INSERT INTO listings (owner_id, kind, title, city) VALUES ($1, 'used_item', 'Velo', 'Goma')`, [u.id]);
+    }
+    await q(`INSERT INTO push_tokens (user_id, session_id, token, platform)
+             SELECT user_id, id, 'tok-' || id::text, 'ios' FROM sessions WHERE user_id = $1 LIMIT 1`, [a.id]);
+    // Freelance: a is the client of a mission with a proposal and a contract from b, and wrote a review and a dispute.
+    const [{ id: mid }] = await q(
+      `INSERT INTO missions (client_id, title, description, budget_minor, currency) VALUES ($1, 'Site web', 'secret', 100, 'USD') RETURNING id`, [a.id]);
+    await q(`INSERT INTO mission_proposals (mission_id, freelancer_id, amount_minor, delivery_days, message) VALUES ($1, $2, 90, 5, 'salut')`, [mid, b.id]);
+    const [{ id: cid }] = await q(
+      `INSERT INTO freelance_contracts (mission_id, client_id, freelancer_id, amount_minor, currency) VALUES ($1, $2, $3, 90, 'USD') RETURNING id`, [mid, a.id, b.id]);
+    await q(`INSERT INTO freelance_reviews (contract_id, reviewer_id, reviewee_id, rating, body) VALUES ($1, $2, $3, 4, 'bien')`, [cid, a.id, b.id]);
+    await q(`INSERT INTO contract_disputes (contract_id, opened_by, reason) VALUES ($1, $2, 'motif prive')`, [cid, a.id]);
+    // C: a trace owned by an admin-ish reference stays.
+    await q(`INSERT INTO ai_model_settings (model_id, enabled, updated_by) VALUES ('purge-test-model', true, $1)`, [a.id]);
+
+    await ctx.http.post('/v1/me/deletion-request').set(bearer(a.token)).send({ password: PASSWORD }).expect(202);
+    await ctx.sql.query(`UPDATE users SET deletion_requested_at = now() - interval '31 days' WHERE id = $1`, [a.id]);
+    await ctx.app.get(MaintenanceService).runOnce();
+    expect((await userRow(a.id)).status).toBe('deleted');
+
+    for (const [t, c] of [['budgets', 'user_id'], ['job_profiles', 'user_id'], ['health_consents', 'user_id'], ['health_entries', 'user_id'],
+      ['listing_alerts', 'user_id'], ['notifications', 'user_id'], ['listings', 'owner_id'], ['push_tokens', 'user_id']]) {
+      expect(await n(t, c, a.id), `${t} of the deleted account`).toBe(0);
+    }
+    for (const [t, c] of [['budgets', 'user_id'], ['job_profiles', 'user_id'], ['health_consents', 'user_id'], ['health_entries', 'user_id'],
+      ['listing_alerts', 'user_id'], ['notifications', 'user_id'], ['listings', 'owner_id']]) {
+      expect(await n(t, c, b.id), `${t} of the other account`).toBe(1);
+    }
+    expect((await q(`SELECT title, description FROM missions WHERE id = $1`, [mid]))[0]).toEqual({ title: '[supprimé]', description: '' });
+    expect((await q(`SELECT message FROM mission_proposals WHERE mission_id = $1`, [mid]))[0].message).toBe('salut');
+    expect((await q(`SELECT body FROM freelance_reviews WHERE contract_id = $1`, [cid]))[0].body).toBe('');
+    expect((await q(`SELECT reason FROM contract_disputes WHERE contract_id = $1`, [cid]))[0].reason).toBe('[supprimé]');
+    expect(await n('freelance_contracts', 'id', cid)).toBe(1);
+    expect(await n('ai_model_settings', 'updated_by', a.id)).toBe(1);
+  });
+
   it('purges due deletions: anonymises the account, frees the e-mail, keeps the audit log', async () => {
     const a = await user();
     const b = await user();
