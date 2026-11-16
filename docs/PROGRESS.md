@@ -638,3 +638,10 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 ## Lot 20c - anti-triche du quiz eclair (migration 0056)
 - Partie rendue en moins de 8 s : score 0, `suspicious = true`, reponse `counted: false` ; 5 parties suspectes le meme jour UTC : 409 `cooldown` au demarrage ; exclues du classement, des tournois et du badge perfect ; message neutre sur l ecran de resultat. Teste : 1 nouveau test e2e, les autres aident le test a vieillir `started_at`.
 - Differe : seuil par question (temps de lecture), detection de motifs (memes reponses en rafale), revue administrateur des parties suspectes, parties suspectes toujours comptees dans `played` des badges.
+
+## Lot 17h — Frais scolaires (relevé, sans paiement) (§13) (2026-11-16) : testé côté API ; écrans non vérifiés dans le navigateur
+- Migration 0057 : `school_fees` (frais d'une classe : intitulé, montant en unités mineures, USD ou CDF, date limite) et `school_fee_payments` (seuls les élèves ayant payé sont stockés). **Un relevé seulement : la plateforme ne prend ni ne déplace aucun argent** (paiements réels : FlexPay, question Q5) ; l'école marque elle-même ce qui a été réglé hors plateforme. Sous le drapeau réglementé `school`.
+- Routes personnel (`org.members.manage`) : créer un frais, lister avec le nombre d'élèves ayant payé, voir les statuts, marquer un élève payé ou non (seuls les élèves de la classe, 404 sinon) ; `GET /me/school/fees` pour les inscrits (le statut est `null` pour un parent ou un enseignant). Audit sans noms ni montants. OpenAPI + test e2e.
+- Mobile : « Frais scolaires » (écran inscrit) et « Frais de la classe » (personnel : énoncer un frais, voir les élèves, marquer payé).
+- Résultats observés : API ciblé 18 tests, mobile 243 ; types propres.
+- Différé : lien parent-enfant (un parent ne voit pas le statut d'un élève), rappel avant échéance, export de compte des frais, paiement réel.

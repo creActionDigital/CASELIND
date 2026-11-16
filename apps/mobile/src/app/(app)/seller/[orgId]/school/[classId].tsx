@@ -1,6 +1,6 @@
 import type { SchoolRole } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useI18n } from '../../../../../i18n';
@@ -17,6 +17,7 @@ export default function ManageClass() {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const qc = useQueryClient();
+  const router = useRouter();
   const { orgId, classId } = useLocalSearchParams<{ orgId: string; classId: string }>();
   const [error, setError] = useState<string | null>(null);
   const [handle, setHandle] = useState('');
@@ -50,6 +51,7 @@ export default function ManageClass() {
           </Text>
         ) : null}
 
+        <Button variant="secondary" label={t('fees.staff.manage')} onPress={() => router.push(`/seller/${orgId}/school/fees/${classId}` as never)} />
         <SectionTitle>{t('school.staff.enroll')}</SectionTitle>
         <TextField label={t('school.staff.handle')} value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} />
         <Chips

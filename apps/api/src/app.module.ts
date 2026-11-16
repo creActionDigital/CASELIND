@@ -55,6 +55,8 @@ import { MySchoolController, OrgSchoolController } from './school/school.control
 import { SchoolService } from './school/school.service.js';
 import { OrgScholarshipsController, ScholarshipsController } from './school/scholarships.controller.js';
 import { ScholarshipsService } from './school/scholarships.service.js';
+import { MyFeesController, OrgFeesController } from './school/fees.controller.js';
+import { FeesService } from './school/fees.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -333,6 +335,8 @@ export class AppModule {
         AdminGamesController,
         AdminTournamentsController,
         OrgSchoolController,
+        OrgFeesController,
+        MyFeesController,
         MySchoolController,
         OrgScholarshipsController,
         ScholarshipsController,
@@ -521,6 +525,7 @@ export class AppModule {
         HealthService,
         GamesService,
         SchoolService,
+        FeesService,
         ScholarshipsService,
         MessagesService,
         // Lot 3b

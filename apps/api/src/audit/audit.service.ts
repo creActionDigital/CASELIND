@@ -149,6 +149,8 @@ export type AuditAction =
   | 'school.left'
   | 'school.announced'
   | 'school.scholarship_published'
+  | 'school.fee_created'
+  | 'school.fee_marked'
   | 'school.scholarship_closed'
   | 'school.scholarship_updated'
   | 'conversation.member_removed'

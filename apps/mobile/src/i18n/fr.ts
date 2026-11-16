@@ -13,6 +13,7 @@ import { gamesFr } from '../games/messages';
 import { docsFr } from '../seller/documents-messages';
 import { schoolFr } from '../school/messages';
 import { scholarshipsFr } from '../school/messages-scholarships';
+import { feesFr } from '../school/messages-fees';
 import { salesFr } from '../seller/sales-messages';
 import { loyaltyFr } from '../loyalty/messages';
 export const fr = {
@@ -1297,6 +1298,7 @@ export const fr = {
   ...healthProFr,
   ...gamesFr,
   ...salesFr,
+  ...feesFr,
   ...loyaltyFr,
   ...schoolFr,
   ...scholarshipsFr,

@@ -8,3 +8,4 @@ apps/api/.data/
 *.log
 .DS_Store
 graphify-out/
+scripts/.seed-demo-state.json
