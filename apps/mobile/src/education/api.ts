@@ -6,6 +6,9 @@ import {
   courseReviewListSchema,
   courseStudentsSchema,
   enrollmentListSchema,
+  examHistorySchema,
+  examResultSchema,
+  examSessionSchema,
   quizResultSchema,
   quizSchema,
   type CourseLevel,
@@ -32,6 +35,7 @@ export const eduKeys = {
   authored: ['education', 'authored'] as const,
   certificates: ['education', 'certificates'] as const,
   reviews: (id: string) => ['education', 'reviews', id] as const,
+  exam: (id: string) => ['education', 'exam', id] as const,
   students: (id: string) => ['education', 'students', id] as const,
 };
 
@@ -53,3 +57,7 @@ export const verifyCertificate = (code: string) => api.request(`/public/certific
 export const fetchReviews = (id: string, cursor?: string) => api.request(`/courses/${id}/reviews`, { query: { limit: 50, cursor }, schema: courseReviewListSchema });
 export const saveReview = (id: string, body: CourseReviewRequest) => api.request(`/courses/${id}/reviews/me`, { method: 'PUT', body, schema: courseDetailSchema });
 export const deleteReview = (id: string) => api.request(`/courses/${id}/reviews/me`, { method: 'DELETE' });
+export const saveExam = (id: string, examMinutes: number | null) => api.request(`/courses/${id}/exam`, { method: 'PUT', body: { examMinutes }, schema: courseDetailSchema });
+export const startExam = (id: string) => api.request(`/courses/${id}/exam/sessions`, { method: 'POST', schema: examSessionSchema });
+export const submitExam = (id: string, sid: string, answers: number[]) => api.request(`/courses/${id}/exam/sessions/${sid}/answers`, { method: 'POST', body: { answers }, schema: examResultSchema });
+export const fetchExamHistory = (id: string) => api.request(`/courses/${id}/exam/attempts`, { schema: examHistorySchema });

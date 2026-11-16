@@ -14,9 +14,10 @@ interface TU {
   token: string;
   id: string;
 }
-async function user(): Promise<TU> {
+async function user(roles?: string[]): Promise<TU> {
   const { tokens } = await signUp(ctx);
   const me = await ctx.http.get('/v1/me').set(bearer(tokens.accessToken)).expect(200);
+  if (roles) await ctx.sql.query('UPDATE users SET roles = $1::text[] WHERE id = $2', [roles, me.body.id]);
   return { token: tokens.accessToken, id: me.body.id };
 }
 let n = 0;
@@ -26,7 +27,7 @@ async function org(owner: TU, kind: string, name: string, city: string): Promise
   await ctx.sql.query(`UPDATE organizations SET city = $2 WHERE id = $1`, [id, city]);
   return id;
 }
-const call = (method: 'get' | 'post', u: TU, path: string, body?: Record<string, unknown>) => ctx.http[method](`/v1${path}`).set(bearer(u.token)).send(body ?? {});
+const call = (method: 'get' | 'post' | 'patch', u: TU, path: string, body?: Record<string, unknown>) => ctx.http[method](`/v1${path}`).set(bearer(u.token)).send(body ?? {});
 
 describe('school search and scholarships (lot 17e)', () => {
   it('is off by default (regulated flag)', async () => {
@@ -107,6 +108,37 @@ describe('school search and scholarships (lot 17e)', () => {
       const audits = await ctx.sql.query(`SELECT action, metadata::text AS md FROM audit_events WHERE action LIKE 'school.scholarship%'`);
       expect(audits.rows.map((r: { action: string }) => r.action)).toEqual(expect.arrayContaining(['school.scholarship_published', 'school.scholarship_closed']));
       expect(audits.rows.map((r: { md: string }) => r.md).join('')).not.toMatch(/Excellence|meilleurs|ecole\.example/);
+    });
+
+    it('staff edit an open scholarship (not a closed one), audited without text', async () => {
+      const [head, outsider] = [await user(), await user()];
+      const school = await org(head, 'school', 'Ecole Edition', 'Goma');
+      const sch = (await call('post', head, `/orgs/${school}/school/scholarships`, { title: 'Avant', description: 'Ancien texte' }).expect(201)).body;
+      await call('patch', head, `/orgs/${school}/school/scholarships/${sch.id}`, {}).expect(400);
+      await call('patch', head, `/orgs/${school}/school/scholarships/${sch.id}`, { url: 'http://nope.example' }).expect(400);
+      await call('patch', outsider, `/orgs/${school}/school/scholarships/${sch.id}`, { title: 'x' }).expect(404);
+      const up = (await call('patch', head, `/orgs/${school}/school/scholarships/${sch.id}`, { title: 'Apres', deadline: '2999-01-01' }).expect(200)).body;
+      expect(up).toMatchObject({ title: 'Apres', description: 'Ancien texte', deadline: '2999-01-01' });
+      await call('post', head, `/orgs/${school}/school/scholarships/${sch.id}/close`).expect(204);
+      await call('patch', head, `/orgs/${school}/school/scholarships/${sch.id}`, { title: 'Tard' }).expect(409);
+      const md = await ctx.sql.query(`SELECT metadata::text AS md FROM audit_events WHERE action = 'school.scholarship_updated'`);
+      expect(md.rows.map((r: { md: string }) => r.md).join('')).not.toMatch(/Apres|Ancien/);
+    });
+
+    it('reported and hidden by a moderator: gone from public lists, still visible to staff', async () => {
+      const [head, reader, mod] = [await user(), await user(), await user(['user', 'moderator'])];
+      const school = await org(head, 'school', 'Ecole Moderee', 'Matadi');
+      const sch = (await call('post', head, `/orgs/${school}/school/scholarships`, { title: 'Douteuse', description: 'Arnaque' }).expect(201)).body;
+      await call('post', reader, '/reports', { targetType: 'scholarship', targetId: sch.id, reason: 'spam' }).expect(201);
+      await call('post', mod, '/admin/moderation/actions', { targetType: 'scholarship', targetId: sch.id, action: 'hide' }).expect(200);
+      const ids = async (u: TU) => (await call('get', u, '/school/scholarships?city=matadi').expect(200)).body.items.map((s: { id: string }) => s.id);
+      expect(await ids(reader)).not.toContain(sch.id);
+      await call('get', reader, `/school/scholarships/${sch.id}`).expect(404);
+      await call('post', reader, '/reports', { targetType: 'scholarship', targetId: sch.id, reason: 'spam' }).expect(404);
+      expect((await call('get', head, `/school/scholarships/${sch.id}`).expect(200)).body.id).toBe(sch.id);
+      expect((await call('get', head, `/orgs/${school}/school/scholarships`).expect(200)).body.items.map((s: { id: string }) => s.id)).toContain(sch.id);
+      await call('post', mod, '/admin/moderation/actions', { targetType: 'scholarship', targetId: sch.id, action: 'restore' }).expect(200);
+      expect(await ids(reader)).toContain(sch.id);
     });
 
     it('refuses to publish for an inactive school', async () => {

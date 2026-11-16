@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { eduKeys, fetchCourse, fetchQuiz, saveLessons, saveQuiz } from '../../../../education/api';
+import { eduKeys, fetchCourse, fetchQuiz, saveExam, saveLessons, saveQuiz } from '../../../../education/api';
 import { correctIndex, educationErrorKey, parseOptions } from '../../../../education/logic';
 import { useI18n } from '../../../../i18n';
 import { ApiRequestError } from '../../../../lib/api';
@@ -33,14 +33,18 @@ export default function EditCourse() {
   const [lessons, setLessons] = useState<LessonDraft[] | null>(null);
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
   const [pass, setPass] = useState('70');
+  const [examMin, setExamMin] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState<'lessons' | 'quiz' | null>(null);
+  const [saved, setSaved] = useState<'lessons' | 'quiz' | 'exam' | null>(null);
 
   useEffect(() => {
     if (course.data && lessons === null) setLessons(course.data.lessons.map((l) => ({ title: l.title, content: l.content ?? '' })));
   }, [course.data, lessons]);
   useEffect(() => {
-    if (course.data) setPass(String(course.data.passPercent));
+    if (course.data) {
+      setPass(String(course.data.passPercent));
+      setExamMin(course.data.examMinutes ? String(course.data.examMinutes) : '');
+    }
     // Le corrigé n'est jamais renvoyé : on ne recharge que les énoncés et les réponses possibles.
     if (quiz.data) setQuestions(quiz.data.questions.map((q) => ({ prompt: q.prompt, options: q.options.join('\n'), correct: '' })));
   }, [quiz.data, course.data]);
@@ -51,7 +55,7 @@ export default function EditCourse() {
     if (key) return setError(t(key));
     setError(e instanceof ApiRequestError && e.status === 400 ? t('education.err.invalid') : errorMessage(e, t, locale));
   };
-  const done = (which: 'lessons' | 'quiz') => {
+  const done = (which: 'lessons' | 'quiz' | 'exam') => {
     setError(null);
     setSaved(which);
     void qc.invalidateQueries({ queryKey: eduKeys.all });
@@ -74,6 +78,16 @@ export default function EditCourse() {
       return saveQuiz(courseId, { passPercent, questions: qs });
     },
     onSuccess: () => done('quiz'),
+    onError: (e) => (e instanceof Error && e.message === 'invalid' ? setError(t('education.err.invalid')) : fail(e)),
+  });
+
+  const saveE = useMutation({
+    mutationFn: () => {
+      const m = examMin.trim() === '' ? null : Number(examMin);
+      if (m !== null && !Number.isInteger(m)) throw new Error('invalid');
+      return saveExam(courseId, m);
+    },
+    onSuccess: () => done('exam'),
     onError: (e) => (e instanceof Error && e.message === 'invalid' ? setError(t('education.err.invalid')) : fail(e)),
   });
 
@@ -130,6 +144,9 @@ export default function EditCourse() {
         <Button variant="secondary" label={t('education.addQuestion')} onPress={() => setQuestions((cur) => [...cur, { prompt: '', options: '', correct: '' }])} />
         <Button label={t('education.saveQuiz')} loading={saveQ.isPending} onPress={() => saveQ.mutate()} />
         {saved === 'quiz' ? <Text variant="small">{t('education.saved')}</Text> : null}
+        <TextField label={t('education.examMinutes')} value={examMin} onChangeText={setExamMin} keyboardType="number-pad" maxLength={3} />
+        <Button label={t('education.saveExam')} loading={saveE.isPending} onPress={() => saveE.mutate()} />
+        {saved === 'exam' ? <Text variant="small">{t('education.saved')}</Text> : null}
       </View>
     </Screen>
   );

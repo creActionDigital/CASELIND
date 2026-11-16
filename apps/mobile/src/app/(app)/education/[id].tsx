@@ -101,6 +101,7 @@ export default function CourseScreen() {
           <>
             {c.bestScorePercent !== null ? <Text variant="small">{t('education.bestScore', { n: c.bestScorePercent })}</Text> : null}
             <Button label={t('education.takeQuiz')} onPress={() => router.push({ pathname: '/education/quiz/[id]', params: { id: c.id } })} />
+            {c.examMinutes && c.enrolled ? <Button variant="secondary" label={t('education.examButton', { n: c.examMinutes })} onPress={() => router.push({ pathname: '/education/exam/[id]', params: { id: c.id } })} /> : null}
           </>
         ) : null}
 

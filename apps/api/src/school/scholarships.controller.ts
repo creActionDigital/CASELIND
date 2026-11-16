@@ -1,8 +1,10 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import {
   type CreateScholarshipRequest,
   createScholarshipRequestSchema,
   type Scholarship,
+  type UpdateScholarshipRequest,
+  updateScholarshipRequestSchema,
   type ScholarshipList,
   type ScholarshipListQuery,
   scholarshipListQuerySchema,
@@ -55,6 +57,12 @@ export class OrgScholarshipsController {
   @OrgPermission('org.members.manage')
   list(@CurrentMembership() m: OrgMembership, @Query(new ZodPipe(scholarshipListQuerySchema)) q: ScholarshipListQuery): Promise<ScholarshipList> {
     return this.s.orgList(m.orgId, q);
+  }
+
+  @Patch(':id')
+  @OrgPermission('org.members.manage')
+  update(@CurrentMembership() m: OrgMembership, @CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new ZodPipe(updateScholarshipRequestSchema)) b: UpdateScholarshipRequest, @ReqMeta() meta: RequestMeta): Promise<Scholarship> {
+    return this.s.update(m.orgId, u.userId, id, b, meta);
   }
 
   @Post(':id/close')

@@ -24,6 +24,11 @@ export const scholarshipsFr = {
   'school.scholarships.publish': 'Publier la bourse',
   'school.scholarships.close': 'Clôturer',
   'school.scholarships.invalid': 'Vérifiez le titre, la date (AAAA-MM-JJ) et le lien https.',
+  'school.scholarships.edit': 'Modifier',
+  'school.scholarships.save': 'Enregistrer les modifications',
+  'school.scholarships.cancelEdit': 'Annuler la modification',
+  'school.scholarships.report': 'Signaler cette bourse',
+  'report.target.scholarship': 'Bourse d’études',
 } as const;
 
 export const scholarshipsEn: Record<keyof typeof scholarshipsFr, string> = {
@@ -51,4 +56,9 @@ export const scholarshipsEn: Record<keyof typeof scholarshipsFr, string> = {
   'school.scholarships.publish': 'Publish the scholarship',
   'school.scholarships.close': 'Close',
   'school.scholarships.invalid': 'Check the title, the date (YYYY-MM-DD) and the https link.',
+  'school.scholarships.edit': 'Edit',
+  'school.scholarships.save': 'Save changes',
+  'school.scholarships.cancelEdit': 'Cancel editing',
+  'school.scholarships.report': 'Report this scholarship',
+  'report.target.scholarship': 'Scholarship',
 };

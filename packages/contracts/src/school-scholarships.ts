@@ -28,6 +28,10 @@ export const createScholarshipRequestSchema = z.object({
 });
 export type CreateScholarshipRequest = z.infer<typeof createScholarshipRequestSchema>;
 
+/** Lot 17g: partial edit of an open scholarship (at least one field). */
+export const updateScholarshipRequestSchema = createScholarshipRequestSchema.partial().refine((b) => Object.keys(b).length > 0, 'at least one field');
+export type UpdateScholarshipRequest = z.infer<typeof updateScholarshipRequestSchema>;
+
 export const scholarshipListQuerySchema = pageQuerySchema.extend({ city: z.string().trim().max(80).optional() });
 export type ScholarshipListQuery = z.infer<typeof scholarshipListQuerySchema>;
 

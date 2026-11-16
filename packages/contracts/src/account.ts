@@ -146,6 +146,8 @@ export const accountExportSchema = z.object({
     enrollments: z.array(z.object({ courseTitle: z.string(), progressPercent: z.number().int(), completed: z.boolean(), certificateCode: z.string().nullable(), enrolledAt: z.string() })),
     /** Lot 17d: own course reviews (own words, no one else's). */
     reviews: z.array(z.object({ courseTitle: z.string(), rating: z.number().int(), body: z.string(), createdAt: z.string() })),
+    /** Lot 17f: own finished mock exams (score and time used; never the answers). */
+    exams: z.array(z.object({ courseTitle: z.string(), scorePercent: z.number().int(), usedSeconds: z.number().int(), startedAt: z.string() })),
   }),
   /** Lot 13: own monthly budgets (sandbox). */
   budgets: z.array(z.object({ currency: z.string(), limitMinor: z.number().int() })),

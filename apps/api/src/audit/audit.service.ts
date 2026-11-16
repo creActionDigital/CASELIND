@@ -94,6 +94,9 @@ export type AuditAction =
   | 'education.certificate_issued'
   | 'education.review_saved'
   | 'education.review_deleted'
+  | 'education.exam_configured'
+  | 'education.exam_started'
+  | 'education.exam_finished'
   /** Health (lot 18a): ids and kinds only. Never a title, a detail, a symptom, a medicine or a dose. */
   | 'health.consent_granted'
   | 'health.consent_revoked'
@@ -123,6 +126,7 @@ export type AuditAction =
   | 'school.announced'
   | 'school.scholarship_published'
   | 'school.scholarship_closed'
+  | 'school.scholarship_updated'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'

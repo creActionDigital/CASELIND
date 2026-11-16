@@ -285,3 +285,77 @@ describe('education: reviews (lot 17d)', () => {
     expect((await ctx.http.get('/v1/me/export').set(bearer(a.token)).expect(200)).body.education.reviews).toMatchObject([{ courseTitle: 'Comptabilité de base', rating: 4, body: 'Clair' }]);
   });
 });
+
+describe('education: timed mock exams (lot 17f)', () => {
+  const setExam = (u: TU, id: string, examMinutes: number | null) => ctx.http.put(`/v1/courses/${id}/exam`).set(bearer(u.token)).send({ examMinutes });
+  const start = (u: TU, id: string) => ctx.http.post(`/v1/courses/${id}/exam/sessions`).set(bearer(u.token));
+  const submit = (u: TU, id: string, sid: string, answers: number[]) => ctx.http.post(`/v1/courses/${id}/exam/sessions/${sid}/answers`).set(bearer(u.token)).send({ answers });
+  const history = (u: TU, id: string) => ctx.http.get(`/v1/courses/${id}/exam/attempts`).set(bearer(u.token));
+  /** Answers in the served order: right = true gives the correct option of each question. */
+  const answersFor = (qs: { prompt: string }[], right: boolean) => qs.map((q) => ((q.prompt.startsWith('2 + 2') ? 1 : 0) + (right ? 0 : 1)) % (q.prompt.startsWith('2 + 2') ? 3 : 2));
+
+  it('sets the duration (author, 5 to 180, needs a quiz) and hides the answer key', async () => {
+    const t = await user();
+    const bare = (await create(t).expect(201)).body;
+    await setExam(t, bare.id, 30).expect(409).expect((r) => expect(r.body.error.details.reason).toBe('no_quiz'));
+    const { teacher, id } = await ready();
+    await setExam(teacher, id, 4).expect(400);
+    await setExam(teacher, id, 181).expect(400);
+    const learner = await user();
+    await setExam(learner, id, 30).expect(404);
+    await start(learner, id).expect(404); // not enrolled
+    await enroll(learner, id).expect(200);
+    await start(learner, id).expect(409).expect((r) => expect(r.body.error.details.reason).toBe('exam_not_enabled'));
+    expect((await setExam(teacher, id, 30).expect(200)).body.examMinutes).toBe(30);
+    const s = (await start(learner, id).expect(201)).body;
+    expect(s.durationMinutes).toBe(30);
+    expect(new Date(s.expiresAt).getTime() - new Date(s.startedAt).getTime()).toBe(30 * 60_000);
+    expect(s.questions).toHaveLength(2);
+    expect(JSON.stringify(s)).not.toContain('correct');
+    expect((await start(learner, id).expect(201)).body.id).toBe(s.id); // the open session is returned, no attempt burned
+    expect((await setExam(teacher, id, null).expect(200)).body.examMinutes).toBeNull();
+  });
+
+  it('grades once, refuses late answers, caps 3 a day, keeps the quiz score and issues no certificate', async () => {
+    const { teacher, id } = await ready();
+    await setExam(teacher, id, 10).expect(200);
+    const learner = await user();
+    const other = await user();
+    await enroll(learner, id).expect(200);
+    await enroll(other, id).expect(200);
+
+    const s1 = (await start(learner, id).expect(201)).body;
+    await submit(other, id, s1.id, [0, 0]).expect(404); // someone else's session
+    await submit(learner, id, s1.id, [0]).expect(400);
+    const r1 = (await submit(learner, id, s1.id, answersFor(s1.questions, true)).expect(200)).body;
+    expect(r1).toMatchObject({ scorePercent: 100, correct: 2, total: 2, passed: true });
+    await submit(learner, id, s1.id, answersFor(s1.questions, true)).expect(409).expect((r) => expect(r.body.error.details.reason).toBe('already_finished'));
+
+    // Expired beyond the 5 second grace: 409 expired; within the grace it still counts.
+    const s2 = (await start(learner, id).expect(201)).body;
+    await ctx.sql.query(`UPDATE exam_sessions SET expires_at = now() - interval '2 seconds' WHERE id = $1`, [s2.id]);
+    const r2 = (await submit(learner, id, s2.id, answersFor(s2.questions, false)).expect(200)).body;
+    expect(r2).toMatchObject({ scorePercent: 0, passed: false });
+    const s3 = (await start(learner, id).expect(201)).body;
+    await ctx.sql.query(`UPDATE exam_sessions SET expires_at = now() - interval '10 seconds' WHERE id = $1`, [s3.id]);
+    await submit(learner, id, s3.id, answersFor(s3.questions, true)).expect(409).expect((r) => expect(r.body.error.details.reason).toBe('expired'));
+    await start(learner, id).expect(409).expect((r) => expect(r.body.error.details.reason).toBe('daily_limit'));
+    await start(other, id).expect(201); // the cap is per learner
+
+    const h = (await history(learner, id).expect(200)).body;
+    expect(h.attemptsLeftToday).toBe(0);
+    expect(h.items.map((i: { scorePercent: number }) => i.scorePercent)).toEqual([0, 100]);
+    expect(h.items[0].usedSeconds).toBeGreaterThanOrEqual(0);
+
+    // No certificate and no official quiz score from a mock exam.
+    const d = (await ctx.http.get(`/v1/courses/${id}`).set(bearer(learner.token)).expect(200)).body;
+    expect(d).toMatchObject({ bestScorePercent: null, certificateCode: null });
+    expect((await ctx.sql.query('SELECT count(*)::int AS n FROM certificates WHERE user_id = $1', [learner.id])).rows[0].n).toBe(0);
+
+    // Audit without the answers; own export carries the finished attempts.
+    const audits = await ctx.sql.query(`SELECT action, metadata::text AS md FROM audit_events WHERE subject_user_id = $1 AND action LIKE 'education.exam%'`, [learner.id]);
+    expect(audits.rows.map((r: { action: string }) => r.action)).toContain('education.exam_finished');
+    expect(JSON.stringify(audits.rows)).not.toContain('answers');
+    expect((await ctx.http.get('/v1/me/export').set(bearer(learner.token)).expect(200)).body.education.exams).toHaveLength(2);
+  });
+});

@@ -1,10 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { type CreateScholarshipRequest, ErrorCodes, type Scholarship, type ScholarshipList, type ScholarshipListQuery, type SchoolSearchQuery, type SchoolSummaryList } from '@caselind/contracts';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { type CreateScholarshipRequest, ErrorCodes, type Scholarship, type ScholarshipList, type ScholarshipListQuery, type SchoolSearchQuery, type SchoolSummaryList, type UpdateScholarshipRequest } from '@caselind/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
+import { ModerationRegistry } from '../moderation/moderation-registry.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -57,11 +58,39 @@ const SELECT_S = sql`SELECT s.id, s.org_id, s.title, s.description, to_char(s.de
 
 /** School search and scholarships. Audit holds ids only, never the text. */
 @Injectable()
-export class ScholarshipsService {
+export class ScholarshipsService implements OnModuleInit {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly moderation: ModerationRegistry,
   ) {}
+
+  onModuleInit(): void {
+    this.moderation.register('scholarship', {
+      visibleTo: async (viewerId, id) => {
+        if (!UUID_RE.test(id)) return false;
+        const res = await this.db.execute(sql`${SELECT_S} WHERE s.id = ${id}::uuid AND ${publicSchool} AND ${this.readable(viewerId)}`);
+        return res.rows.length > 0;
+      },
+      // Oldest active owner of the school (the moderation service needs a non-null author to restore without an open report).
+      authorOf: async (id) => {
+        if (!UUID_RE.test(id)) return null;
+        const res = await this.db.execute<{ user_id: string }>(sql`SELECT m.user_id FROM school_scholarships s JOIN org_members m ON m.org_id = s.org_id AND m.role = 'owner' AND m.status = 'active'
+          WHERE s.id = ${id}::uuid ORDER BY m.created_at, m.user_id LIMIT 1`);
+        return res.rows[0]?.user_id ?? null;
+      },
+      setHidden: async (id, hidden) => {
+        if (!UUID_RE.test(id)) return;
+        await this.db.execute(sql`UPDATE school_scholarships SET hidden = ${hidden} WHERE id = ${id}::uuid`);
+      },
+    });
+  }
+
+  /** Open and not hidden, or any state for active members of the school. */
+  private readable(viewerId: string): SQL {
+    return sql`((s.status = 'open' AND NOT s.hidden AND (s.deadline IS NULL OR s.deadline >= ${TODAY}))
+      OR EXISTS (SELECT 1 FROM org_members m WHERE m.org_id = s.org_id AND m.user_id = ${viewerId}::uuid AND m.status = 'active'))`;
+  }
 
   async searchSchools(q: SchoolSearchQuery): Promise<SchoolSummaryList> {
     const f: SQL[] = [publicSchool];
@@ -91,7 +120,7 @@ export class ScholarshipsService {
 
   /** Open (not closed, deadline not passed) scholarships of public active schools. */
   list(q: ScholarshipListQuery): Promise<ScholarshipList> {
-    const f: SQL[] = [publicSchool, sql`s.status = 'open' AND (s.deadline IS NULL OR s.deadline >= ${TODAY})`];
+    const f: SQL[] = [publicSchool, sql`s.status = 'open' AND NOT s.hidden AND (s.deadline IS NULL OR s.deadline >= ${TODAY})`];
     if (q.city) f.push(sql`o.city ILIKE ${escapeLike(q.city)}`);
     if (q.cursor) {
       const c = decodeCursor(q.cursor);
@@ -103,9 +132,7 @@ export class ScholarshipsService {
   /** A closed or expired scholarship is only readable by active members of its school. */
   async get(id: string, viewerId: string): Promise<Scholarship> {
     if (!UUID_RE.test(id)) throw AppError.notFound('Scholarship not found');
-    const res = await this.db.execute<SRow>(sql`${SELECT_S} WHERE s.id = ${id}::uuid AND ${publicSchool}
-      AND ((s.status = 'open' AND (s.deadline IS NULL OR s.deadline >= ${TODAY}))
-        OR EXISTS (SELECT 1 FROM org_members m WHERE m.org_id = s.org_id AND m.user_id = ${viewerId}::uuid AND m.status = 'active'))`);
+    const res = await this.db.execute<SRow>(sql`${SELECT_S} WHERE s.id = ${id}::uuid AND ${publicSchool} AND ${this.readable(viewerId)}`);
     if (!res.rows[0]) throw AppError.notFound('Scholarship not found');
     return toScholarship(res.rows[0]);
   }
@@ -132,6 +159,21 @@ export class ScholarshipsService {
     await this.audit.record({ action: 'school.scholarship_published', actorUserId: userId, meta, metadata: { orgId, scholarshipId: id } });
     const res = await this.db.execute<SRow>(sql`${SELECT_S} WHERE s.id = ${id}::uuid`);
     return toScholarship(res.rows[0]!);
+  }
+
+  async update(orgId: string, userId: string, id: string, b: UpdateScholarshipRequest, meta: RequestMeta): Promise<Scholarship> {
+    if (!UUID_RE.test(id)) throw AppError.notFound('Scholarship not found');
+    const r = await this.db.execute<{ status: string }>(sql`
+      UPDATE school_scholarships SET title = COALESCE(${b.title ?? null}, title), description = COALESCE(${b.description ?? null}, description),
+        deadline = COALESCE(${b.deadline ?? null}::date, deadline), url = COALESCE(${b.url ?? null}, url)
+      WHERE id = ${id}::uuid AND org_id = ${orgId}::uuid AND status = 'open' RETURNING status`);
+    if (r.rows.length === 0) {
+      const e = await this.db.execute(sql`SELECT 1 FROM school_scholarships WHERE id = ${id}::uuid AND org_id = ${orgId}::uuid`);
+      if (e.rows.length === 0) throw AppError.notFound('Scholarship not found');
+      throw AppError.conflict('A closed scholarship cannot be edited', { reason: 'closed' });
+    }
+    await this.audit.record({ action: 'school.scholarship_updated', actorUserId: userId, meta, metadata: { orgId, scholarshipId: id } });
+    return toScholarship((await this.db.execute<SRow>(sql`${SELECT_S} WHERE s.id = ${id}::uuid`)).rows[0]!);
   }
 
   async close(orgId: string, userId: string, id: string, meta: RequestMeta): Promise<void> {

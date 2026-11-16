@@ -4,6 +4,7 @@ import { Linking, ScrollView } from 'react-native';
 import { useI18n } from '../../../../i18n';
 import { fetchScholarship, schsk } from '../../../../school/scholarships-api';
 import { Card, Loading } from '../../../../seller/ui';
+import { openReport } from '../../../../report/open-report';
 import { spacing } from '../../../../theme/tokens';
 import { Badge, Button, ErrorState, Text } from '../../../../ui';
 
@@ -32,6 +33,7 @@ export default function ScholarshipDetail() {
               {s.deadline ? t('school.scholarships.deadline', { date: s.deadline }) : t('school.scholarships.noDeadline')}
             </Text>
             {s.url ? <Button label={t('school.scholarships.apply')} onPress={() => void Linking.openURL(s.url!)} /> : null}
+            <Button variant="secondary" label={t('school.scholarships.report')} onPress={() => openReport({ targetType: 'scholarship', targetId: s.id })} />
           </Card>
         ) : null}
       </ScrollView>

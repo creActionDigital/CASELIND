@@ -13,6 +13,11 @@ import {
   type CreateCourseRequest,
   createCourseRequestSchema,
   type EnrollmentList,
+  type ExamHistory,
+  type ExamResult,
+  type ExamSession,
+  type SetExamRequest,
+  setExamRequestSchema,
   type PageQuery,
   pageQuerySchema,
   type Quiz,
@@ -111,6 +116,27 @@ export class EducationController {
   @HttpCode(200)
   attempt(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new ZodPipe(quizAttemptRequestSchema)) b: QuizAttemptRequest, @ReqMeta() meta: RequestMeta): Promise<QuizResult> {
     return this.edu.attempt(u.userId, id, b, meta);
+  }
+
+  @Put('courses/:id/exam')
+  setExam(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new ZodPipe(setExamRequestSchema)) b: SetExamRequest, @ReqMeta() meta: RequestMeta): Promise<CourseDetail> {
+    return this.edu.setExam(u.userId, id, b, meta);
+  }
+
+  @Post('courses/:id/exam/sessions')
+  startExam(@CurrentUser() u: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<ExamSession> {
+    return this.edu.startExam(u.userId, id, meta);
+  }
+
+  @Post('courses/:id/exam/sessions/:sid/answers')
+  @HttpCode(200)
+  submitExam(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('sid') sid: string, @Body(new ZodPipe(quizAttemptRequestSchema)) b: QuizAttemptRequest, @ReqMeta() meta: RequestMeta): Promise<ExamResult> {
+    return this.edu.submitExam(u.userId, id, sid, b, meta);
+  }
+
+  @Get('courses/:id/exam/attempts')
+  examHistory(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<ExamHistory> {
+    return this.edu.examHistory(u.userId, id);
   }
 
   @Get('courses/:id/reviews')

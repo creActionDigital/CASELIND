@@ -15,6 +15,10 @@ import {
   type CourseStudents,
   type CreateCourseRequest,
   type EnrollmentList,
+  type ExamHistory,
+  type ExamResult,
+  type ExamSession,
+  type SetExamRequest,
   type Quiz,
   type QuizAttemptRequest,
   type QuizResult,
@@ -32,6 +36,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const EXAM_DAILY_LIMIT = 3;
 const notFound = () => AppError.notFound('Course not found');
 const invalid = (path: string, message: string) => new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path, message }]);
 const iso = (d: Date | string) => new Date(d).toISOString();
@@ -350,6 +355,7 @@ export class EducationService implements OnModuleInit {
       progressPercent: enrollment ? (lessons.rows.length === 0 ? 0 : Math.floor((done * 100) / lessons.rows.length)) : null,
       bestScorePercent: best,
       certificateCode: code,
+      examMinutes: (await this.db.execute<{ m: number | null }>(sql`SELECT exam_minutes AS m FROM courses WHERE id = ${id}::uuid`)).rows[0]?.m ?? null,
     };
   }
 
@@ -417,6 +423,99 @@ export class EducationService implements OnModuleInit {
       out.certificateCode = have.rows[0]?.code ?? null;
     }
     return out;
+  }
+
+  // ---- Timed mock exams (lot 17f) ---------------------------------------------------------------
+
+  /** Author only: sets (or clears) the mock exam duration. Needs a quiz. */
+  async setExam(userId: string, id: string, body: SetExamRequest, meta: RequestMeta): Promise<CourseDetail> {
+    const c = await this.ownCourse(userId, id);
+    if (body.examMinutes !== null && c.questionCount === 0) throw AppError.conflict('Add a quiz before enabling the mock exam', { reason: 'no_quiz' });
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`UPDATE courses SET exam_minutes = ${body.examMinutes}, updated_at = now() WHERE id = ${id}::uuid`);
+      await this.audit.record({ action: 'education.exam_configured', actorUserId: userId, meta, metadata: { courseId: id, examMinutes: body.examMinutes } }, tx);
+    });
+    return this.get(userId, id);
+  }
+
+  /** Starts a session (or returns the one still open): the quiz questions in random order, without answers. 3 sessions a day (UTC) and course. */
+  async startExam(userId: string, courseId: string, meta: RequestMeta): Promise<ExamSession> {
+    if (!UUID_RE.test(courseId)) throw notFound();
+    return this.db.transaction(async (tx) => {
+      const enr = await this.enrollmentOf(tx, userId, courseId);
+      await tx.execute(sql`SELECT 1 FROM course_enrollments WHERE id = ${enr}::uuid FOR UPDATE`);
+      const minutes = (await tx.execute<{ m: number | null }>(sql`SELECT exam_minutes AS m FROM courses WHERE id = ${courseId}::uuid`)).rows[0]?.m;
+      if (!minutes) throw AppError.conflict('This course has no mock exam', { reason: 'exam_not_enabled' });
+      const qs = await tx.execute<{ id: string; prompt: string; options: string[] }>(sql`SELECT id, prompt, options FROM course_questions WHERE course_id = ${courseId}::uuid ORDER BY position`);
+      if (qs.rows.length === 0) throw AppError.conflict('This course has no quiz', { reason: 'no_quiz' });
+      const byId = new Map(qs.rows.map((q) => [q.id, q]));
+      type S = { id: string; started_at: Date; expires_at: Date; question_ids: string[] };
+      const open = await tx.execute<S>(sql`SELECT id, started_at, expires_at, question_ids FROM exam_sessions WHERE enrollment_id = ${enr}::uuid AND finished_at IS NULL AND expires_at > now() ORDER BY started_at DESC LIMIT 1`);
+      let s = open.rows[0];
+      if (!s) {
+        const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM exam_sessions WHERE enrollment_id = ${enr}::uuid AND started_at >= (date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')`);
+        if ((n.rows[0]?.n ?? 0) >= EXAM_DAILY_LIMIT) throw AppError.conflict('Daily limit of mock exams reached', { reason: 'daily_limit' });
+        const order = qs.rows.map((q) => q.id);
+        for (let i = order.length - 1; i > 0; i -= 1) {
+          const j = randomInt(i + 1);
+          [order[i], order[j]] = [order[j]!, order[i]!];
+        }
+        const ins = await tx.execute<S>(sql`
+          INSERT INTO exam_sessions (enrollment_id, user_id, course_id, question_ids, expires_at, total)
+          VALUES (${enr}::uuid, ${userId}::uuid, ${courseId}::uuid, (SELECT array_agg(v::uuid ORDER BY o) FROM jsonb_array_elements_text(${JSON.stringify(order)}::jsonb) WITH ORDINALITY AS t(v, o)), now() + make_interval(mins => ${minutes}), ${order.length})
+          RETURNING id, started_at, expires_at, question_ids`);
+        s = ins.rows[0]!;
+        await this.audit.record({ action: 'education.exam_started', actorUserId: userId, meta, metadata: { courseId, sessionId: s.id } }, tx);
+      }
+      return {
+        id: s.id,
+        startedAt: iso(s.started_at),
+        expiresAt: iso(s.expires_at),
+        durationMinutes: minutes,
+        questions: s.question_ids.flatMap((q) => byId.get(q) ?? []),
+      };
+    });
+  }
+
+  /** Grades once, up to 5 seconds after the deadline (grace for the network); then 409 expired. No certificate, no touch to quiz_attempts. */
+  async submitExam(userId: string, courseId: string, sessionId: string, body: QuizAttemptRequest, meta: RequestMeta): Promise<ExamResult> {
+    if (!UUID_RE.test(courseId) || !UUID_RE.test(sessionId)) throw notFound();
+    return this.db.transaction(async (tx) => {
+      const res = await tx.execute<{ question_ids: string[]; finished_at: Date | null; late: boolean; used: number }>(sql`
+        SELECT question_ids, finished_at, (now() > expires_at + interval '5 seconds') AS late,
+          GREATEST(0, round(extract(epoch FROM (LEAST(now(), expires_at) - started_at))))::int AS used
+        FROM exam_sessions WHERE id = ${sessionId}::uuid AND user_id = ${userId}::uuid AND course_id = ${courseId}::uuid FOR UPDATE`);
+      const s = res.rows[0];
+      if (!s) throw AppError.notFound('Exam session not found');
+      if (s.finished_at) throw AppError.conflict('This exam is already finished', { reason: 'already_finished' });
+      if (s.late) throw AppError.conflict('Time is up', { reason: 'expired' });
+      if (body.answers.length !== s.question_ids.length) throw invalid('answers', `expected ${s.question_ids.length} answers`);
+      const keys = await tx.execute<{ id: string; correct_index: number; n: number }>(sql`
+        SELECT id, correct_index, jsonb_array_length(options)::int AS n FROM course_questions WHERE course_id = ${courseId}::uuid`);
+      const byId = new Map(keys.rows.map((k) => [k.id, k]));
+      if (body.answers.some((a, i) => a >= (byId.get(s.question_ids[i]!)?.n ?? 0))) throw invalid('answers', 'an answer points to an option that does not exist');
+      const total = s.question_ids.length;
+      const correct = body.answers.filter((a, i) => a === byId.get(s.question_ids[i]!)?.correct_index).length;
+      const score = Math.floor((correct * 100) / total);
+      const pass = (await tx.execute<{ p: number }>(sql`SELECT pass_percent AS p FROM courses WHERE id = ${courseId}::uuid`)).rows[0]?.p ?? 70;
+      await tx.execute(sql`UPDATE exam_sessions SET finished_at = now(), score_percent = ${score}, correct = ${correct} WHERE id = ${sessionId}::uuid`);
+      await this.audit.record({ action: 'education.exam_finished', actorUserId: userId, meta, metadata: { courseId, sessionId, scorePercent: score } }, tx);
+      return { scorePercent: score, correct, total, passed: score >= pass, usedSeconds: s.used };
+    });
+  }
+
+  /** Own finished attempts, newest first, and how many sessions remain today. */
+  async examHistory(userId: string, courseId: string): Promise<ExamHistory> {
+    if (!UUID_RE.test(courseId)) throw notFound();
+    const enr = await this.enrollmentOf(this.db, userId, courseId);
+    const res = await this.db.execute<{ id: string; started_at: Date; score_percent: number; used: number }>(sql`
+      SELECT id, started_at, score_percent, round(extract(epoch FROM (finished_at - started_at)))::int AS used
+      FROM exam_sessions WHERE enrollment_id = ${enr}::uuid AND finished_at IS NOT NULL ORDER BY started_at DESC, id DESC LIMIT 50`);
+    const today = await this.db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM exam_sessions WHERE enrollment_id = ${enr}::uuid AND started_at >= (date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')`);
+    return {
+      attemptsLeftToday: Math.max(0, EXAM_DAILY_LIMIT - (today.rows[0]?.n ?? 0)),
+      items: res.rows.map((r) => ({ id: r.id, startedAt: iso(r.started_at), scorePercent: r.score_percent, usedSeconds: r.used })),
+    };
   }
 
   async myEnrollments(userId: string, q: { limit: number; cursor?: string }): Promise<EnrollmentList> {

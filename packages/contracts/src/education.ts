@@ -72,6 +72,8 @@ export const courseDetailSchema = courseSchema.extend({
   progressPercent: z.number().int().nullable(),
   bestScorePercent: z.number().int().nullable(),
   certificateCode: z.string().nullable(),
+  /** Mock exam duration in minutes set by the author; null = no mock exam. */
+  examMinutes: z.number().int().nullable(),
 });
 export type CourseDetail = z.infer<typeof courseDetailSchema>;
 
@@ -136,3 +138,23 @@ export const courseReviewSchema = z.object({
 export type CourseReview = z.infer<typeof courseReviewSchema>;
 export const courseReviewListSchema = z.object({ items: z.array(courseReviewSchema), nextCursor: z.string().nullable() });
 export type CourseReviewList = z.infer<typeof courseReviewListSchema>;
+
+/** Timed mock exams (lot 17f): the author sets a duration; no certificate, the official quiz score is untouched. */
+export const setExamRequestSchema = z.object({ examMinutes: z.number().int().min(5).max(180).nullable() });
+export type SetExamRequest = z.infer<typeof setExamRequestSchema>;
+/** The questions come without the answer key; `expiresAt` is the server's deadline. */
+export const examSessionSchema = z.object({
+  id: z.uuid(),
+  startedAt: z.string(),
+  expiresAt: z.string(),
+  durationMinutes: z.number().int(),
+  questions: z.array(z.object({ id: z.uuid(), prompt: z.string(), options: z.array(z.string()) })),
+});
+export type ExamSession = z.infer<typeof examSessionSchema>;
+export const examResultSchema = z.object({ scorePercent: z.number().int(), correct: z.number().int(), total: z.number().int(), passed: z.boolean(), usedSeconds: z.number().int() });
+export type ExamResult = z.infer<typeof examResultSchema>;
+export const examHistorySchema = z.object({
+  attemptsLeftToday: z.number().int(),
+  items: z.array(z.object({ id: z.uuid(), startedAt: z.string(), scorePercent: z.number().int(), usedSeconds: z.number().int() })),
+});
+export type ExamHistory = z.infer<typeof examHistorySchema>;

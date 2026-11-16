@@ -26,5 +26,12 @@ export function educationErrorKey(err: unknown): MessageKey | null {
   const reason = err.detail<string>('reason');
   if (reason === 'course_has_learners') return 'education.err.has_learners';
   if (reason === 'course_empty') return 'education.err.empty';
+  if (reason === 'exam_not_enabled' || reason === 'no_quiz' || reason === 'daily_limit' || reason === 'expired' || reason === 'already_finished') return `education.err.${reason}` as MessageKey;
   return null;
+}
+
+/** Compte à rebours « m:ss » ; 0 une fois l'échéance passée. */
+export function formatCountdown(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }

@@ -408,6 +408,7 @@ export class AccountService {
         authored: eduAuthored.rows.map((c) => ({ id: c.id, title: c.title, status: c.status, createdAt: new Date(c.created_at).toISOString() })),
         enrollments: eduEnrollments,
         reviews: (await this.db.execute<{ title: string; rating: number; body: string; created_at: Date }>(sql`SELECT c.title, rv.rating, rv.body, rv.created_at FROM course_reviews rv JOIN courses c ON c.id = rv.course_id WHERE rv.user_id = ${auth.userId}::uuid ORDER BY rv.created_at, rv.id`)).rows.map((r) => ({ courseTitle: r.title, rating: r.rating, body: r.body, createdAt: new Date(r.created_at).toISOString() })),
+        exams: (await this.db.execute<{ title: string; score_percent: number; used: number; started_at: Date }>(sql`SELECT c.title, x.score_percent, round(extract(epoch FROM (x.finished_at - x.started_at)))::int AS used, x.started_at FROM exam_sessions x JOIN courses c ON c.id = x.course_id WHERE x.user_id = ${auth.userId}::uuid AND x.finished_at IS NOT NULL ORDER BY x.started_at, x.id`)).rows.map((r) => ({ courseTitle: r.title, scorePercent: r.score_percent, usedSeconds: r.used, startedAt: new Date(r.started_at).toISOString() })),
       },
       budgets: budgetRows.rows.map((b) => ({ currency: b.currency, limitMinor: Number(b.limit_minor) })),
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
