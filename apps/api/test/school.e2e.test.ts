@@ -86,5 +86,23 @@ describe('schools (lot 17b)', () => {
       await call('get', pupil, `/me/school/classes/${cls.id}`).expect(404);
       await call('delete', head, `/orgs/${school}/school/classes/${cls.id}/members/${pupil.handle}`).expect(404); // already gone
     });
+
+    describe('announcement notifications (lot 17c)', () => {
+      it('notifies the enrolled, not the author, without the text; the departed get nothing', async () => {
+        const [head, pupil, gone] = [await user(), await user(), await user()];
+        const school = await org(head, 'school');
+        const cls = (await call('post', head, `/orgs/${school}/school/classes`, { name: '5e B', yearLabel: '2026-2027' }).expect(201)).body;
+        for (const u of [pupil, gone]) await call('post', head, `/orgs/${school}/school/classes/${cls.id}/members`, { handle: u.handle, role: 'student' }).expect(204);
+        await call('delete', gone, `/me/school/classes/${cls.id}`).expect(204);
+        await call('post', head, `/orgs/${school}/school/classes/${cls.id}/announcements`, { title: 'Sortie secrete', body: 'Zoo mardi' }).expect(201);
+        const notes = async (u: TU) => (await call('get', u, '/notifications').expect(200)).body.items.filter((x: { data?: { classId?: string } }) => x.data?.classId === cls.id);
+        const got = await notes(pupil);
+        expect(got).toHaveLength(1);
+        expect(JSON.stringify(got)).not.toMatch(/secrete|Zoo/);
+        expect(got[0].body).toContain('5e B');
+        expect(await notes(head)).toHaveLength(0);
+        expect(await notes(gone)).toHaveLength(0);
+      });
+    });
   });
 });
