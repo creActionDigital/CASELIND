@@ -445,3 +445,11 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Tests : `games.e2e.test.ts` (7), API 580 OK ; mobile 231 OK ; typechecks propres ; vérifié à l'écran (partie 10/10 = 1114 points, classement avec « vous »).
 - **Différé (consigné)** : tournois et compétitions à dates, autres jeux, récompenses non monétaires (badges), événements, lives, dons et pourboires, anti-triche avancé (vitesse de réponse implausible, comptes multiples), banque de questions initiale (aucune question n'est fournie : l'administrateur doit en saisir au moins 10 avant que le jeu démarre), NFT et loteries (soumis à licence, hors périmètre).
 - **Essai OmniRoute (modèles gratuits)** : OmniRoute a été démarré (l'onglet Terminal), répond, et un Claude Code secondaire (`auto/coding:free` → `gpt-oss-120b`, `CLAUDE_CODE_MAX_CONTEXT_TOKENS=100000`) a reçu la mission de ce lot. **Résultat rejeté** : il a inventé un autre modèle de données que la spécification (jeux créés par un admin, `game_attempts`), le code ne compilait pas (5 erreurs TypeScript) et ses tests étaient minces ; son compte rendu décrivait des tables qui n'existent pas. Le lot a été recodé par la suite d'après la spécification. À réserver à des tâches courtes et fermées, jamais sans relecture et sans relancer les tests.
+
+## Lot 20b — Jeux : tournois et badges non monétaires (§21) (2026-11-16) : testé côté API et mobile, écran non vérifié dans le navigateur
+- Migration 0035 `game_tournaments` (fenêtre de dates). Classement d'un tournoi = meilleur score terminé dans la fenêtre, un rang par joueur, top 20 ; aucun prix, aucun frais, aucun argent.
+- Badges (première partie, 10 parties, 10/10) calculés à la volée depuis `game_sessions`, rien n'est stocké.
+- Routes : `GET /games/quiz/badges`, `GET /games/quiz/tournaments[/{id}]`, `POST /admin/games/tournaments` (admin, audité). OpenAPI et test e2e à jour. Mobile : badges et tournois sur l'écran Jeux, i18n fr+en.
+- Résultats observés : API 581 tests, mobile 231, typechecks propres.
+- Différé : vérification à l'écran ; pas de participation explicite (tout score terminé dans la fenêtre compte) ; autres jeux ; /code-review non lancé.
+- Questions au propriétaire : 14 posées en début de session, réponses en attente (à noter dans BACKLOG « Décisions »).
