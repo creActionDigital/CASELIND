@@ -160,3 +160,26 @@ export const prescriptionSchema = z.object({
 export type Prescription = z.infer<typeof prescriptionSchema>;
 export const prescriptionListSchema = z.object({ items: z.array(prescriptionSchema) });
 export type PrescriptionList = z.infer<typeof prescriptionListSchema>;
+
+/** Weekly availability of a verified professional (lot 18c). No medical data. Day 1 = Monday to 7 = Sunday, on the professional's clock. */
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+export const healthAvailabilityWindowSchema = z.object({ day: z.number().int().min(1).max(7), start: hhmm, end: hhmm }).refine((w) => w.start < w.end, { message: 'start must be before end', path: ['end'] });
+export const healthSlotMinutesSchema = z.union([z.literal(15), z.literal(20), z.literal(30), z.literal(45), z.literal(60)]);
+/** Up to 4 windows per day, without overlap; an empty list removes the availability (any future time is accepted again). */
+export const setHealthAvailabilityRequestSchema = z
+  .object({ slotMinutes: healthSlotMinutesSchema, utcOffsetMinutes: z.number().int().min(-840).max(840), windows: z.array(healthAvailabilityWindowSchema).max(28) })
+  .superRefine((v, ctx) => {
+    for (let d = 1; d <= 7; d++) {
+      const ws = v.windows.filter((w) => w.day === d).sort((a, b) => (a.start < b.start ? -1 : 1));
+      if (ws.length > 4) ctx.addIssue({ code: 'custom', path: ['windows'], message: 'at most 4 windows per day' });
+      for (let i = 1; i < ws.length; i++) if (ws[i]!.start < ws[i - 1]!.end) ctx.addIssue({ code: 'custom', path: ['windows'], message: 'windows overlap' });
+    }
+  });
+export type SetHealthAvailabilityRequest = z.infer<typeof setHealthAvailabilityRequestSchema>;
+export const healthAvailabilitySchema = z.object({
+  availability: z.object({ slotMinutes: healthSlotMinutesSchema, utcOffsetMinutes: z.number().int(), windows: z.array(z.object({ day: z.number().int(), start: z.string(), end: z.string() })) }).nullable(),
+});
+export type MyHealthAvailability = z.infer<typeof healthAvailabilitySchema>;
+/** Free slots of the next 14 days. `slotMinutes` null = the professional set no availability (any future time may be requested). */
+export const healthSlotListSchema = z.object({ slotMinutes: z.number().int().nullable(), items: z.array(z.object({ startsAt: z.string() })) });
+export type HealthSlotList = z.infer<typeof healthSlotListSchema>;

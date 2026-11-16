@@ -335,6 +335,12 @@ describe('interview calendar (lot 16f)', () => {
     const c = (await propose(org, hr, app.id, { startsAt: inHours(24), durationMin: 60 }).expect(201)).body.id;
     await ctx.sql.query(`UPDATE job_interviews SET starts_at = now() - interval '1 hour' WHERE id = $1`, [c]);
     await mine(cand, c, 'confirm').expect(409); // already took place
+    expect((await mine(cand, c, 'decline').expect(200)).body.status).toBe('declined'); // a stale one can still be declined
+    const e = (await propose(org, hr, app.id, { startsAt: inHours(24), durationMin: 60 }).expect(201)).body.id;
+    await mine(cand, e, 'confirm').expect(200);
+    await ctx.sql.query(`UPDATE job_interviews SET starts_at = now() - interval '1 hour' WHERE id = $1`, [e]);
+    expect((await mine(cand, e, 'cancel').expect(200)).body.status).toBe('cancelled'); // past: no 1 h rule, no stuck unique index
+    await propose(org, hr, app.id, { startsAt: inHours(24), durationMin: 60 }).expect(201);
   });
 
   it('is removed with the application', async () => {

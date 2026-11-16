@@ -1,5 +1,8 @@
 import {
   accessLogSchema,
+  healthAvailabilitySchema,
+  healthSlotListSchema,
+  type SetHealthAvailabilityRequest,
   appointmentListSchema,
   appointmentSchema,
   myProfessionalSchema,
@@ -91,3 +94,11 @@ export const fetchSharedRecord = (patientId: string) => api.request(`/me/health/
 export const prescribe = (appointmentId: string, body: CreatePrescriptionRequest) =>
   api.request(`/me/health/professional/appointments/${appointmentId}/prescription`, { method: 'POST', body, schema: prescriptionSchema });
 export const fetchPrescriptions = () => api.request('/me/health/prescriptions', { schema: prescriptionListSchema });
+
+// ---- Lot 18c : disponibilités, créneaux libres, agenda -------------------------------------------
+
+export const availabilityKeys = { mine: ['health', 'pro', 'availability'] as const, agenda: ['health', 'pro', 'agenda'] as const, slots: (id: string) => ['health', 'slots', id] as const };
+export const fetchAvailability = () => api.request('/me/health/professional/availability', { schema: healthAvailabilitySchema });
+export const saveAvailability = (body: SetHealthAvailabilityRequest) => api.request('/me/health/professional/availability', { method: 'PUT', body, schema: healthAvailabilitySchema });
+export const fetchAgenda = () => api.request('/me/health/professional/agenda', { schema: appointmentListSchema });
+export const fetchSlots = (professionalId: string) => api.request(`/health-professionals/${professionalId}/slots`, { schema: healthSlotListSchema });

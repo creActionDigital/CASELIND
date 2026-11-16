@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appointmentActions, isDate, localToIso, parseTimes, todayLocal } from './logic';
+import { appointmentActions, parseDayWindows, isDate, localToIso, parseTimes, todayLocal } from './logic';
 
 describe('health logic', () => {
   it('reads times in several spellings, sorted and de-duplicated', () => {
@@ -35,5 +35,18 @@ describe('health appointments logic', () => {
     expect(appointmentActions('professional', 'requested')).toEqual(['confirm', 'decline']);
     expect(appointmentActions('professional', 'confirmed')).toEqual(['complete', 'cancel']);
     expect(appointmentActions('professional', 'declined')).toEqual([]);
+  });
+});
+
+describe('parseDayWindows (lot 18c)', () => {
+  it('reads windows in several spellings', () => {
+    expect(parseDayWindows(2, '8:00-12:00, 14h-17:30')).toEqual([{ day: 2, start: '08:00', end: '12:00' }, { day: 2, start: '14:00', end: '17:30' }]);
+    expect(parseDayWindows(1, '')).toEqual([]);
+  });
+  it('refuses reversed, overlapping, invalid or more than 4 windows', () => {
+    expect(parseDayWindows(1, '12:00-08:00')).toBeNull();
+    expect(parseDayWindows(1, '08:00-10:00, 09:00-11:00')).toBeNull();
+    expect(parseDayWindows(1, '25:00-26:00')).toBeNull();
+    expect(parseDayWindows(1, '01:00-02:00,03:00-04:00,05:00-06:00,07:00-08:00,09:00-10:00')).toBeNull();
   });
 });

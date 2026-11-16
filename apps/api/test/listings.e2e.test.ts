@@ -234,6 +234,26 @@ describe('classified ads (lot 15)', () => {
     expect(Number((await ctx.sql.query('SELECT count(*) AS n FROM listing_visits WHERE listing_id = $1', [l.id])).rows[0].n)).toBe(0);
   });
 
+  it('hides visits once a block exists and refuses confirm/decline on an inactive ad (cancel stays possible)', async () => {
+    const [owner, v] = [await user(), await user()];
+    const l = (await create(owner, ad()).expect(201)).body;
+    const at = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+    const ask = (u: TU, listingId: string) => ctx.http.post(`/v1/listings/${listingId}/visits`).set(bearer(u.token)).send({ scheduledAt: at(48) });
+    const act = (u: TU, id: string, a: string) => ctx.http.post(`/v1/visits/${id}/${a}`).set(bearer(u.token)).send({});
+    const a = (await ask(v, l.id).expect(201)).body;
+    await ctx.sql.query(`UPDATE listings SET hidden = true WHERE id = $1`, [l.id]);
+    expect((await act(owner, a.id, 'confirm').expect(409)).body.error.details.reason).toBe('listing_inactive');
+    await act(owner, a.id, 'decline').expect(409);
+    expect((await act(v, a.id, 'cancel').expect(200)).body.status).toBe('cancelled');
+    await ctx.sql.query(`UPDATE listings SET hidden = false WHERE id = $1`, [l.id]);
+    const b = (await ask(v, l.id).expect(201)).body;
+    await ctx.http.put(`/v1/blocks/${v.id}`).set(bearer(owner.token)).expect(204);
+    await ctx.http.get(`/v1/visits/${b.id}`).set(bearer(v.token)).expect(404);
+    await act(owner, b.id, 'confirm').expect(404);
+    await act(v, b.id, 'cancel').expect(404);
+    expect((await ctx.http.get('/v1/me/visits').set(bearer(owner.token)).expect(200)).body.items).toHaveLength(0);
+  });
+
   it('is off when the flag is off', async () => {
     const a = await user();
     await ctx.sql.query(`UPDATE feature_flags SET enabled = false WHERE key = 'listings'`);

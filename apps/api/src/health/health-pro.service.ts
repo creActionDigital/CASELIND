@@ -11,6 +11,9 @@ import {
   type CreateAppointmentRequest,
   type CreatePrescriptionRequest,
   type CreateShareRequest,
+  type HealthSlotList,
+  type MyHealthAvailability,
+  type SetHealthAvailabilityRequest,
   type MyProfessional,
   type Prescription,
   type PrescriptionList,
@@ -169,6 +172,67 @@ export class HealthProService {
     if (res.rows.length === 0) throw consentRequired();
   }
 
+// ---- Availability and agenda (lot 18c) --------------------------------------------------------
+
+  async myAvailability(userId: string): Promise<MyHealthAvailability> {
+    const res = await this.db.execute<{ slot_minutes: number; utc_offset_minutes: number; windows: Window[] }>(sql`SELECT slot_minutes, utc_offset_minutes, windows FROM health_availability WHERE professional_id = ${userId}::uuid`);
+    const r = res.rows[0];
+    return { availability: r ? { slotMinutes: r.slot_minutes as 15, utcOffsetMinutes: r.utc_offset_minutes, windows: r.windows } : null };
+  }
+
+  /** Only a professional whose licence is verified; an empty list removes the availability. */
+  async setAvailability(userId: string, body: SetHealthAvailabilityRequest, meta: RequestMeta): Promise<MyHealthAvailability> {
+    await this.approvedPro(userId);
+    await this.db.transaction(async (tx) => {
+      if (body.windows.length === 0) await tx.execute(sql`DELETE FROM health_availability WHERE professional_id = ${userId}::uuid`);
+      else
+        await tx.execute(sql`
+          INSERT INTO health_availability (professional_id, slot_minutes, utc_offset_minutes, windows) VALUES (${userId}::uuid, ${body.slotMinutes}, ${body.utcOffsetMinutes}, ${JSON.stringify(body.windows)}::jsonb)
+          ON CONFLICT (professional_id) DO UPDATE SET slot_minutes = EXCLUDED.slot_minutes, utc_offset_minutes = EXCLUDED.utc_offset_minutes, windows = EXCLUDED.windows, updated_at = now()`);
+      await this.audit.record({ action: 'health.availability_updated', actorUserId: userId, meta, metadata: { windows: body.windows.length, slotMinutes: body.slotMinutes } }, tx);
+    });
+    return this.myAvailability(userId);
+  }
+
+  /** Free slots of the next 14 days: windows cut into slots, in the future, minus requested or confirmed appointments. null = no availability set. */
+  private async freeSlots(professionalId: string): Promise<{ slotMinutes: number; starts: string[] } | null> {
+    const res = await this.db.execute<{ slot_minutes: number; utc_offset_minutes: number; windows: Window[] }>(sql`SELECT slot_minutes, utc_offset_minutes, windows FROM health_availability WHERE professional_id = ${professionalId}::uuid`);
+    const a = res.rows[0];
+    if (!a) return null;
+    const now = Date.now();
+    const end = now + 14 * DAY_MS;
+    const taken = await this.db.execute<{ starts_at: Date }>(sql`
+      SELECT starts_at FROM health_appointments WHERE professional_id = ${professionalId}::uuid AND status IN ('requested', 'confirmed') AND starts_at > now() AND starts_at <= ${new Date(end).toISOString()}::timestamptz`);
+    const busy = new Set(taken.rows.map((r) => iso(r.starts_at)));
+    const toMin = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
+    const localMidnight = Math.floor((now + a.utc_offset_minutes * 60_000) / DAY_MS) * DAY_MS; // the professional's today, as a UTC-looking instant
+    const starts: string[] = [];
+    for (let d = 0; d <= 14; d++) {
+      const base = localMidnight + d * DAY_MS;
+      const dow = new Date(base).getUTCDay() || 7;
+      for (const w of a.windows.filter((x) => x.day === dow)) {
+        for (let t = toMin(w.start); t + a.slot_minutes <= toMin(w.end); t += a.slot_minutes) {
+          const at = base + (t - a.utc_offset_minutes) * 60_000;
+          if (at > now && at <= end && !busy.has(new Date(at).toISOString())) starts.push(new Date(at).toISOString());
+        }
+      }
+    }
+    return { slotMinutes: a.slot_minutes, starts: starts.sort() };
+  }
+
+  async slots(viewerId: string, professionalId: string): Promise<HealthSlotList> {
+    await this.approvedPro(professionalId);
+    if (await this.blocked(viewerId, professionalId)) throw notFound('Professional');
+    const f = await this.freeSlots(professionalId);
+    return { slotMinutes: f?.slotMinutes ?? null, items: (f?.starts ?? []).map((startsAt) => ({ startsAt })) };
+  }
+
+  /** The professional's upcoming appointments (requested or confirmed), soonest first. */
+  async agenda(professionalId: string): Promise<AppointmentList> {
+    const res = await this.db.execute<ApptRow>(sql`${this.apptBase()} WHERE a.professional_id = ${professionalId}::uuid AND a.status IN ('requested', 'confirmed') AND a.starts_at >= now() ORDER BY a.starts_at, a.id LIMIT 100`);
+    return { items: res.rows.map((r) => this.toAppointment(r, professionalId)), nextCursor: null };
+  }
+
   // ---- Appointments -----------------------------------------------------------------------------
 
   async book(patientId: string, body: CreateAppointmentRequest, meta: RequestMeta): Promise<Appointment> {
@@ -178,6 +242,8 @@ export class HealthProService {
     if (await this.blocked(patientId, body.professionalId)) throw notFound('Professional');
     const when = new Date(body.startsAt);
     if (when.getTime() <= Date.now() || when.getTime() > Date.now() + 365 * DAY_MS) throw invalid('startsAt', 'must be in the future, within a year');
+    const free = await this.freeSlots(body.professionalId); // lot 18c: with availability, only a free slot may be requested
+    if (free && !free.starts.includes(when.toISOString())) throw AppError.conflict('That time is not a free slot of the professional', { reason: 'slot_unavailable' });
     if (body.mode === 'teleconsultation' && !(await this.flags.evaluateForUser('health.teleconsultation', patientId))) throw AppError.featureDisabled('Teleconsultation is not available');
     const reasonEnc = this.crypto.seal(patientId, { reason: body.reason });
     const id = await this.db.transaction(async (tx) => {
@@ -423,12 +489,14 @@ export class HealthProService {
   /** Everything the user holds as a patient, sealed with their key, plus their professional application. */
   async exportFor(userId: string): Promise<{
     professional: MyProfessional['profile'];
+    availability: MyHealthAvailability['availability'];
     appointments: { startsAt: string; mode: string; status: string; professional: string; reason: string }[];
     prescriptions: { code: string; validUntil: string; items: { name: string; dose: string; instructions: string }[] }[];
   }> {
     const appts = await this.db.execute<ApptRow>(sql`${this.apptBase()} WHERE a.patient_id = ${userId}::uuid ORDER BY a.starts_at, a.id`);
     return {
       professional: (await this.mine(userId)).profile,
+      availability: (await this.myAvailability(userId)).availability,
       appointments: appts.rows.map((r) => {
         const a = this.toAppointment(r, userId);
         return { startsAt: a.startsAt, mode: a.mode, status: a.status, professional: a.other.displayName, reason: a.reason };
@@ -445,6 +513,7 @@ export class HealthProService {
   }
 }
 
+type Window = { day: number; start: string; end: string };
 type ApplyKind = 'doctor' | 'dentist' | 'laboratory' | 'pharmacist' | 'nurse' | 'psychologist' | 'other';
 type ApptRow = {
   id: string;

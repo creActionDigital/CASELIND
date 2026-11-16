@@ -105,6 +105,7 @@ export default function ProSpace() {
 
         {approved ? (
           <>
+            <Button variant="secondary" label={t('health.avail.open')} onPress={() => router.push('/health/availability')} />
             <Text variant="heading" accessibilityRole="header">
               {t('health.appointments')}
             </Text>

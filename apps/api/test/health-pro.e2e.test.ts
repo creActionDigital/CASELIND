@@ -264,6 +264,77 @@ describe('e-prescriptions (lot 18b)', () => {
   });
 });
 
+describe('availability and agenda (lot 18c)', () => {
+  const allDays = [1, 2, 3, 4, 5, 6, 7].map((day) => ({ day, start: '08:00', end: '10:00' }));
+  const setAv = (pro: TU, body: Record<string, unknown>) => api('put', pro, '/me/health/professional/availability', { slotMinutes: 30, utcOffsetMinutes: 0, windows: allDays, ...body });
+
+  it('validates the windows and needs a verified professional', async () => {
+    const { pro } = await approvedPro();
+    for (const bad of [
+      { windows: [{ day: 1, start: '10:00', end: '09:00' }] },
+      { windows: [{ day: 8, start: '08:00', end: '09:00' }] },
+      { windows: [{ day: 1, start: '8:00', end: '09:00' }] },
+      { slotMinutes: 25 },
+      { windows: [1, 2, 3, 4, 5].map((h) => ({ day: 1, start: `0${h}:00`, end: `0${h}:30` })) },
+      { windows: [{ day: 1, start: '08:00', end: '10:00' }, { day: 1, start: '09:00', end: '11:00' }] },
+    ]) expect((await setAv(pro, bad)).status).toBe(400);
+    expect((await setAv(await user(), {})).status).toBe(404); // not a verified professional
+    const ok = (await setAv(pro, {}).expect(200)).body;
+    expect(ok.availability).toMatchObject({ slotMinutes: 30, utcOffsetMinutes: 0 });
+    expect((await api('get', pro, '/me/health/professional/availability').expect(200)).body.availability.windows).toHaveLength(7);
+  });
+
+  it('lists free slots for 14 days, minus taken ones, and refuses a booking outside them', async () => {
+    const { pro } = await approvedPro();
+    const patient = await consenting();
+    expect((await api('get', patient, `/health-professionals/${pro.id}/slots`).expect(200)).body).toEqual({ slotMinutes: null, items: [] });
+    await api('post', patient, '/me/health/appointments', { professionalId: pro.id, startsAt: future(2) }).expect(201); // no availability: unchanged
+
+    await setAv(pro, {}).expect(200);
+    const slots = (await api('get', patient, `/health-professionals/${pro.id}/slots`).expect(200)).body;
+    expect(slots.slotMinutes).toBe(30);
+    const times: string[] = slots.items.map((i: { startsAt: string }) => i.startsAt);
+    expect(times.length).toBeGreaterThanOrEqual(14 * 4 - 4);
+    expect(times.length).toBeLessThanOrEqual(15 * 4);
+    expect([...times].sort()).toEqual(times);
+    expect(times.every((t) => Date.parse(t) > Date.now() && Date.parse(t) <= Date.now() + 14 * 86_400_000 && /T0[89]:[03]0:00/.test(t))).toBe(true);
+
+    const refused = await api('post', patient, '/me/health/appointments', { professionalId: pro.id, startsAt: future(3) });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.details.reason).toBe('slot_unavailable');
+    const pick = times[5]!;
+    await api('post', patient, '/me/health/appointments', { professionalId: pro.id, startsAt: pick }).expect(201);
+    const after = (await api('get', patient, `/health-professionals/${pro.id}/slots`).expect(200)).body.items.map((i: { startsAt: string }) => i.startsAt);
+    expect(after).not.toContain(pick);
+    expect((await api('post', await consenting(), '/me/health/appointments', { professionalId: pro.id, startsAt: pick })).status).toBe(409);
+
+    // the professional's clock: +180 minutes moves the slots 3 hours earlier in UTC
+    await setAv(pro, { utcOffsetMinutes: 180 }).expect(200);
+    const shifted = (await api('get', patient, `/health-professionals/${pro.id}/slots`).expect(200)).body.items;
+    expect(shifted.every((i: { startsAt: string }) => /T0[5-6]:[03]0:00/.test(i.startsAt))).toBe(true);
+
+    await setAv(pro, { windows: [] }).expect(200); // removed: free choice again
+    await api('post', patient, '/me/health/appointments', { professionalId: pro.id, startsAt: future(4) }).expect(201);
+  });
+
+  it('shows the professional their upcoming agenda, soonest first, without the past or cancelled', async () => {
+    const { pro } = await approvedPro();
+    const patient = await consenting();
+    const [late, soon, gone] = [future(6), future(2), future(4)];
+    await api('post', patient, '/me/health/appointments', { professionalId: pro.id, startsAt: late }).expect(201);
+    await api('post', patient, '/me/health/appointments', { professionalId: pro.id, startsAt: soon }).expect(201);
+    const c = (await api('post', patient, '/me/health/appointments', { professionalId: pro.id, startsAt: gone }).expect(201)).body;
+    await api('post', patient, `/health/appointments/${c.id}/cancel`).expect(200);
+    const agenda = (await api('get', pro, '/me/health/professional/agenda').expect(200)).body.items;
+    expect(agenda.map((a: { startsAt: string }) => a.startsAt)).toEqual([soon, late]);
+    await setAv(pro, {}).expect(200);
+    const audits = await ctx.sql.query(`SELECT metadata::text AS md FROM audit_events WHERE action = 'health.availability_updated' AND subject_user_id = $1`, [pro.id]);
+    expect(audits.rows).toHaveLength(1);
+    expect(JSON.stringify(audits.rows)).not.toContain('08:00');
+    expect((await api('get', pro, '/me/export').expect(200)).body.health).toHaveProperty('availability');
+  });
+});
+
 describe('audit, export, erasure (lot 18b)', () => {
   it('audits without any content, exports the patient\'s decrypted data, and erases it with the rest', async () => {
     const { pro } = await approvedPro();

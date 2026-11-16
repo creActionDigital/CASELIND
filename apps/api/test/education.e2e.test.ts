@@ -316,6 +316,17 @@ describe('education: timed mock exams (lot 17f)', () => {
     expect((await setExam(teacher, id, null).expect(200)).body.examMinutes).toBeNull();
   });
 
+  it('a question deleted after the start is left out of the grade, the copy can still be handed in', async () => {
+    const { teacher, id } = await ready();
+    await setExam(teacher, id, 10).expect(200);
+    const learner = await user();
+    await enroll(learner, id).expect(200);
+    const s = (await start(learner, id).expect(201)).body;
+    await ctx.sql.query(`DELETE FROM course_questions WHERE course_id = $1 AND id = (SELECT question_ids[1] FROM exam_sessions WHERE id = $2)`, [id, s.id]);
+    const r = (await submit(learner, id, s.id, answersFor(s.questions, true)).expect(200)).body;
+    expect(r.total).toBe(1);
+  });
+
   it('grades once, refuses late answers, caps 3 a day, keeps the quiz score and issues no certificate', async () => {
     const { teacher, id } = await ready();
     await setExam(teacher, id, 10).expect(200);

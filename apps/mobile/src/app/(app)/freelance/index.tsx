@@ -12,6 +12,7 @@ import { Card, Chips, PagedList } from '../../../seller/ui';
 import { formatMoney } from '../../../shop/format';
 import { spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
+import { useAuth } from '../../../auth/auth-context';
 import { IconButton, Text, TextField } from '../../../ui';
 
 /** Missions freelance ouvertes, récentes d'abord ; accès à mon activité et à la publication. */
@@ -19,6 +20,7 @@ export default function Freelance() {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const router = useRouter();
+  const isAdmin = useAuth().me?.roles.includes('admin') ?? false;
   const [text, setText] = useState('');
   const [category, setCategory] = useState<MissionCategory | 'all'>('all');
   const q = useDebouncedValue(text.trim());
@@ -37,6 +39,7 @@ export default function Freelance() {
           title: t('freelance.title'),
           headerRight: () => (
             <View style={styles.actions}>
+              {isAdmin ? <IconButton icon="shield-checkmark-outline" label={t('freelance.admin.title')} onPress={() => router.push('/freelance/disputes')} /> : null}
               <IconButton icon="people-outline" label={t('freelance.freelancers')} onPress={() => router.push('/freelance/freelancers')} />
               <IconButton icon="albums-outline" label={t('freelance.mine')} onPress={() => router.push('/freelance/mine')} />
               <IconButton icon="add-circle-outline" label={t('freelance.new')} onPress={() => router.push('/freelance/new')} />

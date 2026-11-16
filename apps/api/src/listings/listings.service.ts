@@ -253,7 +253,9 @@ export class ListingsService implements OnModuleInit {
         o.id AS other_id, o.display_name AS other_name, o.handle::text AS other_handle
       FROM listing_visits v JOIN listings l ON l.id = v.listing_id
       JOIN users o ON o.id = CASE WHEN v.visitor_id = ${viewerId}::uuid THEN l.owner_id ELSE v.visitor_id END
-      WHERE (v.visitor_id = ${viewerId}::uuid OR l.owner_id = ${viewerId}::uuid) AND ${where} ${tail}`);
+      WHERE (v.visitor_id = ${viewerId}::uuid OR l.owner_id = ${viewerId}::uuid)
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = v.visitor_id AND b.blocked_id = l.owner_id) OR (b.blocker_id = l.owner_id AND b.blocked_id = v.visitor_id))
+        AND ${where} ${tail}`);
     return res.rows;
   }
 
@@ -298,6 +300,10 @@ export class ListingsService implements OnModuleInit {
     const next = { confirm: 'confirmed', decline: 'declined', cancel: 'cancelled' }[action] as ListingVisit['status'];
     if (action === 'cancel' ? v.status !== 'requested' && v.status !== 'confirmed' : v.status !== 'requested') throw AppError.conflict('Visit cannot change from its current status', { reason: 'bad_status' });
     if (action !== 'cancel' && v.role !== 'owner') throw AppError.notFound('Visit not found');
+    if (action !== 'cancel') {
+      const live = await this.db.execute(sql`SELECT 1 FROM listings WHERE id = ${v.listingId}::uuid AND status = 'active' AND NOT hidden`);
+      if (live.rows.length === 0) throw AppError.conflict('The listing is no longer active', { reason: 'listing_inactive' });
+    }
     const startsIn = new Date(v.scheduledAt).getTime() - Date.now();
     if (action === 'confirm' && startsIn <= 0) throw AppError.conflict('The requested time has passed', { reason: 'past' });
     if (action === 'cancel' && v.role === 'visitor' && startsIn < 3_600_000) throw AppError.conflict('A visit can only be cancelled up to 1 hour before', { reason: 'too_late' });

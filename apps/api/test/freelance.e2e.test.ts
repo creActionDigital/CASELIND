@@ -220,6 +220,26 @@ describe('freelance contracts (lot 16b)', () => {
     expect(ledger.rows[0].n).toBe(0);
   });
 
+  it('dispute resolution: admin only, 500-char decision, both parties notified generically, audit without the decision text', async () => {
+    const { client, freelancer, c } = await awarded();
+    const admin = await user(['user', 'admin']);
+    const mod = await user(['user', 'moderator']);
+    await ctx.http.post(`/v1/freelance-contracts/${c.id}/dispute`).set(bearer(client.token)).send({ reason: 'Travail non livré à temps' }).expect(201);
+    await ctx.http.get('/v1/admin/freelance/disputes').set(bearer(mod.token)).expect(403);
+    const d = (await ctx.http.get('/v1/admin/freelance/disputes?status=open').set(bearer(admin.token)).expect(200)).body.items.find((x: { contractId: string }) => x.contractId === c.id);
+    expect(JSON.stringify(d)).not.toContain('"message"');
+    const resolve = (resolution: string) => ctx.http.post(`/v1/admin/freelance/disputes/${d.id}/resolve`).set(bearer(admin.token)).send({ outcome: 'cancel', resolution });
+    await resolve('x'.repeat(501)).expect(400);
+    const before = async (u: TU) => Number((await ctx.sql.query(`SELECT count(*)::int AS n FROM notifications WHERE user_id = $1`, [u.id])).rows[0].n);
+    const [nc, nf] = [await before(client), await before(freelancer)];
+    await resolve('Décision SECRETE-XYZ').expect(200);
+    expect(await before(client)).toBe(nc + 1);
+    expect(await before(freelancer)).toBe(nf + 1);
+    const audit = await ctx.sql.query(`SELECT metadata::text AS md FROM audit_events WHERE action = 'freelance.dispute_resolved'`);
+    expect(audit.rows.length).toBeGreaterThan(0);
+    expect(JSON.stringify(audit.rows)).not.toContain('SECRETE-XYZ');
+  });
+
   it('notifies, audits without content, exports only the account\'s own data, and can be reported, hidden and switched off', async () => {
     const { client, freelancer, m, c } = await awarded();
     const mod = await user(['user', 'moderator']);

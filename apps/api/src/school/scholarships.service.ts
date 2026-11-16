@@ -148,7 +148,14 @@ export class ScholarshipsService implements OnModuleInit {
     return this.page(f, q.limit);
   }
 
+  private async assertDeadlineNotPast(deadline: string | null | undefined): Promise<void> {
+    if (!deadline) return;
+    const r = await this.db.execute<{ past: boolean }>(sql`SELECT ${deadline}::date < ${TODAY} AS past`);
+    if (r.rows[0]?.past) throw new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path: 'deadline', message: 'deadline is in the past' }]);
+  }
+
   async publish(orgId: string, userId: string, b: CreateScholarshipRequest, meta: RequestMeta): Promise<Scholarship> {
+    await this.assertDeadlineNotPast(b.deadline);
     const k = await this.db.execute<{ kind: string; status: string }>(sql`SELECT kind, status FROM organizations WHERE id = ${orgId}::uuid`);
     if (k.rows[0]?.kind !== 'school') throw AppError.conflict('Only a school can publish scholarships', { reason: 'not_a_school' });
     if (k.rows[0].status !== 'active') throw AppError.conflict('The organisation is not active', { reason: 'org_inactive' });
@@ -163,9 +170,12 @@ export class ScholarshipsService implements OnModuleInit {
 
   async update(orgId: string, userId: string, id: string, b: UpdateScholarshipRequest, meta: RequestMeta): Promise<Scholarship> {
     if (!UUID_RE.test(id)) throw AppError.notFound('Scholarship not found');
+    await this.assertDeadlineNotPast(b.deadline);
+    // undefined = keep, null = clear.
     const r = await this.db.execute<{ status: string }>(sql`
       UPDATE school_scholarships SET title = COALESCE(${b.title ?? null}, title), description = COALESCE(${b.description ?? null}, description),
-        deadline = COALESCE(${b.deadline ?? null}::date, deadline), url = COALESCE(${b.url ?? null}, url)
+        deadline = CASE WHEN ${b.deadline !== undefined} THEN ${b.deadline ?? null}::date ELSE deadline END,
+        url = CASE WHEN ${b.url !== undefined} THEN ${b.url ?? null}::text ELSE url END
       WHERE id = ${id}::uuid AND org_id = ${orgId}::uuid AND status = 'open' RETURNING status`);
     if (r.rows.length === 0) {
       const e = await this.db.execute(sql`SELECT 1 FROM school_scholarships WHERE id = ${id}::uuid AND org_id = ${orgId}::uuid`);

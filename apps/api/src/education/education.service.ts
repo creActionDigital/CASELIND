@@ -493,10 +493,12 @@ export class EducationService implements OnModuleInit {
       const keys = await tx.execute<{ id: string; correct_index: number; n: number }>(sql`
         SELECT id, correct_index, jsonb_array_length(options)::int AS n FROM course_questions WHERE course_id = ${courseId}::uuid`);
       const byId = new Map(keys.rows.map((k) => [k.id, k]));
-      if (body.answers.some((a, i) => a >= (byId.get(s.question_ids[i]!)?.n ?? 0))) throw invalid('answers', 'an answer points to an option that does not exist');
-      const total = s.question_ids.length;
-      const correct = body.answers.filter((a, i) => a === byId.get(s.question_ids[i]!)?.correct_index).length;
-      const score = Math.floor((correct * 100) / total);
+      // A question the author deleted after the session started is left out of the grade instead of blocking the submission.
+      const live = s.question_ids.map((qid, i) => ({ k: byId.get(qid), a: body.answers[i]! })).filter((x): x is { k: { id: string; correct_index: number; n: number }; a: number } => !!x.k);
+      if (live.some((x) => x.a >= x.k.n)) throw invalid('answers', 'an answer points to an option that does not exist');
+      const total = live.length;
+      const correct = live.filter((x) => x.a === x.k.correct_index).length;
+      const score = total === 0 ? 0 : Math.floor((correct * 100) / total);
       const pass = (await tx.execute<{ p: number }>(sql`SELECT pass_percent AS p FROM courses WHERE id = ${courseId}::uuid`)).rows[0]?.p ?? 70;
       await tx.execute(sql`UPDATE exam_sessions SET finished_at = now(), score_percent = ${score}, correct = ${correct} WHERE id = ${sessionId}::uuid`);
       await this.audit.record({ action: 'education.exam_finished', actorUserId: userId, meta, metadata: { courseId, sessionId, scorePercent: score } }, tx);

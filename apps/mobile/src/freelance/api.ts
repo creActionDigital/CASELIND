@@ -1,4 +1,6 @@
 import {
+  adminDisputeListSchema,
+  adminDisputeSchema,
   contractListSchema,
   contractSchema,
   freelancerListSchema,
@@ -56,3 +58,7 @@ export const reviseMilestone = (id: string, mid: string, note: string) => step(i
 export const cancelContract = (id: string) => api.request(`/freelance-contracts/${id}/cancel`, { method: 'POST', schema: contractSchema });
 export const reviewContract = (id: string, rating: number, body: string) => api.request(`/freelance-contracts/${id}/review`, { method: 'POST', body: { rating, body }, schema: contractSchema });
 export const openDispute = (id: string, reason: string) => api.request(`/freelance-contracts/${id}/dispute`, { method: 'POST', body: { reason }, schema: contractSchema });
+
+export const fetchAdminDisputes = (cursor?: string) => api.request('/admin/freelance/disputes', { query: { status: 'open', limit: PAGE, cursor }, schema: adminDisputeListSchema });
+export const resolveAdminDispute = (id: string, outcome: 'resume' | 'cancel', resolution: string) =>
+  api.request(`/admin/freelance/disputes/${id}/resolve`, { method: 'POST', body: { outcome, resolution }, schema: adminDisputeSchema });

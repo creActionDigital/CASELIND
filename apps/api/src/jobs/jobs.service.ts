@@ -524,8 +524,10 @@ export class JobsService implements OnModuleInit {
       const at = new Date(cur.starts_at).getTime();
       const ok = action === 'cancel' ? (who.side === 'org' ? cur.status === 'proposed' || cur.status === 'confirmed' : cur.status === 'confirmed') : cur.status === 'proposed';
       if (!ok) throw AppError.conflict(`An interview ${cur.status} cannot be ${action}ed`, { reason: 'invalid_state', status: cur.status });
-      if (at <= Date.now()) throw AppError.conflict('This interview already took place', { reason: 'interview_past' });
-      if (action === 'cancel' && who.side === 'candidate' && at - Date.now() < 3_600_000) throw AppError.conflict('Too late to cancel (less than 1 hour)', { reason: 'too_late' });
+      const past = at <= Date.now();
+      // A stale proposed/confirmed interview can still be declined or cancelled (the unique index would otherwise block a new one).
+      if (past && action === 'confirm') throw AppError.conflict('This interview already took place', { reason: 'interview_past' });
+      if (action === 'cancel' && who.side === 'candidate' && !past && at - Date.now() < 3_600_000) throw AppError.conflict('Too late to cancel (less than 1 hour)', { reason: 'too_late' });
       const status = action === 'confirm' ? 'confirmed' : action === 'decline' ? 'declined' : 'cancelled';
       await tx.execute(sql`UPDATE job_interviews SET status = ${status}, reason = ${action === 'decline' ? reason : ''}, updated_at = now() WHERE id = ${interviewId}::uuid`);
       await this.audit.record({ action: `job.interview_${status}` as 'job.interview_confirmed', actorUserId: actorId, meta, metadata: { orgId: cur.org_id, interviewId } }, tx);

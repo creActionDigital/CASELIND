@@ -80,7 +80,8 @@ describe('school search and scholarships (lot 17e)', () => {
       expect(open).toMatchObject({ status: 'open', deadline: '2999-12-31', school: { id: school, city: 'Goma', verified: false } });
       const noUrl = (await call('post', head, `/orgs/${school}/school/scholarships`, { title: 'Bourse Libre', description: 'Sans date' }).expect(201)).body;
       expect(noUrl).toMatchObject({ deadline: null, url: null });
-      const expired = (await call('post', head, `/orgs/${school}/school/scholarships`, { title: 'Bourse Passee', description: 'Trop tard', deadline: '2000-01-01' }).expect(201)).body;
+      const expired = (await call('post', head, `/orgs/${school}/school/scholarships`, { title: 'Bourse Passee', description: 'Trop tard', deadline: '2999-01-01' }).expect(201)).body;
+      await ctx.sql.query(`UPDATE school_scholarships SET deadline = '2000-01-01' WHERE id = $1`, [expired.id]);
 
       const ids = async (path: string) => (await call('get', reader, path).expect(200)).body.items.map((s: { id: string }) => s.id);
       const seen = await ids('/school/scholarships?city=goma');
@@ -123,6 +124,18 @@ describe('school search and scholarships (lot 17e)', () => {
       await call('patch', head, `/orgs/${school}/school/scholarships/${sch.id}`, { title: 'Tard' }).expect(409);
       const md = await ctx.sql.query(`SELECT metadata::text AS md FROM audit_events WHERE action = 'school.scholarship_updated'`);
       expect(md.rows.map((r: { md: string }) => r.md).join('')).not.toMatch(/Apres|Ancien/);
+    });
+
+    it('deadline and url can be cleared with null, are kept when omitted, and a past deadline is refused', async () => {
+      const head = await user();
+      const school = await org(head, 'school', 'Ecole Effacement', 'Goma');
+      const p = `/orgs/${school}/school/scholarships`;
+      await call('post', head, p, { title: 'Passee', description: 'd', deadline: '2000-01-01' }).expect(400);
+      const sch = (await call('post', head, p, { title: 'T', description: 'd', deadline: '2999-01-01', url: 'https://ecole.example/b' }).expect(201)).body;
+      expect((await call('patch', head, `${p}/${sch.id}`, { title: 'T2' }).expect(200)).body).toMatchObject({ deadline: '2999-01-01', url: 'https://ecole.example/b' });
+      await call('patch', head, `${p}/${sch.id}`, { deadline: '2000-01-01' }).expect(400);
+      expect((await call('patch', head, `${p}/${sch.id}`, { deadline: null }).expect(200)).body).toMatchObject({ deadline: null, url: 'https://ecole.example/b' });
+      expect((await call('patch', head, `${p}/${sch.id}`, { url: null }).expect(200)).body).toMatchObject({ deadline: null, url: null });
     });
 
     it('reported and hidden by a moderator: gone from public lists, still visible to staff', async () => {

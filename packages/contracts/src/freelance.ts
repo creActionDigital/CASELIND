@@ -138,7 +138,7 @@ export const openDisputeRequestSchema = z.object({ reason: z.string().trim().min
 export type OpenDisputeRequest = z.infer<typeof openDisputeRequestSchema>;
 
 /** Platform admin: `resume` puts the contract back to active, `cancel` cancels it. No money moves (payments are external). */
-export const resolveDisputeRequestSchema = z.object({ outcome: z.enum(['resume', 'cancel']), resolution: z.string().trim().min(3).max(2000) });
+export const resolveDisputeRequestSchema = z.object({ outcome: z.enum(['resume', 'cancel']), resolution: z.string().trim().min(3).max(500) });
 export type ResolveDisputeRequest = z.infer<typeof resolveDisputeRequestSchema>;
 
 export const adminDisputeSchema = z.object({

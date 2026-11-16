@@ -13,6 +13,10 @@ import {
   type CreatePrescriptionRequest,
   createPrescriptionRequestSchema,
   type CreateShareRequest,
+  type HealthSlotList,
+  type MyHealthAvailability,
+  type SetHealthAvailabilityRequest,
+  setHealthAvailabilityRequestSchema,
   createShareRequestSchema,
   type MyProfessional,
   type PageQuery,
@@ -54,6 +58,26 @@ export class HealthProController {
   @Put('me/health/professional')
   apply(@CurrentUser() u: AuthUser, @Body(new ZodPipe(applyProfessionalRequestSchema)) b: ApplyProfessionalRequest, @ReqMeta() meta: RequestMeta): Promise<MyProfessional> {
     return this.pro.apply(u.userId, b, meta);
+  }
+
+  @Get('me/health/professional/availability')
+  availability(@CurrentUser() u: AuthUser): Promise<MyHealthAvailability> {
+    return this.pro.myAvailability(u.userId);
+  }
+
+  @Put('me/health/professional/availability')
+  setAvailability(@CurrentUser() u: AuthUser, @Body(new ZodPipe(setHealthAvailabilityRequestSchema)) b: SetHealthAvailabilityRequest, @ReqMeta() meta: RequestMeta): Promise<MyHealthAvailability> {
+    return this.pro.setAvailability(u.userId, b, meta);
+  }
+
+  @Get('me/health/professional/agenda')
+  agenda(@CurrentUser() u: AuthUser): Promise<AppointmentList> {
+    return this.pro.agenda(u.userId);
+  }
+
+  @Get('health-professionals/:id/slots')
+  slots(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<HealthSlotList> {
+    return this.pro.slots(u.userId, id);
   }
 
   @Post('me/health/appointments')

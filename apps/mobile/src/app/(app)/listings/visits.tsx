@@ -68,7 +68,7 @@ export default function Visits() {
           <View key={v.id} style={[styles.card, { backgroundColor: colors.surface }]}>
             <Text variant="heading">{v.listingTitle}</Text>
             <Text muted>{t(v.role === 'owner' ? 'listings.visit.receivedFrom' : 'listings.visit.sentBy', { name: v.other.displayName })}</Text>
-            <Text>{new Date(v.scheduledAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' })} UTC</Text>
+            <Text>{new Date(v.scheduledAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}</Text>
             <Badge tone={v.status === 'confirmed' ? 'primary' : 'neutral'} label={t(`listings.visit.status.${v.status}` as 'listings.visit.status.requested')} />
             {v.message ? <Text>{v.message}</Text> : null}
             {v.place ? <Text style={{ color: brandColor }}>{t('listings.visit.place', { place: v.place })}</Text> : null}

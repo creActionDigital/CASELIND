@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { useI18n } from '../i18n';
+import { useI18n, type MessageKey } from '../i18n';
 import { errorMessage } from '../lib/errors';
 import { startChatErrorKey } from '../messaging/api';
 import { qk } from '../messaging/keys';
@@ -14,7 +14,7 @@ import { Button, Text } from '../ui';
  * (`contactUserId`, fourni par l'API). Masqué quand l'API n'en donne pas (aucun membre, ou blocage).
  * Les réglages `contactRequestsFrom` du membre s'appliquent : le refus est expliqué, pas masqué.
  */
-export function ContactSeller({ contactUserId }: { contactUserId: string | null | undefined }) {
+export function ContactSeller({ contactUserId, labelKey = 'shop.contactSeller' }: { contactUserId: string | null | undefined; labelKey?: MessageKey }) {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -35,7 +35,7 @@ export function ContactSeller({ contactUserId }: { contactUserId: string | null 
   if (!contactUserId) return null;
   return (
     <>
-      <Button variant="secondary" label={t('shop.contactSeller')} loading={open.isPending} onPress={() => open.mutate()} />
+      <Button variant="secondary" label={t(labelKey)} loading={open.isPending} onPress={() => open.mutate()} />
       {notice ? (
         <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">
           {notice}

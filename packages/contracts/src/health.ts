@@ -96,6 +96,8 @@ export const exportedHealthSchema = z.object({
   reminders: z.array(z.object({ title: z.string(), dose: z.string(), times: z.array(z.string()), startsOn: z.string(), endsOn: z.string().nullable(), active: z.boolean() })),
   /** Lot 18b: own professional application, appointments as a patient and prescriptions received. */
   professional: z.object({ kind: z.string(), specialty: z.string(), licenseNumber: z.string(), city: z.string(), bio: z.string(), status: z.string(), reviewNote: z.string() }).nullable(),
+  /** Lot 18c: the weekly availability set as a professional (no medical data). */
+  availability: z.object({ slotMinutes: z.number().int(), utcOffsetMinutes: z.number().int(), windows: z.array(z.object({ day: z.number().int(), start: z.string(), end: z.string() })) }).nullable(),
   appointments: z.array(z.object({ startsAt: z.string(), mode: z.string(), status: z.string(), professional: z.string(), reason: z.string() })),
   prescriptions: z.array(z.object({ code: z.string(), validUntil: z.string(), items: z.array(z.object({ name: z.string(), dose: z.string(), instructions: z.string() })) })),
 });

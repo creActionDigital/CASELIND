@@ -126,6 +126,7 @@ export type AuditAction =
   | 'health.appointment_updated'
   | 'health.share_granted'
   | 'health.share_revoked'
+  | 'health.availability_updated'
   | 'health.record_read'
   | 'health.prescription_issued'
   /** Games (lot 20a): session id and score only, never an answer. */

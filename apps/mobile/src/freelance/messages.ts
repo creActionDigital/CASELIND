@@ -1,5 +1,16 @@
 /** Textes du lot 16b (freelance). Fusionnés dans `fr` et `en`. */
 export const freelanceFr = {
+  'freelance.admin.title': 'Litiges',
+  'freelance.admin.forbidden': 'Réservé aux administrateurs.',
+  'freelance.admin.empty': 'Aucun litige ouvert.',
+  'freelance.admin.openedBy': 'Ouvert par {name} le {date}',
+  'freelance.admin.resolution': 'Décision motivée (visible des deux parties)',
+  'freelance.admin.resume': 'Reprendre le contrat',
+  'freelance.admin.cancel': 'Annuler le contrat',
+  'freelance.admin.confirm': 'Confirmer',
+  'freelance.admin.confirmResume': 'Reprendre le contrat ? Aucun argent ne bouge.',
+  'freelance.admin.confirmCancel': 'Annuler le contrat ? Aucun argent ne bouge.',
+  'freelance.writeOther': 'Écrire à l’autre partie',
   'freelance.title': 'Freelance',
   'freelance.search': 'Rechercher une mission',
   'freelance.emptyTitle': 'Aucune mission',
@@ -102,6 +113,17 @@ export const freelanceFr = {
 } as const;
 
 export const freelanceEn = {
+  'freelance.admin.title': 'Disputes',
+  'freelance.admin.forbidden': 'Administrators only.',
+  'freelance.admin.empty': 'No open disputes.',
+  'freelance.admin.openedBy': 'Opened by {name} on {date}',
+  'freelance.admin.resolution': 'Reasoned decision (visible to both parties)',
+  'freelance.admin.resume': 'Resume the contract',
+  'freelance.admin.cancel': 'Cancel the contract',
+  'freelance.admin.confirm': 'Confirm',
+  'freelance.admin.confirmResume': 'Resume the contract? No money moves.',
+  'freelance.admin.confirmCancel': 'Cancel the contract? No money moves.',
+  'freelance.writeOther': 'Message the other party',
   'freelance.title': 'Freelance',
   'freelance.search': 'Search missions',
   'freelance.emptyTitle': 'No missions',

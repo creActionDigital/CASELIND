@@ -66,6 +66,27 @@ export function healthProErrorKey(err: unknown): MessageKey | null {
     already_registered: 'health.err.already_registered',
     already_issued: 'health.err.already_issued',
     appointment_not_completed: 'health.err.not_completed',
+    slot_unavailable: 'health.err.slot_unavailable',
   };
   return reason && map[reason] ? map[reason]! : null;
+}
+
+// ---- Lot 18c ----------------------------------------------------------------------------------
+
+/** « 08:00-12:00, 14h-17:30 » -> plages du jour ; [] si vide ; null si une plage est invalide (début >= fin) ou s'il y en a plus de 4. */
+export function parseDayWindows(day: number, input: string): { day: number; start: string; end: string }[] | null {
+  const parts = input.split(/[,;]+/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 4) return null;
+  const out: { day: number; start: string; end: string }[] = [];
+  for (const p of parts) {
+    const m = /^(\d{1,2})[:hH](\d{0,2})\s*-\s*(\d{1,2})[:hH](\d{0,2})$/.exec(p);
+    if (!m) return null;
+    const [h1, m1, h2, m2] = [Number(m[1]), Number(m[2] || 0), Number(m[3]), Number(m[4] || 0)];
+    if (h1 > 23 || h2 > 23 || m1 > 59 || m2 > 59) return null;
+    const f = (h: number, mi: number) => `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+    const [start, end] = [f(h1, m1), f(h2, m2)];
+    if (start >= end) return null;
+    out.push({ day, start, end });
+  }
+  return out.sort((a, b) => (a.start < b.start ? -1 : 1)).every((w, i, all) => i === 0 || all[i - 1]!.end <= w.start) ? out : null;
 }

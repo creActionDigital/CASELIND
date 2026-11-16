@@ -7,6 +7,7 @@ import { ApiRequestError } from '../../../../lib/api';
 import { errorMessage } from '../../../../lib/errors';
 import { approveMilestone, cancelContract, deliverMilestone, fetchContract, frKeys, openDispute, reviewContract, reviseMilestone } from '../../../../freelance/api';
 import { canCancel, canDispute, canReview, contractStatusKey, freelanceErrorKey, milestoneActions, milestoneStatusKey, type MilestoneAction } from '../../../../freelance/logic';
+import { ContactSeller } from '../../../../shop/ContactSeller';
 import { formatMoney } from '../../../../shop/format';
 import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
@@ -82,6 +83,7 @@ export default function ContractDetail() {
             {t('freelance.contract.paymentExternal')}
           </Text>
         </View>
+        <ContactSeller contactUserId={other.id} labelKey="freelance.writeOther" />
         {error ? (
           <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">
             {error}
