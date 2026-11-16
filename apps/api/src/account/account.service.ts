@@ -236,12 +236,21 @@ export class AccountService {
       SELECT headline, summary, skills, city, experience, education FROM job_profiles WHERE user_id = ${auth.userId}::uuid`);
     const listingAlertRows = await this.db.execute<{ id: string; q: string | null; city: string | null; kind: string | null; created_at: Date }>(sql`
       SELECT id, q, city, kind, created_at FROM listing_alerts WHERE user_id = ${auth.userId}::uuid ORDER BY created_at`);
+    const visitRows = await this.db.execute<{ id: string; listing_id: string; role: string; status: string; scheduled_at: Date; message: string; place: string | null; created_at: Date }>(sql`
+      SELECT v.id, v.listing_id, CASE WHEN v.visitor_id = ${auth.userId}::uuid THEN 'visitor' ELSE 'owner' END AS role, v.status, v.scheduled_at, v.message,
+        CASE WHEN v.status = 'confirmed' THEN v.place END AS place, v.created_at
+      FROM listing_visits v JOIN listings l ON l.id = v.listing_id
+      WHERE v.visitor_id = ${auth.userId}::uuid OR l.owner_id = ${auth.userId}::uuid ORDER BY v.created_at, v.id`);
     const jobAlertRows = await this.db.execute<{ id: string; q: string | null; city: string | null; contract_type: string | null; created_at: Date }>(sql`
       SELECT id, q, city, contract_type, created_at FROM job_alerts WHERE user_id = ${auth.userId}::uuid ORDER BY created_at`);
     const jobAppRows = await this.db.execute<{ id: string; title: string; org_name: string; status: string; message: string; created_at: Date }>(sql`
       SELECT a.id, j.title, o.name AS org_name, a.status, a.message, a.created_at FROM job_applications a
       JOIN job_postings j ON j.id = a.posting_id JOIN organizations o ON o.id = j.org_id
       WHERE a.user_id = ${auth.userId}::uuid ORDER BY a.created_at, a.id`);
+    const jobInterviewRows = await this.db.execute<{ id: string; title: string; org_name: string; status: string; starts_at: Date; duration_min: number; location: string; reason: string }>(sql`
+      SELECT i.id, j.title, o.name AS org_name, i.status, i.starts_at, i.duration_min, i.location, i.reason FROM job_interviews i
+      JOIN job_applications a ON a.id = i.application_id JOIN job_postings j ON j.id = a.posting_id JOIN organizations o ON o.id = j.org_id
+      WHERE a.user_id = ${auth.userId}::uuid ORDER BY i.starts_at, i.id`);
     const frMissions = await this.db.execute<{ id: string; title: string; budget_minor: string; currency: string; status: string; created_at: Date }>(sql`
       SELECT id, title, budget_minor, currency, status, created_at FROM missions WHERE client_id = ${auth.userId}::uuid ORDER BY created_at, id`);
     const frProposals = await this.db.execute<{ id: string; title: string; amount_minor: string; delivery_days: number; message: string; status: string; created_at: Date }>(sql`
@@ -400,8 +409,10 @@ export class AccountService {
       })),
       jobProfile: cvRows.rows[0] ?? null,
       listingAlerts: listingAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, kind: a.kind, createdAt: new Date(a.created_at).toISOString() })),
+      listingVisits: visitRows.rows.map((v) => ({ id: v.id, listingId: v.listing_id, role: v.role, status: v.status, scheduledAt: new Date(v.scheduled_at).toISOString(), message: v.message, place: v.place, createdAt: new Date(v.created_at).toISOString() })),
       jobAlerts: jobAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, contractType: a.contract_type, createdAt: new Date(a.created_at).toISOString() })),
       jobApplications: jobAppRows.rows.map((a) => ({ id: a.id, jobTitle: a.title, orgName: a.org_name, status: a.status, message: a.message, createdAt: new Date(a.created_at).toISOString() })),
+      jobInterviews: jobInterviewRows.rows.map((i) => ({ id: i.id, jobTitle: i.title, orgName: i.org_name, status: i.status, startsAt: new Date(i.starts_at).toISOString(), durationMin: i.duration_min, location: i.location, reason: i.reason })),
       freelance: {
         missions: frMissions.rows.map((m) => ({ id: m.id, title: m.title, budgetMinor: Number(m.budget_minor), currency: m.currency.trim(), status: m.status, createdAt: new Date(m.created_at).toISOString() })),
         proposals: frProposals.rows.map((p) => ({ id: p.id, missionTitle: p.title, amountMinor: Number(p.amount_minor), deliveryDays: p.delivery_days, message: p.message, status: p.status, createdAt: new Date(p.created_at).toISOString() })),

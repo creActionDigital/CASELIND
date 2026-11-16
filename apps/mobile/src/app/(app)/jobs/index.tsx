@@ -50,6 +50,7 @@ export default function Jobs() {
             <View style={styles.actions}>
               <IconButton icon="notifications-outline" label={t('jobs.alerts')} onPress={() => router.push('/jobs/alerts')} />
               <IconButton icon="document-text-outline" label={t('jobs.cv')} onPress={() => router.push('/jobs/cv')} />
+              <IconButton icon="calendar-outline" label={t('jobs.interviews')} onPress={() => router.push('/jobs/interviews')} />
               <IconButton icon="paper-plane-outline" label={t('jobs.applications')} onPress={() => router.push('/jobs/applications')} />
             </View>
           ),

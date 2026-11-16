@@ -168,3 +168,31 @@ export const jobAlertSchema = z.object({
 export type JobAlert = z.infer<typeof jobAlertSchema>;
 export const jobAlertListSchema = z.object({ items: z.array(jobAlertSchema) });
 export type JobAlertList = z.infer<typeof jobAlertListSchema>;
+
+/** Interview calendar (lot 16f): a recruiter proposes, the candidate confirms or declines. No video link. */
+export const interviewStatusSchema = z.enum(['proposed', 'confirmed', 'declined', 'cancelled']);
+export type InterviewStatus = z.infer<typeof interviewStatusSchema>;
+export const proposeInterviewRequestSchema = z.object({
+  startsAt: z.iso.datetime(),
+  durationMin: z.number().int().min(15).max(180),
+  location: z.string().trim().max(200).default(''),
+});
+export type ProposeInterviewRequest = z.infer<typeof proposeInterviewRequestSchema>;
+export const interviewReasonRequestSchema = z.object({ reason: z.string().trim().max(200).default('') });
+export type InterviewReasonRequest = z.infer<typeof interviewReasonRequestSchema>;
+export const interviewSchema = z.object({
+  id: z.uuid(),
+  applicationId: z.uuid(),
+  status: interviewStatusSchema,
+  startsAt: z.string(),
+  durationMin: z.number().int(),
+  location: z.string(),
+  reason: z.string(),
+  job: z.object({ id: z.uuid(), title: z.string(), orgName: z.string() }),
+  applicant: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Interview = z.infer<typeof interviewSchema>;
+export const interviewListSchema = z.object({ items: z.array(interviewSchema) });
+export type InterviewList = z.infer<typeof interviewListSchema>;

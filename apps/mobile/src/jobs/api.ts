@@ -1,6 +1,8 @@
 import {
   applicationListSchema,
   applicationSchema,
+  interviewListSchema,
+  interviewSchema,
   jobAlertListSchema,
   jobAlertSchema,
   jobListSchema,
@@ -32,6 +34,8 @@ export const jobKeys = {
   profile: ['jobs', 'profile'] as const,
   mine: ['jobs', 'mine'] as const,
   alerts: ['jobs', 'alerts'] as const,
+  interviews: ['jobs', 'interviews'] as const,
+  orgInterviews: (orgId: string, appId: string) => ['jobs', 'org', orgId, 'interviews', appId] as const,
   org: (orgId: string) => ['jobs', 'org', orgId] as const,
   orgApps: (orgId: string, jobId: string) => ['jobs', 'org', orgId, 'apps', jobId] as const,
 };
@@ -58,3 +62,11 @@ export const fetchOrgApplications = (orgId: string, jobId: string, cursor?: stri
   api.request(`/orgs/${orgId}/jobs/${jobId}/applications`, { query: { limit: PAGE, cursor }, schema: orgApplicationListSchema });
 export const setApplicationStatus = (orgId: string, applicationId: string, status: Exclude<ApplicationStatus, 'submitted' | 'withdrawn'>) =>
   api.request(`/orgs/${orgId}/job-applications/${applicationId}/status`, { method: 'POST', body: { status }, schema: orgApplicationSchema });
+
+export const fetchMyInterviews = () => api.request('/me/job-interviews', { schema: interviewListSchema });
+export const answerInterview = (id: string, action: 'confirm' | 'decline' | 'cancel', reason = '') =>
+  api.request(`/me/job-interviews/${id}/${action}`, { method: 'POST', body: action === 'decline' ? { reason } : {}, schema: interviewSchema });
+export const fetchOrgInterviews = (orgId: string, applicationId: string) => api.request(`/orgs/${orgId}/job-applications/${applicationId}/interviews`, { schema: interviewListSchema });
+export const proposeInterview = (orgId: string, applicationId: string, body: { startsAt: string; durationMin: number; location: string }) =>
+  api.request(`/orgs/${orgId}/job-applications/${applicationId}/interviews`, { method: 'POST', body, schema: interviewSchema });
+export const cancelOrgInterview = (orgId: string, id: string) => api.request(`/orgs/${orgId}/job-interviews/${id}/cancel`, { method: 'POST', schema: interviewSchema });

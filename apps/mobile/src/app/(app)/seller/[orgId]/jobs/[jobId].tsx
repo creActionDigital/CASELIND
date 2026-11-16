@@ -7,7 +7,8 @@ import { useI18n } from '../../../../../i18n';
 import { ApiRequestError } from '../../../../../lib/api';
 import { errorMessage } from '../../../../../lib/errors';
 import { fetchOrgApplications, jobKeys, setApplicationStatus } from '../../../../../jobs/api';
-import { nextStatuses, statusKey, type RecruiterStatus } from '../../../../../jobs/logic';
+import { InterviewBox } from '../../../../../jobs/InterviewBox';
+import { canPropose, nextStatuses, statusKey, type RecruiterStatus } from '../../../../../jobs/logic';
 import { Card, PagedList } from '../../../../../seller/ui';
 import { spacing } from '../../../../../theme/tokens';
 import { useTheme } from '../../../../../theme/use-theme';
@@ -64,6 +65,7 @@ export default function OrgApplications() {
             {item.cv.experience ? <Text variant="small">{item.cv.experience}</Text> : null}
             {item.cv.education ? <Text variant="small">{item.cv.education}</Text> : null}
             {item.message ? <Text>{item.message}</Text> : null}
+            <InterviewBox orgId={String(orgId)} applicationId={item.id} canPropose={canPropose(item.status)} />
             <View style={styles.actions}>
               {nextStatuses(item.status).map((s) => (
                 <Button

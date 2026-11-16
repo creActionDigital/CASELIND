@@ -103,3 +103,31 @@ export const listingAlertSchema = z.object({
 export type ListingAlert = z.infer<typeof listingAlertSchema>;
 export const listingAlertListSchema = z.object({ items: z.array(listingAlertSchema) });
 export type ListingAlertList = z.infer<typeof listingAlertListSchema>;
+
+/** Visit appointments (lot 15c). The precise place is only exposed once confirmed, and only to the two parties. */
+export const MAX_PENDING_VISITS = 5;
+export const MAX_VISIT_DAYS_AHEAD = 60;
+export const createVisitRequestSchema = z.object({
+  scheduledAt: z.iso.datetime(),
+  message: z.string().trim().max(300).default(''),
+});
+export type CreateVisitRequest = z.infer<typeof createVisitRequestSchema>;
+export const confirmVisitRequestSchema = z.object({ place: z.string().trim().min(1).max(200).optional() });
+export type ConfirmVisitRequest = z.infer<typeof confirmVisitRequestSchema>;
+export const listingVisitSchema = z.object({
+  id: z.uuid(),
+  listingId: z.uuid(),
+  listingTitle: z.string(),
+  status: z.enum(['requested', 'confirmed', 'declined', 'cancelled']),
+  scheduledAt: z.string(),
+  message: z.string(),
+  /** Only when confirmed. */
+  place: z.string().nullable(),
+  /** The caller's side: the visitor who asked, or the ad's owner who answers. */
+  role: z.enum(['visitor', 'owner']),
+  other: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }),
+  createdAt: z.string(),
+});
+export type ListingVisit = z.infer<typeof listingVisitSchema>;
+export const listingVisitListSchema = z.object({ items: z.array(listingVisitSchema) });
+export type ListingVisitList = z.infer<typeof listingVisitListSchema>;

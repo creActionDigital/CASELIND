@@ -3,6 +3,11 @@ import {
   ErrorCodes,
   type CreateListingAlertRequest,
   type CreateListingRequest,
+  type CreateVisitRequest,
+  type ListingVisit,
+  type ListingVisitList,
+  MAX_PENDING_VISITS,
+  MAX_VISIT_DAYS_AHEAD,
   type ListingAlert,
   type ListingAlertList,
   MAX_LISTING_ALERTS,
@@ -240,6 +245,74 @@ export class ListingsService implements OnModuleInit {
     await this.notifications.notifyMany(res.rows.map((r) => ({ userId: r.user_id, category: 'commerce' as const, title: 'Nouvelle annonce correspondant à votre alerte', body: 'Ouvrez l’annonce pour la consulter.', data: { listingId } })));
   }
 
+  // ---- Visit appointments (lot 15c) -------------------------------------------------------------
+
+  private async visitRows(viewerId: string, where: SQL, tail: SQL = sql``): Promise<VisitRow[]> {
+    const res = await this.db.execute<VisitRow>(sql`
+      SELECT v.id, v.listing_id, l.title AS listing_title, v.status, v.scheduled_at, v.message, v.place, v.visitor_id, l.owner_id, v.created_at,
+        o.id AS other_id, o.display_name AS other_name, o.handle::text AS other_handle
+      FROM listing_visits v JOIN listings l ON l.id = v.listing_id
+      JOIN users o ON o.id = CASE WHEN v.visitor_id = ${viewerId}::uuid THEN l.owner_id ELSE v.visitor_id END
+      WHERE (v.visitor_id = ${viewerId}::uuid OR l.owner_id = ${viewerId}::uuid) AND ${where} ${tail}`);
+    return res.rows;
+  }
+
+  async requestVisit(userId: string, listingId: string, body: CreateVisitRequest, meta: RequestMeta): Promise<ListingVisit> {
+    const at = new Date(body.scheduledAt);
+    const now = Date.now();
+    if (at.getTime() <= now || at.getTime() > now + MAX_VISIT_DAYS_AHEAD * 86_400_000) throw invalid('scheduledAt', `must be in the future, within ${MAX_VISIT_DAYS_AHEAD} days`);
+    const listing = await this.get(userId, listingId); // 404 when hidden, closed for others, or blocked
+    if (listing.mine) throw invalid('listingId', 'you cannot visit your own listing');
+    if (listing.status !== 'active') throw notFound();
+    const id = await this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT 1 FROM users WHERE id = ${userId}::uuid FOR NO KEY UPDATE`); // serialises the quotas
+      const open = await tx.execute(sql`SELECT 1 FROM listing_visits WHERE listing_id = ${listingId}::uuid AND visitor_id = ${userId}::uuid AND status IN ('requested', 'confirmed')`);
+      if (open.rows.length > 0) throw AppError.conflict('A visit is already open for this listing', { reason: 'visit_exists' });
+      const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM listing_visits WHERE visitor_id = ${userId}::uuid AND status = 'requested'`);
+      if ((n.rows[0]?.n ?? 0) >= MAX_PENDING_VISITS) throw AppError.conflict('Too many pending visit requests', { reason: 'visit_limit', max: MAX_PENDING_VISITS });
+      const res = await tx.execute<{ id: string }>(sql`
+        INSERT INTO listing_visits (listing_id, visitor_id, scheduled_at, message) VALUES (${listingId}::uuid, ${userId}::uuid, ${at.toISOString()}::timestamptz, ${body.message}) RETURNING id`);
+      const visitId = res.rows[0]!.id;
+      await this.audit.record({ action: 'listing.visit_requested', actorUserId: userId, meta, metadata: { visitId, listingId } }, tx);
+      return visitId;
+    });
+    await this.notifications.notify({ userId: listing.owner.id, category: 'commerce', title: 'Nouvelle demande de visite', body: 'Ouvrez Mes visites pour répondre.', data: { visitId: id } }).catch(() => undefined);
+    return this.getVisit(userId, id);
+  }
+
+  async listVisits(userId: string): Promise<ListingVisitList> {
+    const rows = await this.visitRows(userId, sql`TRUE`, sql`ORDER BY v.scheduled_at DESC, v.id DESC LIMIT 100`); // shortcut: 100 most recent, no paging
+    return { items: rows.map((r) => toVisit(r, userId)) };
+  }
+
+  async getVisit(userId: string, id: string): Promise<ListingVisit> {
+    if (!UUID_RE.test(id)) throw notFound();
+    const row = (await this.visitRows(userId, sql`v.id = ${id}::uuid`))[0];
+    if (!row) throw AppError.notFound('Visit not found');
+    return toVisit(row, userId);
+  }
+
+  /** Owner confirms (optionally with a precise place) or declines a pending request; either party cancels an open one (the visitor until 1 h before). */
+  async answerVisit(userId: string, id: string, action: 'confirm' | 'decline' | 'cancel', place: string | undefined, meta: RequestMeta): Promise<ListingVisit> {
+    const v = await this.getVisit(userId, id);
+    const next = { confirm: 'confirmed', decline: 'declined', cancel: 'cancelled' }[action] as ListingVisit['status'];
+    if (action === 'cancel' ? v.status !== 'requested' && v.status !== 'confirmed' : v.status !== 'requested') throw AppError.conflict('Visit cannot change from its current status', { reason: 'bad_status' });
+    if (action !== 'cancel' && v.role !== 'owner') throw AppError.notFound('Visit not found');
+    const startsIn = new Date(v.scheduledAt).getTime() - Date.now();
+    if (action === 'confirm' && startsIn <= 0) throw AppError.conflict('The requested time has passed', { reason: 'past' });
+    if (action === 'cancel' && v.role === 'visitor' && startsIn < 3_600_000) throw AppError.conflict('A visit can only be cancelled up to 1 hour before', { reason: 'too_late' });
+    await this.db.transaction(async (tx) => {
+      const res = await tx.execute(sql`
+        UPDATE listing_visits SET status = ${next}, place = ${action === 'confirm' ? (place ?? null) : null}, updated_at = now()
+        WHERE id = ${id}::uuid AND status = ${v.status}`);
+      if (!res.rowCount) throw AppError.conflict('Visit cannot change from its current status', { reason: 'bad_status' });
+      await this.audit.record({ action: `listing.visit_${next}` as 'listing.visit_confirmed', actorUserId: userId, meta, metadata: { visitId: id, listingId: v.listingId } }, tx);
+    });
+    const title = { confirmed: 'Votre demande de visite a été confirmée', declined: 'Votre demande de visite a été refusée', cancelled: 'Une visite a été annulée' }[next as 'confirmed'];
+    await this.notifications.notify({ userId: v.other.id, category: 'commerce', title, body: 'Ouvrez Mes visites pour les détails.', data: { visitId: id } }).catch(() => undefined);
+    return this.getVisit(userId, id);
+  }
+
   private async page(viewerId: string, filters: SQL[], limit: number): Promise<ListingList> {
     const res = await this.db.execute<Row>(sql`
       ${this.base()} WHERE ${sql.join(filters, sql` AND `)}
@@ -290,6 +363,37 @@ function toListing(r: Row, viewerId: string): Listing {
     mediaIds: r.media_ids ?? [],
     owner: { id: r.owner_id, displayName: r.owner_name, handle: r.owner_handle },
     mine: r.owner_id === viewerId,
+    createdAt: new Date(r.created_at).toISOString(),
+  };
+}
+
+type VisitRow = {
+  id: string;
+  listing_id: string;
+  listing_title: string;
+  status: ListingVisit['status'];
+  scheduled_at: Date;
+  message: string;
+  place: string | null;
+  visitor_id: string;
+  owner_id: string;
+  created_at: Date;
+  other_id: string;
+  other_name: string;
+  other_handle: string;
+};
+
+function toVisit(r: VisitRow, viewerId: string): ListingVisit {
+  return {
+    id: r.id,
+    listingId: r.listing_id,
+    listingTitle: r.listing_title,
+    status: r.status,
+    scheduledAt: new Date(r.scheduled_at).toISOString(),
+    message: r.message,
+    place: r.status === 'confirmed' ? r.place : null, // the precise place is only given once confirmed
+    role: r.visitor_id === viewerId ? 'visitor' : 'owner',
+    other: { id: r.other_id, displayName: r.other_name, handle: r.other_handle },
     createdAt: new Date(r.created_at).toISOString(),
   };
 }

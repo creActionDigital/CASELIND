@@ -572,3 +572,17 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : `freelance/profile.tsx` (activer, modifier) et `freelance/freelancers.tsx` (recherche, accès depuis l'en-tête de la liste), textes fr+en dans `freelance/messages.ts` ; couleur de marque unie, aucun dégradé.
 - Tests : `freelance.e2e.test.ts` + openapi + account : 26 tests verts ; mobile : 237 tests verts. Non testé : suppression de compte réelle (cascade SQL seulement) ; non vérifié à l'écran.
 - **Différé** : catégorie visible sur la fiche mission, plusieurs catégories dans l'écran du profil (l'API en accepte 5, l'écran en propose une), page de profil individuelle d'un freelance, contact/invitation d'un freelance vers une mission, signalement d'un profil.
+
+## Lot 15c : rendez-vous de visite (annonces)
+- Migration 0049 `listing_visits` (CASCADE annonce/compte, index unique partiel : 1 demande ouverte par visiteur et annonce), contrats `createVisitRequest/confirmVisitRequest/listingVisit`, routes `POST /v1/listings/:id/visits`, `GET /v1/me/visits`, `GET /v1/visits/:id`, `POST /v1/visits/:id/confirm|decline|cancel` (`ListingVisitsController`, drapeau `listings`), OpenAPI, export `listingVisits`, audit `listing.visit_*` sans contenu.
+- Règles : date future à 60 jours, message 300, lieu 200 (donné seulement une fois confirmé), 5 demandes en attente au plus (409 `visit_limit`), 409 `visit_exists`, visiteur ne peut annuler moins d1 h avant (`too_late`), 404 pour un tiers, blocage refuse la demande ; notification générique (catégorie `commerce`) à l autre partie.
+- Mobile : bouton « Demander une visite » (date/heure UTC saisies, rappel lieu public) dans la fiche, écran `listings/visits.tsx` (envoyées et reçues, confirmer avec lieu, refuser, annuler), icône calendrier dans l en-tête, textes fr+en.
+- Tests : voir le compte rendu (e2e listings, mobile) ; écrans non vérifiés dans le navigateur.
+- Différé : pas de sélecteur de date natif, pas de rappel avant la visite, pas de pagination de la liste (100 dernières), pas de nouvelle demande des conflits d horaire côté propriétaire, pas de notification de dépassement.
+
+## Lot 16f — Calendrier d entretien (2026-11-16) : testé (API), non vérifié à l écran
+- Migration 0048 (`job_interviews`, ON DELETE CASCADE, un seul entretien proposé/confirmé par candidature) ; le recruteur (`hr.manage`) propose (début UTC futur, 15 à 180 min, lieu 200 car.) et annule avant l heure ; le candidat confirme, refuse (motif facultatif) ou annule un entretien confirmé (au plus tard 1 h avant) ; 404 hors des deux parties ; aucun lien visio.
+- Routes `/v1/me/job-interviews[/:id/confirm|decline|cancel]` et `/v1/orgs/:orgId/job-applications/:id/interviews`, `/v1/orgs/:orgId/job-interviews/:id/cancel` (drapeau `jobs`) ; notifications génériques (jamais lieu ni motif) ; audit sans contenu ; export de compte (`jobInterviews`) ; OpenAPI à jour.
+- Mobile : « Mes entretiens » (`jobs/interviews`, icône calendrier), bloc proposer/annuler par candidature côté recruteur (`jobs/InterviewBox.tsx`), textes fr+en ; date saisie en texte AAAA-MM-JJ HH:MM.
+- Tests : jobs, openapi, account : 29 OK (+4 e2e entretiens) ; mobile 239 OK ; typechecks API et mobile OK.
+- Différé : sélecteur de date natif, rappel avant l entretien, ajout au calendrier de l appareil, reprogrammation, entretien par visio (WebRTC), pagination des entretiens (100 max), vérification à l écran.

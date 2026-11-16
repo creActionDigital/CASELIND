@@ -328,6 +328,10 @@ import {
   applyRequestSchema,
   createJobRequestSchema,
   createJobAlertRequestSchema,
+  interviewListSchema,
+  interviewReasonRequestSchema,
+  interviewSchema,
+  proposeInterviewRequestSchema,
   jobAlertListSchema,
   jobAlertSchema,
   jobListQuerySchema,
@@ -342,7 +346,7 @@ import {
   setApplicationStatusRequestSchema,
   updateJobRequestSchema,
 } from '@caselind/contracts';
-import { createListingAlertRequestSchema, listingAlertListSchema, listingAlertSchema, createListingRequestSchema, listingListQuerySchema, listingListSchema, listingSchema, updateListingRequestSchema } from '@caselind/contracts';
+import { confirmVisitRequestSchema, createVisitRequestSchema, listingVisitListSchema, listingVisitSchema, createListingAlertRequestSchema, listingAlertListSchema, listingAlertSchema, createListingRequestSchema, listingListQuerySchema, listingListSchema, listingSchema, updateListingRequestSchema } from '@caselind/contracts';
 import { budgetSchema, financeSummaryQuerySchema, financeSummarySchema, removeBudgetQuerySchema, setBudgetRequestSchema } from '@caselind/contracts';
 // Lot 6A (ledger, sandbox wallet), separate import block.
 import {
@@ -804,11 +808,25 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/orgs/{orgId}/jobs/{jobId}/close', summary: 'Close an offer; applications are kept; idempotent; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), jobId: z.string() }, response: jobSchema, status: 200 },
   { method: 'get', path: '/v1/orgs/{orgId}/jobs/{jobId}/applications', summary: 'Applications of an offer with the CV snapshots (hr.manage; filter status)', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), jobId: z.string() }, query: orgApplicationsQuerySchema, response: orgApplicationListSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/job-applications/{applicationId}/status', summary: 'Move an application along submitted > viewed > shortlisted > interview > offered > hired, or reject it; other moves: 409 invalid_transition; notifies the candidate; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), applicationId: z.string() }, body: setApplicationStatusRequestSchema, response: orgApplicationSchema, status: 200 },
+  // Lot 16f: interview calendar (no video link). Visible to the two parties only (404 otherwise); notifications and audit never carry the place or the reason.
+  { method: 'get', path: '/v1/me/job-interviews', summary: 'Interviews proposed to me, newest first', tags: ['jobs'], auth: 'user', response: interviewListSchema, status: 200 },
+  { method: 'post', path: '/v1/me/job-interviews/{id}/confirm', summary: 'Confirm a proposed interview (409 invalid_state or interview_past); notifies the recruiters; audited', tags: ['jobs'], auth: 'user', params: { id: z.string() }, response: interviewSchema, status: 200 },
+  { method: 'post', path: '/v1/me/job-interviews/{id}/decline', summary: 'Decline a proposed interview with an optional reason (200 characters max); notifies the recruiters; audited without the reason', tags: ['jobs'], auth: 'user', params: { id: z.string() }, body: interviewReasonRequestSchema, response: interviewSchema, status: 200 },
+  { method: 'post', path: '/v1/me/job-interviews/{id}/cancel', summary: 'Cancel a confirmed interview, 1 hour before at the latest (409 too_late); notifies the recruiters; audited', tags: ['jobs'], auth: 'user', params: { id: z.string() }, response: interviewSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/job-applications/{applicationId}/interviews', summary: 'Interviews of an application (hr.manage)', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), applicationId: z.string() }, response: interviewListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/job-applications/{applicationId}/interviews', summary: 'Propose an interview (hr.manage; future UTC start, 15 to 180 min, place up to 200 characters; one pending or confirmed per application: 409 interview_exists; decided application: 409 application_final); notifies the candidate; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), applicationId: z.string() }, body: proposeInterviewRequestSchema, response: interviewSchema, status: 201 },
+  { method: 'post', path: '/v1/orgs/{orgId}/job-interviews/{interviewId}/cancel', summary: 'Cancel a pending or confirmed interview that has not taken place (hr.manage); notifies the candidate; audited', tags: ['jobs'], auth: 'user', params: { orgId: z.string(), interviewId: z.string() }, response: interviewSchema, status: 200 },
   // Lot 15: classified ads (property, vehicles, used goods, lost and found). Behind the `listings` flag; contact goes through messaging.
   { method: 'get', path: '/v1/listings', summary: 'Active ads, newest first (filters kind, q, city, currency, price range; keyset cursor). Hidden ads and ads of blocked users are not listed', tags: ['listings'], auth: 'user', query: listingListQuerySchema, response: listingListSchema, status: 200 },
   { method: 'get', path: '/v1/me/listing-alerts', summary: 'My ad alerts (private)', tags: ['listings'], auth: 'user', response: listingAlertListSchema, status: 200 },
   { method: 'post', path: '/v1/me/listing-alerts', summary: 'Create an ad alert (q, city, kind; at least one; 5 max: 409 alert_limit); audited without the criteria', tags: ['listings'], auth: 'user', body: createListingAlertRequestSchema, response: listingAlertSchema, status: 201 },
   { method: 'delete', path: '/v1/me/listing-alerts/{id}', summary: 'Delete one of my ad alerts (idempotent)', tags: ['listings'], auth: 'user', params: { id: z.string() }, status: 204 },
+  { method: 'post', path: '/v1/listings/{id}/visits', summary: 'Ask to visit an active ad (future UTC time within 60 days; message 300 max; one open request per ad: 409 visit_exists; 5 pending: 409 visit_limit; not your own ad, no block); notifies the owner without the message; audited without content', tags: ['listings'], auth: 'user', params: { id: z.string() }, body: createVisitRequestSchema, response: listingVisitSchema, status: 201 },
+  { method: 'get', path: '/v1/me/visits', summary: 'My visit appointments, sent and received (the precise place only when confirmed)', tags: ['listings'], auth: 'user', response: listingVisitListSchema, status: 200 },
+  { method: 'get', path: '/v1/visits/{id}', summary: 'One visit appointment (visible to the visitor and the ad owner only: 404 otherwise)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingVisitSchema, status: 200 },
+  { method: 'post', path: '/v1/visits/{id}/confirm', summary: 'Owner confirms a pending visit, optionally giving a precise place (200 chars); 409 if not pending', tags: ['listings'], auth: 'user', params: { id: z.string() }, body: confirmVisitRequestSchema, response: listingVisitSchema, status: 200 },
+  { method: 'post', path: '/v1/visits/{id}/decline', summary: 'Owner declines a pending visit', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingVisitSchema, status: 200 },
+  { method: 'post', path: '/v1/visits/{id}/cancel', summary: 'Either party cancels an open visit (the visitor until 1 hour before: 409 too_late)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingVisitSchema, status: 200 },
   { method: 'get', path: '/v1/listings/mine', summary: 'The caller\'s own ads, active and closed', tags: ['listings'], auth: 'user', query: pageQuerySchema, response: listingListSchema, status: 200 },
   { method: 'get', path: '/v1/listings/{id}', summary: 'One ad (closed, hidden, blocked or unknown: 404, except for its owner)', tags: ['listings'], auth: 'user', params: { id: z.string() }, response: listingSchema, status: 200 },
   { method: 'post', path: '/v1/listings', summary: 'Publish an ad (photos: own ready uploads with purpose listing, up to 8; at most 20 active ads per owner: 409 listing_limit; lost/found carry no price); audited', tags: ['listings'], auth: 'user', body: createListingRequestSchema, response: listingSchema, status: 201 },

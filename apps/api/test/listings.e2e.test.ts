@@ -166,6 +166,74 @@ describe('classified ads (lot 15)', () => {
     expect((await ctx.http.get(alerts).set(bearer(seeker.token)).expect(200)).body.items).toHaveLength(4);
   });
 
+  it('handles visit appointments: request, limits, confirm with place, decline, cancel, rights, blocks, export', async () => {
+    const [owner, v, w, stranger, blocked] = [await user(), await user(), await user(), await user(), await user()];
+    const l = (await create(owner, ad()).expect(201)).body;
+    const at = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+    const ask = (u: TU, listingId: string, body: Record<string, unknown>) => ctx.http.post(`/v1/listings/${listingId}/visits`).set(bearer(u.token)).send(body);
+    const act = (u: TU, id: string, a: string, body: Record<string, unknown> = {}) => ctx.http.post(`/v1/visits/${id}/${a}`).set(bearer(u.token)).send(body);
+
+    await ask(v, l.id, { scheduledAt: at(-1) }).expect(400); // past
+    await ask(v, l.id, { scheduledAt: at(61 * 24) }).expect(400); // beyond 60 days
+    await ask(v, l.id, { scheduledAt: at(48), message: 'x'.repeat(301) }).expect(400);
+    await ask(owner, l.id, { scheduledAt: at(48) }).expect(400); // own ad
+    await ctx.http.put(`/v1/blocks/${blocked.id}`).set(bearer(owner.token)).expect(204);
+    await ask(blocked, l.id, { scheduledAt: at(48) }).expect(404);
+
+    const visit = (await ask(v, l.id, { scheduledAt: at(48), message: 'Secret message' }).expect(201)).body;
+    expect(visit).toMatchObject({ status: 'requested', role: 'visitor', place: null, listingTitle: 'Studio meublé' });
+    await ask(v, l.id, { scheduledAt: at(72) }).expect(409); // one open request per ad
+    const notes = async (u: TU) => (await ctx.sql.query(`SELECT title, body FROM notifications WHERE user_id = $1 AND data::text LIKE '%visitId%'`, [u.id])).rows;
+    expect(await notes(owner)).toHaveLength(1);
+    expect(JSON.stringify(await notes(owner))).not.toContain('Secret');
+
+    // Only the two parties see it.
+    await ctx.http.get(`/v1/visits/${visit.id}`).set(bearer(stranger.token)).expect(404);
+    await act(stranger, visit.id, 'cancel').expect(404);
+    expect((await ctx.http.get('/v1/me/visits').set(bearer(owner.token)).expect(200)).body.items[0]).toMatchObject({ role: 'owner', other: { id: v.id } });
+    expect((await ctx.http.get('/v1/me/visits').set(bearer(stranger.token)).expect(200)).body.items).toHaveLength(0);
+
+    // The visitor cannot confirm; the owner confirms with a place, visible to both.
+    await act(v, visit.id, 'confirm', { place: 'Chez moi' }).expect(404);
+    const ok = (await act(owner, visit.id, 'confirm', { place: 'Café du Lac, avenue de la Paix' }).expect(200)).body;
+    expect(ok).toMatchObject({ status: 'confirmed', place: 'Café du Lac, avenue de la Paix' });
+    expect((await ctx.http.get(`/v1/visits/${visit.id}`).set(bearer(v.token)).expect(200)).body.place).toBe('Café du Lac, avenue de la Paix');
+    expect(JSON.stringify(await notes(v))).not.toContain('Café');
+    await act(owner, visit.id, 'decline').expect(409); // not pending any more
+    const audits = JSON.stringify((await ctx.sql.query(`SELECT metadata::text FROM audit_events WHERE action LIKE 'listing.visit_%'`)).rows);
+    expect(audits).not.toContain('Café');
+    expect(audits).not.toContain('Secret');
+    const exp = (await ctx.http.get('/v1/me/export').set(bearer(v.token)).expect(200)).body.listingVisits;
+    expect(exp).toHaveLength(1);
+    expect(exp[0]).toMatchObject({ role: 'visitor', status: 'confirmed' });
+
+    // The visitor cannot cancel within the last hour; the owner can; then a new request is possible.
+    await ctx.sql.query(`UPDATE listing_visits SET scheduled_at = now() + interval '30 minutes' WHERE id = $1`, [visit.id]);
+    await act(v, visit.id, 'cancel').expect(409);
+    expect((await act(owner, visit.id, 'cancel').expect(200)).body.status).toBe('cancelled');
+    expect(await notes(v)).toHaveLength(2); // confirmed, then cancelled
+
+    // Decline, then visitor cancel.
+    const d = (await ask(v, l.id, { scheduledAt: at(48) }).expect(201)).body;
+    expect((await act(owner, d.id, 'decline').expect(200)).body.status).toBe('declined');
+    const c = (await ask(v, l.id, { scheduledAt: at(48) }).expect(201)).body;
+    expect((await act(v, c.id, 'cancel').expect(200)).body.status).toBe('cancelled');
+    await act(v, c.id, 'cancel').expect(409);
+
+    // 5 pending requests at most per visitor.
+    for (let i = 0; i < 5; i++) {
+      const o = await user();
+      const li = (await create(o, ad()).expect(201)).body;
+      await ask(w, li.id, { scheduledAt: at(48) }).expect(201);
+    }
+    const last = (await create(owner, ad()).expect(201)).body;
+    await ask(w, last.id, { scheduledAt: at(48) }).expect(409);
+
+    // Deleted with the ad.
+    await ctx.sql.query('DELETE FROM listings WHERE id = $1', [l.id]);
+    expect(Number((await ctx.sql.query('SELECT count(*) AS n FROM listing_visits WHERE listing_id = $1', [l.id])).rows[0].n)).toBe(0);
+  });
+
   it('is off when the flag is off', async () => {
     const a = await user();
     await ctx.sql.query(`UPDATE feature_flags SET enabled = false WHERE key = 'listings'`);

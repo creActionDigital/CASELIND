@@ -259,3 +259,88 @@ describe('job alerts (lot 16d)', () => {
     expect([await count(a), await count(b), await count(c)]).toEqual([0, 0, 1]);
   });
 });
+
+describe('interview calendar (lot 16f)', () => {
+  const inHours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+  async function setup() {
+    const [owner, hr, sales, cand, stranger] = [await user(), await user(), await user(), await user(), await user()];
+    const org = await createOrg(owner);
+    await addMember(org, owner, hr, 'hr');
+    await addMember(org, owner, sales, 'sales');
+    const j = (await post(org, owner, job()).expect(201)).body;
+    await saveCv(cand).expect(200);
+    const app = (await apply(cand, j.id).expect(201)).body;
+    return { owner, hr, sales, cand, stranger, org, app };
+  }
+  const propose = (org: string, u: TU, appId: string, body: Record<string, unknown>) => ctx.http.post(`/v1/orgs/${org}/job-applications/${appId}/interviews`).set(bearer(u.token)).send(body);
+  const mine = (u: TU, id: string, action: string, body: Record<string, unknown> = {}) => ctx.http.post(`/v1/me/job-interviews/${id}/${action}`).set(bearer(u.token)).send(body);
+  const notes = async (u: TU, like: string) => Number((await ctx.sql.query(`SELECT count(*) AS n FROM notifications WHERE user_id = $1 AND title LIKE $2`, [u.id, like])).rows[0].n);
+
+  it('proposes, validates, limits to one live interview, and checks rights', async () => {
+    const { owner, hr, sales, cand, stranger, org, app } = await setup();
+    const ok = { startsAt: inHours(48), durationMin: 45, location: 'Bureau secret 12' };
+    await propose(org, sales, app.id, ok).expect(403);
+    await propose(org, stranger, app.id, ok).expect(404);
+    await propose(org, hr, app.id, { ...ok, startsAt: inHours(-1) }).expect(400);
+    await propose(org, hr, app.id, { ...ok, durationMin: 10 }).expect(400);
+    await propose(org, hr, app.id, { ...ok, durationMin: 181 }).expect(400);
+    await propose(org, hr, app.id, { ...ok, location: 'x'.repeat(201) }).expect(400);
+    const r = await propose(org, hr, app.id, ok).expect(201);
+    expect(r.body).toMatchObject({ status: 'proposed', durationMin: 45, location: 'Bureau secret 12', applicationId: app.id });
+    await propose(org, owner, app.id, ok).expect(409); // one live interview
+    expect(await notes(cand, 'Entretien proposé')).toBe(1);
+    const nb = await ctx.sql.query(`SELECT body FROM notifications WHERE user_id = $1 AND title = 'Entretien proposé'`, [cand.id]);
+    expect(JSON.stringify(nb.rows)).not.toContain('secret');
+    const audits = await ctx.sql.query(`SELECT metadata::text AS m FROM audit_events WHERE action = 'job.interview_proposed' AND actor_user_id = $1`, [hr.id]);
+    expect(JSON.stringify(audits.rows)).not.toContain('secret');
+    expect((await ctx.http.get(`/v1/orgs/${org}/job-applications/${app.id}/interviews`).set(bearer(owner.token)).expect(200)).body.items).toHaveLength(1);
+    await ctx.http.get(`/v1/orgs/${org}/job-applications/${app.id}/interviews`).set(bearer(stranger.token)).expect(404);
+  });
+
+  it('candidate confirms; only the two parties see it; export includes it; rights on cancel', async () => {
+    const { owner, hr, cand, stranger, org, app } = await setup();
+    const id = (await propose(org, hr, app.id, { startsAt: inHours(48), durationMin: 30, location: 'Salle A' }).expect(201)).body.id;
+    expect((await ctx.http.get('/v1/me/job-interviews').set(bearer(cand.token)).expect(200)).body.items.map((i: { id: string }) => i.id)).toEqual([id]);
+    expect((await ctx.http.get('/v1/me/job-interviews').set(bearer(stranger.token)).expect(200)).body.items).toHaveLength(0);
+    await mine(stranger, id, 'confirm').expect(404);
+    await ctx.http.post(`/v1/orgs/${org}/job-interviews/${id}/cancel`).set(bearer(stranger.token)).expect(404);
+    expect((await mine(cand, id, 'confirm').expect(200)).body.status).toBe('confirmed');
+    await mine(cand, id, 'confirm').expect(409);
+    await mine(cand, id, 'decline').expect(409);
+    expect(await notes(owner, 'Entretien confirmé')).toBe(1);
+    const exp = (await ctx.http.get('/v1/me/export').set(bearer(cand.token)).expect(200)).body;
+    expect(exp.jobInterviews).toHaveLength(1);
+    expect((await mine(cand, id, 'cancel').expect(200)).body.status).toBe('cancelled');
+    expect(await notes(hr, 'Entretien annulé')).toBe(1);
+    await ctx.http.post(`/v1/orgs/${org}/job-interviews/${id}/cancel`).set(bearer(hr.token)).expect(409); // already cancelled
+    await propose(org, hr, app.id, { startsAt: inHours(72), durationMin: 30 }).expect(201); // a new one is allowed again
+  });
+
+  it('candidate declines with a reason; cancel is too late within 1 hour; recruiter cancels', async () => {
+    const { hr, cand, org, app } = await setup();
+    const a = (await propose(org, hr, app.id, { startsAt: inHours(24), durationMin: 60 }).expect(201)).body.id;
+    const d = await mine(cand, a, 'decline', { reason: 'Indisponible ce jour' }).expect(200);
+    expect(d.body).toMatchObject({ status: 'declined', reason: 'Indisponible ce jour' });
+    await mine(cand, a, 'decline', { reason: 'x'.repeat(201) }).expect(400);
+    const dn = await ctx.sql.query(`SELECT body FROM notifications WHERE title = 'Entretien refusé' AND user_id <> $1`, [cand.id]);
+    expect(JSON.stringify(dn.rows)).not.toContain('Indisponible');
+    const b = (await propose(org, hr, app.id, { startsAt: inHours(24), durationMin: 60 }).expect(201)).body.id;
+    await mine(cand, b, 'cancel').expect(409); // still proposed: candidate cannot cancel
+    await mine(cand, b, 'confirm').expect(200);
+    await ctx.sql.query(`UPDATE job_interviews SET starts_at = now() + interval '30 minutes' WHERE id = $1`, [b]);
+    const late = await mine(cand, b, 'cancel').expect(409);
+    expect(JSON.stringify(late.body)).toContain('too_late');
+    expect((await ctx.http.post(`/v1/orgs/${org}/job-interviews/${b}/cancel`).set(bearer(hr.token)).expect(200)).body.status).toBe('cancelled');
+    expect(await notes(cand, 'Entretien annulé')).toBe(1);
+    const c = (await propose(org, hr, app.id, { startsAt: inHours(24), durationMin: 60 }).expect(201)).body.id;
+    await ctx.sql.query(`UPDATE job_interviews SET starts_at = now() - interval '1 hour' WHERE id = $1`, [c]);
+    await mine(cand, c, 'confirm').expect(409); // already took place
+  });
+
+  it('is removed with the application', async () => {
+    const { hr, cand, org, app } = await setup();
+    await propose(org, hr, app.id, { startsAt: inHours(24), durationMin: 60 }).expect(201);
+    await ctx.sql.query('DELETE FROM job_applications WHERE id = $1', [app.id]);
+    expect((await ctx.http.get('/v1/me/job-interviews').set(bearer(cand.token)).expect(200)).body.items).toHaveLength(0);
+  });
+});

@@ -1,4 +1,4 @@
-import { listingAlertListSchema, listingAlertSchema, listingListSchema, listingSchema, type CreateListingAlertRequest, type CreateListingRequest, type ListingKind } from '@caselind/contracts';
+import { listingVisitListSchema, listingVisitSchema, type ConfirmVisitRequest, type CreateVisitRequest, listingAlertListSchema, listingAlertSchema, listingListSchema, listingSchema, type CreateListingAlertRequest, type CreateListingRequest, type ListingKind } from '@caselind/contracts';
 import { api } from '../auth/auth-context';
 
 const PAGE = 20;
@@ -13,6 +13,7 @@ export const listingKeys = {
   list: (f: ListingFilters) => ['listings', 'list', f] as const,
   mine: ['listings', 'mine'] as const,
   alerts: ['listings', 'alerts'] as const,
+  visits: ['listings', 'visits'] as const,
   one: (id: string) => ['listings', 'one', id] as const,
 };
 
@@ -25,3 +26,6 @@ export const closeListing = (id: string) => api.request(`/listings/${id}/close`,
 export const fetchListingAlerts = () => api.request('/me/listing-alerts', { schema: listingAlertListSchema });
 export const createListingAlert = (body: CreateListingAlertRequest) => api.request('/me/listing-alerts', { method: 'POST', body, schema: listingAlertSchema });
 export const deleteListingAlert = (id: string) => api.request(`/me/listing-alerts/${id}`, { method: 'DELETE' });
+export const requestVisit = (listingId: string, body: CreateVisitRequest) => api.request(`/listings/${listingId}/visits`, { method: 'POST', body, schema: listingVisitSchema });
+export const fetchVisits = () => api.request('/me/visits', { schema: listingVisitListSchema });
+export const answerVisit = (id: string, action: 'confirm' | 'decline' | 'cancel', body: ConfirmVisitRequest = {}) => api.request(`/visits/${id}/${action}`, { method: 'POST', body, schema: listingVisitSchema });

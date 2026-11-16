@@ -22,3 +22,14 @@ describe('jobs logic', () => {
     expect(salaryLabel({ salary: { minMinor: 30000, maxMinor: 50000, currency: 'USD' } }, 'fr')).toContain('–');
   });
 });
+
+describe('interview helpers', () => {
+  it('parses a local date and time, rejects nonsense', async () => {
+    const { parseLocalDateTime, canPropose } = await import('./logic');
+    expect(parseLocalDateTime('2030-02-10 14:30')).toBe(new Date(2030, 1, 10, 14, 30).toISOString());
+    expect(parseLocalDateTime('2030-02-31 14:30')).toBeNull();
+    expect(parseLocalDateTime('demain')).toBeNull();
+    expect(canPropose('shortlisted')).toBe(true);
+    expect(canPropose('rejected')).toBe(false);
+  });
+});

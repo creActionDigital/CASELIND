@@ -61,6 +61,11 @@ export type AuditAction =
   | 'listing.closed'
   | 'listing.alert_created'
   | 'listing.alert_deleted'
+  /** Visit appointments (lot 15c): metadata {visitId, listingId}. Never the message or the place. */
+  | 'listing.visit_requested'
+  | 'listing.visit_confirmed'
+  | 'listing.visit_declined'
+  | 'listing.visit_cancelled'
   /** Jobs (lot 16a): metadata ids and statuses only, never a CV, a message or a name. */
   | 'job.posted'
   | 'job.updated'
@@ -72,6 +77,10 @@ export type AuditAction =
   | 'job.applied'
   | 'job.application_withdrawn'
   | 'job.application_status'
+  | 'job.interview_proposed'
+  | 'job.interview_confirmed'
+  | 'job.interview_declined'
+  | 'job.interview_cancelled'
   /** Freelance (lot 16b): ids and outcomes only, never a message, a note or a reason. */
   | 'freelance.mission_created'
   | 'freelance.mission_updated'

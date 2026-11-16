@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
-import { closeListing, fetchListing, listingKeys } from '../../../listings/api';
-import { kindKey, priceLabel } from '../../../listings/logic';
+import { ApiRequestError } from '../../../lib/api';
+import { closeListing, fetchListing, listingKeys, requestVisit } from '../../../listings/api';
+import { kindKey, parseVisitTime, priceLabel, visitErrorKey } from '../../../listings/logic';
 import { createDirect, startChatErrorKey } from '../../../messaging/api';
 import { openReport } from '../../../report/open-report';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
-import { AuthImage, Badge, Button, ErrorState, Screen, Text } from '../../../ui';
+import { AuthImage, Badge, Button, ErrorState, Screen, Text, TextField } from '../../../ui';
 
 /** Fiche d'annonce : photos, prix, ville, vendeur ; contact par la messagerie, signalement, clôture par le propriétaire. */
 export default function ListingDetail() {
@@ -30,6 +31,28 @@ export default function ListingDetail() {
       setError(key ? t(key) : errorMessage(e, t, locale));
     },
   });
+  const [visitOpen, setVisitOpen] = useState(false);
+  const [vDate, setVDate] = useState('');
+  const [vTime, setVTime] = useState('');
+  const [vMsg, setVMsg] = useState('');
+  const [visitInfo, setVisitInfo] = useState<string | null>(null);
+  const visit = useMutation({
+    mutationFn: (scheduledAt: string) => requestVisit(String(id), { scheduledAt, message: vMsg.trim() }),
+    onSuccess: () => {
+      setVisitOpen(false);
+      setVisitInfo(t('listings.visit.sent'));
+      setError(null);
+    },
+    onError: (e) => {
+      const key = e instanceof ApiRequestError ? visitErrorKey(e.details) : null;
+      setError(key ? t(key) : errorMessage(e, t, locale));
+    },
+  });
+  const sendVisit = () => {
+    const at = parseVisitTime(vDate, vTime);
+    if (!at) setError(t('listings.visit.err.date'));
+    else visit.mutate(at);
+  };
   const close = useMutation({
     mutationFn: () => closeListing(String(id)),
     onSuccess: () => void qc.invalidateQueries({ queryKey: listingKeys.all }),
@@ -87,6 +110,23 @@ export default function ListingDetail() {
           l.status === 'active' ? <Button variant="secondary" label={t('listings.close')} loading={close.isPending} onPress={() => close.mutate()} /> : null
         ) : (
           <>
+            {l.status === 'active' ? <Button variant="secondary" label={t('listings.visit.ask')} onPress={() => setVisitOpen(!visitOpen)} /> : null}
+            {visitOpen ? (
+              <View style={styles.body}>
+                <Text variant="small" muted>
+                  {t('listings.visit.safety')}
+                </Text>
+                <TextField label={t('listings.visit.date')} value={vDate} onChangeText={setVDate} maxLength={10} autoCapitalize="none" />
+                <TextField label={t('listings.visit.time')} value={vTime} onChangeText={setVTime} maxLength={5} autoCapitalize="none" />
+                <TextField label={t('listings.visit.message')} value={vMsg} onChangeText={setVMsg} maxLength={300} multiline />
+                <Button label={t('listings.visit.send')} loading={visit.isPending} onPress={sendVisit} />
+              </View>
+            ) : null}
+            {visitInfo ? (
+              <Text variant="small" accessibilityLiveRegion="polite">
+                {visitInfo}
+              </Text>
+            ) : null}
             <Button label={t('listings.contact')} loading={contact.isPending} onPress={() => contact.mutate(l.owner.id)} />
             <Button variant="ghost" label={t('listings.report')} onPress={() => openReport({ targetType: 'listing', targetId: l.id })} />
           </>

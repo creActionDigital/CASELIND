@@ -7,6 +7,12 @@ import {
   type CreateJobAlertRequest,
   createJobAlertRequestSchema,
   type CreateJobRequest,
+  type Interview,
+  type InterviewList,
+  type InterviewReasonRequest,
+  interviewReasonRequestSchema,
+  type ProposeInterviewRequest,
+  proposeInterviewRequestSchema,
   type JobAlert,
   type JobAlertList,
   createJobRequestSchema,
@@ -66,6 +72,29 @@ export class JobsController {
   @HttpCode(200)
   withdraw(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<Application> {
     return this.jobs.withdraw(user.userId, id, meta);
+  }
+
+  @Get('me/job-interviews')
+  interviews(@CurrentUser() user: AuthUser): Promise<InterviewList> {
+    return this.jobs.myInterviews(user.userId);
+  }
+
+  @Post('me/job-interviews/:id/confirm')
+  @HttpCode(200)
+  confirmInterview(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<Interview> {
+    return this.jobs.changeInterview({ side: 'candidate', userId: user.userId }, user.userId, id, 'confirm', '', meta);
+  }
+
+  @Post('me/job-interviews/:id/decline')
+  @HttpCode(200)
+  declineInterview(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodPipe(interviewReasonRequestSchema)) body: InterviewReasonRequest, @ReqMeta() meta: RequestMeta): Promise<Interview> {
+    return this.jobs.changeInterview({ side: 'candidate', userId: user.userId }, user.userId, id, 'decline', body.reason, meta);
+  }
+
+  @Post('me/job-interviews/:id/cancel')
+  @HttpCode(200)
+  cancelInterview(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<Interview> {
+    return this.jobs.changeInterview({ side: 'candidate', userId: user.userId }, user.userId, id, 'cancel', '', meta);
   }
 
   @Get('me/job-alerts')
@@ -155,5 +184,29 @@ export class OrgJobsController {
     @ReqMeta() meta: RequestMeta,
   ): Promise<OrgApplication> {
     return this.jobs.setStatus(m.orgId, applicationId, user.userId, body.status, meta);
+  }
+  @Get('job-applications/:applicationId/interviews')
+  @OrgPermission('hr.manage')
+  interviews(@CurrentMembership() m: OrgMembership, @Param('applicationId') applicationId: string): Promise<InterviewList> {
+    return this.jobs.orgInterviews(m.orgId, applicationId);
+  }
+
+  @Post('job-applications/:applicationId/interviews')
+  @OrgPermission('hr.manage')
+  proposeInterview(
+    @CurrentMembership() m: OrgMembership,
+    @CurrentUser() user: AuthUser,
+    @Param('applicationId') applicationId: string,
+    @Body(new ZodPipe(proposeInterviewRequestSchema)) body: ProposeInterviewRequest,
+    @ReqMeta() meta: RequestMeta,
+  ): Promise<Interview> {
+    return this.jobs.proposeInterview(m.orgId, applicationId, user.userId, body, meta);
+  }
+
+  @Post('job-interviews/:interviewId/cancel')
+  @HttpCode(200)
+  @OrgPermission('hr.manage')
+  cancelInterview(@CurrentMembership() m: OrgMembership, @CurrentUser() user: AuthUser, @Param('interviewId') interviewId: string, @ReqMeta() meta: RequestMeta): Promise<Interview> {
+    return this.jobs.changeInterview({ side: 'org', orgId: m.orgId }, user.userId, interviewId, 'cancel', '', meta);
   }
 }

@@ -7,6 +7,10 @@ import {
   type ApplyRequest,
   type CreateJobAlertRequest,
   type CreateJobRequest,
+  type Interview,
+  type InterviewList,
+  type InterviewStatus,
+  type ProposeInterviewRequest,
   type JobAlert,
   type JobAlertList,
   MAX_JOB_ALERTS,
@@ -436,6 +440,108 @@ export class JobsService implements OnModuleInit {
       })),
       nextCursor: res.rows.length > limit && last ? encodeCursor(last.created_at, last.id) : null,
     };
+  }
+
+  // ---- Interview calendar (lot 16f): no video link; notifications and audit never carry the place or the reason ----
+
+  private async interviewPage(filters: SQL[]): Promise<InterviewList> {
+    const res = await this.db.execute<{
+      id: string; application_id: string; status: InterviewStatus; starts_at: Date; duration_min: number; location: string; reason: string; created_at: Date; updated_at: Date;
+      job_id: string; job_title: string; org_name: string; user_id: string; display_name: string; handle: string;
+    }>(sql`
+      SELECT i.id, i.application_id, i.status, i.starts_at, i.duration_min, i.location, i.reason, i.created_at, i.updated_at,
+        j.id AS job_id, j.title AS job_title, o.name AS org_name, u.id AS user_id, u.display_name, u.handle::text AS handle
+      FROM job_interviews i JOIN job_applications a ON a.id = i.application_id JOIN job_postings j ON j.id = a.posting_id
+      JOIN organizations o ON o.id = j.org_id JOIN users u ON u.id = a.user_id
+      WHERE ${sql.join(filters, sql` AND `)} ORDER BY i.starts_at DESC, i.id DESC LIMIT 100`); // shortcut: no cursor, 100 newest, when someone has more
+    return {
+      items: res.rows.map((r) => ({
+        id: r.id,
+        applicationId: r.application_id,
+        status: r.status,
+        startsAt: iso(r.starts_at),
+        durationMin: r.duration_min,
+        location: r.location,
+        reason: r.reason,
+        job: { id: r.job_id, title: r.job_title, orgName: r.org_name },
+        applicant: { id: r.user_id, displayName: r.display_name, handle: r.handle },
+        createdAt: iso(r.created_at),
+        updatedAt: iso(r.updated_at),
+      })),
+    };
+  }
+
+  myInterviews(userId: string): Promise<InterviewList> {
+    return this.interviewPage([sql`a.user_id = ${userId}::uuid`]);
+  }
+
+  async orgInterviews(orgId: string, applicationId: string): Promise<InterviewList> {
+    if (!UUID_RE.test(applicationId)) throw AppError.notFound('Application not found');
+    return this.interviewPage([sql`a.id = ${applicationId}::uuid`, sql`j.org_id = ${orgId}::uuid`]);
+  }
+
+  async proposeInterview(orgId: string, applicationId: string, userId: string, body: ProposeInterviewRequest, meta: RequestMeta): Promise<Interview> {
+    if (!UUID_RE.test(applicationId)) throw AppError.notFound('Application not found');
+    if (new Date(body.startsAt).getTime() <= Date.now()) throw invalid('startsAt', 'must be in the future');
+    const { id, candidateId } = await this.db.transaction(async (tx) => {
+      const res = await tx.execute<{ status: ApplicationStatus; user_id: string }>(sql`
+        SELECT a.status, a.user_id FROM job_applications a JOIN job_postings j ON j.id = a.posting_id
+        WHERE a.id = ${applicationId}::uuid AND j.org_id = ${orgId}::uuid FOR UPDATE OF a`);
+      const app = res.rows[0];
+      if (!app) throw AppError.notFound('Application not found');
+      if (APPLICATION_TRANSITIONS[app.status].length === 0) throw AppError.conflict('This application is already decided', { reason: 'application_final' });
+      const live = await tx.execute(sql`SELECT 1 FROM job_interviews WHERE application_id = ${applicationId}::uuid AND status IN ('proposed', 'confirmed')`);
+      if (live.rows.length) throw AppError.conflict('An interview is already pending or confirmed', { reason: 'interview_exists' });
+      const ins = await tx.execute<{ id: string }>(sql`
+        INSERT INTO job_interviews (application_id, proposed_by, starts_at, duration_min, location)
+        VALUES (${applicationId}::uuid, ${userId}::uuid, ${body.startsAt}::timestamptz, ${body.durationMin}, ${body.location}) RETURNING id`);
+      const row = ins.rows[0]!;
+      await this.audit.record({ action: 'job.interview_proposed', actorUserId: userId, meta, metadata: { orgId, applicationId, interviewId: row.id } }, tx);
+      return { id: row.id, candidateId: app.user_id };
+    });
+    await this.notifications.notify({ userId: candidateId, category: 'job', title: 'Entretien proposé', body: 'Ouvrez « Mes entretiens » pour répondre.', data: { interviewId: id } }).catch(() => undefined);
+    return (await this.interviewPage([sql`i.id = ${id}::uuid`])).items[0]!;
+  }
+
+  /** One state change. `org`: the recruiter cancels; `candidate`: confirm, decline or cancel (confirmed only, 1 h before at the latest). */
+  async changeInterview(
+    who: { side: 'org'; orgId: string } | { side: 'candidate'; userId: string },
+    actorId: string,
+    interviewId: string,
+    action: 'confirm' | 'decline' | 'cancel',
+    reason: string,
+    meta: RequestMeta,
+  ): Promise<Interview> {
+    if (!UUID_RE.test(interviewId)) throw AppError.notFound('Interview not found');
+    const party = who.side === 'org' ? sql`j.org_id = ${who.orgId}::uuid` : sql`a.user_id = ${who.userId}::uuid`;
+    const info = await this.db.transaction(async (tx) => {
+      const res = await tx.execute<{ status: InterviewStatus; starts_at: Date; user_id: string; org_id: string; posting_id: string }>(sql`
+        SELECT i.status, i.starts_at, a.user_id, j.org_id, j.id AS posting_id FROM job_interviews i
+        JOIN job_applications a ON a.id = i.application_id JOIN job_postings j ON j.id = a.posting_id
+        WHERE i.id = ${interviewId}::uuid AND ${party} FOR UPDATE OF i`);
+      const cur = res.rows[0];
+      if (!cur) throw AppError.notFound('Interview not found');
+      const at = new Date(cur.starts_at).getTime();
+      const ok = action === 'cancel' ? (who.side === 'org' ? cur.status === 'proposed' || cur.status === 'confirmed' : cur.status === 'confirmed') : cur.status === 'proposed';
+      if (!ok) throw AppError.conflict(`An interview ${cur.status} cannot be ${action}ed`, { reason: 'invalid_state', status: cur.status });
+      if (at <= Date.now()) throw AppError.conflict('This interview already took place', { reason: 'interview_past' });
+      if (action === 'cancel' && who.side === 'candidate' && at - Date.now() < 3_600_000) throw AppError.conflict('Too late to cancel (less than 1 hour)', { reason: 'too_late' });
+      const status = action === 'confirm' ? 'confirmed' : action === 'decline' ? 'declined' : 'cancelled';
+      await tx.execute(sql`UPDATE job_interviews SET status = ${status}, reason = ${action === 'decline' ? reason : ''}, updated_at = now() WHERE id = ${interviewId}::uuid`);
+      await this.audit.record({ action: `job.interview_${status}` as 'job.interview_confirmed', actorUserId: actorId, meta, metadata: { orgId: cur.org_id, interviewId } }, tx);
+      return cur;
+    });
+    const label = action === 'confirm' ? 'confirmé' : action === 'decline' ? 'refusé' : 'annulé';
+    const title = `Entretien ${label}`;
+    const data = { interviewId, jobId: info.posting_id };
+    if (who.side === 'org') {
+      await this.notifications.notify({ userId: info.user_id, category: 'job', title, body: 'Ouvrez « Mes entretiens ».', data }).catch(() => undefined);
+    } else {
+      const m = await this.db.execute<{ user_id: string; role: OrgRole }>(sql`SELECT user_id, role FROM org_members WHERE org_id = ${info.org_id}::uuid AND status = 'active'`);
+      const to = m.rows.filter((r) => roleHasPermission(r.role, 'hr.manage') && r.user_id !== actorId);
+      await this.notifications.notifyMany(to.map((r) => ({ userId: r.user_id, category: 'job' as const, title, body: 'Consultez la candidature.', data }))).catch(() => undefined);
+    }
+    return (await this.interviewPage([sql`i.id = ${interviewId}::uuid`])).items[0]!;
   }
 
   private async notifyRecruiters(orgId: string, jobId: string, title: string, applicantId: string): Promise<void> {

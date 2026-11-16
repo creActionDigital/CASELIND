@@ -4,6 +4,12 @@ import {
   createListingAlertRequestSchema,
   type ListingAlert,
   type ListingAlertList,
+  type ConfirmVisitRequest,
+  confirmVisitRequestSchema,
+  type CreateVisitRequest,
+  createVisitRequestSchema,
+  type ListingVisit,
+  type ListingVisitList,
   type CreateListingRequest,
   createListingRequestSchema,
   type Listing,
@@ -84,5 +90,45 @@ export class ListingAlertsController {
   @HttpCode(204)
   async remove(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<void> {
     await this.listings.deleteAlert(user.userId, id, meta);
+  }
+}
+
+/** Visit appointments (lot 15c): visible only to the visitor and the ad's owner (404 otherwise). */
+@Controller()
+@RequireFlag('listings')
+export class ListingVisitsController {
+  constructor(private readonly listings: ListingsService) {}
+
+  @Post('listings/:id/visits')
+  request(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodPipe(createVisitRequestSchema)) body: CreateVisitRequest, @ReqMeta() meta: RequestMeta): Promise<ListingVisit> {
+    return this.listings.requestVisit(user.userId, id, body, meta);
+  }
+
+  @Get('me/visits')
+  mine(@CurrentUser() user: AuthUser): Promise<ListingVisitList> {
+    return this.listings.listVisits(user.userId);
+  }
+
+  @Get('visits/:id')
+  get(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<ListingVisit> {
+    return this.listings.getVisit(user.userId, id);
+  }
+
+  @Post('visits/:id/confirm')
+  @HttpCode(200)
+  confirm(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodPipe(confirmVisitRequestSchema)) body: ConfirmVisitRequest, @ReqMeta() meta: RequestMeta): Promise<ListingVisit> {
+    return this.listings.answerVisit(user.userId, id, 'confirm', body.place, meta);
+  }
+
+  @Post('visits/:id/decline')
+  @HttpCode(200)
+  decline(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<ListingVisit> {
+    return this.listings.answerVisit(user.userId, id, 'decline', undefined, meta);
+  }
+
+  @Post('visits/:id/cancel')
+  @HttpCode(200)
+  cancel(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<ListingVisit> {
+    return this.listings.answerVisit(user.userId, id, 'cancel', undefined, meta);
   }
 }

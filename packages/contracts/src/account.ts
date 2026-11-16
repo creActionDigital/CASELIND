@@ -129,8 +129,12 @@ export const accountExportSchema = z.object({
   /** Lot 16a: own CV and own applications (with the message sent; never other people's data). */
   jobProfile: z.object({ headline: z.string(), summary: z.string(), skills: z.array(z.string()), city: z.string(), experience: z.string(), education: z.string() }).nullable(),
   listingAlerts: z.array(z.object({ id: z.uuid(), q: z.string().nullable(), city: z.string().nullable(), kind: z.string().nullable(), createdAt: z.string() })),
+  /** Lot 15c: visit appointments, as visitor or as ad owner. */
+  listingVisits: z.array(z.object({ id: z.uuid(), listingId: z.uuid(), role: z.string(), status: z.string(), scheduledAt: z.string(), message: z.string(), place: z.string().nullable(), createdAt: z.string() })),
   jobAlerts: z.array(z.object({ id: z.uuid(), q: z.string().nullable(), city: z.string().nullable(), contractType: z.string().nullable(), createdAt: z.string() })),
   jobApplications: z.array(z.object({ id: z.uuid(), jobTitle: z.string(), orgName: z.string(), status: z.string(), message: z.string(), createdAt: z.string() })),
+  /** Lot 16f: interviews proposed to me (date, duration, place, status, my reason; no video link). */
+  jobInterviews: z.array(z.object({ id: z.uuid(), jobTitle: z.string(), orgName: z.string(), status: z.string(), startsAt: z.string(), durationMin: z.number().int(), location: z.string(), reason: z.string() })),
   /** Lot 16b: own missions, proposals and contracts (titles, amounts, statuses; never the other party's data beyond the handle). */
   freelance: z.object({
     missions: z.array(z.object({ id: z.uuid(), title: z.string(), budgetMinor: z.number().int(), currency: z.string(), status: z.string(), createdAt: z.string() })),
