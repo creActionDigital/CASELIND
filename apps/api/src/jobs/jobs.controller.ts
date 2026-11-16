@@ -4,7 +4,11 @@ import {
   type ApplicationList,
   type ApplyRequest,
   applyRequestSchema,
+  type CreateJobAlertRequest,
+  createJobAlertRequestSchema,
   type CreateJobRequest,
+  type JobAlert,
+  type JobAlertList,
   createJobRequestSchema,
   type Job,
   type JobList,
@@ -62,6 +66,22 @@ export class JobsController {
   @HttpCode(200)
   withdraw(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<Application> {
     return this.jobs.withdraw(user.userId, id, meta);
+  }
+
+  @Get('me/job-alerts')
+  alerts(@CurrentUser() user: AuthUser): Promise<JobAlertList> {
+    return this.jobs.listAlerts(user.userId);
+  }
+
+  @Post('me/job-alerts')
+  createAlert(@CurrentUser() user: AuthUser, @Body(new ZodPipe(createJobAlertRequestSchema)) body: CreateJobAlertRequest, @ReqMeta() meta: RequestMeta): Promise<JobAlert> {
+    return this.jobs.createAlert(user.userId, body, meta);
+  }
+
+  @Delete('me/job-alerts/:id')
+  @HttpCode(204)
+  async deleteAlert(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<void> {
+    await this.jobs.deleteAlert(user.userId, id, meta);
   }
 
   @Get('me/job-profile')

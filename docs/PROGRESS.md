@@ -515,3 +515,17 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : étoiles et commentaire dans la fiche du cours (`education/Reviews.tsx`), moyenne dans la liste, signalement d'un avis ; textes fr+en dans `education/messages.ts`.
 - Tests : `education.e2e.test.ts` (+1), openapi et account OK ; mobile 235 OK ; typecheck API et mobile OK. Non vérifié à l'écran.
 - Différé : réponse de l'auteur à un avis, tri/filtre des avis, avis réservé aux apprenants ayant terminé une part du cours, masquage des avis des utilisateurs bloqués, notification à l'auteur d'un nouvel avis.
+
+## Lot 16d — Alertes d'offres d'emploi (2026-11-16) : testé (API), non vérifié à l'écran
+- **Livré** : jusqu'à 5 alertes privées par personne (mot-clé, ville, contrat ; au moins un critère), listables et supprimables ; à la publication d'une offre, les personnes dont une alerte correspond (même filtre que `GET /jobs`) reçoivent la notification générique « Nouvelle offre correspondant à votre alerte » (catégorie `job`, sans la description), sauf l'auteur et les membres actifs de l'organisation ; envoi au mieux (l'offre est déjà publiée).
+- Migration 0042 (`job_alerts`, ON DELETE CASCADE) ; routes `GET/POST /v1/me/job-alerts`, `DELETE /v1/me/job-alerts/:id` derrière le drapeau `jobs` (6e alerte : 409 `alert_limit`) ; contrats et OpenAPI à jour ; audit `job.alert_created/deleted` (id seulement, jamais les critères) ; export de compte : `jobAlerts`.
+- Mobile : écran `jobs/alerts.tsx` (liste, création, suppression), accès par la cloche de l'écran emploi ; textes fr+en dans `jobs/messages.ts`.
+- Tests : `jobs.e2e.test.ts` (+1), openapi et account : 24 OK ; mobile 235 OK ; typecheck API et mobile OK.
+- Différé : alerte déclenchée aussi à la modification d'une offre, résumé groupé (digest) ou fréquence, alerte par salaire, vérification à l'écran, notification cliquable vers l'offre côté mobile.
+
+## Lot 17e — Recherche d'établissements et bourses (§13) (2026-11-16) : testé, non vérifié à l'écran
+- `GET /v1/schools?q=&city=` : écoles publiques et actives (même règle que la vitrine), curseur, champs publics seulement (nom, ville, logo, `verified`), jamais de classe ni d'élève ; derrière le drapeau réglementé `school`.
+- Bourses (migration 0043, `school_scholarships`) : le personnel (`org.members.manage`, organisation de type école, sinon 409) publie (titre, description 2000 car., date limite et lien https facultatifs) et clôture ; `GET /v1/school/scholarships` (ouvertes, date limite non passée, filtre ville) et `/{id}` pour tout connecté ; audit sans texte.
+- Mobile : « Établissements » (`school/search`), « Bourses » et détail (`school/scholarships`), gestion côté école (`seller/[orgId]/school/scholarships`) ; textes dans `school/messages-scholarships.ts`.
+- Tests : `school-scholarships.e2e.test.ts` + school, openapi, account : 20 OK ; mobile 235 OK ; typechecks API et mobile OK.
+- Différé : candidature en ligne, modification d'une bourse, signalement/masquage, fiche détaillée d'un établissement, tri par proximité, export de compte, vérification à l'écran.

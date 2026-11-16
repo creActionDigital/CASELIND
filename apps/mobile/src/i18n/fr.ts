@@ -12,6 +12,7 @@ import { healthProFr } from '../health/messages-pro';
 import { gamesFr } from '../games/messages';
 import { docsFr } from '../seller/documents-messages';
 import { schoolFr } from '../school/messages';
+import { scholarshipsFr } from '../school/messages-scholarships';
 import { salesFr } from '../seller/sales-messages';
 export const fr = {
   'common.loading': 'Chargement…',
@@ -1296,6 +1297,7 @@ export const fr = {
   ...gamesFr,
   ...salesFr,
   ...schoolFr,
+  ...scholarshipsFr,
   ...docsFr,
   ...deliveryFr,
   ...aiFr,

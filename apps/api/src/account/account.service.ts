@@ -233,6 +233,8 @@ export class AccountService {
       SELECT id, kind, title, description, price_minor, currency, city, status, created_at FROM listings WHERE owner_id = ${auth.userId}::uuid ORDER BY created_at, id`);
     const cvRows = await this.db.execute<AccountExport['jobProfile'] & object>(sql`
       SELECT headline, summary, skills, city, experience, education FROM job_profiles WHERE user_id = ${auth.userId}::uuid`);
+    const jobAlertRows = await this.db.execute<{ id: string; q: string | null; city: string | null; contract_type: string | null; created_at: Date }>(sql`
+      SELECT id, q, city, contract_type, created_at FROM job_alerts WHERE user_id = ${auth.userId}::uuid ORDER BY created_at`);
     const jobAppRows = await this.db.execute<{ id: string; title: string; org_name: string; status: string; message: string; created_at: Date }>(sql`
       SELECT a.id, j.title, o.name AS org_name, a.status, a.message, a.created_at FROM job_applications a
       JOIN job_postings j ON j.id = a.posting_id JOIN organizations o ON o.id = j.org_id
@@ -392,6 +394,7 @@ export class AccountService {
         createdAt: new Date(l.created_at).toISOString(),
       })),
       jobProfile: cvRows.rows[0] ?? null,
+      jobAlerts: jobAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, contractType: a.contract_type, createdAt: new Date(a.created_at).toISOString() })),
       jobApplications: jobAppRows.rows.map((a) => ({ id: a.id, jobTitle: a.title, orgName: a.org_name, status: a.status, message: a.message, createdAt: new Date(a.created_at).toISOString() })),
       freelance: {
         missions: frMissions.rows.map((m) => ({ id: m.id, title: m.title, budgetMinor: Number(m.budget_minor), currency: m.currency.trim(), status: m.status, createdAt: new Date(m.created_at).toISOString() })),

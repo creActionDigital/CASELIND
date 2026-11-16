@@ -127,6 +127,7 @@ export const accountExportSchema = z.object({
   ),
   /** Lot 16a: own CV and own applications (with the message sent; never other people's data). */
   jobProfile: z.object({ headline: z.string(), summary: z.string(), skills: z.array(z.string()), city: z.string(), experience: z.string(), education: z.string() }).nullable(),
+  jobAlerts: z.array(z.object({ id: z.uuid(), q: z.string().nullable(), city: z.string().nullable(), contractType: z.string().nullable(), createdAt: z.string() })),
   jobApplications: z.array(z.object({ id: z.uuid(), jobTitle: z.string(), orgName: z.string(), status: z.string(), message: z.string(), createdAt: z.string() })),
   /** Lot 16b: own missions, proposals and contracts (titles, amounts, statuses; never the other party's data beyond the handle). */
   freelance: z.object({

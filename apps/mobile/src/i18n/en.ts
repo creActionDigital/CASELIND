@@ -12,6 +12,7 @@ import { healthProEn } from '../health/messages-pro';
 import { gamesEn } from '../games/messages';
 import { docsEn } from '../seller/documents-messages';
 import { schoolEn } from '../school/messages';
+import { scholarshipsEn } from '../school/messages-scholarships';
 import { salesEn } from '../seller/sales-messages';
 import { deliveryEn } from '../delivery/messages';
 
@@ -1298,6 +1299,7 @@ export const en: Record<MessageKey, string> = {
   ...gamesEn,
   ...salesEn,
   ...schoolEn,
+  ...scholarshipsEn,
   ...docsEn,
   ...deliveryEn,
   ...aiEn,

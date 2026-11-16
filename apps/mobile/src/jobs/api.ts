@@ -1,6 +1,8 @@
 import {
   applicationListSchema,
   applicationSchema,
+  jobAlertListSchema,
+  jobAlertSchema,
   jobListSchema,
   jobProfileSchema,
   jobSchema,
@@ -9,6 +11,7 @@ import {
   orgApplicationSchema,
   type ApplicationStatus,
   type ContractType,
+  type CreateJobAlertRequest,
   type CreateJobRequest,
   type UpdateJobRequest,
   type JobProfileInput,
@@ -28,6 +31,7 @@ export const jobKeys = {
   one: (id: string) => ['jobs', 'one', id] as const,
   profile: ['jobs', 'profile'] as const,
   mine: ['jobs', 'mine'] as const,
+  alerts: ['jobs', 'alerts'] as const,
   org: (orgId: string) => ['jobs', 'org', orgId] as const,
   orgApps: (orgId: string, jobId: string) => ['jobs', 'org', orgId, 'apps', jobId] as const,
 };
@@ -41,6 +45,10 @@ export const withdrawApplication = (id: string) => api.request(`/me/job-applicat
 export const fetchMyJobProfile = () => api.request('/me/job-profile', { schema: myJobProfileSchema });
 export const saveJobProfile = (body: JobProfileInput) => api.request('/me/job-profile', { method: 'PUT', body, schema: jobProfileSchema });
 export const deleteJobProfile = () => api.request('/me/job-profile', { method: 'DELETE' });
+
+export const fetchJobAlerts = () => api.request('/me/job-alerts', { schema: jobAlertListSchema });
+export const createJobAlert = (body: CreateJobAlertRequest) => api.request('/me/job-alerts', { method: 'POST', body, schema: jobAlertSchema });
+export const deleteJobAlert = (id: string) => api.request(`/me/job-alerts/${id}`, { method: 'DELETE' });
 
 export const fetchOrgJobs = (orgId: string, cursor?: string) => api.request(`/orgs/${orgId}/jobs`, { query: { limit: PAGE, cursor }, schema: jobListSchema });
 export const updateOrgJob = (orgId: string, jobId: string, body: UpdateJobRequest) => api.request(`/orgs/${orgId}/jobs/${jobId}`, { method: 'PATCH', body, schema: jobSchema });

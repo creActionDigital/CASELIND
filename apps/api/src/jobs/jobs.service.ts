@@ -5,7 +5,11 @@ import {
   type ApplicationList,
   type ApplicationStatus,
   type ApplyRequest,
+  type CreateJobAlertRequest,
   type CreateJobRequest,
+  type JobAlert,
+  type JobAlertList,
+  MAX_JOB_ALERTS,
   type Job,
   type JobList,
   type JobListQuery,
@@ -143,6 +147,7 @@ export class JobsService implements OnModuleInit {
       await this.audit.record({ action: 'job.posted', actorUserId: userId, meta, metadata: { orgId, jobId } }, tx);
       return jobId;
     });
+    await this.notifyAlerts(orgId, id, body).catch(() => undefined); // best effort: the offer is already published
     return this.orgGet(orgId, id, userId);
   }
 
@@ -225,6 +230,61 @@ export class JobsService implements OnModuleInit {
         j.title, j.description, j.city, j.contract_type, j.salary_min_minor, j.salary_max_minor, j.currency, j.status, j.created_at,
         EXISTS (SELECT 1 FROM job_applications a WHERE a.posting_id = j.id AND a.user_id = ${viewerId}::uuid) AS applied
       FROM job_postings j JOIN organizations o ON o.id = j.org_id`;
+  }
+
+  // ---- Alerts (private to their owner) ----------------------------------------------------------
+
+  private toAlert = (r: { id: string; q: string | null; city: string | null; contract_type: JobAlert['contractType']; created_at: Date }): JobAlert => ({
+    id: r.id,
+    q: r.q,
+    city: r.city,
+    contractType: r.contract_type,
+    createdAt: iso(r.created_at),
+  });
+
+  async listAlerts(userId: string): Promise<JobAlertList> {
+    const res = await this.db.execute<{ id: string; q: string | null; city: string | null; contract_type: JobAlert['contractType']; created_at: Date }>(
+      sql`SELECT id, q, city, contract_type, created_at FROM job_alerts WHERE user_id = ${userId}::uuid ORDER BY created_at, id`,
+    );
+    return { items: res.rows.map(this.toAlert) };
+  }
+
+  async createAlert(userId: string, body: CreateJobAlertRequest, meta: RequestMeta): Promise<JobAlert> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT 1 FROM users WHERE id = ${userId}::uuid FOR NO KEY UPDATE`); // serialises the quota check
+      const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM job_alerts WHERE user_id = ${userId}::uuid`);
+      if ((n.rows[0]?.n ?? 0) >= MAX_JOB_ALERTS) throw AppError.conflict('Job alert limit reached', { reason: 'alert_limit' });
+      const res = await tx.execute<{ id: string; q: string | null; city: string | null; contract_type: JobAlert['contractType']; created_at: Date }>(sql`
+        INSERT INTO job_alerts (user_id, q, city, contract_type) VALUES (${userId}::uuid, ${body.q ?? null}, ${body.city ?? null}, ${body.contractType ?? null})
+        RETURNING id, q, city, contract_type, created_at`);
+      const row = res.rows[0]!;
+      await this.audit.record({ action: 'job.alert_created', actorUserId: userId, meta, metadata: { alertId: row.id } }, tx);
+      return this.toAlert(row);
+    });
+  }
+
+  /** Idempotent; only the owner can delete (anything else is a no-op 204). */
+  async deleteAlert(userId: string, id: string, meta: RequestMeta): Promise<void> {
+    if (!UUID_RE.test(id)) return;
+    await this.db.transaction(async (tx) => {
+      const res = await tx.execute(sql`DELETE FROM job_alerts WHERE id = ${id}::uuid AND user_id = ${userId}::uuid`);
+      if (res.rowCount) await this.audit.record({ action: 'job.alert_deleted', actorUserId: userId, meta, metadata: { alertId: id } }, tx);
+    });
+  }
+
+  /** Same filter as GET /jobs (text in title, description or organisation name; city; contract). Generic title: never the offer's content. */
+  private async notifyAlerts(orgId: string, jobId: string, body: CreateJobRequest): Promise<void> {
+    const org = await this.db.execute(sql`SELECT 1 FROM organizations WHERE id = ${orgId}::uuid AND status = 'active' AND visibility = 'public'`);
+    if (org.rows.length === 0) return;
+    const res = await this.db.execute<{ user_id: string }>(sql`
+      SELECT DISTINCT a.user_id FROM job_alerts a, organizations o
+      WHERE o.id = ${orgId}::uuid
+        AND (a.contract_type IS NULL OR a.contract_type = ${body.contractType})
+        AND (a.city IS NULL OR lower(a.city) = lower(${body.city}))
+        AND (a.q IS NULL OR position(lower(a.q) in lower(${body.title} || ' ' || ${body.description} || ' ' || o.name)) > 0)
+        AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id = o.id AND m.user_id = a.user_id AND m.status = 'active')
+        AND a.user_id <> (SELECT created_by FROM job_postings WHERE id = ${jobId}::uuid)`);
+    await this.notifications.notifyMany(res.rows.map((r) => ({ userId: r.user_id, category: 'job' as const, title: 'Nouvelle offre correspondant à votre alerte', body: 'Ouvrez l’emploi pour la consulter.', data: { jobId } })));
   }
 
   // ---- CV ---------------------------------------------------------------------------------------

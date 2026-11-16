@@ -210,3 +210,40 @@ describe('jobs (lot 16a)', () => {
     expect(exp.jobApplications[0]).toMatchObject({ message: 'Message privé', status: 'submitted', jobTitle: 'Comptable' });
   });
 });
+
+describe('job alerts (lot 16d)', () => {
+  it('keeps up to 5 private alerts, notifies matching people on a new offer (not the organisation), exports and audits without criteria', async () => {
+    const [owner, hr, seeker, other] = [await user(), await user(), await user(), await user()];
+    const org = await createOrg(owner);
+    await addMember(org, owner, hr, 'hr');
+    const alerts = '/v1/me/job-alerts';
+    await ctx.http.post(alerts).set(bearer(seeker.token)).send({}).expect(400);
+    const a = (await ctx.http.post(alerts).set(bearer(seeker.token)).send({ q: 'compta', city: 'goma' }).expect(201)).body;
+    expect(a).toMatchObject({ q: 'compta', city: 'goma', contractType: null });
+    await ctx.http.post(alerts).set(bearer(other.token)).send({ city: 'Bukavu' }).expect(201);
+    await ctx.http.post(alerts).set(bearer(hr.token)).send({ contractType: 'full_time' }).expect(201); // a member of the organisation
+    for (let i = 0; i < 4; i++) await ctx.http.post(alerts).set(bearer(seeker.token)).send({ contractType: 'internship' }).expect(201);
+    await ctx.http.post(alerts).set(bearer(seeker.token)).send({ q: 'x' }).expect(409);
+    expect((await ctx.http.get(alerts).set(bearer(other.token)).expect(200)).body.items).toHaveLength(1);
+
+    await post(org, owner, job()).expect(201);
+    const count = async (u: TU) => Number((await ctx.sql.query(`SELECT count(*) AS n FROM notifications WHERE user_id = $1 AND title LIKE 'Nouvelle offre correspondant%'`, [u.id])).rows[0].n);
+    expect(await count(seeker)).toBe(1);
+    expect(await count(other)).toBe(0);
+    expect(await count(hr)).toBe(0);
+    const body = JSON.stringify((await ctx.sql.query('SELECT title, body FROM notifications WHERE user_id = $1', [seeker.id])).rows);
+    expect(body).not.toContain('Tenue de la comptabilité');
+
+    const audits = await ctx.sql.query(`SELECT metadata::text AS m FROM audit_events WHERE subject_user_id = $1 AND action = 'job.alert_created'`, [seeker.id]);
+    expect(audits.rows.length).toBe(5);
+    expect(JSON.stringify(audits.rows)).not.toContain('compta');
+    const exp = (await ctx.http.get('/v1/me/export').set(bearer(seeker.token)).expect(200)).body;
+    expect(exp.jobAlerts).toHaveLength(5);
+
+    await ctx.http.delete(`${alerts}/${a.id}`).set(bearer(other.token)).expect(204); // not theirs: no effect
+    expect((await ctx.http.get(alerts).set(bearer(seeker.token)).expect(200)).body.items).toHaveLength(5);
+    await ctx.http.delete(`${alerts}/${a.id}`).set(bearer(seeker.token)).expect(204);
+    await ctx.http.delete(`${alerts}/${a.id}`).set(bearer(seeker.token)).expect(204);
+    expect((await ctx.http.get(alerts).set(bearer(seeker.token)).expect(200)).body.items).toHaveLength(4);
+  });
+});

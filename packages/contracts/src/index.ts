@@ -36,3 +36,4 @@ export * from './health-pro.js';
 export * from './documents.js';
 export * from './games.js';
 export * from './school.js';
+export * from './school-scholarships.js';

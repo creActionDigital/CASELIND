@@ -147,3 +147,24 @@ export const isTerminalApplication = (s: ApplicationStatus): boolean => APPLICAT
 /** GET /v1/me/job-profile: wrapped so that "no CV yet" is a real JSON body. */
 export const myJobProfileSchema = z.object({ profile: jobProfileSchema.nullable() });
 export type MyJobProfile = z.infer<typeof myJobProfileSchema>;
+
+/** Job alerts (lot 16d): up to 5 per person, private, at least one criterion. */
+export const MAX_JOB_ALERTS = 5;
+export const createJobAlertRequestSchema = z
+  .object({
+    q: z.string().trim().min(1).max(100).optional(),
+    city: z.string().trim().min(1).max(80).optional(),
+    contractType: contractTypeSchema.optional(),
+  })
+  .refine((v) => v.q !== undefined || v.city !== undefined || v.contractType !== undefined, { path: ['q'], message: 'at least one criterion is required' });
+export type CreateJobAlertRequest = z.infer<typeof createJobAlertRequestSchema>;
+export const jobAlertSchema = z.object({
+  id: z.uuid(),
+  q: z.string().nullable(),
+  city: z.string().nullable(),
+  contractType: contractTypeSchema.nullable(),
+  createdAt: z.string(),
+});
+export type JobAlert = z.infer<typeof jobAlertSchema>;
+export const jobAlertListSchema = z.object({ items: z.array(jobAlertSchema) });
+export type JobAlertList = z.infer<typeof jobAlertListSchema>;

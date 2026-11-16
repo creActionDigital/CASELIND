@@ -5,7 +5,7 @@ import { useI18n } from '../../../i18n';
 import { fetchMyClasses, schk } from '../../../school/api';
 import { Card, Loading } from '../../../seller/ui';
 import { spacing } from '../../../theme/tokens';
-import { Badge, ErrorState, Text } from '../../../ui';
+import { Badge, Button, ErrorState, Text } from '../../../ui';
 
 /** Mes classes : celles où la personne est inscrite par son établissement (élève, parent ou enseignant). */
 export default function MyClasses() {
@@ -16,6 +16,8 @@ export default function MyClasses() {
     <>
       <Stack.Screen options={{ title: t('school.title') }} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
+        <Button variant="secondary" label={t('school.search.link')} onPress={() => router.push('/school/search' as never)} />
+        <Button variant="secondary" label={t('school.scholarships.link')} onPress={() => router.push('/school/scholarships' as never)} />
         {q.isPending ? <Loading /> : null}
         {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : null}
         {q.data?.items.length === 0 ? <Text muted>{t('school.empty')}</Text> : null}
