@@ -5,7 +5,7 @@ Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShe
 ## À lire d'abord
 1. `CASELIND_CAHIER_DES_CHARGES_DEFINITIF.md` (racine) : le cahier maître. Relis la section de chaque lot avant de le cadrer (§39.4 processus, §39.10 rapport de fin de lot, §34 règles non négociables).
 2. `docs/BACKLOG.md` : **décisions du propriétaire** et feuille de route des lots, à tenir à jour. `docs/PROGRESS.md` : état réel, tests, différés par lot. `docs/CONTROLE_ET_COMPTES.md`, `docs/architecture/DECISIONS.md`.
-3. `git log --oneline` : dernier lot = 20a jeux (quiz éclair).
+3. `git log --oneline` : derniers travaux = web v1 (`apps/web`), 17b établissements, 16c (analyse de ventes, devis/factures, clients), 20b jeux (tournois, badges).
 
 ## Décisions du propriétaire (à respecter)
 - **Trading et paris sportifs : RETIRÉS du projet.** Ne rien développer ni proposer.
@@ -14,10 +14,11 @@ Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShe
 - Pas d'argent réel, pas de NFT, CSL Coins (§18) bloqué : règles non spécifiées, ne rien inventer.
 - Ne pas inventer de numéros d'urgence, d'agréments ou d'intégrations ; dire honnêtement le statut de chaque intégration (§34).
 
-## État (2026-11-15)
-- **Backend** NestJS + PostgreSQL, migrations 0001–0034. **580 tests API**, **231 tests mobile**, typechecks propres. Lots livrés et testés : 1 à 12 (identité, messagerie, social, commerce, livraison, services, wallet sandbox, KYC, mini-apps, mobilité, IA, lieux), 13 finance personnelle, 14 communautés, 15 petites annonces, 16a emploi, 16b freelance (paiement externe, séquestre différé), 17a éducation (cours, quiz, certificats), 18a santé personnelle (consentement, dossier chiffré, rappels), 18b santé professionnels (agrément vérifié, rendez-vous, partage du dossier, ordonnances).
-- **Mobile** Expo SDK 58 (`apps/mobile`), mobile validé par le propriétaire. **Web** (React + Vite) : non commencé, après les lots backend.
-- Reste à faire, dans l'ordre : **20b jeux (tournois, badges non monétaires, §21)** ; 16c outils professionnels (§14, auditer d'abord l'existant : commandes, stock, coupons, avis, wallet) ; 17b établissements scolaires (§13, **décision du propriétaire requise sur les mineurs / consentement parental**) ; puis le web (§27). Les différés de chaque lot sont dans `docs/PROGRESS.md`.
+## État (2026-11-16)
+- **Backend** NestJS + PostgreSQL, migrations 0001–0038. **587 tests API**, **235 tests mobile**, 3 tests web, typechecks propres. Lots livrés et testés : 1 à 18b, 20a, **20b** jeux (tournois, badges), **16c** en partie (analyse de ventes, devis/factures, clients), **17b** établissements (classes, emplois du temps, annonces ; drapeau `school` réglementé, coupé par défaut).
+- **Mobile** Expo SDK 58 (`apps/mobile`). **Web** `apps/web` (React 19 + Vite 8) : v1 = accueil, vitrine publique `/s/<adresse>`, PWA.
+- **Réponses du propriétaire (2026-11-16, voir BACKLOG « Décisions »)** : GitHub privé autorisé (URL `https://github.com/creActionDigital/CASELIND.git`, remote `origin` configuré, **le push échoue : « Repository not found »** tant que le dépôt n'existe pas ou que la machine n'est pas authentifiée) ; mineurs : à l'établissement ; services publics (lot 19) **abandonné** ; CSL Coins et FlexPay plus tard ; pays = RDC ; IA : OmniRoute d'abord ; web après le mobile ; pas de domaine ni d'hébergement.
+- Reste à faire : **16c** caisse, fidélité, campagnes (règles non spécifiées : à cadrer, l'architecte décide) ; **web** : swahili, catalogue public (aucune route publique de produits), comptes, SEO ; 17b différé (frais, bourses, recherche d'établissements) ; `/code-review` à relancer sur 17b et le web ; CSL Coins bloqué. Pièges de la session : ports Expo 8083 parfois indisponible (utiliser 8085 et `CORS_ORIGINS=http://localhost:8085` en lançant l'API) ; la base de dev est `caselind_utf8` ; blocs shell longs refusés : écrire les fichiers avec l'outil Write.
 
 ## Règles de design décidées par le propriétaire
 - **Aucun dégradé** : couleur de marque unie `#4F46E5` (`brandColor`, `src/theme/tokens.ts`). Police Poppins. Style Apple.
@@ -58,19 +59,5 @@ claude
 ## Retour d'expérience OmniRoute (modèles gratuits)
 Un essai du lot 20a avec `auto/coding:free` (`gpt-oss-120b`) a échoué : modèle de données inventé, code qui ne compile pas, compte rendu qui décrit des tables inexistantes. Avec ces modèles : tâches **courtes et fermées**, une à la fois ; vérifier soi-même `npx tsc --noEmit -p .` et les tests ; ne jamais croire un compte rendu sans lire le diff. OmniRoute met ~30 s à démarrer et manque de mémoire si le navigateur et les serveurs tournent.
 
-## QUESTIONS À POSER AU PROPRIÉTAIRE DÈS LE DÉBUT DE LA CONVERSATION (il n'y a pas encore répondu)
-Pose-les **toutes tout de suite**, regroupées en une seule liste numérotée (pas une par une, pas après avoir commencé à coder), puis note les réponses dans `docs/BACKLOG.md` (section « Décisions ») et dans la mémoire. Pendant qu'il répond, enchaîne sur le travail qui ne dépend d'aucune réponse.
-1. **Dépôt GitHub privé** (urgent : le code n'existe qu'en local). A-t-il un compte GitHub ? Veut-il que je crée le dépôt privé et pousse (avec son accord explicite) ?
-2. **Mineurs et consentement parental** (bloque le lot 17b établissements scolaires §13) : la plateforme ne connaît pas l'âge des comptes. Faut-il demander une date de naissance à l'inscription, un âge minimum, un compte « parent » qui valide l'inscription d'un enfant ? Ou reporter 17b ?
-3. **Numéros d'urgence officiels** (lot 19, branche `wip/lot19-services-publics`) : quels numéros fournir (police, pompiers, ambulance, par pays) ? Je n'en invente aucun. Et veut-il reprendre le lot 19 maintenant ou plus tard ?
-4. **CSL Coins (§18)** : quelles sont les règles (création, acquisition, dépense, transfert, expiration, conversion, valeur) ? Sans elles, rien n'est codé.
-5. **Paiements réels** : compte marchand FlexPay (Mobile Money, question Q5) : l'a-t-il ouvert ? Débloque le séquestre freelance, les frais, les paiements réels (toujours coupés tant que non validés).
-6. **Codes de connexion** (Q2) : comptes Brevo (e-mail) et Meta WhatsApp Business créés ? (`docs/OTP_SETUP.md`)
-7. **Expo** (Q8) : `npx expo login` fait ? Nécessaire pour les notifications push réelles et la compilation sur téléphone.
-8. **Assistant IA** : a-t-il une clé Google AI Studio (Gemini) à configurer ? Veut-il garder OmniRoute (modèles gratuits) comme solution de repli pour l'assistant ?
-9. **Hébergement, nom de domaine, WebRTC/TURN** (Q6) : où héberger ? Quel nom de domaine ? Quel service d'appels vidéo ? Débloque appels, entretiens vidéo, téléconsultation en vidéo, le web et la mise en ligne.
-10. **Santé** : le module est codé mais coupé. Quand et dans quel pays veut-il l'activer ? Quelle durée de conservation des données de santé par pays (je n'en fixe aucune) ? Quels pays, quelles licences ?
-11. **Quiz éclair** : veut-il que je prépare une banque de questions de départ (au moins 10 sont nécessaires pour que le jeu démarre) ? Sur quels thèmes, en quelles langues ?
-12. **Outils professionnels (lot 16c, §14)** : après audit de l'existant, quels outils veut-il en priorité (devis, factures, CRM, caisse, campagnes) ?
-13. **Web (React + Vite, §27)** : veut-il commencer le web maintenant que le backend est avancé, ou finir d'abord les lots restants (20b jeux, 16c, 17b, 19) ?
-14. **Sécurité d'OmniRoute** : il écoute sur `0.0.0.0` sans clé obligatoire. Veut-il que je lui explique comment exiger une clé ou limiter à `localhost` ?
+## Questions
+Les 14 questions de départ ont reçu une réponse le 2026-11-16 (voir `docs/BACKLOG.md`, « Réponses du 2026-11-16 »). Ne les reposer pas. Restent ouvertes : règles CSL Coins, compte FlexPay, Brevo/WhatsApp, hébergement et domaine, création du dépôt GitHub.
