@@ -29,6 +29,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 20b | §21 | Jeux : tournois et badges non monétaires (autres jeux : différé) | testé (API + mobile ; écran vérifié dans le navigateur) |
 | — | §20, paris | Trading, paris sportifs | **retiré** |
 | — | §18 | CSL Coins | bloqué : règles non spécifiées (question ouverte) |
+| M9 | §6, §4 | Appels 1:1 et lives : signalisation WebRTC relayée par le temps réel (rien de stocké), historique des appels, salons live (chat, compteur, pic), drapeaux calls/live, export et purge | **API testée** (e2e calls-live, migration 0058) ; mobile : écran d’appel, bandeau d’appel entrant, boutons dans la conversation, onglet Live ; typecheck OK, **non vérifié à l’écran**. **Média (audio/vidéo) NON fait** : exige un serveur STUN/TURN (Q6) et un appareil réel ; `react-native-webrtc` hors Expo Go |
 | Web | §27 | React + Vite, PWA | première version faite (accueil, vitrine publique, PWA) ; comptes, catalogue public, swahili, SEO à faire |
 
 ## Ordre imposé

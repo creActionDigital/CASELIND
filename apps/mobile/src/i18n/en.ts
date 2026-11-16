@@ -18,6 +18,7 @@ import { feesEn } from '../school/messages-fees';
 import { salesEn } from '../seller/sales-messages';
 import { loyaltyEn } from '../loyalty/messages';
 import { miniappsEn } from '../miniapps/messages';
+import { callliveEn } from '../calllive/messages';
 import { deliveryEn } from '../delivery/messages';
 
 export const en: Record<MessageKey, string> = {
@@ -1306,6 +1307,7 @@ export const en: Record<MessageKey, string> = {
   ...feesEn,
   ...loyaltyEn,
   ...miniappsEn,
+  ...callliveEn,
   ...schoolEn,
   ...adminEn,
   ...scholarshipsEn,

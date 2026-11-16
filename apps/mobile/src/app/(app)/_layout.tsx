@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { useI18n } from '../../i18n';
+import { IncomingCall } from '../../calllive/IncomingCall';
 import { PushRouting } from '../../notifications/PushRouting';
 import { ReportSheet } from '../../report/ReportSheet';
 import { useTheme } from '../../theme/use-theme';
@@ -10,6 +11,7 @@ export default function AppLayout() {
   return (
     <>
     <PushRouting />
+    <IncomingCall />
     <ReportSheet />
     <Stack
       screenOptions={{
@@ -55,6 +57,8 @@ export default function AppLayout() {
       <Stack.Screen name="scheduled" options={{ title: t('messagesX.scheduled.title') }} />
       <Stack.Screen name="chat-info/[conversationId]" options={{ title: t('messagesX.info') }} />
       <Stack.Screen name="story/[userId]" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="lives/[id]" options={{ title: t('lives.title') }} />
+      <Stack.Screen name="calls/[id]" options={{ title: t('calls.title'), presentation: 'modal' }} />
       <Stack.Screen name="story/new" options={{ headerShown: false, presentation: 'modal' }} />
     </Stack>
     </>

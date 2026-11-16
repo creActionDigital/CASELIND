@@ -18,6 +18,7 @@ import { feesFr } from '../school/messages-fees';
 import { salesFr } from '../seller/sales-messages';
 import { loyaltyFr } from '../loyalty/messages';
 import { miniappsFr } from '../miniapps/messages';
+import { callliveFr } from '../calllive/messages';
 export const fr = {
   'common.loading': 'Chargement…',
   'common.retry': 'Réessayer',
@@ -1304,6 +1305,7 @@ export const fr = {
   ...feesFr,
   ...loyaltyFr,
   ...miniappsFr,
+  ...callliveFr,
   ...schoolFr,
   ...adminFr,
   ...scholarshipsFr,

@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { api, useAuth } from '../../../auth/auth-context';
 import { SheetModal } from '../../../components/SheetModal';
 import { openReport } from '../../../report/open-report';
+import { startCall } from '../../../calllive/api';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
@@ -415,10 +416,24 @@ export default function ChatRoom() {
           </Text>
         ) : null}
       </View>
+      {conv.data?.kind === 'direct' ? (
+        <>
+          <IconButton icon="call-outline" label={t('calls.audio')} onPress={() => void placeCall('audio')} style={{ backgroundColor: cc.card }} />
+          <IconButton icon="videocam-outline" label={t('calls.video')} onPress={() => void placeCall('video')} style={{ backgroundColor: cc.card }} />
+        </>
+      ) : null}
       {conv.data ? <IconButton icon="ellipsis-horizontal" label={t('chat.menu.more')} onPress={() => setMenu(true)} style={{ backgroundColor: cc.card }} /> : null}
     </View>
   );
 
+  async function placeCall(kind: 'audio' | 'video') {
+    try {
+      const call = await startCall(id, kind);
+      router.push({ pathname: '/calls/[id]', params: { id: call.id } });
+    } catch (err) {
+      setNotice(errorMessage(err, t, locale));
+    }
+  }
   async function patchState(body: { mutedUntil?: string | null; archived?: boolean }) {
     setMenu(false);
     try {
