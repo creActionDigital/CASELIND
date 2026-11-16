@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { api } from '../../../auth/auth-context';
+import { api, useAuth } from '../../../auth/auth-context';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { radius, spacing, TAB_BAR_SPACE } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -25,6 +25,7 @@ export default function More() {
   const { colors } = useTheme();
   const { t } = useI18n();
   const router = useRouter();
+  const { me } = useAuth();
   const flags = useQuery({
     queryKey: ['flags'],
     queryFn: () => api.request('/config/flags', { schema: userFlagsSchema }),
@@ -165,6 +166,19 @@ export default function More() {
               <Ionicons name="briefcase-outline" size={26} color={colors.primary} />
               <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
                 {t('jobs.title')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {me?.roles.includes('admin') ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('admin.title')}
+              onPress={() => router.push('/admin/governance')}
+              style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="shield-checkmark-outline" size={26} color={colors.primary} />
+              <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+                {t('admin.title')}
               </Text>
             </Pressable>
           ) : null}

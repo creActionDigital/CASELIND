@@ -12,6 +12,7 @@ import { healthProFr } from '../health/messages-pro';
 import { gamesFr } from '../games/messages';
 import { docsFr } from '../seller/documents-messages';
 import { schoolFr } from '../school/messages';
+import { adminFr } from '../admin/messages';
 import { scholarshipsFr } from '../school/messages-scholarships';
 import { feesFr } from '../school/messages-fees';
 import { salesFr } from '../seller/sales-messages';
@@ -1301,6 +1302,7 @@ export const fr = {
   ...feesFr,
   ...loyaltyFr,
   ...schoolFr,
+  ...adminFr,
   ...scholarshipsFr,
   ...docsFr,
   ...deliveryFr,

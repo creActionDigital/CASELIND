@@ -652,3 +652,7 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 ## Corrections de documentation (audit de conformité, 2026-11-16)
 - Affirmations périmées des lots 1 à 4 de ce fichier, à lire ainsi : `@RequireFlag` est posé sur une trentaine de contrôleurs de production ; le dépôt Git a plus de 100 commits, une CI et un Dockerfile existent depuis le lot 1c ; les permissions métier des organisations sont utilisées (catalogue, commandes, wallet d'organisation, QR) ; l'outil d'administration de sanction de compte cité au lot 4 existe maintenant (gouvernance admin) ; la livraison a été faite au lot 8.
 - Les comptes de tests cités dans ce fichier sont ceux observés au moment de chaque lot ; les derniers chiffres vérifiés sont ceux de la section la plus récente.
+
+## Écran gouvernance (2026-11-16)
+- Mobile : `admin/governance.tsx` (onglets Comptes/Organisations, recherche, suspendre/réactiver/vérifier avec motif ≥ 3 caractères et confirmation, erreurs 409 via `details.reason`), tuile « Gouvernance » dans Plus réservée aux admins.
+- Fichiers : `admin/api.ts`, `logic.ts` (+ test), `messages.ts` fr/en ; tsc propre.
