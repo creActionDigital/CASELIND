@@ -12,6 +12,10 @@ import {
   orgReviewListSchema,
   reviewSchema,
   salesSummarySchema,
+  businessDocumentListSchema,
+  businessDocumentSchema,
+  type CreateDocumentRequest,
+  type DocumentStatus,
   variantSchema,
   type CreateCouponRequest,
   type OrderStatus,
@@ -86,3 +90,14 @@ export function useMembership(orgId: string) {
 }
 
 export const fetchSalesSummary = (orgId: string, days: number) => api.request(`/orgs/${orgId}/sales-summary`, { query: { days }, schema: salesSummarySchema });
+
+export const dk = {
+  list: (orgId: string, kind: string) => ['seller', orgId, 'documents', kind] as const,
+  all: (orgId: string) => ['seller', orgId, 'documents'] as const,
+  one: (orgId: string, id: string) => ['seller', orgId, 'document', id] as const,
+};
+export const fetchDocuments = (orgId: string, kind?: 'quote' | 'invoice') => api.request(`/orgs/${orgId}/documents`, { query: kind ? { kind } : {}, schema: businessDocumentListSchema });
+export const fetchDocument = (orgId: string, id: string) => api.request(`/orgs/${orgId}/documents/${id}`, { schema: businessDocumentSchema });
+export const createDocument = (orgId: string, body: CreateDocumentRequest) => api.request(`/orgs/${orgId}/documents`, { method: 'POST', body, schema: businessDocumentSchema });
+export const setDocumentStatus = (orgId: string, id: string, status: DocumentStatus) => api.request(`/orgs/${orgId}/documents/${id}/status`, { method: 'POST', body: { status }, schema: businessDocumentSchema });
+export const convertDocument = (orgId: string, id: string) => api.request(`/orgs/${orgId}/documents/${id}/convert`, { method: 'POST', schema: businessDocumentSchema });

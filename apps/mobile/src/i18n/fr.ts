@@ -10,6 +10,7 @@ import { educationFr } from '../education/messages';
 import { healthFr } from '../health/messages';
 import { healthProFr } from '../health/messages-pro';
 import { gamesFr } from '../games/messages';
+import { docsFr } from '../seller/documents-messages';
 import { salesFr } from '../seller/sales-messages';
 export const fr = {
   'common.loading': 'Chargement…',
@@ -1293,6 +1294,7 @@ export const fr = {
   ...healthProFr,
   ...gamesFr,
   ...salesFr,
+  ...docsFr,
   ...deliveryFr,
   ...aiFr,
   ...walletUiFr,
