@@ -17,11 +17,11 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 |---|---|---|---|
 | 13 | §19 | Finance personnelle (budget, bilan) | testé |
 | 15 | §15 | Petites annonces | testé |
-| 16a | §14 | Emploi : offres, CV, candidatures | testé |
+| 16a | §14 | Emploi : offres, CV, candidatures | testé ; modification d’offre à l’écran et alertes d’offres (16d) faites |
 | 16b | §14 | Freelance : missions, propositions, jalons, litiges | testé (paiement externe, séquestre différé) |
 | 16c | §14 | Outils pro : devis, factures, CRM, caisse | analyse de ventes, devis et factures, clients (CRM léger) testés ; caisse, fidélité, campagnes à faire |
-| 17a | §13 | Éducation : cours, quiz, certificats | testé |
-| 17b | §13 | Établissements : emplois du temps, parents, frais, bourses | testé (classes, emploi du temps, annonces ; frais et bourses différés) |
+| 17a | §13 | Éducation : cours, quiz, certificats | testé ; avis et notes sur les cours (17d) faits |
+| 17b | §13 | Établissements : emplois du temps, parents, frais, bourses | testé (classes, emploi du temps, annonces, notifications aux inscrits, recherche d’établissements, bourses sans candidature en ligne ; frais scolaires différés) |
 | 18a | §12 | Santé : consentement, dossier chiffré, rappels | testé (module réglementé, coupé par défaut) |
 | 18b | §12 | Santé : professionnels vérifiés, rendez-vous, partage du dossier, ordonnances | testé (réglementé, coupé par défaut) ; pharmacie, résultats d’examens, assurance, vidéo : différés |
 | 19 | §16 | Administration publique, alertes, urgences, signalements urbains | **abandonné : le propriétaire a retiré les services publics (2026-11-16)** ; le code reste sur la branche `wip/lot19-services-publics`, non fusionné |
