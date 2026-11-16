@@ -24,6 +24,7 @@ import {
   type OrderListQuery,
   orderListQuerySchema,
   type PaymentMethodList,
+  type CustomerList,
   type SalesSummary,
   type SalesSummaryQuery,
   salesSummaryQuerySchema,
@@ -134,6 +135,12 @@ export class OrgOrdersController {
   @OrgPermission('orders.manage')
   convertQuote(@CurrentMembership() m: OrgMembership, @CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<BusinessDocument> {
     return this.documents.convert(m.orgId, user.userId, id, meta);
+  }
+
+  @Get('customers')
+  @OrgPermission('orders.view')
+  customers(@CurrentMembership() m: OrgMembership): Promise<CustomerList> {
+    return this.orders.customers(m.orgId);
   }
 
   @Get('sales-summary')

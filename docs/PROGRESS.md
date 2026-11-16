@@ -486,3 +486,9 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Risque trouvé et corrigé : un propriétaire d'organisation « école » pouvait inscrire quelqu'un sans son accord, sans issue pour lui. Ajout de `DELETE /me/school/classes/{id}` (quitter la classe) et du bouton dans l'application.
 - Risques restants, à connaître : la plateforme ne vérifie pas qu'une organisation de type « école » en est vraiment une (à brancher sur la vérification d'organisation si elle existe) ; l'inscription par identifiant révèle si un identifiant existe (404) au personnel de l'école.
 - Résultats observés : API 586 tests, mobile 235, typechecks propres.
+
+## Lot 16c (suite) — Clients (CRM léger) (2026-11-16) : API testée, écran codé non vérifié dans le navigateur
+- `GET /orgs/{orgId}/customers` : acheteurs de l'organisation dérivés des commandes (annulées ignorées), meilleurs clients d'abord, une ligne par acheteur et devise, top 100 ; `orders.view`. Aucune table, aucune donnée en plus que ce que le vendeur voit déjà dans ses commandes. Écran « Clients » dans le tableau de bord vendeur.
+- Résultats observés : API 587 tests, mobile 235, typechecks propres.
+- Différé : caisse, fidélité, campagnes (règles non spécifiées au cahier : à cadrer avec le propriétaire), notes sur les clients, rendu à l'écran.
+- Lot 19 (services publics) : marqué abandonné dans BACKLOG, à la demande du propriétaire.

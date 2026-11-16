@@ -12,6 +12,7 @@ import {
   orgReviewListSchema,
   reviewSchema,
   salesSummarySchema,
+  customerListSchema,
   businessDocumentListSchema,
   businessDocumentSchema,
   type CreateDocumentRequest,
@@ -101,3 +102,5 @@ export const fetchDocument = (orgId: string, id: string) => api.request(`/orgs/$
 export const createDocument = (orgId: string, body: CreateDocumentRequest) => api.request(`/orgs/${orgId}/documents`, { method: 'POST', body, schema: businessDocumentSchema });
 export const setDocumentStatus = (orgId: string, id: string, status: DocumentStatus) => api.request(`/orgs/${orgId}/documents/${id}/status`, { method: 'POST', body: { status }, schema: businessDocumentSchema });
 export const convertDocument = (orgId: string, id: string) => api.request(`/orgs/${orgId}/documents/${id}/convert`, { method: 'POST', schema: businessDocumentSchema });
+
+export const fetchCustomers = (orgId: string) => api.request(`/orgs/${orgId}/customers`, { schema: customerListSchema });

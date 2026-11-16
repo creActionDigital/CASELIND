@@ -760,4 +760,22 @@ describe('seller contact', () => {
     const next = (await post('', { kind: 'quote', customerName: 'Awa', currency: 'USD', lines: [{ description: 'x', quantity: 1, unitPriceMinor: 100 }] }).expect(201)).body;
     expect(next.number).toMatch(/-0001$/);
   });
+
+  it('customers: derived from orders, best spenders first, cancelled ignored, members only (lot 16c)', async () => {
+    const [owner, a, b, stranger] = [await user(), await user(), await user(), await user()];
+    const orgId = await createOrg(owner);
+    const add = (buyer: TU, status: string, total: number) =>
+      ctx.sql.query(
+        `INSERT INTO orders (number, buyer_id, org_id, client_id, currency, status, subtotal_minor, total_minor, payment_method) VALUES ($1, $2, $3, $4, 'USD', $5, $6, $6, 'cash_on_delivery')`,
+        [`C-${randomUUID()}`, buyer.id, orgId, randomUUID(), status, total],
+      );
+    await add(a, 'delivered', 1000);
+    await add(a, 'pending', 500);
+    await add(b, 'delivered', 4000);
+    await add(b, 'cancelled', 90000);
+    const get = (who: TU) => ctx.http.get(`/v1/orgs/${orgId}/customers`).set(bearer(who.token));
+    const items = (await get(owner).expect(200)).body.items;
+    expect(items.map((i: { handle: string; orders: number; spentMinor: number }) => [i.handle, i.orders, i.spentMinor])).toEqual([[b.handle, 1, 4000], [a.handle, 2, 1500]]);
+    await get(stranger).expect(404);
+  });
 });

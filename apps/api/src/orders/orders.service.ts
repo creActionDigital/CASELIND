@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  type CustomerList,
   type SalesSummary,
   type CheckoutRequest,
   ErrorCodes,
@@ -251,6 +252,16 @@ export class OrdersService {
         topProducts: tops.rows.filter((p) => p.currency === t.currency).map((p) => ({ productId: p.product_id, title: p.title, quantity: p.qty, revenueMinor: Number(p.revenue) })),
       })),
     };
+  }
+
+  /** Buyers of the organisation, best spenders first (one line per buyer and currency, top 100). */
+  async customers(orgId: string): Promise<CustomerList> {
+    const res = await this.db.execute<{ handle: string; display_name: string; currency: string; n: number; spent: string; last: Date }>(sql`
+      SELECT u.handle::text AS handle, u.display_name, o.currency::text AS currency, count(*)::int AS n, sum(o.total_minor)::text AS spent, max(o.created_at) AS last
+      FROM orders o JOIN users u ON u.id = o.buyer_id
+      WHERE o.org_id = ${orgId}::uuid AND o.status <> 'cancelled'
+      GROUP BY u.id, u.handle, u.display_name, o.currency ORDER BY sum(o.total_minor) DESC, max(o.created_at) DESC LIMIT 100`);
+    return { items: res.rows.map((r) => ({ handle: r.handle, displayName: r.display_name, currency: r.currency, orders: r.n, spentMinor: Number(r.spent), lastOrderAt: new Date(r.last).toISOString() })) };
   }
 
   listForOrg(orgId: string, q: OrderListQuery): Promise<OrderList> {

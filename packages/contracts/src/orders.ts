@@ -361,3 +361,18 @@ export const salesSummarySchema = z.object({
   ),
 });
 export type SalesSummary = z.infer<typeof salesSummarySchema>;
+
+/** Customers of an organisation (lot 16c, light CRM): derived from its orders, nothing stored. Cancelled orders are ignored. */
+export const customerListSchema = z.object({
+  items: z.array(
+    z.object({
+      handle: z.string(),
+      displayName: z.string(),
+      currency: z.string(),
+      orders: z.number().int(),
+      spentMinor: z.number().int(),
+      lastOrderAt: z.string(),
+    }),
+  ),
+});
+export type CustomerList = z.infer<typeof customerListSchema>;
