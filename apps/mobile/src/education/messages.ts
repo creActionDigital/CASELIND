@@ -65,6 +65,17 @@ export const educationFr = {
   'education.err.empty': 'Ajoutez au moins une leçon avant de publier.',
   'education.err.invalid': 'Vérifiez les champs.',
   'report.target.course': 'Cours',
+  'education.reviews': 'Avis',
+  'education.rating': '{avg}/5 ({n} avis)',
+  'education.noRating': 'Pas encore d’avis',
+  'education.reviewMine': 'Votre avis',
+  'education.reviewStars': '{n} sur 5',
+  'education.reviewBody': 'Commentaire (facultatif)',
+  'education.reviewSend': 'Publier mon avis',
+  'education.reviewDelete': 'Supprimer mon avis',
+  'education.reviewReport': 'Signaler cet avis',
+  'education.reviewsEmpty': 'Aucun avis pour le moment.',
+  'report.target.course_review': 'Avis sur un cours',
 } as const;
 
 export const educationEn = {
@@ -133,4 +144,15 @@ export const educationEn = {
   'education.err.empty': 'Add at least one lesson before publishing.',
   'education.err.invalid': 'Check the fields.',
   'report.target.course': 'Course',
+  'education.reviews': 'Reviews',
+  'education.rating': '{avg}/5 ({n} reviews)',
+  'education.noRating': 'No reviews yet',
+  'education.reviewMine': 'Your review',
+  'education.reviewStars': '{n} out of 5',
+  'education.reviewBody': 'Comment (optional)',
+  'education.reviewSend': 'Post my review',
+  'education.reviewDelete': 'Delete my review',
+  'education.reviewReport': 'Report this review',
+  'education.reviewsEmpty': 'No reviews yet.',
+  'report.target.course_review': 'Course review',
 } as const;

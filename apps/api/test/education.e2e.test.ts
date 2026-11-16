@@ -236,3 +236,50 @@ describe('education: learning, quiz and certificates (lot 17a)', () => {
     }
   });
 });
+
+describe('education: reviews (lot 17d)', () => {
+  const review = (u: TU, id: string, body: Record<string, unknown>) => ctx.http.put(`/v1/courses/${id}/reviews/me`).set(bearer(u.token)).send(body);
+  const reviewsOf = (u: TU, id: string) => ctx.http.get(`/v1/courses/${id}/reviews`).set(bearer(u.token));
+
+  it('needs enrollment, forbids the author, keeps one review per learner and averages the visible ones', async () => {
+    const { teacher, id } = await ready();
+    const [a, b, stranger, mod] = [await user(), await user(), await user(), await user(['user', 'moderator'])];
+    await review(stranger, id, { rating: 5 }).expect(403);
+    await review(teacher, id, { rating: 5 }).expect(403);
+    await enroll(a, id).expect(200);
+    await enroll(b, id).expect(200);
+    await review(a, id, { rating: 0 }).expect(400);
+    await review(a, id, { rating: 6 }).expect(400);
+    await review(a, id, { rating: 4, body: 'x'.repeat(501) }).expect(400);
+    await ctx.http.delete(`/v1/courses/${id}/reviews/me`).set(bearer(a.token)).expect(404);
+
+    await review(a, id, { rating: 5, body: 'Très clair' }).expect(200);
+    const edited = (await review(a, id, { rating: 4, body: 'Clair' }).expect(200)).body;
+    expect(edited).toMatchObject({ ratingAvg: 4, ratingCount: 1 });
+    const second = (await review(b, id, { rating: 2 }).expect(200)).body;
+    expect(second).toMatchObject({ ratingAvg: 3, ratingCount: 2 });
+    expect((await ctx.http.get('/v1/courses').set(bearer(stranger.token)).expect(200)).body.items.find((c: { id: string }) => c.id === id)).toMatchObject({ ratingAvg: 3, ratingCount: 2 });
+
+    const list = (await reviewsOf(stranger, id).expect(200)).body.items;
+    expect(list).toHaveLength(2);
+    expect(list.find((r: { mine: boolean }) => r.mine)).toBeUndefined();
+    expect((await reviewsOf(a, id).expect(200)).body.items.filter((r: { mine: boolean }) => r.mine)).toHaveLength(1);
+
+    // Report then hide: the review leaves the average and the public list, but stays visible to its author.
+    const mine = (await reviewsOf(a, id)).body.items.find((r: { mine: boolean }) => r.mine);
+    await ctx.http.post('/v1/reports').set(bearer(stranger.token)).send({ targetType: 'course_review', targetId: mine.id, reason: 'spam' }).expect(201);
+    await ctx.http.post('/v1/admin/moderation/actions').set(bearer(mod.token)).send({ targetType: 'course_review', targetId: mine.id, action: 'hide' }).expect(200);
+    expect((await ctx.http.get(`/v1/courses/${id}`).set(bearer(stranger.token)).expect(200)).body).toMatchObject({ ratingAvg: 2, ratingCount: 1 });
+    expect((await reviewsOf(stranger, id)).body.items).toHaveLength(1);
+    expect((await reviewsOf(a, id)).body.items).toHaveLength(2);
+
+    await ctx.http.delete(`/v1/courses/${id}/reviews/me`).set(bearer(b.token)).expect(204);
+    expect((await ctx.http.get(`/v1/courses/${id}`).set(bearer(stranger.token)).expect(200)).body).toMatchObject({ ratingAvg: null, ratingCount: 0 });
+
+    // Audit carries ids and the rating, never the comment; the export has the author's own words.
+    const audits = await ctx.sql.query(`SELECT action, metadata::text AS md FROM audit_events WHERE subject_user_id = $1 AND action LIKE 'education.review%'`, [a.id]);
+    expect(audits.rows.map((r: { action: string }) => r.action)).toEqual(['education.review_saved', 'education.review_saved']);
+    expect(JSON.stringify(audits.rows)).not.toContain('Clair');
+    expect((await ctx.http.get('/v1/me/export').set(bearer(a.token)).expect(200)).body.education.reviews).toMatchObject([{ courseTitle: 'Comptabilité de base', rating: 4, body: 'Clair' }]);
+  });
+});

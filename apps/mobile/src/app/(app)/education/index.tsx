@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { eduKeys, fetchCourses } from '../../../education/api';
 import { COURSE_LEVELS, levelKey } from '../../../education/logic';
+import { RatingLine } from '../../../education/Reviews';
 import { useI18n } from '../../../i18n';
 import { useDebouncedValue } from '../../../search/api';
 import { Card, Chips, PagedList } from '../../../seller/ui';
@@ -67,6 +68,7 @@ export default function Education() {
             <Text variant="small" muted>
               {t('education.by', { name: item.author.displayName })} · {t('education.lessons', { n: item.lessonCount })}
             </Text>
+            <RatingLine avg={item.ratingAvg} count={item.ratingCount} />
             <View style={styles.badges}>
               <Badge tone="neutral" label={t(levelKey(item.level))} />
               <Badge tone="neutral" label={item.language.toUpperCase()} />

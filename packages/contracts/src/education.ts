@@ -54,6 +54,9 @@ export const courseSchema = z.object({
   lessonCount: z.number().int(),
   questionCount: z.number().int(),
   enrolled: z.boolean(),
+  /** Average of the visible reviews (null without any) and their count. */
+  ratingAvg: z.number().nullable(),
+  ratingCount: z.number().int(),
   createdAt: z.string(),
 });
 export type Course = z.infer<typeof courseSchema>;
@@ -118,3 +121,18 @@ export const courseStudentsSchema = z.object({
   items: z.array(z.object({ handle: z.string(), displayName: z.string(), progressPercent: z.number().int(), completed: z.boolean() })),
 });
 export type CourseStudents = z.infer<typeof courseStudentsSchema>;
+
+/** Course reviews (lot 17d): one rating and an optional comment per enrolled learner; the author cannot rate their own course. */
+export const courseReviewRequestSchema = z.object({ rating: z.number().int().min(1).max(5), body: z.string().trim().max(500).default('') });
+export type CourseReviewRequest = z.infer<typeof courseReviewRequestSchema>;
+export const courseReviewSchema = z.object({
+  id: z.uuid(),
+  rating: z.number().int(),
+  body: z.string(),
+  author: z.object({ displayName: z.string(), handle: z.string() }),
+  mine: z.boolean(),
+  createdAt: z.string(),
+});
+export type CourseReview = z.infer<typeof courseReviewSchema>;
+export const courseReviewListSchema = z.object({ items: z.array(courseReviewSchema), nextCursor: z.string().nullable() });
+export type CourseReviewList = z.infer<typeof courseReviewListSchema>;

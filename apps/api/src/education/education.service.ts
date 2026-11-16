@@ -9,6 +9,9 @@ import {
   type CourseDetail,
   type CourseList,
   type CourseListQuery,
+  type CourseReview,
+  type CourseReviewList,
+  type CourseReviewRequest,
   type CourseStudents,
   type CreateCourseRequest,
   type EnrollmentList,
@@ -63,6 +66,8 @@ type CourseRow = {
   lesson_count: number;
   question_count: number;
   enrolled: boolean;
+  rating_avg: number | null;
+  rating_count: number;
 };
 
 /** Visible to the viewer: the author, a learner already enrolled, or anyone while published, not hidden and not blocked with the author. */
@@ -86,6 +91,8 @@ const toCourse = (r: CourseRow, viewerId: string): Course => ({
   lessonCount: r.lesson_count,
   questionCount: r.question_count,
   enrolled: r.enrolled,
+  ratingAvg: r.rating_avg,
+  ratingCount: r.rating_count,
   createdAt: iso(r.created_at),
 });
 
@@ -115,6 +122,67 @@ export class EducationService implements OnModuleInit {
         if (!UUID_RE.test(id)) return;
         await this.db.execute(sql`UPDATE courses SET hidden = ${hidden} WHERE id = ${id}::uuid`);
       },
+    });
+    this.moderation.register('course_review', {
+      visibleTo: async (viewerId, id) => {
+        if (!UUID_RE.test(id)) return false;
+        const res = await this.db.execute(sql`
+          SELECT 1 FROM course_reviews rv JOIN courses c ON c.id = rv.course_id
+          WHERE rv.id = ${id}::uuid AND (NOT rv.hidden OR rv.user_id = ${viewerId}::uuid) AND ${visibleSql(viewerId)}`);
+        return res.rows.length > 0;
+      },
+      authorOf: async (id) => {
+        if (!UUID_RE.test(id)) return null;
+        const res = await this.db.execute<{ user_id: string }>(sql`SELECT user_id FROM course_reviews WHERE id = ${id}::uuid`);
+        return res.rows[0]?.user_id ?? null;
+      },
+      setHidden: async (id, hidden) => {
+        if (!UUID_RE.test(id)) return;
+        await this.db.execute(sql`UPDATE course_reviews SET hidden = ${hidden} WHERE id = ${id}::uuid`);
+      },
+    });
+  }
+
+  // ---- Reviews (lot 17d) ------------------------------------------------------------------------
+
+  /** Visible reviews, newest first; a hidden review stays visible to its own author only. */
+  async reviews(viewerId: string, courseId: string, q: { limit: number; cursor?: string }): Promise<CourseReviewList> {
+    await this.getCourse(viewerId, courseId);
+    const f: SQL[] = [sql`rv.course_id = ${courseId}::uuid`, sql`(NOT rv.hidden OR rv.user_id = ${viewerId}::uuid)`];
+    if (q.cursor) {
+      const c = decodeCursor(q.cursor);
+      f.push(sql`(rv.created_at, rv.id) < (${c.at}::timestamptz, ${c.id}::uuid)`);
+    }
+    const res = await this.db.execute<{ id: string; rating: number; body: string; user_id: string; created_at: Date; display_name: string; handle: string }>(sql`
+      SELECT rv.id, rv.rating, rv.body, rv.user_id, rv.created_at, u.display_name, u.handle::text AS handle
+      FROM course_reviews rv JOIN users u ON u.id = rv.user_id WHERE ${sql.join(f, sql` AND `)}
+      ORDER BY rv.created_at DESC, rv.id DESC LIMIT ${q.limit + 1}`);
+    const rows = res.rows.slice(0, q.limit);
+    const last = rows[rows.length - 1];
+    const items: CourseReview[] = rows.map((r) => ({ id: r.id, rating: r.rating, body: r.body, author: { displayName: r.display_name, handle: r.handle }, mine: r.user_id === viewerId, createdAt: iso(r.created_at) }));
+    return { items, nextCursor: res.rows.length > q.limit && last ? encodeCursor(last.created_at, last.id) : null };
+  }
+
+  /** Create or replace my review. Enrolled learners only (so never the author, who cannot enroll). */
+  async saveReview(userId: string, courseId: string, body: CourseReviewRequest, meta: RequestMeta): Promise<CourseDetail> {
+    const course = await this.getCourse(userId, courseId);
+    if (course.mine) throw AppError.forbidden('You cannot review your own course');
+    if (!course.enrolled) throw AppError.forbidden('Enroll in the course before reviewing it');
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO course_reviews (course_id, user_id, rating, body) VALUES (${courseId}::uuid, ${userId}::uuid, ${body.rating}, ${body.body})
+        ON CONFLICT (course_id, user_id) DO UPDATE SET rating = EXCLUDED.rating, body = EXCLUDED.body, updated_at = now()`);
+      await this.audit.record({ action: 'education.review_saved', actorUserId: userId, meta, metadata: { courseId, rating: body.rating } }, tx);
+    });
+    return this.get(userId, courseId);
+  }
+
+  async deleteReview(userId: string, courseId: string, meta: RequestMeta): Promise<void> {
+    await this.getCourse(userId, courseId);
+    await this.db.transaction(async (tx) => {
+      const res = await tx.execute(sql`DELETE FROM course_reviews WHERE course_id = ${courseId}::uuid AND user_id = ${userId}::uuid`);
+      if ((res.rowCount ?? 0) === 0) throw AppError.notFound('Review not found');
+      await this.audit.record({ action: 'education.review_deleted', actorUserId: userId, meta, metadata: { courseId } }, tx);
     });
   }
 
@@ -241,7 +309,9 @@ export class EducationService implements OnModuleInit {
         u.id AS author_id, u.display_name AS author_name, u.handle::text AS author_handle,
         (SELECT count(*)::int FROM course_lessons l WHERE l.course_id = c.id) AS lesson_count,
         (SELECT count(*)::int FROM course_questions q WHERE q.course_id = c.id) AS question_count,
-        EXISTS (SELECT 1 FROM course_enrollments e WHERE e.course_id = c.id AND e.user_id = ${viewerId}::uuid) AS enrolled
+        EXISTS (SELECT 1 FROM course_enrollments e WHERE e.course_id = c.id AND e.user_id = ${viewerId}::uuid) AS enrolled,
+        (SELECT avg(rv.rating)::float8 FROM course_reviews rv WHERE rv.course_id = c.id AND NOT rv.hidden) AS rating_avg,
+        (SELECT count(*)::int FROM course_reviews rv WHERE rv.course_id = c.id AND NOT rv.hidden) AS rating_count
       FROM courses c JOIN users u ON u.id = c.author_id`;
   }
 

@@ -3,11 +3,13 @@ import {
   certificateVerificationSchema,
   courseDetailSchema,
   courseListSchema,
+  courseReviewListSchema,
   courseStudentsSchema,
   enrollmentListSchema,
   quizResultSchema,
   quizSchema,
   type CourseLevel,
+  type CourseReviewRequest,
   type CreateCourseRequest,
   type SetLessonsRequest,
   type SetQuizRequest,
@@ -29,6 +31,7 @@ export const eduKeys = {
   enrollments: ['education', 'enrollments'] as const,
   authored: ['education', 'authored'] as const,
   certificates: ['education', 'certificates'] as const,
+  reviews: (id: string) => ['education', 'reviews', id] as const,
   students: (id: string) => ['education', 'students', id] as const,
 };
 
@@ -47,3 +50,6 @@ export const fetchMyCourses = (cursor?: string) => api.request('/me/courses', { 
 export const fetchEnrollments = (cursor?: string) => api.request('/me/enrollments', { query: { limit: PAGE, cursor }, schema: enrollmentListSchema });
 export const fetchCertificates = () => api.request('/me/certificates', { schema: certificateListSchema });
 export const verifyCertificate = (code: string) => api.request(`/public/certificates/${encodeURIComponent(code)}`, { schema: certificateVerificationSchema });
+export const fetchReviews = (id: string) => api.request(`/courses/${id}/reviews`, { query: { limit: 50 }, schema: courseReviewListSchema });
+export const saveReview = (id: string, body: CourseReviewRequest) => api.request(`/courses/${id}/reviews/me`, { method: 'PUT', body, schema: courseDetailSchema });
+export const deleteReview = (id: string) => api.request(`/courses/${id}/reviews/me`, { method: 'DELETE' });

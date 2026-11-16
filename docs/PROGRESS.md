@@ -502,3 +502,16 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 ## Banque de questions de départ du quiz éclair (2026-11-16) : testée
 - Migration 0039 : 20 questions en français (RDC, Afrique, culture générale), faits stables et vérifiés ; le jeu peut démarrer sans saisie. Les administrateurs peuvent en ajouter ou en retirer. Test : au moins 10 questions actives, clé de réponse valide, une partie démarre.
 - Résultats observés : API 588 tests.
+
+## Lot 17c — Notifications des annonces d'école (2026-11-16)
+- `SchoolService.announce` notifie les inscrits de la classe via `NotificationsService.notifyMany` (catégorie existante `system`, donc préférences et push respectés ; aucune migration, aucun contrat modifié).
+- Titre générique « Nouvelle annonce » + nom de la classe seulement : jamais le titre ni le texte de l'annonce. L'auteur n'est pas notifié ; un inscrit parti n'en reçoit plus.
+- Test e2e ajouté dans `school.e2e.test.ts` (inscrit notifié, auteur non, texte absent, parti non notifié).
+- Différé : catégorie dédiée « école » dans les préférences, notification au personnel lors d'une inscription, frais, bourses, recherche d'établissements, messagerie école-parents.
+
+## Lot 17d — Éducation : avis et notes sur les cours (2026-11-16) : testé
+- **Livré** : un avis par apprenant inscrit (note 1 à 5, commentaire de 500 caractères max), modifiable et supprimable ; l'auteur ne peut pas noter son cours, un non-inscrit non plus (403) ; note moyenne et nombre d'avis dans la liste et la fiche du cours (avis masqués exclus) ; liste des avis paginée ; signalement et masquage via la cible `course_review` (un avis masqué reste visible de son auteur).
+- Migration 0041 (`course_reviews`, cible de signalement `course_review`) ; routes `GET /v1/courses/:id/reviews`, `PUT` et `DELETE /v1/courses/:id/reviews/me` derrière le drapeau `education` ; contrats et OpenAPI à jour ; audit `education.review_saved/deleted` (id et note, jamais le texte) ; export de compte : `education.reviews` (ses propres avis seulement).
+- Mobile : étoiles et commentaire dans la fiche du cours (`education/Reviews.tsx`), moyenne dans la liste, signalement d'un avis ; textes fr+en dans `education/messages.ts`.
+- Tests : `education.e2e.test.ts` (+1), openapi et account OK ; mobile 235 OK ; typecheck API et mobile OK. Non vérifié à l'écran.
+- Différé : réponse de l'auteur à un avis, tri/filtre des avis, avis réservé aux apprenants ayant terminé une part du cours, masquage des avis des utilisateurs bloqués, notification à l'auteur d'un nouvel avis.

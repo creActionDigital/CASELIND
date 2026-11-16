@@ -90,6 +90,8 @@ export type AuditAction =
   | 'education.enrolled'
   | 'education.quiz_attempted'
   | 'education.certificate_issued'
+  | 'education.review_saved'
+  | 'education.review_deleted'
   /** Health (lot 18a): ids and kinds only. Never a title, a detail, a symptom, a medicine or a dose. */
   | 'health.consent_granted'
   | 'health.consent_revoked'

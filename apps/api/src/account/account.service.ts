@@ -404,6 +404,7 @@ export class AccountService {
       education: {
         authored: eduAuthored.rows.map((c) => ({ id: c.id, title: c.title, status: c.status, createdAt: new Date(c.created_at).toISOString() })),
         enrollments: eduEnrollments,
+        reviews: (await this.db.execute<{ title: string; rating: number; body: string; created_at: Date }>(sql`SELECT c.title, rv.rating, rv.body, rv.created_at FROM course_reviews rv JOIN courses c ON c.id = rv.course_id WHERE rv.user_id = ${auth.userId}::uuid ORDER BY rv.created_at, rv.id`)).rows.map((r) => ({ courseTitle: r.title, rating: r.rating, body: r.body, createdAt: new Date(r.created_at).toISOString() })),
       },
       budgets: budgetRows.rows.map((b) => ({ currency: b.currency, limitMinor: Number(b.limit_minor) })),
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({

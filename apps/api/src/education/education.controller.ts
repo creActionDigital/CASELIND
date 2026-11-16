@@ -1,10 +1,13 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import {
   type CertificateList,
   type CertificateVerification,
   type CourseDetail,
   type CourseList,
   type CourseListQuery,
+  type CourseReviewList,
+  type CourseReviewRequest,
+  courseReviewRequestSchema,
   courseListQuerySchema,
   type CourseStudents,
   type CreateCourseRequest,
@@ -108,6 +111,22 @@ export class EducationController {
   @HttpCode(200)
   attempt(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new ZodPipe(quizAttemptRequestSchema)) b: QuizAttemptRequest, @ReqMeta() meta: RequestMeta): Promise<QuizResult> {
     return this.edu.attempt(u.userId, id, b, meta);
+  }
+
+  @Get('courses/:id/reviews')
+  reviews(@CurrentUser() u: AuthUser, @Param('id') id: string, @Query(new ZodPipe(pageQuerySchema)) q: PageQuery): Promise<CourseReviewList> {
+    return this.edu.reviews(u.userId, id, q);
+  }
+
+  @Put('courses/:id/reviews/me')
+  saveReview(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new ZodPipe(courseReviewRequestSchema)) b: CourseReviewRequest, @ReqMeta() meta: RequestMeta): Promise<CourseDetail> {
+    return this.edu.saveReview(u.userId, id, b, meta);
+  }
+
+  @Delete('courses/:id/reviews/me')
+  @HttpCode(204)
+  deleteReview(@CurrentUser() u: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<void> {
+    return this.edu.deleteReview(u.userId, id, meta);
   }
 
   @Get('me/enrollments')

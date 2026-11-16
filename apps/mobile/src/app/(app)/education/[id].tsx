@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { completeLesson, eduKeys, enrollInCourse, fetchCourse, fetchStudents, setPublished } from '../../../education/api';
 import { educationErrorKey, levelKey } from '../../../education/logic';
+import { CourseReviews } from '../../../education/Reviews';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { openReport } from '../../../report/open-report';
@@ -102,6 +103,8 @@ export default function CourseScreen() {
             <Button label={t('education.takeQuiz')} onPress={() => router.push({ pathname: '/education/quiz/[id]', params: { id: c.id } })} />
           </>
         ) : null}
+
+        {c.status === 'published' ? <CourseReviews course={c} /> : null}
 
         {c.mine ? (
           <>
