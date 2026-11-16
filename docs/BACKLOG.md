@@ -25,7 +25,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 18b | §12 | Santé : professionnels vérifiés, rendez-vous, partage du dossier, ordonnances | testé (réglementé, coupé par défaut) ; pharmacie, résultats d’examens, assurance, vidéo : différés |
 | 19 | §16 | Administration publique, alertes, urgences, signalements urbains | **reporté à la demande du propriétaire (2026-11-15)** ; travail déjà codé et testé sur la branche `wip/lot19-services-publics` (migration 0033), à reprendre plus tard |
 | 20a | §21 | Jeux : quiz éclair et classement (sans argent) | testé |
-| 20b | §21 | Jeux : tournois et badges non monétaires (autres jeux : différé) | testé (API + mobile ; écran non vérifié dans le navigateur) |
+| 20b | §21 | Jeux : tournois et badges non monétaires (autres jeux : différé) | testé (API + mobile ; écran vérifié dans le navigateur) |
 | — | §20, paris | Trading, paris sportifs | **retiré** |
 | — | §18 | CSL Coins | bloqué : règles non spécifiées (question ouverte) |
 | Web | §27 | React + Vite, PWA | planifié, après les lots backend |

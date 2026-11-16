@@ -11,6 +11,7 @@ import {
   productSchema,
   orgReviewListSchema,
   reviewSchema,
+  salesSummarySchema,
   variantSchema,
   type CreateCouponRequest,
   type OrderStatus,
@@ -83,3 +84,5 @@ export function useMembership(orgId: string) {
   const m = q.data?.items.find((i) => i.org.id === orgId && i.status === 'active');
   return { ...q, membership: m, role: m?.role };
 }
+
+export const fetchSalesSummary = (orgId: string, days: number) => api.request(`/orgs/${orgId}/sales-summary`, { query: { days }, schema: salesSummarySchema });
