@@ -35,3 +35,4 @@ export * from './health.js';
 export * from './health-pro.js';
 export * from './documents.js';
 export * from './games.js';
+export * from './school.js';

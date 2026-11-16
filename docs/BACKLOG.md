@@ -20,7 +20,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 16b | §14 | Freelance : missions, propositions, jalons, litiges | testé (paiement externe, séquestre différé) |
 | 16c | §14 | Outils pro : devis, factures, CRM, caisse | analyse de ventes, devis et factures testés ; CRM, caisse, fidélité, campagnes à faire |
 | 17a | §13 | Éducation : cours, quiz, certificats | testé |
-| 17b | §13 | Établissements : emplois du temps, parents, frais, bourses | planifié (consentement parental à décider) |
+| 17b | §13 | Établissements : emplois du temps, parents, frais, bourses | testé (classes, emploi du temps, annonces ; frais et bourses différés) |
 | 18a | §12 | Santé : consentement, dossier chiffré, rappels | testé (module réglementé, coupé par défaut) |
 | 18b | §12 | Santé : professionnels vérifiés, rendez-vous, partage du dossier, ordonnances | testé (réglementé, coupé par défaut) ; pharmacie, résultats d’examens, assurance, vidéo : différés |
 | 19 | §16 | Administration publique, alertes, urgences, signalements urbains | **reporté à la demande du propriétaire (2026-11-15)** ; travail déjà codé et testé sur la branche `wip/lot19-services-publics` (migration 0033), à reprendre plus tard |

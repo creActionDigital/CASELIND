@@ -51,6 +51,8 @@ import { AdminHealthController, HealthProController } from './health/health-pro.
 import { HealthProService } from './health/health-pro.service.js';
 import { AdminGamesController, AdminTournamentsController, GamesController } from './games/games.controller.js';
 import { GamesService } from './games/games.service.js';
+import { MySchoolController, OrgSchoolController } from './school/school.controller.js';
+import { SchoolService } from './school/school.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
@@ -323,6 +325,8 @@ export class AppModule {
         GamesController,
         AdminGamesController,
         AdminTournamentsController,
+        OrgSchoolController,
+        MySchoolController,
         OpenApiController,
         AuthController,
         UsersController,
@@ -504,6 +508,7 @@ export class AppModule {
         HealthProService,
         HealthService,
         GamesService,
+        SchoolService,
         MessagesService,
         // Lot 3b
         MessageExtrasService,

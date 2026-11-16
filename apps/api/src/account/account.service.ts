@@ -48,6 +48,7 @@ import { UsersService } from '../users/users.service.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { HealthService } from '../health/health.service.js';
 import { GamesService } from '../games/games.service.js';
+import { SchoolService } from '../school/school.service.js';
 import { TwoFactorService } from '../auth/identity/two-factor.service.js';
 
 const DAY_MS = 86_400_000;
@@ -70,6 +71,7 @@ export class AccountService {
     private readonly messageExtras: MessageExtrasService,
     private readonly healthData: HealthService,
     private readonly games: GamesService,
+    private readonly school: SchoolService,
   ) {}
 
   /**
@@ -398,6 +400,7 @@ export class AccountService {
       },
       health: await this.healthData.exportFor(auth.userId),
       games: await this.games.exportFor(auth.userId),
+      school: await this.school.exportFor(auth.userId),
       education: {
         authored: eduAuthored.rows.map((c) => ({ id: c.id, title: c.title, status: c.status, createdAt: new Date(c.created_at).toISOString() })),
         enrollments: eduEnrollments,

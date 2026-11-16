@@ -103,6 +103,19 @@ export default function More() {
               </Text>
             </Pressable>
           ) : null}
+          {flags.data.flags.school === true ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('school.title')}
+              onPress={() => router.push('/school')}
+              style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="school-outline" size={26} color={colors.primary} />
+              <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+                {t('school.title')}
+              </Text>
+            </Pressable>
+          ) : null}
           {flags.data.flags.health === true ? (
             <Pressable
               accessibilityRole="button"

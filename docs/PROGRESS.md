@@ -472,3 +472,11 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - 9 constats, 7 corrigés : numérotation DEV/FAC par année (compte sur le préfixe du numéro), audit du changement d'état dans la transaction, migration 0037 (une facture annulée ne bloque plus la réémission depuis le devis), intervalle SQL non ambigu, ligne à prix 0 permise, quantité strictement numérique, double envoi bloqué sur l'écran détail.
 - Non corrigés, voulus : le chiffre d'affaires de l'analyse de ventes compte les commandes non annulées (paiement à la livraison uniquement pour l'instant) ; la course sur la conversion est fermée par l'index unique (testé).
 - Résultats observés : API 584 tests, mobile 235, typechecks propres.
+
+## Lot 17b — Établissements : classes, emplois du temps, annonces (§13, seconde moitié) (2026-11-16) : testé et vérifié à l'écran
+- Décision du propriétaire : le consentement parental des mineurs est géré par l'établissement ; la plateforme n'a pas de compte « parent » validant. Le rôle « parent » existe seulement comme inscrit à une classe, décidé par l'école.
+- Migration 0038 : classes, inscrits (élève, parent, enseignant), cours (emploi du temps), annonces. Drapeau `school` **réglementé, coupé par défaut**. Rien de public : seuls le personnel (propriétaire/administrateur d'une organisation de type école) et les inscrits lisent.
+- Routes `/orgs/{orgId}/school/classes…` (personnel) et `/me/school/classes` (inscrits). Un non-membre ou un non-inscrit reçoit 404. Audit sans noms ni texte des annonces. Export de compte : rubrique `school`. OpenAPI + test e2e.
+- Mobile : « Mes classes » (tuile du menu Plus quand le drapeau est actif), détail (emploi du temps par jour, annonces), et côté école : classes, inscription par identifiant, cours, annonces.
+- Résultats observés : API 586 tests, mobile 235, typechecks propres ; parcours complet vérifié à 375 px (création de classe, inscription, cours, annonce, vue de l'inscrit), puis données de test et drapeau remis.
+- Différé : frais scolaires, bourses, recherche d'établissements, notifications aux inscrits, messagerie école-parents (la messagerie existante peut servir), /security-review non lancé.
