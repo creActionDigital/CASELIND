@@ -453,3 +453,9 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Résultats observés : API 581 tests, mobile 231, typechecks propres.
 - Différé : vérification à l'écran ; pas de participation explicite (tout score terminé dans la fenêtre compte) ; autres jeux ; /code-review non lancé.
 - Questions au propriétaire : 14 posées en début de session, réponses en attente (à noter dans BACKLOG « Décisions »).
+
+## Lot 16c — Outils professionnels (§14) : audit et premier outil (2026-11-16) : API testée, écran mobile non fait
+- **Audit de l'existant** : déjà là = catalogue, variantes, mouvements de stock, commandes vendeur, coupons, avis, portefeuille. **Manquent** : devis/factures, CRM clients, caisse, campagnes/marketing, fidélité, analyse de ventes.
+- **Livré** : `GET /orgs/{orgId}/sales-summary?days=` (analyse de ventes : commandes, annulées, chiffre d'affaires hors annulées, panier moyen, top 5 produits, par devise ; membres de l'organisation seulement, 404 sinon). Dérivé des commandes, sans migration. OpenAPI + test e2e.
+- Résultats observés : API 582 tests, typecheck propre.
+- **Différé** : écran vendeur « Ventes » ; factures/devis (prochain candidat), CRM, caisse, fidélité, campagnes ; /code-review.

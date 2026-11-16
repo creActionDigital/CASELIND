@@ -343,3 +343,21 @@ export const exportedReviewSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 export type ExportedReview = z.infer<typeof exportedReviewSchema>;
+
+/** Sales summary of an organisation (lot 16c): read-only, derived from its orders. Cancelled orders are not revenue. One block per currency. */
+export const salesSummaryQuerySchema = z.object({ days: z.coerce.number().int().min(1).max(365).default(30) });
+export type SalesSummaryQuery = z.infer<typeof salesSummaryQuerySchema>;
+export const salesSummarySchema = z.object({
+  days: z.number().int(),
+  currencies: z.array(
+    z.object({
+      currency: z.string(),
+      orders: z.number().int(),
+      cancelled: z.number().int(),
+      revenueMinor: z.number().int(),
+      averageBasketMinor: z.number().int(),
+      topProducts: z.array(z.object({ productId: z.uuid(), title: z.string(), quantity: z.number().int(), revenueMinor: z.number().int() })),
+    }),
+  ),
+});
+export type SalesSummary = z.infer<typeof salesSummarySchema>;

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  type SalesSummary,
   type CheckoutRequest,
   ErrorCodes,
   type Order,
@@ -224,6 +225,32 @@ export class OrdersService {
 
   listMine(buyerId: string, q: OrderListQuery): Promise<OrderList> {
     return this.page(q, eq(orders.buyerId, buyerId));
+  }
+
+  /** Orders, revenue (cancelled excluded), average basket and top 5 products per currency over the last `days` days. */
+  async salesSummary(orgId: string, days: number): Promise<SalesSummary> {
+    const totals = await this.db.execute<{ currency: string; n: number; cancelled: number; revenue: string }>(sql`
+      SELECT currency::text AS currency, count(*) FILTER (WHERE status <> 'cancelled')::int AS n, count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
+             COALESCE(sum(total_minor) FILTER (WHERE status <> 'cancelled'), 0)::text AS revenue
+      FROM orders WHERE org_id = ${orgId}::uuid AND created_at >= now() - (${days} || ' days')::interval GROUP BY currency ORDER BY currency`);
+    const tops = await this.db.execute<{ currency: string; product_id: string; title: string; qty: number; revenue: string; rk: number }>(sql`
+      SELECT * FROM (
+        SELECT o.currency::text AS currency, i.product_id, max(i.title) AS title, sum(i.quantity)::int AS qty, sum(i.line_total_minor)::text AS revenue,
+               row_number() OVER (PARTITION BY o.currency ORDER BY sum(i.quantity) DESC, i.product_id) AS rk
+        FROM order_items i JOIN orders o ON o.id = i.order_id
+        WHERE o.org_id = ${orgId}::uuid AND o.status <> 'cancelled' AND o.created_at >= now() - (${days} || ' days')::interval
+        GROUP BY o.currency, i.product_id) t WHERE rk <= 5 ORDER BY currency, rk`);
+    return {
+      days,
+      currencies: totals.rows.map((t) => ({
+        currency: t.currency,
+        orders: t.n,
+        cancelled: t.cancelled,
+        revenueMinor: Number(t.revenue),
+        averageBasketMinor: t.n === 0 ? 0 : Math.round(Number(t.revenue) / t.n),
+        topProducts: tops.rows.filter((p) => p.currency === t.currency).map((p) => ({ productId: p.product_id, title: p.title, quantity: p.qty, revenueMinor: Number(p.revenue) })),
+      })),
+    };
   }
 
   listForOrg(orgId: string, q: OrderListQuery): Promise<OrderList> {

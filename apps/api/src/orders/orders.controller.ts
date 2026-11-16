@@ -16,6 +16,9 @@ import {
   type OrderListQuery,
   orderListQuerySchema,
   type PaymentMethodList,
+  type SalesSummary,
+  type SalesSummaryQuery,
+  salesSummaryQuerySchema,
   type UpdateCouponRequest,
   updateCouponRequestSchema,
   type UpdateOrderStatusRequest,
@@ -90,6 +93,12 @@ export class OrgOrdersController {
   @OrgPermission('orders.view')
   list(@CurrentMembership() m: OrgMembership, @Query(new ZodPipe(orderListQuerySchema)) q: OrderListQuery): Promise<OrderList> {
     return this.orders.listForOrg(m.orgId, q);
+  }
+
+  @Get('sales-summary')
+  @OrgPermission('orders.view')
+  salesSummary(@CurrentMembership() m: OrgMembership, @Query(new ZodPipe(salesSummaryQuerySchema)) q: SalesSummaryQuery): Promise<SalesSummary> {
+    return this.orders.salesSummary(m.orgId, q.days);
   }
 
   @Get('orders/:id')

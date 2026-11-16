@@ -675,4 +675,36 @@ describe('seller contact', () => {
     await ctx.http.delete(`/v1/blocks/${buyer.id}`).set(bearer(s.owner.token)).expect(204);
     expect((await detailOf(buyer, order.id)).contactUserId).toBe(s.owner.id);
   });
+
+  it('sales summary: revenue without cancelled orders, top products, window, and members only (lot 16c)', async () => {
+    const [owner, buyer, stranger] = [await user(), await user(), await user()];
+    const orgId = await createOrg(owner);
+    const [p1, p2] = [randomUUID(), randomUUID()];
+    const add = async (status: string, total: number, age: string, items: [string, number][]) => {
+      const o = await ctx.sql.query(
+        `INSERT INTO orders (number, buyer_id, org_id, client_id, currency, status, subtotal_minor, total_minor, payment_method, created_at)
+         VALUES ($1, $2, $3, $4, 'CDF', $5, $6, $6, 'cash_on_delivery', now() - $7::interval) RETURNING id`,
+        [`T-${randomUUID()}`, buyer.id, orgId, randomUUID(), status, total, age],
+      );
+      for (const [pid, qty] of items) {
+        await ctx.sql.query(
+          `INSERT INTO order_items (order_id, variant_id, product_id, title, unit_price_minor, quantity, line_total_minor) VALUES ($1, $2, $3, $4, $5::bigint, $6::int, $5::bigint * $6::int)`,
+          [o.rows[0].id, randomUUID(), pid, pid === p1 ? 'Savon' : 'Sac', 1000, qty],
+        );
+      }
+    };
+    await add('delivered', 5000, '1 day', [[p1, 3], [p2, 2]]);
+    await add('pending', 1000, '2 days', [[p1, 1]]);
+    await add('cancelled', 9000, '2 days', [[p2, 9]]);
+    await add('delivered', 7000, '60 days', [[p2, 7]]); // outside the 30-day window
+    const get = (who: TU, q = '') => ctx.http.get(`/v1/orgs/${orgId}/sales-summary${q}`).set(bearer(who.token));
+    const body = (await get(owner).expect(200)).body;
+    expect(body.days).toBe(30);
+    expect(body.currencies).toHaveLength(1);
+    expect(body.currencies[0]).toMatchObject({ currency: 'CDF', orders: 2, cancelled: 1, revenueMinor: 6000, averageBasketMinor: 3000 });
+    expect(body.currencies[0].topProducts.map((p: { title: string; quantity: number }) => [p.title, p.quantity])).toEqual([['Savon', 4], ['Sac', 2]]);
+    expect((await get(owner, '?days=90').expect(200)).body.currencies[0].revenueMinor).toBe(13000);
+    await get(owner, '?days=0').expect(400);
+    await get(stranger).expect(404); // non-members do not learn the organisation exists
+  });
 });
