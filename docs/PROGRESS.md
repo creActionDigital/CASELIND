@@ -529,3 +529,14 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : « Établissements » (`school/search`), « Bourses » et détail (`school/scholarships`), gestion côté école (`seller/[orgId]/school/scholarships`) ; textes dans `school/messages-scholarships.ts`.
 - Tests : `school-scholarships.e2e.test.ts` + school, openapi, account : 20 OK ; mobile 235 OK ; typechecks API et mobile OK.
 - Différé : candidature en ligne, modification d'une bourse, signalement/masquage, fiche détaillée d'un établissement, tri par proximité, export de compte, vérification à l'écran.
+
+## Correctifs revue 16d/17e
+- Alertes d offres : plus de notification si blocage (auteur ou membre actif, dans les deux sens) ; 500 destinataires max par offre (shortcut).
+- Bourses : détail fermé/expiré réservé aux membres de l école (404 sinon) ; date limite au fuseau Africa/Lubumbashi ; publication refusée si organisation non active (409 org_inactive).
+- Mobile : avis de cours paginés (useInfiniteQuery) avec bouton « Voir plus d avis » (fr+en).
+- Tests : jobs.e2e (blocages), school-scholarships.e2e (détail membres, org inactive) ; pas de test mobile pour Reviews (pas d infra de rendu).
+
+## Revue de code des lots 17c à 17e et 16d (2026-11-16)
+- 10 constats, 7 corrigés (3 par l'agent principal : un avis masqué par la modération ne peut plus être supprimé puis republié comme neuf ; le formulaire d'édition d'offre ne se remplit qu'une fois ; l'annonce d'école n'échoue plus si la notification échoue. 4 par un sous-agent : blocages respectés par les alertes d'offres, bourse fermée ou expirée invisible du public, fuseau de la RDC pour les dates limites, pagination des avis).
+- Non corrigés, notés : helpers dupliqués (UUID_RE, curseurs, échappement LIKE) à extraire dans un module commun ; moyenne des avis calculée par deux sous-requêtes par cours (index ou jointure à prévoir si la liste grossit) ; requête d'export des avis à écrire comme les autres.
+- Résultats observés : API 596 tests, mobile 235, typechecks propres.

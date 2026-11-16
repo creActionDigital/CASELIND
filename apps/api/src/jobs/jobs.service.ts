@@ -283,7 +283,14 @@ export class JobsService implements OnModuleInit {
         AND (a.city IS NULL OR lower(a.city) = lower(${body.city}))
         AND (a.q IS NULL OR position(lower(a.q) in lower(${body.title} || ' ' || ${body.description} || ' ' || o.name)) > 0)
         AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id = o.id AND m.user_id = a.user_id AND m.status = 'active')
-        AND a.user_id <> (SELECT created_by FROM job_postings WHERE id = ${jobId}::uuid)`);
+        AND a.user_id <> (SELECT created_by FROM job_postings WHERE id = ${jobId}::uuid)
+        AND NOT EXISTS (
+          SELECT 1 FROM user_blocks b
+          WHERE (b.blocker_id = a.user_id AND (b.blocked_id = (SELECT created_by FROM job_postings WHERE id = ${jobId}::uuid)
+                  OR b.blocked_id IN (SELECT user_id FROM org_members WHERE org_id = o.id AND status = 'active')))
+             OR (b.blocked_id = a.user_id AND (b.blocker_id = (SELECT created_by FROM job_postings WHERE id = ${jobId}::uuid)
+                  OR b.blocker_id IN (SELECT user_id FROM org_members WHERE org_id = o.id AND status = 'active'))))
+        LIMIT 500`); // shortcut: 500 recipients per offer, no paging; upgrade to a batched job if alerts exceed that
     await this.notifications.notifyMany(res.rows.map((r) => ({ userId: r.user_id, category: 'job' as const, title: 'Nouvelle offre correspondant à votre alerte', body: 'Ouvrez l’emploi pour la consulter.', data: { jobId } })));
   }
 

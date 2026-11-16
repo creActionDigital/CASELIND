@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { CourseDetail } from '@caselind/contracts';
@@ -47,8 +47,14 @@ export function CourseReviews({ course }: { course: CourseDetail }) {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: eduKeys.reviews(course.id), queryFn: () => fetchReviews(course.id) });
-  const mine = q.data?.items.find((r) => r.mine);
+  const q = useInfiniteQuery({
+    queryKey: eduKeys.reviews(course.id),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => fetchReviews(course.id, pageParam),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+  const items = q.data?.pages.flatMap((p) => p.items);
+  const mine = items?.find((r) => r.mine);
   const [rating, setRating] = useState<number | null>(null);
   const [body, setBody] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,13 +93,13 @@ export function CourseReviews({ course }: { course: CourseDetail }) {
           {mine ? <Button variant="ghost" label={t('education.reviewDelete')} loading={remove.isPending} onPress={() => remove.mutate()} /> : null}
         </View>
       ) : null}
-      {q.data && q.data.items.length === 0 ? (
+      {items && items.length === 0 ? (
         <Text variant="small" muted>
           {t('education.reviewsEmpty')}
         </Text>
       ) : null}
-      {q.data?.items
-        .filter((r) => !r.mine)
+      {items
+        ?.filter((r) => !r.mine)
         .map((r) => (
           <View key={r.id} style={[styles.card, { backgroundColor: colors.surface }]}>
             <View style={styles.between}>
@@ -110,6 +116,7 @@ export function CourseReviews({ course }: { course: CourseDetail }) {
             </Pressable>
           </View>
         ))}
+      {q.hasNextPage ? <Button variant="ghost" label={t('education.reviewsMore')} loading={q.isFetchingNextPage} onPress={() => void q.fetchNextPage()} /> : null}
     </View>
   );
 }

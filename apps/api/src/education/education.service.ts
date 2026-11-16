@@ -180,8 +180,11 @@ export class EducationService implements OnModuleInit {
   async deleteReview(userId: string, courseId: string, meta: RequestMeta): Promise<void> {
     await this.getCourse(userId, courseId);
     await this.db.transaction(async (tx) => {
-      const res = await tx.execute(sql`DELETE FROM course_reviews WHERE course_id = ${courseId}::uuid AND user_id = ${userId}::uuid`);
-      if ((res.rowCount ?? 0) === 0) throw AppError.notFound('Review not found');
+      const cur = await tx.execute<{ hidden: boolean }>(sql`SELECT hidden FROM course_reviews WHERE course_id = ${courseId}::uuid AND user_id = ${userId}::uuid FOR UPDATE`);
+      if (!cur.rows[0]) throw AppError.notFound('Review not found');
+      // A moderated review cannot be deleted and posted again as a fresh, visible one.
+      if (cur.rows[0].hidden) throw AppError.conflict('This review was hidden by moderation', { reason: 'moderated' });
+      await tx.execute(sql`DELETE FROM course_reviews WHERE course_id = ${courseId}::uuid AND user_id = ${userId}::uuid`);
       await this.audit.record({ action: 'education.review_deleted', actorUserId: userId, meta, metadata: { courseId } }, tx);
     });
   }

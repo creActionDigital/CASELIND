@@ -92,6 +92,10 @@ describe('school search and scholarships (lot 17e)', () => {
       await call('post', head, `/orgs/${school}/school/scholarships/${open.id}/close`).expect(204);
       await call('post', head, `/orgs/${shop}/school/scholarships/${noUrl.id}/close`).expect(404); // not that org's
       expect(await ids('/school/scholarships?city=goma')).not.toContain(open.id);
+      await call('get', reader, `/school/scholarships/${open.id}`).expect(404); // closed: members only
+      await call('get', reader, `/school/scholarships/${expired.id}`).expect(404);
+      expect((await call('get', head, `/school/scholarships/${open.id}`).expect(200)).body.status).toBe('closed');
+      expect((await call('get', head, `/school/scholarships/${expired.id}`).expect(200)).body.id).toBe(expired.id);
       const mine = (await call('get', head, `/orgs/${school}/school/scholarships`).expect(200)).body.items;
       expect(mine.find((s: { id: string }) => s.id === open.id).status).toBe('closed');
       await call('get', outsider, `/orgs/${school}/school/scholarships`).expect(404);
@@ -103,6 +107,16 @@ describe('school search and scholarships (lot 17e)', () => {
       const audits = await ctx.sql.query(`SELECT action, metadata::text AS md FROM audit_events WHERE action LIKE 'school.scholarship%'`);
       expect(audits.rows.map((r: { action: string }) => r.action)).toEqual(expect.arrayContaining(['school.scholarship_published', 'school.scholarship_closed']));
       expect(audits.rows.map((r: { md: string }) => r.md).join('')).not.toMatch(/Excellence|meilleurs|ecole\.example/);
+    });
+
+    it('refuses to publish for an inactive school', async () => {
+      const head = await user();
+      const school = await org(head, 'school', 'Ecole Inactive', 'Goma');
+      await ctx.sql.query(`UPDATE organizations SET status = 'suspended' WHERE id = $1`, [school]);
+      const res = await call('post', head, `/orgs/${school}/school/scholarships`, { title: 'x', description: 'y' });
+      expect(res.status, JSON.stringify(res.body)).toBeGreaterThanOrEqual(400); // the org guard may already refuse a suspended org
+      const rows = await ctx.sql.query(`SELECT 1 FROM school_scholarships WHERE org_id = $1`, [school]);
+      expect(rows.rows).toHaveLength(0);
     });
   });
 });

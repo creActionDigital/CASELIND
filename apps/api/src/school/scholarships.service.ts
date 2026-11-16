@@ -46,6 +46,9 @@ const toScholarship = (r: SRow): Scholarship => ({
   createdAt: new Date(r.created_at).toISOString(),
 });
 
+/** Today in DR Congo (Lubumbashi, UTC+2), not the database server's zone. */
+const TODAY: SQL = sql`(now() AT TIME ZONE 'Africa/Lubumbashi')::date`;
+
 /** Public and active schools: same rule as the storefront. */
 const publicSchool: SQL = sql`o.kind = 'school' AND o.status = 'active' AND o.visibility = 'public'`;
 const SELECT_S = sql`SELECT s.id, s.org_id, s.title, s.description, to_char(s.deadline, 'YYYY-MM-DD') AS deadline, s.url, s.status, s.created_at,
@@ -88,7 +91,7 @@ export class ScholarshipsService {
 
   /** Open (not closed, deadline not passed) scholarships of public active schools. */
   list(q: ScholarshipListQuery): Promise<ScholarshipList> {
-    const f: SQL[] = [publicSchool, sql`s.status = 'open' AND (s.deadline IS NULL OR s.deadline >= current_date)`];
+    const f: SQL[] = [publicSchool, sql`s.status = 'open' AND (s.deadline IS NULL OR s.deadline >= ${TODAY})`];
     if (q.city) f.push(sql`o.city ILIKE ${escapeLike(q.city)}`);
     if (q.cursor) {
       const c = decodeCursor(q.cursor);
@@ -97,9 +100,12 @@ export class ScholarshipsService {
     return this.page(f, q.limit);
   }
 
-  async get(id: string): Promise<Scholarship> {
+  /** A closed or expired scholarship is only readable by active members of its school. */
+  async get(id: string, viewerId: string): Promise<Scholarship> {
     if (!UUID_RE.test(id)) throw AppError.notFound('Scholarship not found');
-    const res = await this.db.execute<SRow>(sql`${SELECT_S} WHERE s.id = ${id}::uuid AND ${publicSchool}`);
+    const res = await this.db.execute<SRow>(sql`${SELECT_S} WHERE s.id = ${id}::uuid AND ${publicSchool}
+      AND ((s.status = 'open' AND (s.deadline IS NULL OR s.deadline >= ${TODAY}))
+        OR EXISTS (SELECT 1 FROM org_members m WHERE m.org_id = s.org_id AND m.user_id = ${viewerId}::uuid AND m.status = 'active'))`);
     if (!res.rows[0]) throw AppError.notFound('Scholarship not found');
     return toScholarship(res.rows[0]);
   }
@@ -116,8 +122,9 @@ export class ScholarshipsService {
   }
 
   async publish(orgId: string, userId: string, b: CreateScholarshipRequest, meta: RequestMeta): Promise<Scholarship> {
-    const k = await this.db.execute<{ kind: string }>(sql`SELECT kind FROM organizations WHERE id = ${orgId}::uuid`);
+    const k = await this.db.execute<{ kind: string; status: string }>(sql`SELECT kind, status FROM organizations WHERE id = ${orgId}::uuid`);
     if (k.rows[0]?.kind !== 'school') throw AppError.conflict('Only a school can publish scholarships', { reason: 'not_a_school' });
+    if (k.rows[0].status !== 'active') throw AppError.conflict('The organisation is not active', { reason: 'org_inactive' });
     const r = await this.db.execute<{ id: string }>(sql`
       INSERT INTO school_scholarships (org_id, title, description, deadline, url)
       VALUES (${orgId}::uuid, ${b.title}, ${b.description}, ${b.deadline ?? null}::date, ${b.url ?? null}) RETURNING id`);

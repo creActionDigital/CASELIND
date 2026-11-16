@@ -75,6 +75,7 @@ export const educationFr = {
   'education.reviewDelete': 'Supprimer mon avis',
   'education.reviewReport': 'Signaler cet avis',
   'education.reviewsEmpty': 'Aucun avis pour le moment.',
+  'education.reviewsMore': 'Voir plus d’avis',
   'report.target.course_review': 'Avis sur un cours',
 } as const;
 
@@ -154,5 +155,6 @@ export const educationEn = {
   'education.reviewDelete': 'Delete my review',
   'education.reviewReport': 'Report this review',
   'education.reviewsEmpty': 'No reviews yet.',
+  'education.reviewsMore': 'Show more reviews',
   'report.target.course_review': 'Course review',
 } as const;

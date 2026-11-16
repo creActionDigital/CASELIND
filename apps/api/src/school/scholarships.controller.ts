@@ -34,8 +34,8 @@ export class ScholarshipsController {
   }
 
   @Get('school/scholarships/:id')
-  one(@Param('id') id: string): Promise<Scholarship> {
-    return this.s.get(id);
+  one(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<Scholarship> {
+    return this.s.get(id, u.userId);
   }
 }
 

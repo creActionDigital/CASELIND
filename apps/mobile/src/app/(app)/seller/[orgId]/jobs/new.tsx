@@ -32,9 +32,11 @@ export default function NewJob() {
   const [error, setError] = useState<string | null>(null);
 
   const existing = useQuery({ queryKey: jobKeys.one(String(jobId)), queryFn: () => fetchJob(String(jobId)), enabled: !!jobId });
+  const [prefilled, setPrefilled] = useState(false);
   useEffect(() => {
     const j = existing.data;
-    if (!j) return;
+    if (!j || prefilled) return; // fill once: a background refetch must not wipe what the recruiter is typing
+    setPrefilled(true);
     setTitle(j.title);
     setDescription(j.description);
     setCity(j.city);
@@ -44,7 +46,7 @@ export default function NewJob() {
       setMin(j.salary.minMinor === null ? '' : minorToDecimalString(j.salary.minMinor, j.salary.currency));
       setMax(j.salary.maxMinor === null ? '' : minorToDecimalString(j.salary.maxMinor, j.salary.currency));
     }
-  }, [existing.data]);
+  }, [existing.data, prefilled]);
 
   const publish = useMutation({
     mutationFn: () => {

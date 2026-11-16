@@ -246,4 +246,16 @@ describe('job alerts (lot 16d)', () => {
     await ctx.http.delete(`${alerts}/${a.id}`).set(bearer(seeker.token)).expect(204);
     expect((await ctx.http.get(alerts).set(bearer(seeker.token)).expect(200)).body.items).toHaveLength(4);
   });
+
+  it('does not notify someone who blocked the author or a member, or was blocked by one', async () => {
+    const [owner, hr, a, b, c] = [await user(), await user(), await user(), await user(), await user()];
+    const org = await createOrg(owner);
+    await addMember(org, owner, hr, 'hr');
+    for (const u of [a, b, c]) await ctx.http.post('/v1/me/job-alerts').set(bearer(u.token)).send({ city: 'Goma' }).expect(201);
+    await ctx.http.put(`/v1/blocks/${owner.id}`).set(bearer(a.token)).expect(204); // a blocked the author
+    await ctx.http.put(`/v1/blocks/${b.id}`).set(bearer(hr.token)).expect(204); // a member blocked b
+    await post(org, owner, job()).expect(201);
+    const count = async (u: TU) => Number((await ctx.sql.query(`SELECT count(*) AS n FROM notifications WHERE user_id = $1 AND title LIKE 'Nouvelle offre correspondant%'`, [u.id])).rows[0].n);
+    expect([await count(a), await count(b), await count(c)]).toEqual([0, 0, 1]);
+  });
 });

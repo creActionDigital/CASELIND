@@ -272,6 +272,8 @@ describe('education: reviews (lot 17d)', () => {
     expect((await ctx.http.get(`/v1/courses/${id}`).set(bearer(stranger.token)).expect(200)).body).toMatchObject({ ratingAvg: 2, ratingCount: 1 });
     expect((await reviewsOf(stranger, id)).body.items).toHaveLength(1);
     expect((await reviewsOf(a, id)).body.items).toHaveLength(2);
+    // A hidden review cannot be deleted and re-posted as a fresh visible one.
+    expect((await ctx.http.delete(`/v1/courses/${id}/reviews/me`).set(bearer(a.token)).expect(409)).body.error.details.reason).toBe('moderated');
 
     await ctx.http.delete(`/v1/courses/${id}/reviews/me`).set(bearer(b.token)).expect(204);
     expect((await ctx.http.get(`/v1/courses/${id}`).set(bearer(stranger.token)).expect(200)).body).toMatchObject({ ratingAvg: null, ratingCount: 0 });

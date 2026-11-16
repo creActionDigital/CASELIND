@@ -116,9 +116,14 @@ export class SchoolService {
       INSERT INTO school_announcements (class_id, author_id, title, body) VALUES (${classId}::uuid, ${userId}::uuid, ${body.title}, ${body.body}) RETURNING id, created_at`);
     await this.audit.record({ action: 'school.announced', actorUserId: userId, meta, metadata: { orgId, classId, announcementId: r.rows[0]!.id } });
     // Generic text on purpose: the announcement itself is read in the app, never in a push or a lock screen.
-    const to = await this.db.execute<{ user_id: string; name: string }>(sql`
-      SELECT e.user_id, c.name FROM school_enrollments e JOIN school_classes c ON c.id = e.class_id WHERE e.class_id = ${classId}::uuid AND e.user_id <> ${userId}::uuid`);
-    await this.notifications.notifyMany(to.rows.map((t) => ({ userId: t.user_id, category: 'system' as const, title: 'Nouvelle annonce', body: `Votre école a publié une annonce pour la classe ${t.name}.`, data: { classId } })));
+    // Best effort: the announcement is already saved, so a failing notification must not turn into a 500 (and a duplicate on retry).
+    try {
+      const to = await this.db.execute<{ user_id: string; name: string }>(sql`
+        SELECT e.user_id, c.name FROM school_enrollments e JOIN school_classes c ON c.id = e.class_id WHERE e.class_id = ${classId}::uuid AND e.user_id <> ${userId}::uuid`);
+      await this.notifications.notifyMany(to.rows.map((t) => ({ userId: t.user_id, category: 'system' as const, title: 'Nouvelle annonce', body: `Votre école a publié une annonce pour la classe ${t.name}.`, data: { classId } })));
+    } catch {
+      // not essential
+    }
     return { id: r.rows[0]!.id, title: body.title, body: body.body, createdAt: iso(r.rows[0]!.created_at) };
   }
 

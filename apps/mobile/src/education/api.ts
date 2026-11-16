@@ -50,6 +50,6 @@ export const fetchMyCourses = (cursor?: string) => api.request('/me/courses', { 
 export const fetchEnrollments = (cursor?: string) => api.request('/me/enrollments', { query: { limit: PAGE, cursor }, schema: enrollmentListSchema });
 export const fetchCertificates = () => api.request('/me/certificates', { schema: certificateListSchema });
 export const verifyCertificate = (code: string) => api.request(`/public/certificates/${encodeURIComponent(code)}`, { schema: certificateVerificationSchema });
-export const fetchReviews = (id: string) => api.request(`/courses/${id}/reviews`, { query: { limit: 50 }, schema: courseReviewListSchema });
+export const fetchReviews = (id: string, cursor?: string) => api.request(`/courses/${id}/reviews`, { query: { limit: 50, cursor }, schema: courseReviewListSchema });
 export const saveReview = (id: string, body: CourseReviewRequest) => api.request(`/courses/${id}/reviews/me`, { method: 'PUT', body, schema: courseDetailSchema });
 export const deleteReview = (id: string) => api.request(`/courses/${id}/reviews/me`, { method: 'DELETE' });
