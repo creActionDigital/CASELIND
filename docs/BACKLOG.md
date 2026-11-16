@@ -1,6 +1,6 @@
 # Backlog CASELIND
 
-Dernière mise à jour : 2026-11-02. **Règle CDC §0 : rien n'est supprimé.** Ce qui est différé reste ici avec son statut. Traçabilité fonctionnelle complète : [WECHAT_FUNCTIONAL_MAP.md](reverse-engineering/WECHAT_FUNCTIONAL_MAP.md) (96 lignes).
+Dernière mise à jour : 2026-11-16 (audit de conformité : voir [AUDIT_CONFORMITE_LOTS_1_12.md](AUDIT_CONFORMITE_LOTS_1_12.md)). **Règle CDC §0 : rien n'est supprimé.** Ce qui est différé reste ici avec son statut. Traçabilité fonctionnelle complète : [WECHAT_FUNCTIONAL_MAP.md](reverse-engineering/WECHAT_FUNCTIONAL_MAP.md) (96 lignes).
 
 Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` · `bloqué` · `reporté`
 
@@ -34,7 +34,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 ## Ordre imposé
 
 1. Reverse engineering et cartographie WeChat : **v1 faite** (sources publiques ; à enrichir module par module)
-2. **Backend** : en cours (lots 1, 1b, 1c, 2, 3, 3b, 4, 5, 5b, 6 sandbox et 7 testés)
+2. **Backend** : lots 1 à 18 et 20 livrés et testés (voir la feuille de route ci-dessus) ; 19 abandonné ; restent les différés de chaque lot dans PROGRESS.md
 3. **Mobile** (React Native + Expo) : en cours. M1 (socle, auth, messagerie temps réel, notifications) codé et testé sur Expo web ; validation sur appareil à faire
 4. Intégration mobile ↔ backend, tests et validation
 5. **Web** (React + TS + Vite) : seulement après la validation du mobile
@@ -61,7 +61,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 10 — Mini-apps | OAuth + PKCE, scopes, paiement confirmé par PIN | 509 tests | **testé** (backend) |
 | 11 — Mobilité | Courses type Uber, espèces | 509 tests | **testé** (backend) |
 | 12 — Assistant IA | Multi-fournisseurs, Gemini par défaut | 509 tests | **testé** (backend, sans clé réelle) |
-| 13+ | services, santé, éducation, emploi, immobilier, services publics, jeux, finance personnelle (13, testé : budget + bilan du mois), petites annonces (15, testé) | | planifié |
+| 13+ | Lots 13 à 20 : voir la feuille de route « Feuille de route des lots restants » en tête de ce fichier (livrés et testés, sauf 19 abandonné) | | testé |
 
 | 14 — Communautés publiques | Un groupe publié par son propriétaire (description, 5 étiquettes max) : liste filtrable, étiquettes tendance, rejoindre (idempotent, sans historique antérieur), retiré par un admin = interdit de rejoindre, limite de membres respectée, audité. Mobile : « Explorer les communautés » (filtre Groupes), « Mes groupes », bouton propriétaire Publier / Retirer | 515+ tests | **testé** (backend 5 tests, OpenAPI, mobile vérifié à l'écran) ; description et étiquettes saisies à l'écran, signalement d'une communauté : à faire |
 ## Lots mobile
@@ -75,6 +75,19 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | M5 — Recherche, lieux, QR, sécurité | Recherche, Maps (liste par distance), scanner et paiement QR, QR vendeur et profil, 2FA, KYC, changement d'identifiant, compléments de messagerie | **testé** (unitaires + parcours recherche, lieux, paiement QR sur Expo web) |
 | M6 — Livraison et services | Écrans acheteur, vendeur, livreur et prestataire | **testé** (unitaires) ; parcours complets non exercés |
 | M2 — Social | Fil, publications, commentaires, profils, Stories, signalements ; design Apple (ADR-016) | **testé** (unitaires + parcours Expo web contre l'API réelle) |
+
+## Écarts relevés par l'audit de conformité (2026-11-16, détails dans AUDIT_CONFORMITE_LOTS_1_12.md)
+
+| Réf. | Écart | Statut |
+|---|---|---|
+| G1 | Aucun outil pour suspendre un compte ou vérifier une organisation | **API faite et testée** (gouvernance admin) ; écran mobile admin en cours |
+| G2 | Retours, remboursements et litiges de commande absents | planifié (lot 5c, dépend du paiement réel Q5 ; avant cela, statut « litige » sans mouvement d'argent) |
+| G3 | Double validation des opérations sensibles, remboursement wallet, audit des lectures de mini-apps, limite de débit des publications | planifié |
+| G4 | Mini-apps sans écran mobile (tuile « Plus » sans effet) | planifié (lot M8 : annuaire, consentement OAuth, applications autorisées, révocation) |
+| G5 | Non consignés jusqu'ici : connexion sociale (Google, Apple, Facebook), biométrie, présence en ligne, sondages, recherche dans les messages, messages vocaux côté API, publications sponsorisées, preuve de livraison par photo ou signature, webhooks, actions de l'assistant IA, recherche en langage naturel | planifié |
+| G6 | Export et purge : notifications, brouillons, messages programmés à vérifier | planifié |
+| G7 | Consentements non centralisés (table `user_consents`) | planifié |
+| G8 | Swahili absent du mobile, langue non persistée (§27) | planifié |
 
 ## Décisions attendues du propriétaire (bloquantes seulement pour leur module)
 
