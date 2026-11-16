@@ -743,4 +743,21 @@ describe('seller contact', () => {
     expect(audits.rows.length).toBeGreaterThan(0);
     expect(audits.rows.map((r: { md: string }) => r.md).join('')).not.toContain('Awa');
   });
+
+  it('a cancelled invoice lets the accepted quote be invoiced again; numbering restarts each year (lot 16c review)', async () => {
+    const owner = await user();
+    const orgId = await createOrg(owner);
+    const post = (path: string, b?: Record<string, unknown>) => ctx.http.post(`/v1/orgs/${orgId}/documents${path}`).set(bearer(owner.token)).send(b ?? {});
+    const q = (await post('', { kind: 'quote', customerName: 'Awa', currency: 'USD', lines: [{ description: 'Offert', quantity: 1, unitPriceMinor: 0 }] }).expect(201)).body;
+    expect(q.totalMinor).toBe(0);
+    for (const status of ['sent', 'accepted']) await post(`/${q.id}/status`, { status }).expect(200);
+    const first = (await post(`/${q.id}/convert`).expect(201)).body;
+    await post(`/${first.id}/status`, { status: 'cancelled' }).expect(200);
+    const second = (await post(`/${q.id}/convert`).expect(201)).body;
+    expect(second.id).not.toBe(first.id);
+    await post(`/${q.id}/convert`).expect(409); // a live invoice exists again
+    await ctx.sql.query(`UPDATE business_documents SET number = replace(number, '-' || extract(year FROM now())::int || '-', '-2000-') WHERE org_id = $1`, [orgId]); // last years documents
+    const next = (await post('', { kind: 'quote', customerName: 'Awa', currency: 'USD', lines: [{ description: 'x', quantity: 1, unitPriceMinor: 100 }] }).expect(201)).body;
+    expect(next.number).toMatch(/-0001$/);
+  });
 });

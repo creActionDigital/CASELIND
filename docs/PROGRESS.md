@@ -467,3 +467,8 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Résultats observés : API 583 tests, typecheck propre.
 - Écrans mobiles (liste, création, détail, changement d état) ajoutés ; rendu vérifié à 375 px (création, liste, détail, passage à « envoyé »). Mobile 234 tests.
 - Différé : PDF/partage ; CRM, caisse, fidélité, campagnes ; /code-review.
+
+## Revue de code des lots 20b et 16c (2026-11-16)
+- 9 constats, 7 corrigés : numérotation DEV/FAC par année (compte sur le préfixe du numéro), audit du changement d'état dans la transaction, migration 0037 (une facture annulée ne bloque plus la réémission depuis le devis), intervalle SQL non ambigu, ligne à prix 0 permise, quantité strictement numérique, double envoi bloqué sur l'écran détail.
+- Non corrigés, voulus : le chiffre d'affaires de l'analyse de ventes compte les commandes non annulées (paiement à la livraison uniquement pour l'instant) ; la course sur la conversion est fermée par l'index unique (testé).
+- Résultats observés : API 584 tests, mobile 235, typechecks propres.

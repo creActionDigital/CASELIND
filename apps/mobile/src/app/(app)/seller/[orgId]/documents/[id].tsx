@@ -44,6 +44,7 @@ export default function DocumentDetail() {
   });
 
   const d = q.data;
+  const busy = status.isPending || convert.isPending;
   const canManage = can(role, 'orders.manage');
   return (
     <>
@@ -80,10 +81,10 @@ export default function DocumentDetail() {
                 {error}
               </Text>
             ) : null}
-            {canManage && d.kind === 'quote' && d.status === 'accepted' ? <Button label={t('docs.convert')} loading={convert.isPending} onPress={() => convert.mutate()} /> : null}
+            {canManage && d.kind === 'quote' && d.status === 'accepted' ? <Button label={t('docs.convert')} loading={convert.isPending} disabled={busy} onPress={() => convert.mutate()} /> : null}
             {canManage
               ? nextStatuses(d.kind, d.status).map((s) => (
-                  <Button key={s} variant={s === 'cancelled' ? 'danger' : 'primary'} label={t(`docs.action.${s}` as const)} loading={status.isPending} onPress={() => status.mutate(s)} />
+                  <Button key={s} variant={s === 'cancelled' ? 'danger' : 'primary'} label={t(`docs.action.${s}` as const)} loading={status.isPending} disabled={busy} onPress={() => status.mutate(s)} />
                 ))
               : null}
             <Text variant="small" muted>

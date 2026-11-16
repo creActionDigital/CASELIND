@@ -232,13 +232,13 @@ export class OrdersService {
     const totals = await this.db.execute<{ currency: string; n: number; cancelled: number; revenue: string }>(sql`
       SELECT currency::text AS currency, count(*) FILTER (WHERE status <> 'cancelled')::int AS n, count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
              COALESCE(sum(total_minor) FILTER (WHERE status <> 'cancelled'), 0)::text AS revenue
-      FROM orders WHERE org_id = ${orgId}::uuid AND created_at >= now() - (${days} || ' days')::interval GROUP BY currency ORDER BY currency`);
+      FROM orders WHERE org_id = ${orgId}::uuid AND created_at >= now() - ${days}::int * interval '1 day' GROUP BY currency ORDER BY currency`);
     const tops = await this.db.execute<{ currency: string; product_id: string; title: string; qty: number; revenue: string; rk: number }>(sql`
       SELECT * FROM (
         SELECT o.currency::text AS currency, i.product_id, max(i.title) AS title, sum(i.quantity)::int AS qty, sum(i.line_total_minor)::text AS revenue,
                row_number() OVER (PARTITION BY o.currency ORDER BY sum(i.quantity) DESC, i.product_id) AS rk
         FROM order_items i JOIN orders o ON o.id = i.order_id
-        WHERE o.org_id = ${orgId}::uuid AND o.status <> 'cancelled' AND o.created_at >= now() - (${days} || ' days')::interval
+        WHERE o.org_id = ${orgId}::uuid AND o.status <> 'cancelled' AND o.created_at >= now() - ${days}::int * interval '1 day'
         GROUP BY o.currency, i.product_id) t WHERE rk <= 5 ORDER BY currency, rk`);
     return {
       days,

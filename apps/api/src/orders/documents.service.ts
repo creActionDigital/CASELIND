@@ -65,8 +65,9 @@ export class DocumentsService {
     }
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`SELECT 1 FROM organizations WHERE id = ${orgId}::uuid FOR UPDATE`); // serialises the numbering
-      const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int + 1 AS n FROM business_documents WHERE org_id = ${orgId}::uuid AND kind = ${body.kind}`);
-      const number = `${PREFIX[body.kind]}-${new Date().getUTCFullYear()}-${String(n.rows[0]!.n).padStart(4, '0')}`;
+      const prefix = `${PREFIX[body.kind]}-${new Date().getUTCFullYear()}-`;
+      const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int + 1 AS n FROM business_documents WHERE org_id = ${orgId}::uuid AND number LIKE ${prefix + '%'}`);
+      const number = `${prefix}${String(n.rows[0]!.n).padStart(4, '0')}`;
       const res = await tx.execute<Row>(sql`
         INSERT INTO business_documents (org_id, kind, number, customer_name, customer_contact, currency, lines, total_minor, created_by, source_quote_id)
         VALUES (${orgId}::uuid, ${body.kind}, ${number}, ${body.customerName}, ${body.customerContact}, ${body.currency}, ${JSON.stringify(body.lines)}::jsonb, ${total}, ${userId}::uuid, ${sourceQuoteId}::uuid)
@@ -95,10 +96,12 @@ export class DocumentsService {
     if (!NEXT[cur.kind][cur.status]?.includes(status)) {
       throw AppError.conflict(`A ${cur.kind} cannot go from ${cur.status} to ${status}`, { reason: 'invalid_transition', from: cur.status, to: status });
     }
-    const res = await this.db.execute<Row>(sql`UPDATE business_documents SET status = ${status} WHERE id = ${id}::uuid AND org_id = ${orgId}::uuid AND status = ${cur.status} RETURNING ${COLS}`);
-    if (!res.rows[0]) throw AppError.conflict('The document changed meanwhile', { reason: 'changed' });
-    await this.audit.record({ action: 'commerce.document_status', actorUserId: userId, meta, metadata: { orgId, documentId: id, from: cur.status, to: status } });
-    return toDoc(res.rows[0]);
+    return this.db.transaction(async (tx) => {
+      const res = await tx.execute<Row>(sql`UPDATE business_documents SET status = ${status} WHERE id = ${id}::uuid AND org_id = ${orgId}::uuid AND status = ${cur.status} RETURNING ${COLS}`);
+      if (!res.rows[0]) throw AppError.conflict('The document changed meanwhile', { reason: 'changed' });
+      await this.audit.record({ action: 'commerce.document_status', actorUserId: userId, meta, metadata: { orgId, documentId: id, from: cur.status, to: status } }, tx);
+      return toDoc(res.rows[0]);
+    });
   }
 
   /** An accepted quote becomes one draft invoice with the same customer and lines. */

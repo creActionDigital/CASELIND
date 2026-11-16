@@ -21,8 +21,8 @@ export function toDocumentRequest(d: DocumentDraft): CreateDocumentRequest | nul
   if (!d.customerName.trim()) return null;
   const lines = [];
   for (const l of d.lines) {
-    const quantity = Number(l.quantity);
-    const unitPriceMinor = parseDecimalToMinor(l.price, d.currency);
+    const quantity = /^\d{1,5}$/.test(l.quantity.trim()) ? Number(l.quantity) : NaN;
+    const unitPriceMinor = /^0+([.,]0*)?$/.test(l.price.trim()) ? 0 : parseDecimalToMinor(l.price, d.currency); // a free line is allowed
     if (!l.description.trim() || !Number.isInteger(quantity) || quantity < 1 || quantity > 10_000 || unitPriceMinor === null) return null;
     lines.push({ description: l.description.trim(), quantity, unitPriceMinor });
   }

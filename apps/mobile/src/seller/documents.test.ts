@@ -12,7 +12,11 @@ describe('toDocumentRequest', () => {
     expect(toDocumentRequest({ ...base, lines: [{ description: 'x', quantity: '0', price: '1' }] })).toBeNull();
     expect(toDocumentRequest({ ...base, lines: [{ description: 'x', quantity: '1.5', price: '1' }] })).toBeNull();
     expect(toDocumentRequest({ ...base, lines: [{ description: 'x', quantity: '1', price: 'abc' }] })).toBeNull();
+    expect(toDocumentRequest({ ...base, lines: [{ description: 'x', quantity: '1e2', price: '1' }] })).toBeNull();
     expect(toDocumentRequest({ ...base, lines: [] })).toBeNull();
+  });
+  it('allows a free line', () => {
+    expect(toDocumentRequest({ ...base, lines: [{ description: 'Offert', quantity: '1', price: '0' }] })?.lines[0]?.unitPriceMinor).toBe(0);
   });
 });
 
