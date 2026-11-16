@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { pageQuerySchema } from './pagination.js';
+import { attachedFileSchema } from './media.js';
 
 /** Jobs (lot 16a, CDC §14): offers by organisations, a personal CV, applications. No candidate search, no video interview yet. */
 export const contractTypeSchema = z.enum(['full_time', 'part_time', 'contract', 'internship', 'temporary']);
@@ -117,6 +118,8 @@ export type ApplicationList = z.infer<typeof applicationListSchema>;
 export const orgApplicationSchema = applicationSchema.extend({
   applicant: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }),
   cv: jobProfileSchema,
+  /** The CV PDF attached at the time of the application (null if none). */
+  cvFile: attachedFileSchema.nullable(),
 });
 export type OrgApplication = z.infer<typeof orgApplicationSchema>;
 export const orgApplicationListSchema = z.object({ items: z.array(orgApplicationSchema), nextCursor: z.string().nullable() });
@@ -145,7 +148,7 @@ export const APPLICATION_TRANSITIONS: Readonly<Record<ApplicationStatus, readonl
 export const isTerminalApplication = (s: ApplicationStatus): boolean => APPLICATION_TRANSITIONS[s].length === 0;
 
 /** GET /v1/me/job-profile: wrapped so that "no CV yet" is a real JSON body. */
-export const myJobProfileSchema = z.object({ profile: jobProfileSchema.nullable() });
+export const myJobProfileSchema = z.object({ profile: jobProfileSchema.nullable(), cvFile: attachedFileSchema.nullable() });
 export type MyJobProfile = z.infer<typeof myJobProfileSchema>;
 
 /** Job alerts (lot 16d): up to 5 per person, private, at least one criterion. */
@@ -196,3 +199,7 @@ export const interviewSchema = z.object({
 export type Interview = z.infer<typeof interviewSchema>;
 export const interviewListSchema = z.object({ items: z.array(interviewSchema) });
 export type InterviewList = z.infer<typeof interviewListSchema>;
+
+/** PUT /v1/me/job-profile/cv: a ready `cv` (PDF) upload of the caller, or null to remove it. */
+export const setCvRequestSchema = z.object({ assetId: z.uuid().nullable() });
+export type SetCvRequest = z.infer<typeof setCvRequestSchema>;

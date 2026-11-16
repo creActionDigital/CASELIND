@@ -6,6 +6,12 @@ import {
   type CreateVisitRequest,
   type ListingVisit,
   type ListingVisitList,
+  type CompareListingsResponse,
+  type CreateOfferRequest,
+  type ListingOffer,
+  type ListingOfferList,
+  MAX_OPEN_OFFERS,
+  MIN_OFFER_PERCENT,
   MAX_PENDING_VISITS,
   MAX_VISIT_DAYS_AHEAD,
   type ListingAlert,
@@ -319,6 +325,100 @@ export class ListingsService implements OnModuleInit {
     return this.getVisit(userId, id);
   }
 
+  // ---- Guided negotiation (lot 15d): indicative only, nothing is sold or paid --------------------
+
+  private async offerRows(viewerId: string, where: SQL, tail: SQL = sql``): Promise<OfferRow[]> {
+    const res = await this.db.execute<OfferRow>(sql`
+      SELECT o.id, o.listing_id, l.title AS listing_title, l.price_minor AS asking_minor, o.status, o.offer_minor, o.counter_minor, o.currency, o.message, o.buyer_id, l.owner_id, o.created_at,
+        u.id AS other_id, u.display_name AS other_name, u.handle::text AS other_handle
+      FROM listing_offers o JOIN listings l ON l.id = o.listing_id
+      JOIN users u ON u.id = CASE WHEN o.buyer_id = ${viewerId}::uuid THEN l.owner_id ELSE o.buyer_id END
+      WHERE (o.buyer_id = ${viewerId}::uuid OR l.owner_id = ${viewerId}::uuid)
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = o.buyer_id AND b.blocked_id = l.owner_id) OR (b.blocker_id = l.owner_id AND b.blocked_id = o.buyer_id))
+        AND ${where} ${tail}`);
+    return res.rows;
+  }
+
+  async makeOffer(userId: string, listingId: string, body: CreateOfferRequest, meta: RequestMeta): Promise<ListingOffer> {
+    const listing = await this.get(userId, listingId); // 404 when hidden or blocked
+    if (listing.mine) throw invalid('listingId', 'you cannot make an offer on your own listing');
+    if (listing.status !== 'active') throw notFound();
+    if (listing.priceMinor === null || listing.currency === null) throw invalid('listingId', 'this listing has no fixed price');
+    const min = Math.ceil((listing.priceMinor * MIN_OFFER_PERCENT) / 100);
+    if (body.amountMinor < min || body.amountMinor > listing.priceMinor) throw invalid('amountMinor', `must be between ${min} and ${listing.priceMinor}`);
+    const id = await this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT 1 FROM users WHERE id = ${userId}::uuid FOR NO KEY UPDATE`); // serialises the quotas
+      const open = await tx.execute(sql`SELECT 1 FROM listing_offers WHERE listing_id = ${listingId}::uuid AND buyer_id = ${userId}::uuid AND status IN ('offered', 'countered')`);
+      if (open.rows.length > 0) throw AppError.conflict('A negotiation is already open for this listing', { reason: 'offer_exists' });
+      const n = await tx.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM listing_offers WHERE buyer_id = ${userId}::uuid AND status IN ('offered', 'countered')`);
+      if ((n.rows[0]?.n ?? 0) >= MAX_OPEN_OFFERS) throw AppError.conflict('Too many open negotiations', { reason: 'offer_limit', max: MAX_OPEN_OFFERS });
+      const res = await tx.execute<{ id: string }>(sql`
+        INSERT INTO listing_offers (listing_id, buyer_id, offer_minor, currency, message)
+        VALUES (${listingId}::uuid, ${userId}::uuid, ${body.amountMinor}, ${listing.currency}, ${body.message}) RETURNING id`);
+      const offerId = res.rows[0]!.id;
+      await this.audit.record({ action: 'listing.offer_offered', actorUserId: userId, meta, metadata: { offerId, listingId } }, tx);
+      return offerId;
+    });
+    await this.notifications.notify({ userId: listing.owner.id, category: 'commerce', title: 'Nouvelle offre sur votre annonce', body: 'Ouvrez Mes offres pour répondre.', data: { offerId: id } }).catch(() => undefined);
+    return this.getOffer(userId, id);
+  }
+
+  async listOffers(userId: string): Promise<ListingOfferList> {
+    const rows = await this.offerRows(userId, sql`TRUE`, sql`ORDER BY o.created_at DESC, o.id DESC LIMIT 100`); // shortcut: 100 most recent, no paging
+    return { items: rows.map((r) => toOffer(r, userId)) };
+  }
+
+  async getOffer(userId: string, id: string): Promise<ListingOffer> {
+    if (!UUID_RE.test(id)) throw notFound();
+    const row = (await this.offerRows(userId, sql`o.id = ${id}::uuid`))[0];
+    if (!row) throw AppError.notFound('Offer not found');
+    return toOffer(row, userId);
+  }
+
+  /**
+   * The owner answers an offer (accept, decline, counter once); the buyer answers a counter-offer (accept, decline) or cancels any open negotiation.
+   * Answering needs a live ad (409 listing_inactive); cancelling is always possible.
+   */
+  async answerOffer(userId: string, id: string, action: 'accept' | 'decline' | 'counter' | 'cancel', amountMinor: number | undefined, meta: RequestMeta): Promise<ListingOffer> {
+    const o = await this.getOffer(userId, id);
+    if (o.status !== 'offered' && o.status !== 'countered') throw AppError.conflict('Offer cannot change from its current status', { reason: 'bad_status' });
+    if (action === 'cancel') {
+      if (o.role !== 'buyer') throw AppError.notFound('Offer not found');
+    } else {
+      const turn = o.status === 'offered' ? 'owner' : 'buyer';
+      if (o.role !== turn || (action === 'counter' && o.status !== 'offered')) throw AppError.conflict('It is not your turn to answer', { reason: 'not_your_turn' });
+      const live = await this.db.execute(sql`SELECT 1 FROM listings WHERE id = ${o.listingId}::uuid AND status = 'active' AND NOT hidden`);
+      if (live.rows.length === 0) throw AppError.conflict('The listing is no longer active', { reason: 'listing_inactive' });
+    }
+    if (action === 'counter' && (amountMinor === undefined || amountMinor <= o.offerMinor || o.askingMinor === null || amountMinor > o.askingMinor)) {
+      throw invalid('amountMinor', 'must be above the offer and not above the asking price');
+    }
+    const next = ({ accept: 'accepted', decline: 'declined', counter: 'countered', cancel: 'cancelled' } as const)[action];
+    await this.db.transaction(async (tx) => {
+      const res = await tx.execute(sql`
+        UPDATE listing_offers SET status = ${next}, counter_minor = ${action === 'counter' ? amountMinor! : o.counterMinor}, updated_at = now()
+        WHERE id = ${id}::uuid AND status = ${o.status}`);
+      if (!res.rowCount) throw AppError.conflict('Offer cannot change from its current status', { reason: 'bad_status' });
+      await this.audit.record({ action: `listing.offer_${next}` as 'listing.offer_accepted', actorUserId: userId, meta, metadata: { offerId: id, listingId: o.listingId } }, tx);
+    });
+    const title = { accepted: 'Une offre a été acceptée', declined: 'Une offre a été refusée', countered: 'Vous avez reçu une contre-offre', cancelled: 'Une offre a été annulée' }[next];
+    await this.notifications.notify({ userId: o.other.id, category: 'commerce', title, body: 'Ouvrez Mes offres pour les détails.', data: { offerId: id } }).catch(() => undefined);
+    return this.getOffer(userId, id);
+  }
+
+  // ---- Vehicle comparison (lot 15d) -------------------------------------------------------------
+
+  /** 2 to 3 distinct ids; every ad must be an active, visible vehicle ad, otherwise 404 (no hint about which). */
+  async compare(viewerId: string, idsParam: string): Promise<CompareListingsResponse> {
+    const ids = idsParam.split(',').map((s) => s.trim().toLowerCase());
+    if (ids.length < 2 || ids.length > 3 || new Set(ids).size !== ids.length || !ids.every((i) => UUID_RE.test(i))) throw invalid('ids', 'give 2 or 3 distinct listing ids');
+    const res = await this.db.execute<Row>(sql`
+      ${this.base()} WHERE l.id IN (${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)}) AND l.kind = 'vehicle' AND l.status = 'active' AND NOT l.hidden AND ${visibleSql(viewerId)}`);
+    if (res.rows.length !== ids.length) throw notFound();
+    const byId = new Map(res.rows.map((r) => [r.id, r]));
+    return { items: ids.map((i) => toListing(byId.get(i)!, viewerId)) };
+  }
+
   private async page(viewerId: string, filters: SQL[], limit: number): Promise<ListingList> {
     const res = await this.db.execute<Row>(sql`
       ${this.base()} WHERE ${sql.join(filters, sql` AND `)}
@@ -388,6 +488,41 @@ type VisitRow = {
   other_name: string;
   other_handle: string;
 };
+
+type OfferRow = {
+  id: string;
+  listing_id: string;
+  listing_title: string;
+  asking_minor: string | null;
+  status: ListingOffer['status'];
+  offer_minor: string;
+  counter_minor: string | null;
+  currency: string;
+  message: string;
+  buyer_id: string;
+  owner_id: string;
+  created_at: Date;
+  other_id: string;
+  other_name: string;
+  other_handle: string;
+};
+
+function toOffer(r: OfferRow, viewerId: string): ListingOffer {
+  return {
+    id: r.id,
+    listingId: r.listing_id,
+    listingTitle: r.listing_title,
+    status: r.status,
+    offerMinor: Number(r.offer_minor),
+    counterMinor: r.counter_minor === null ? null : Number(r.counter_minor),
+    currency: r.currency,
+    askingMinor: r.asking_minor === null ? null : Number(r.asking_minor),
+    message: r.message,
+    role: r.buyer_id === viewerId ? 'buyer' : 'owner',
+    other: { id: r.other_id, displayName: r.other_name, handle: r.other_handle },
+    createdAt: new Date(r.created_at).toISOString(),
+  };
+}
 
 function toVisit(r: VisitRow, viewerId: string): ListingVisit {
   return {

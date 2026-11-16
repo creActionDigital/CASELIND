@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { pageQuerySchema } from './pagination.js';
+import { attachedFileSchema } from './media.js';
 
 /**
  * Freelance (lot 16b, CDC §14): missions, proposals, contracts with milestones, reviews, disputes.
@@ -100,6 +101,8 @@ export const milestoneSchema = z.object({
   amountMinor: z.number().int(),
   status: z.enum(['pending', 'delivered', 'revision', 'approved']),
   note: z.string(),
+  /** Delivery files (up to 3), readable by both parties. */
+  files: z.array(attachedFileSchema),
 });
 export type Milestone = z.infer<typeof milestoneSchema>;
 

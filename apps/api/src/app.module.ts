@@ -36,7 +36,7 @@ import { CommunitiesController, ConversationCommunityController } from './messag
 import { CommunitiesService } from './messaging/communities.service.js';
 import { FinanceController } from './finance/finance.controller.js';
 import { FinanceService } from './finance/finance.service.js';
-import { ListingAlertsController, ListingsController, ListingVisitsController } from './listings/listings.controller.js';
+import { ListingAlertsController, ListingOffersController, ListingsController, ListingVisitsController } from './listings/listings.controller.js';
 import { ListingsService } from './listings/listings.service.js';
 import { JobsController, OrgJobsController } from './jobs/jobs.controller.js';
 import { JobsService } from './jobs/jobs.service.js';
@@ -317,6 +317,7 @@ export class AppModule {
         ListingsController,
         ListingAlertsController,
         ListingVisitsController,
+        ListingOffersController,
         JobsController,
         OrgJobsController,
         FreelanceController,

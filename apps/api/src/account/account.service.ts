@@ -241,6 +241,10 @@ export class AccountService {
         CASE WHEN v.status = 'confirmed' THEN v.place END AS place, v.created_at
       FROM listing_visits v JOIN listings l ON l.id = v.listing_id
       WHERE v.visitor_id = ${auth.userId}::uuid OR l.owner_id = ${auth.userId}::uuid ORDER BY v.created_at, v.id`);
+    const offerRows = await this.db.execute<{ id: string; listing_id: string; role: string; status: string; offer_minor: string; counter_minor: string | null; currency: string; message: string; created_at: Date }>(sql`
+      SELECT o.id, o.listing_id, CASE WHEN o.buyer_id = ${auth.userId}::uuid THEN 'buyer' ELSE 'owner' END AS role, o.status, o.offer_minor, o.counter_minor, o.currency, o.message, o.created_at
+      FROM listing_offers o JOIN listings l ON l.id = o.listing_id
+      WHERE o.buyer_id = ${auth.userId}::uuid OR l.owner_id = ${auth.userId}::uuid ORDER BY o.created_at, o.id`);
     const jobAlertRows = await this.db.execute<{ id: string; q: string | null; city: string | null; contract_type: string | null; created_at: Date }>(sql`
       SELECT id, q, city, contract_type, created_at FROM job_alerts WHERE user_id = ${auth.userId}::uuid ORDER BY created_at`);
     const jobAppRows = await this.db.execute<{ id: string; title: string; org_name: string; status: string; message: string; created_at: Date }>(sql`
@@ -410,6 +414,7 @@ export class AccountService {
       jobProfile: cvRows.rows[0] ?? null,
       listingAlerts: listingAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, kind: a.kind, createdAt: new Date(a.created_at).toISOString() })),
       listingVisits: visitRows.rows.map((v) => ({ id: v.id, listingId: v.listing_id, role: v.role, status: v.status, scheduledAt: new Date(v.scheduled_at).toISOString(), message: v.message, place: v.place, createdAt: new Date(v.created_at).toISOString() })),
+      listingOffers: offerRows.rows.map((o) => ({ id: o.id, listingId: o.listing_id, role: o.role, status: o.status, offerMinor: Number(o.offer_minor), counterMinor: o.counter_minor === null ? null : Number(o.counter_minor), currency: o.currency, message: o.message, createdAt: new Date(o.created_at).toISOString() })),
       jobAlerts: jobAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, contractType: a.contract_type, createdAt: new Date(a.created_at).toISOString() })),
       jobApplications: jobAppRows.rows.map((a) => ({ id: a.id, jobTitle: a.title, orgName: a.org_name, status: a.status, message: a.message, createdAt: new Date(a.created_at).toISOString() })),
       jobInterviews: jobInterviewRows.rows.map((i) => ({ id: i.id, jobTitle: i.title, orgName: i.org_name, status: i.status, startsAt: new Date(i.starts_at).toISOString(), durationMin: i.duration_min, location: i.location, reason: i.reason })),

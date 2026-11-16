@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
+import { TINY_PDF, TINY_PNG, uploadAsset } from './upload.js';
 
 let ctx: TestContext;
 beforeAll(async () => {
@@ -171,6 +172,42 @@ describe('freelance contracts (lot 16b)', () => {
     const r2 = (await review(freelancer, { rating: 4 }).expect(201)).body;
     expect(r2.theirReview).toEqual({ rating: 5, body: 'Excellent' });
     await step(freelancer, c.id, m1!.id, 'deliver').expect(409); // completed contract is closed
+  });
+
+  it('delivery files: up to 3 by the freelancer, readable by the two parties only, deleted when dropped (lot 19m)', async () => {
+    const { client, freelancer, c } = await awarded();
+    const stranger = await user();
+    const m1 = c.milestones[0].id as string;
+    const put = (u: TU, assetIds: string[]) => ctx.http.put(`/v1/freelance-contracts/${c.id}/milestones/${m1}/files`).set(bearer(u.token)).send({ assetIds });
+    const read = (u: TU, id: string) => ctx.http.get(`/v1/media/${id}/content`).set(bearer(u.token));
+    await ctx.http.post('/v1/media/uploads').set(bearer(freelancer.token)).send({ purpose: 'delivery', mime: 'video/mp4', sizeBytes: 10 }).expect(400);
+    await ctx.http.post('/v1/media/uploads').set(bearer(freelancer.token)).send({ purpose: 'delivery', mime: 'application/pdf', sizeBytes: 10 * 1024 * 1024 + 1 }).expect(400);
+    const pdf = await uploadAsset(ctx, freelancer.token, 'delivery', 'application/pdf', TINY_PDF);
+    const png = await uploadAsset(ctx, freelancer.token, 'delivery', 'image/png', TINY_PNG);
+    await put(client, [pdf]).expect(404); // only the freelancer attaches
+    await put(stranger, [pdf]).expect(404);
+    await put(freelancer, [pdf, pdf]).expect(400);
+    const four = await Promise.all([1, 2, 3, 4].map(() => uploadAsset(ctx, freelancer.token, 'delivery', 'application/pdf', TINY_PDF)));
+    await put(freelancer, four).expect(400); // at most 3
+    const done = await put(freelancer, [pdf, png]).expect(200);
+    expect(done.body.milestones[0].files.map((f: { id: string }) => f.id)).toEqual([pdf, png]);
+    for (const id of [pdf, png]) {
+      await read(client, id).expect(200);
+      await read(freelancer, id).expect(200);
+      await read(stranger, id).expect(404);
+    }
+    expect((await ct(client, c.id).expect(200)).body.milestones[0].files).toHaveLength(2);
+    expect((await ct(client, c.id).expect(200)).body.milestones[1].files).toEqual([]);
+    // Dropping a file deletes it; the audit keeps only a count.
+    await put(freelancer, [png]).expect(200);
+    await read(freelancer, pdf).expect(404);
+    const audit = await ctx.sql.query(`SELECT metadata FROM audit_events WHERE action = 'freelance.delivery_files_set' AND actor_user_id = $1 ORDER BY id`, [freelancer.id]);
+    expect(audit.rows.map((r: { metadata: { count: number } }) => r.metadata.count)).toEqual([2, 1]);
+    await step(freelancer, c.id, m1, 'deliver').expect(200);
+    await put(freelancer, []).expect(200); // still allowed once delivered, until approved
+    await read(client, png).expect(404);
+    await step(client, c.id, m1, 'approve').expect(200);
+    await put(freelancer, []).expect(409);
   });
 
   it('cancel works until something is approved (idempotent); afterwards only a dispute', async () => {

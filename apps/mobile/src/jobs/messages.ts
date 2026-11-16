@@ -1,6 +1,7 @@
 /** Textes du lot 16a (emploi). Fusionnés dans `fr` et `en`. */
 export const jobsFr = {
   'jobs.title': 'Emploi',
+  'jobs.cvFile': 'CV (PDF)',
   'jobs.search': 'Rechercher une offre',
   'jobs.all': 'Toutes',
   'jobs.contract.full_time': 'Temps plein',
@@ -95,6 +96,7 @@ export const jobsFr = {
 
 export const jobsEn = {
   'jobs.title': 'Jobs',
+  'jobs.cvFile': 'CV (PDF)',
   'jobs.search': 'Search jobs',
   'jobs.all': 'All',
   'jobs.contract.full_time': 'Full time',

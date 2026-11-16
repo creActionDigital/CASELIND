@@ -66,6 +66,12 @@ export type AuditAction =
   | 'listing.visit_confirmed'
   | 'listing.visit_declined'
   | 'listing.visit_cancelled'
+  /** Guided negotiation (lot 15d): metadata {offerId, listingId}. Never the amounts or the message. */
+  | 'listing.offer_offered'
+  | 'listing.offer_countered'
+  | 'listing.offer_accepted'
+  | 'listing.offer_declined'
+  | 'listing.offer_cancelled'
   /** Jobs (lot 16a): metadata ids and statuses only, never a CV, a message or a name. */
   | 'job.posted'
   | 'job.updated'
@@ -73,6 +79,10 @@ export type AuditAction =
   | 'job.alert_created'
   | 'job.alert_deleted'
   | 'job.profile_saved'
+  | 'job.cv_file_set'
+  | 'job.cv_file_removed'
+  | 'freelance.delivery_files_set'
+  | 'education.lesson_files_set'
   | 'job.profile_deleted'
   | 'job.applied'
   | 'job.application_withdrawn'

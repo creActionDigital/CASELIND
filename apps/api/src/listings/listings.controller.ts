@@ -1,5 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import {
+  type CompareListingsQuery,
+  compareListingsQuerySchema,
+  type CompareListingsResponse,
+  type CounterOfferRequest,
+  counterOfferRequestSchema,
+  type CreateOfferRequest,
+  createOfferRequestSchema,
+  type ListingOffer,
+  type ListingOfferList,
   type CreateListingAlertRequest,
   createListingAlertRequestSchema,
   type ListingAlert,
@@ -41,6 +50,12 @@ export class ListingsController {
   @Get('mine')
   mine(@CurrentUser() user: AuthUser, @Query(new ZodPipe(pageQuerySchema)) q: PageQuery): Promise<ListingList> {
     return this.listings.mine(user.userId, q);
+  }
+
+  /** Declared before `:id`. */
+  @Get('compare')
+  compare(@CurrentUser() user: AuthUser, @Query(new ZodPipe(compareListingsQuerySchema)) q: CompareListingsQuery): Promise<CompareListingsResponse> {
+    return this.listings.compare(user.userId, q.ids);
   }
 
   @Get(':id')
@@ -130,5 +145,51 @@ export class ListingVisitsController {
   @HttpCode(200)
   cancel(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<ListingVisit> {
     return this.listings.answerVisit(user.userId, id, 'cancel', undefined, meta);
+  }
+}
+
+/** Guided negotiation (lot 15d): visible only to the buyer and the ad's owner (404 otherwise). */
+@Controller()
+@RequireFlag('listings')
+export class ListingOffersController {
+  constructor(private readonly listings: ListingsService) {}
+
+  @Post('listings/:id/offers')
+  make(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodPipe(createOfferRequestSchema)) body: CreateOfferRequest, @ReqMeta() meta: RequestMeta): Promise<ListingOffer> {
+    return this.listings.makeOffer(user.userId, id, body, meta);
+  }
+
+  @Get('me/offers')
+  mine(@CurrentUser() user: AuthUser): Promise<ListingOfferList> {
+    return this.listings.listOffers(user.userId);
+  }
+
+  @Get('offers/:id')
+  get(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<ListingOffer> {
+    return this.listings.getOffer(user.userId, id);
+  }
+
+  @Post('offers/:id/accept')
+  @HttpCode(200)
+  accept(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<ListingOffer> {
+    return this.listings.answerOffer(user.userId, id, 'accept', undefined, meta);
+  }
+
+  @Post('offers/:id/decline')
+  @HttpCode(200)
+  decline(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<ListingOffer> {
+    return this.listings.answerOffer(user.userId, id, 'decline', undefined, meta);
+  }
+
+  @Post('offers/:id/counter')
+  @HttpCode(200)
+  counter(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodPipe(counterOfferRequestSchema)) body: CounterOfferRequest, @ReqMeta() meta: RequestMeta): Promise<ListingOffer> {
+    return this.listings.answerOffer(user.userId, id, 'counter', body.amountMinor, meta);
+  }
+
+  @Post('offers/:id/cancel')
+  @HttpCode(200)
+  cancel(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<ListingOffer> {
+    return this.listings.answerOffer(user.userId, id, 'cancel', undefined, meta);
   }
 }

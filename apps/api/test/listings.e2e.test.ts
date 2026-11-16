@@ -254,6 +254,102 @@ describe('classified ads (lot 15)', () => {
     expect((await ctx.http.get('/v1/me/visits').set(bearer(owner.token)).expect(200)).body.items).toHaveLength(0);
   });
 
+  it('guided negotiation: offer, counter, accept, rights, limits, inactive ad, blocks, export, no amounts in audit or notifications', async () => {
+    const [owner, b, c, stranger, blocked] = [await user(), await user(), await user(), await user(), await user()];
+    const l = (await create(owner, ad()).expect(201)).body; // 25 000 USD
+    const offer = (u: TU, listingId: string, body: Record<string, unknown>) => ctx.http.post(`/v1/listings/${listingId}/offers`).set(bearer(u.token)).send(body);
+    const act = (u: TU, id: string, a: string, body: Record<string, unknown> = {}) => ctx.http.post(`/v1/offers/${id}/${a}`).set(bearer(u.token)).send(body);
+
+    await offer(b, l.id, { amountMinor: 2_499 }).expect(400); // under 10%
+    await offer(b, l.id, { amountMinor: 25_001 }).expect(400); // above the asking price
+    await offer(b, l.id, { amountMinor: 20_000, message: 'x'.repeat(301) }).expect(400);
+    await offer(owner, l.id, { amountMinor: 20_000 }).expect(400); // own ad
+    const lost = (await create(owner, ad({ kind: 'lost', priceMinor: null, currency: null })).expect(201)).body;
+    await offer(b, lost.id, { amountMinor: 100 }).expect(400); // no fixed price
+    await ctx.http.put(`/v1/blocks/${blocked.id}`).set(bearer(owner.token)).expect(204);
+    await offer(blocked, l.id, { amountMinor: 20_000 }).expect(404);
+
+    const o = (await offer(b, l.id, { amountMinor: 17_345, message: 'Secret message' }).expect(201)).body;
+    expect(o).toMatchObject({ status: 'offered', role: 'buyer', offerMinor: 17_345, currency: 'USD', askingMinor: 25_000, counterMinor: null });
+    await offer(b, l.id, { amountMinor: 18_000 }).expect(409); // one open per ad
+    const notes = async (u: TU) => (await ctx.sql.query(`SELECT title, body FROM notifications WHERE user_id = $1 AND data::text LIKE '%offerId%'`, [u.id])).rows;
+    expect(await notes(owner)).toHaveLength(1);
+    expect(JSON.stringify(await notes(owner))).not.toMatch(/17|Secret/);
+
+    await ctx.http.get(`/v1/offers/${o.id}`).set(bearer(stranger.token)).expect(404);
+    await act(stranger, o.id, 'cancel').expect(404);
+    expect((await ctx.http.get('/v1/me/offers').set(bearer(owner.token)).expect(200)).body.items[0]).toMatchObject({ role: 'owner', other: { id: b.id } });
+    expect((await ctx.http.get('/v1/me/offers').set(bearer(stranger.token)).expect(200)).body.items).toHaveLength(0);
+
+    // Turns: the buyer cannot answer his own offer; the owner counters once, within (offer, asking].
+    await act(b, o.id, 'accept').expect(409);
+    await act(owner, o.id, 'counter', { amountMinor: 17_345 }).expect(400);
+    await act(owner, o.id, 'counter', { amountMinor: 25_001 }).expect(400);
+    expect((await act(owner, o.id, 'counter', { amountMinor: 21_000 }).expect(200)).body).toMatchObject({ status: 'countered', counterMinor: 21_000 });
+    await act(owner, o.id, 'counter', { amountMinor: 22_000 }).expect(409); // only one counter-offer
+    await act(owner, o.id, 'accept').expect(409); // waiting for the buyer
+    expect((await act(b, o.id, 'accept').expect(200)).body.status).toBe('accepted');
+    await act(b, o.id, 'cancel').expect(409); // closed
+    expect(await notes(b)).toHaveLength(1);
+    const audits = JSON.stringify((await ctx.sql.query(`SELECT metadata::text FROM audit_events WHERE action LIKE 'listing.offer_%'`)).rows);
+    expect(audits).not.toMatch(/Secret|17345|21000/);
+    const exp = (await ctx.http.get('/v1/me/export').set(bearer(b.token)).expect(200)).body.listingOffers;
+    expect(exp[0]).toMatchObject({ role: 'buyer', status: 'accepted', offerMinor: 17_345, counterMinor: 21_000 });
+
+    // A new negotiation is possible once closed; decline by the owner; buyer cancel.
+    const d = (await offer(b, l.id, { amountMinor: 3_000 }).expect(201)).body;
+    expect((await act(owner, d.id, 'decline').expect(200)).body.status).toBe('declined');
+    const e = (await offer(b, l.id, { amountMinor: 3_000 }).expect(201)).body;
+    expect((await act(b, e.id, 'cancel').expect(200)).body.status).toBe('cancelled');
+    await act(owner, e.id, 'decline').expect(409);
+
+    // Inactive ad: no answer (409), cancel still works.
+    const f = (await offer(c, l.id, { amountMinor: 20_000 }).expect(201)).body;
+    await ctx.sql.query(`UPDATE listings SET hidden = true WHERE id = $1`, [l.id]);
+    expect((await act(owner, f.id, 'accept').expect(409)).body.error.details.reason).toBe('listing_inactive');
+    expect((await act(c, f.id, 'cancel').expect(200)).body.status).toBe('cancelled');
+    await ctx.sql.query(`UPDATE listings SET hidden = false WHERE id = $1`, [l.id]);
+
+    // Block hides the negotiation from both parties.
+    const g = (await offer(c, l.id, { amountMinor: 20_000 }).expect(201)).body;
+    await ctx.http.put(`/v1/blocks/${c.id}`).set(bearer(owner.token)).expect(204);
+    await ctx.http.get(`/v1/offers/${g.id}`).set(bearer(c.token)).expect(404);
+    await act(owner, g.id, 'decline').expect(404);
+
+    // 5 open negotiations at most per buyer.
+    const w = await user();
+    for (let i = 0; i < 5; i++) await offer(w, (await create(await user(), ad()).expect(201)).body.id, { amountMinor: 20_000 }).expect(201);
+    await offer(w, (await create(owner, ad()).expect(201)).body.id, { amountMinor: 20_000 }).expect(409);
+
+    await ctx.sql.query('DELETE FROM listings WHERE id = $1', [l.id]);
+    expect(Number((await ctx.sql.query('SELECT count(*) AS n FROM listing_offers WHERE listing_id = $1', [l.id])).rows[0].n)).toBe(0);
+  });
+
+  it('compares 2 to 3 active vehicle ads', async () => {
+    const [owner, viewer, other] = [await user(), await user(), await user()];
+    const car = async (title: string, extra: Record<string, unknown> = {}) => (await create(owner, ad({ kind: 'vehicle', title, ...extra })).expect(201)).body;
+    const [a, b, c] = [await car('Toyota RAV4', { priceMinor: 900_000 }), await car('Suzuki Jimny'), await car('Honda CR-V')];
+    const cmp = (u: TU, ids: string) => ctx.http.get(`/v1/listings/compare?ids=${ids}`).set(bearer(u.token));
+    const res = (await cmp(viewer, `${b.id},${a.id}`).expect(200)).body.items;
+    expect(res.map((x: { title: string }) => x.title)).toEqual(['Suzuki Jimny', 'Toyota RAV4']); // requested order
+    expect(res[1]).toMatchObject({ kind: 'vehicle', priceMinor: 900_000, currency: 'USD' });
+    expect((await cmp(viewer, `${a.id},${b.id},${c.id}`).expect(200)).body.items).toHaveLength(3);
+    await cmp(viewer, a.id).expect(400); // one only
+    await cmp(viewer, `${a.id},${a.id}`).expect(400); // duplicate
+    await cmp(viewer, `${a.id},${b.id},${c.id},${(await car('Nissan X-Trail')).id}`).expect(400); // four
+    await cmp(viewer, `${a.id},not-an-id`).expect(400);
+    const house = (await create(owner, ad()).expect(201)).body;
+    await cmp(viewer, `${a.id},${house.id}`).expect(404); // not a vehicle
+    await ctx.http.post(`/v1/listings/${b.id}/close`).set(bearer(owner.token)).expect(200);
+    await cmp(viewer, `${a.id},${b.id}`).expect(404); // closed
+    await ctx.sql.query(`UPDATE listings SET hidden = true WHERE id = $1`, [c.id]);
+    await cmp(viewer, `${a.id},${c.id}`).expect(404); // hidden
+    await ctx.sql.query(`UPDATE listings SET hidden = false WHERE id = $1`, [c.id]);
+    await ctx.http.put(`/v1/blocks/${other.id}`).set(bearer(owner.token)).expect(204);
+    await cmp(other, `${a.id},${c.id}`).expect(404); // blocked
+    await cmp(viewer, `${a.id},${c.id}`).expect(200);
+  });
+
   it('is off when the flag is off', async () => {
     const a = await user();
     await ctx.sql.query(`UPDATE feature_flags SET enabled = false WHERE key = 'listings'`);

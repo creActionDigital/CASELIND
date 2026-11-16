@@ -9,6 +9,7 @@ import { approveMilestone, cancelContract, deliverMilestone, fetchContract, frKe
 import { canCancel, canDispute, canReview, contractStatusKey, freelanceErrorKey, milestoneActions, milestoneStatusKey, type MilestoneAction } from '../../../../freelance/logic';
 import { ContactSeller } from '../../../../shop/ContactSeller';
 import { formatMoney } from '../../../../shop/format';
+import { FileLinks } from '../../../../media/FileLinks';
 import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
 import { Badge, Button, ErrorState, Screen, Text, TextField } from '../../../../ui';
@@ -100,6 +101,7 @@ export default function ContractDetail() {
               </View>
               <Badge tone="neutral" label={t(milestoneStatusKey(m.status))} />
               {m.note ? <Text variant="small">{m.note}</Text> : null}
+              <FileLinks files={m.files} label={t('freelance.files')} />
               {actions.length > 0 ? (
                 <>
                   {actions.includes('deliver') || actions.includes('revision') ? <TextField label={t(actions.includes('revision') ? 'freelance.revisionNote' : 'freelance.noteLabel')} value={note} onChangeText={setNote} multiline maxLength={2000} /> : null}

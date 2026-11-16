@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasPrice, kindKey, LISTING_KINDS, parseVisitTime, priceLabel, visitErrorKey } from './logic';
+import { hasPrice, kindKey, LISTING_KINDS, offerBounds, offerErrorKey, parseVisitTime, priceLabel, toggleCompare, visitErrorKey } from './logic';
 
 describe('listings logic', () => {
   it('lost and found items have no price', () => {
@@ -23,5 +23,19 @@ describe('parseVisitTime', () => {
     expect(parseVisitTime('2030-1-2', '14:30')).toBeNull();
     expect(parseVisitTime('2030-02-30', '14:30')).not.toBe('2030-02-30T14:30:00.000Z');
     expect(parseVisitTime('2030-01-02', '25:00')).toBeNull();
+  });
+});
+
+describe('offres et comparaison', () => {
+  it('calcule les bornes et les erreurs', () => {
+    expect(offerBounds(25_001)).toEqual({ min: 2_501, max: 25_001 });
+    expect(offerErrorKey({ reason: 'offer_limit' })).toBe('listings.offer.err.limit');
+    expect(offerErrorKey([{ path: 'amountMinor', message: 'm' }])).toBe('listings.offer.err.amount');
+    expect(offerErrorKey({ reason: 'zzz' })).toBeNull();
+  });
+  it('garde 3 annonces au plus, retire au second appui', () => {
+    expect(toggleCompare(['a', 'b'], 'c')).toEqual(['a', 'b', 'c']);
+    expect(toggleCompare(['a', 'b', 'c'], 'd')).toEqual(['b', 'c', 'd']);
+    expect(toggleCompare(['a', 'b'], 'a')).toEqual(['b']);
   });
 });

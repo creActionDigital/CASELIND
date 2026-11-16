@@ -29,3 +29,21 @@ export function visitErrorKey(details: unknown): MessageKey | null {
   if (d.reason === 'past') return 'listings.visit.err.date' as MessageKey;
   return null;
 }
+
+/** Bornes d'une offre : 10 % à 100 % du prix demandé (unités mineures). */
+export const offerBounds = (askingMinor: number): { min: number; max: number } => ({ min: Math.ceil(askingMinor / 10), max: askingMinor });
+
+/** Clé de message pour une erreur d'offre ou de réponse (raison lue dans `details.reason`). */
+export function offerErrorKey(details: unknown): MessageKey | null {
+  if (Array.isArray(details)) return details.some((x) => (x as { path?: unknown })?.path === 'amountMinor') ? ('listings.offer.err.amount' as MessageKey) : null;
+  const r = ((details ?? {}) as { reason?: unknown }).reason;
+  if (r === 'offer_exists') return 'listings.offer.err.exists' as MessageKey;
+  if (r === 'offer_limit') return 'listings.offer.err.limit' as MessageKey;
+  if (r === 'listing_inactive') return 'listings.offer.err.inactive' as MessageKey;
+  if (r === 'not_your_turn' || r === 'bad_status') return 'listings.offer.err.turn' as MessageKey;
+  return null;
+}
+
+export const MAX_COMPARE = 3;
+/** Ajoute ou retire une annonce de la liste à comparer (3 au plus : la plus ancienne sort). */
+export const toggleCompare = (ids: string[], id: string): string[] => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id].slice(-MAX_COMPARE));

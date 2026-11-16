@@ -31,6 +31,8 @@ import {
   type PageQuery,
   pageQuerySchema,
   type SetApplicationStatusRequest,
+  type SetCvRequest,
+  setCvRequestSchema,
   setApplicationStatusRequestSchema,
   type UpdateJobRequest,
   updateJobRequestSchema,
@@ -115,7 +117,12 @@ export class JobsController {
 
   @Get('me/job-profile')
   async profile(@CurrentUser() user: AuthUser): Promise<MyJobProfile> {
-    return { profile: await this.jobs.getProfile(user.userId) };
+    return this.jobs.myProfile(user.userId);
+  }
+
+  @Put('me/job-profile/cv')
+  setCv(@CurrentUser() user: AuthUser, @Body(new ZodPipe(setCvRequestSchema)) body: SetCvRequest, @ReqMeta() meta: RequestMeta): Promise<MyJobProfile> {
+    return this.jobs.setCvFile(user.userId, body.assetId, meta);
   }
 
   @Put('me/job-profile')

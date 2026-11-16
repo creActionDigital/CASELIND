@@ -31,6 +31,8 @@ import {
   type Proposal,
   type ProposalList,
   type ResolveDisputeRequest,
+  type SetFilesRequest,
+  setFilesRequestSchema,
   resolveDisputeRequestSchema,
   type ReviewContractRequest,
   reviewContractRequestSchema,
@@ -137,6 +139,11 @@ export class FreelanceController {
   @HttpCode(200)
   deliver(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('mid') mid: string, @Body(new ZodPipe(deliverMilestoneRequestSchema)) b: DeliverMilestoneRequest, @ReqMeta() meta: RequestMeta): Promise<Contract> {
     return this.f.deliver(u.userId, id, mid, b.note, meta);
+  }
+
+  @Put('freelance-contracts/:id/milestones/:mid/files')
+  setFiles(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('mid') mid: string, @Body(new ZodPipe(setFilesRequestSchema)) b: SetFilesRequest, @ReqMeta() meta: RequestMeta): Promise<Contract> {
+    return this.f.setDeliveryFiles(u.userId, id, mid, b.assetIds, meta);
   }
 
   @Post('freelance-contracts/:id/milestones/:mid/approve')

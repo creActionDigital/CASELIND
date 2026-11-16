@@ -131,3 +131,39 @@ export const listingVisitSchema = z.object({
 export type ListingVisit = z.infer<typeof listingVisitSchema>;
 export const listingVisitListSchema = z.object({ items: z.array(listingVisitSchema) });
 export type ListingVisitList = z.infer<typeof listingVisitListSchema>;
+
+/** Guided negotiation (lot 15d). Indicative only: accepting sells nothing and triggers no payment. */
+export const MAX_OPEN_OFFERS = 5;
+export const MIN_OFFER_PERCENT = 10;
+export const createOfferRequestSchema = z.object({
+  amountMinor: z.number().int().min(1).max(1_000_000_000_000),
+  message: z.string().trim().max(300).default(''),
+});
+export type CreateOfferRequest = z.infer<typeof createOfferRequestSchema>;
+export const counterOfferRequestSchema = z.object({ amountMinor: z.number().int().min(1).max(1_000_000_000_000) });
+export type CounterOfferRequest = z.infer<typeof counterOfferRequestSchema>;
+export const listingOfferSchema = z.object({
+  id: z.uuid(),
+  listingId: z.uuid(),
+  listingTitle: z.string(),
+  status: z.enum(['offered', 'countered', 'accepted', 'declined', 'cancelled']),
+  offerMinor: z.number().int(),
+  counterMinor: z.number().int().nullable(),
+  /** The listing's currency, fixed when the offer was made. */
+  currency: z.string(),
+  askingMinor: z.number().int().nullable(),
+  message: z.string(),
+  /** The caller's side: the buyer who offers, or the ad's owner who answers. */
+  role: z.enum(['buyer', 'owner']),
+  other: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }),
+  createdAt: z.string(),
+});
+export type ListingOffer = z.infer<typeof listingOfferSchema>;
+export const listingOfferListSchema = z.object({ items: z.array(listingOfferSchema) });
+export type ListingOfferList = z.infer<typeof listingOfferListSchema>;
+
+/** Vehicle comparison (lot 15d): 2 to 3 active vehicle ads, same order as requested. */
+export const compareListingsQuerySchema = z.object({ ids: z.string().min(1).max(200) });
+export type CompareListingsQuery = z.infer<typeof compareListingsQuerySchema>;
+export const compareListingsResponseSchema = z.object({ items: z.array(listingSchema) });
+export type CompareListingsResponse = z.infer<typeof compareListingsResponseSchema>;

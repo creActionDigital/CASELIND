@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { pageQuerySchema } from './pagination.js';
+import { attachedFileSchema } from './media.js';
 
 /** Education (lot 17a, CDC §13): courses, lessons, a quiz, progress, verifiable certificates. */
 export const courseLevelSchema = z.enum(['beginner', 'intermediate', 'advanced']);
@@ -64,7 +65,7 @@ export const courseListSchema = z.object({ items: z.array(courseSchema), nextCur
 export type CourseList = z.infer<typeof courseListSchema>;
 
 /** Lesson text is only given to enrolled learners and to the author; everyone else sees the titles. */
-export const lessonSchema = z.object({ id: z.uuid(), position: z.number().int(), title: z.string(), content: z.string().nullable(), done: z.boolean() });
+export const lessonSchema = z.object({ id: z.uuid(), position: z.number().int(), title: z.string(), content: z.string().nullable(), done: z.boolean(), files: z.array(attachedFileSchema) });
 export type Lesson = z.infer<typeof lessonSchema>;
 
 export const courseDetailSchema = courseSchema.extend({

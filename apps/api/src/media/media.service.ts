@@ -13,6 +13,7 @@ import {
   type MediaAssetPublic,
   type MediaKind,
   type MediaMime,
+  MEDIA_PURPOSE_MAX_BYTES,
   mediaKindOf,
   mediaMimeSchema,
   type Me,
@@ -130,7 +131,7 @@ export class MediaService {
   }
 
   async createUpload(auth: AuthUser, body: CreateUploadRequest, now = new Date()): Promise<CreateUploadResponse> {
-    const maxBytes = this.maxBytesFor(mediaKindOf(body.mime));
+    const maxBytes = Math.min(this.maxBytesFor(mediaKindOf(body.mime)), MEDIA_PURPOSE_MAX_BYTES[body.purpose] ?? Infinity);
     if (body.sizeBytes > maxBytes) {
       throw new AppError(400, ErrorCodes.validationFailed, 'File too large for this type', [
         { path: 'sizeBytes', message: `must be at most ${maxBytes} bytes`, maxBytes },

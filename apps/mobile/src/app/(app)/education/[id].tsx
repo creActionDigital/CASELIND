@@ -8,6 +8,7 @@ import { CourseReviews } from '../../../education/Reviews';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { openReport } from '../../../report/open-report';
+import { FileLinks } from '../../../media/FileLinks';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Badge, Button, ErrorState, Screen, Text } from '../../../ui';
@@ -93,6 +94,7 @@ export default function CourseScreen() {
               {l.done ? '  ✓' : ''}
             </Text>
             {canRead && open === l.id ? <Text>{l.content}</Text> : null}
+            {canRead ? <FileLinks files={l.files} label={t('education.files')} /> : null}
             {c.enrolled && !c.mine && !l.done ? <Button variant="secondary" label={t('education.markDone')} loading={done.isPending && done.variables === l.id} onPress={() => done.mutate(l.id)} /> : null}
           </View>
         ))}

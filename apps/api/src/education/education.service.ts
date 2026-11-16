@@ -1,4 +1,6 @@
 import { randomInt } from 'node:crypto';
+import { deleteObjects, filesByKey, LESSON_FILES, replaceFiles } from '../media/attachments.js';
+import { MediaStorage } from '../media/storage.js';
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   ErrorCodes,
@@ -109,6 +111,7 @@ export class EducationService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly moderation: ModerationRegistry,
+    private readonly storage: MediaStorage,
   ) {}
 
   onModuleInit(): void {
@@ -218,14 +221,34 @@ export class EducationService implements OnModuleInit {
   /** Replaces the lessons. Refused once someone is enrolled: it would erase their progress. */
   async setLessons(userId: string, id: string, body: SetLessonsRequest): Promise<CourseDetail> {
     await this.ownCourse(userId, id);
-    await this.db.transaction(async (tx) => {
+    const keys = await this.db.transaction(async (tx) => {
       await this.assertNoLearners(tx, id);
+      // Replacing the lessons drops their files: delete the media too.
+      const gone = await tx.execute<{ storage_key: string }>(sql`
+        DELETE FROM media_assets WHERE id IN (SELECT f.media_id FROM lesson_files f JOIN course_lessons l ON l.id = f.lesson_id WHERE l.course_id = ${id}::uuid) RETURNING storage_key`);
       await tx.execute(sql`DELETE FROM course_lessons WHERE course_id = ${id}::uuid`);
       for (const [position, l] of body.lessons.entries()) {
         await tx.execute(sql`INSERT INTO course_lessons (course_id, position, title, content) VALUES (${id}::uuid, ${position}, ${l.title}, ${l.content})`);
       }
+      return gone.rows.map((r) => r.storage_key);
     });
+    await deleteObjects(this.storage, keys);
     return this.get(userId, id);
+  }
+
+  /** The author attaches up to 3 files to a lesson (replaces the previous ones, which are deleted). Allowed while learners are enrolled. */
+  async setLessonFiles(userId: string, courseId: string, lessonId: string, assetIds: string[], meta: RequestMeta): Promise<CourseDetail> {
+    await this.ownCourse(userId, courseId);
+    if (!UUID_RE.test(lessonId)) throw notFound();
+    const keys = await this.db.transaction(async (tx) => {
+      const lesson = await tx.execute(sql`SELECT 1 FROM course_lessons WHERE id = ${lessonId}::uuid AND course_id = ${courseId}::uuid FOR UPDATE`);
+      if (lesson.rows.length === 0) throw notFound();
+      const removed = await replaceFiles(tx, LESSON_FILES, userId, 'lesson', lessonId, assetIds);
+      await this.audit.record({ action: 'education.lesson_files_set', actorUserId: userId, meta, metadata: { courseId, lessonId, count: assetIds.length } }, tx);
+      return removed;
+    });
+    await deleteObjects(this.storage, keys);
+    return this.get(userId, courseId);
   }
 
   /** Replaces the quiz (an empty list removes it). Refused once someone is enrolled: attempts would no longer compare. */
@@ -341,6 +364,7 @@ export class EducationService implements OnModuleInit {
         ${enrollment ? sql`EXISTS (SELECT 1 FROM lesson_progress p WHERE p.enrollment_id = ${enrollment.id}::uuid AND p.lesson_id = l.id)` : sql`false`} AS done
       FROM course_lessons l WHERE l.course_id = ${id}::uuid ORDER BY l.position`);
     const done = lessons.rows.filter((l) => l.done).length;
+    const files = canRead ? await filesByKey(this.db, LESSON_FILES, lessons.rows.map((l) => l.id)) : new Map();
     let best: number | null = null;
     let code: string | null = null;
     if (enrollment) {
@@ -351,7 +375,7 @@ export class EducationService implements OnModuleInit {
     }
     return {
       ...course,
-      lessons: lessons.rows.map((l) => ({ id: l.id, position: l.position, title: l.title, content: canRead ? l.content : null, done: l.done })),
+      lessons: lessons.rows.map((l) => ({ id: l.id, position: l.position, title: l.title, content: canRead ? l.content : null, done: l.done, files: files.get(l.id) ?? [] })),
       progressPercent: enrollment ? (lessons.rows.length === 0 ? 0 : Math.floor((done * 100) / lessons.rows.length)) : null,
       bestScorePercent: best,
       certificateCode: code,

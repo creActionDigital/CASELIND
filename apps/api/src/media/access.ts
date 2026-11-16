@@ -3,6 +3,8 @@ import { postVisibleSql } from '../social/post-visibility.js';
 import { posts, postMedia, users } from '../db/schema.js';
 import type { Db } from '../db/db.module.js';
 import type { MediaAssetRow } from '../db/schema.js';
+import type { OrgRole } from '@caselind/contracts';
+import { roleHasPermission } from '../orgs/org-permissions.js';
 import type { StoryAccessService } from '../stories/story-access.js';
 
 type Readable = Pick<MediaAssetRow, 'ownerUserId' | 'purpose'>;
@@ -29,6 +31,10 @@ export function canRead(viewerId: string, asset: Readable): boolean {
     case 'document':
     // Identity documents (lot 6B): owner only here; admins are added in canReadAsync.
     case 'kyc_document':
+    // Lot 19m: owner here; the other readers are resolved in canReadAsync.
+    case 'cv':
+    case 'delivery':
+    case 'lesson':
       return false;
   }
 }
@@ -53,6 +59,29 @@ export async function canReadAsync(
     const res = await db.execute(sql`
       SELECT 1 FROM users WHERE id = ${viewerId} AND status = 'active' AND 'admin' = ANY(roles)
         AND EXISTS (SELECT 1 FROM kyc_submissions WHERE ${asset.id}::uuid = ANY(document_ids)) LIMIT 1`);
+    return res.rows.length > 0;
+  }
+  // CV PDF: members of an organisation (hr.manage) that received an application carrying it (snapshot).
+  if (asset.purpose === 'cv') {
+    const res = await db.execute<{ role: string }>(sql`
+      SELECT DISTINCT om.role FROM job_applications a JOIN job_postings j ON j.id = a.posting_id
+      JOIN org_members om ON om.org_id = j.org_id AND om.user_id = ${viewerId}::uuid AND om.status = 'active'
+      WHERE a.cv_media_id = ${asset.id}::uuid`);
+    return res.rows.some((r) => roleHasPermission(r.role as OrgRole, 'hr.manage'));
+  }
+  // Delivery files: the two parties of the contract.
+  if (asset.purpose === 'delivery') {
+    const res = await db.execute(sql`
+      SELECT 1 FROM milestone_files f JOIN contract_milestones ms ON ms.id = f.milestone_id JOIN freelance_contracts c ON c.id = ms.contract_id
+      WHERE f.media_id = ${asset.id}::uuid AND (c.client_id = ${viewerId}::uuid OR c.freelancer_id = ${viewerId}::uuid) LIMIT 1`);
+    return res.rows.length > 0;
+  }
+  // Lesson files: the author of the course and its enrolled learners.
+  if (asset.purpose === 'lesson') {
+    const res = await db.execute(sql`
+      SELECT 1 FROM lesson_files f JOIN course_lessons l ON l.id = f.lesson_id JOIN courses c ON c.id = l.course_id
+      WHERE f.media_id = ${asset.id}::uuid AND (c.author_id = ${viewerId}::uuid
+        OR EXISTS (SELECT 1 FROM course_enrollments e WHERE e.course_id = c.id AND e.user_id = ${viewerId}::uuid)) LIMIT 1`);
     return res.rows.length > 0;
   }
   // Stories: same rule as the story itself (audience, expiry, moderation, blocks).

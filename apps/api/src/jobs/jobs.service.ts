@@ -3,6 +3,7 @@ import {
   APPLICATION_TRANSITIONS,
   ErrorCodes,
   type ApplicationList,
+  type MyJobProfile,
   type ApplicationStatus,
   type ApplyRequest,
   type CreateJobAlertRequest,
@@ -29,6 +30,8 @@ import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
+import { assertOwnReady, deleteObjects, fileOf } from '../media/attachments.js';
+import { MediaStorage } from '../media/storage.js';
 import { ModerationRegistry } from '../moderation/moderation-registry.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { roleHasPermission } from '../orgs/org-permissions.js';
@@ -60,6 +63,7 @@ type AppRow = {
   status: ApplicationStatus;
   message: string;
   cv: JobProfile;
+  cv_media_id: string | null;
   created_at: Date;
   updated_at: Date;
   job_id: string;
@@ -118,6 +122,7 @@ export class JobsService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly moderation: ModerationRegistry,
+    private readonly storage: MediaStorage,
   ) {}
 
   onModuleInit(): void {
@@ -305,6 +310,34 @@ export class JobsService implements OnModuleInit {
     return res.rows[0] ?? null;
   }
 
+  async myProfile(userId: string): Promise<MyJobProfile> {
+    const cv = await this.db.execute<{ cv_media_id: string | null }>(sql`SELECT cv_media_id FROM job_profiles WHERE user_id = ${userId}::uuid`);
+    return { profile: await this.getProfile(userId), cvFile: await fileOf(this.db, cv.rows[0]?.cv_media_id ?? null) };
+  }
+
+  /** Deletes a CV file unless an application still carries it (the recruiter keeps the snapshot). Returns the storage keys to remove. */
+  private async dropCvFile(tx: Pick<Db, 'execute'>, mediaId: string | null): Promise<string[]> {
+    if (!mediaId) return [];
+    const res = await tx.execute<{ storage_key: string }>(sql`
+      DELETE FROM media_assets WHERE id = ${mediaId}::uuid AND NOT EXISTS (SELECT 1 FROM job_applications WHERE cv_media_id = ${mediaId}::uuid) RETURNING storage_key`);
+    return res.rows.map((r) => r.storage_key);
+  }
+
+  /** Attaches (or removes with null) the PDF of the CV. The previous file is deleted unless an application carries it. */
+  async setCvFile(userId: string, assetId: string | null, meta: RequestMeta): Promise<MyJobProfile> {
+    const keys = await this.db.transaction(async (tx) => {
+      const cur = await tx.execute<{ cv_media_id: string | null }>(sql`SELECT cv_media_id FROM job_profiles WHERE user_id = ${userId}::uuid FOR UPDATE`);
+      if (!cur.rows[0]) throw AppError.conflict('Create your CV first', { reason: 'profile_required' });
+      const old = cur.rows[0].cv_media_id;
+      if (assetId) await assertOwnReady(tx, userId, 'cv', [assetId], 'assetId');
+      await tx.execute(sql`UPDATE job_profiles SET cv_media_id = ${assetId}::uuid, updated_at = now() WHERE user_id = ${userId}::uuid`);
+      await this.audit.record({ action: assetId ? 'job.cv_file_set' : 'job.cv_file_removed', actorUserId: userId, meta, metadata: {} }, tx);
+      return old && old !== assetId ? this.dropCvFile(tx, old) : [];
+    });
+    await deleteObjects(this.storage, keys);
+    return this.myProfile(userId);
+  }
+
   async saveProfile(userId: string, body: JobProfileInput, meta: RequestMeta): Promise<JobProfile> {
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
@@ -318,10 +351,13 @@ export class JobsService implements OnModuleInit {
   }
 
   async deleteProfile(userId: string, meta: RequestMeta): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      const del = await tx.execute(sql`DELETE FROM job_profiles WHERE user_id = ${userId}::uuid`);
-      if ((del.rowCount ?? 0) > 0) await this.audit.record({ action: 'job.profile_deleted', actorUserId: userId, meta, metadata: {} }, tx);
+    const keys = await this.db.transaction(async (tx) => {
+      const del = await tx.execute<{ cv_media_id: string | null }>(sql`DELETE FROM job_profiles WHERE user_id = ${userId}::uuid RETURNING cv_media_id`);
+      if (del.rows.length === 0) return [];
+      await this.audit.record({ action: 'job.profile_deleted', actorUserId: userId, meta, metadata: {} }, tx);
+      return this.dropCvFile(tx, del.rows[0]!.cv_media_id);
     });
+    await deleteObjects(this.storage, keys);
   }
 
   // ---- Applications (candidate side) ------------------------------------------------------------
@@ -340,7 +376,8 @@ export class JobsService implements OnModuleInit {
       const dup = await tx.execute(sql`SELECT 1 FROM job_applications WHERE posting_id = ${jobId}::uuid AND user_id = ${userId}::uuid`);
       if (dup.rows.length > 0) throw AppError.conflict('You already applied', { reason: 'already_applied' });
       const ins = await tx.execute<{ id: string }>(sql`
-        INSERT INTO job_applications (posting_id, user_id, message, cv) VALUES (${jobId}::uuid, ${userId}::uuid, ${body.message}, ${JSON.stringify(cv)}::jsonb) RETURNING id`);
+        INSERT INTO job_applications (posting_id, user_id, message, cv, cv_media_id)
+        SELECT ${jobId}::uuid, ${userId}::uuid, ${body.message}, ${JSON.stringify(cv)}::jsonb, (SELECT cv_media_id FROM job_profiles WHERE user_id = ${userId}::uuid) RETURNING id`);
       const appId = ins.rows[0]!.id;
       await this.audit.record({ action: 'job.applied', actorUserId: userId, meta, metadata: { orgId: row.org_id, jobId, applicationId: appId } }, tx);
       return appId;
@@ -421,14 +458,15 @@ export class JobsService implements OnModuleInit {
 
   private async appPage(filters: SQL[], limit: number): Promise<OrgApplicationList> {
     const res = await this.db.execute<AppRow>(sql`
-      SELECT a.id, a.status, a.message, a.cv, a.created_at, a.updated_at, j.id AS job_id, j.title AS job_title, o.name AS org_name,
+      SELECT a.id, a.status, a.message, a.cv, a.cv_media_id, a.created_at, a.updated_at, j.id AS job_id, j.title AS job_title, o.name AS org_name,
         u.id AS user_id, u.display_name, u.handle::text AS handle
       FROM job_applications a JOIN job_postings j ON j.id = a.posting_id JOIN organizations o ON o.id = j.org_id JOIN users u ON u.id = a.user_id
       WHERE ${sql.join(filters, sql` AND `)} ORDER BY a.created_at DESC, a.id DESC LIMIT ${limit + 1}`);
     const rows = res.rows.slice(0, limit);
     const last = rows[rows.length - 1];
+    const cvFiles = await Promise.all(rows.map((r) => fileOf(this.db, r.cv_media_id)));
     return {
-      items: rows.map((r) => ({
+      items: rows.map((r, i) => ({
         id: r.id,
         status: r.status,
         message: r.message,
@@ -437,6 +475,7 @@ export class JobsService implements OnModuleInit {
         updatedAt: iso(r.updated_at),
         applicant: { id: r.user_id, displayName: r.display_name, handle: r.handle },
         cv: r.cv,
+        cvFile: cvFiles[i] ?? null,
       })),
       nextCursor: res.rows.length > limit && last ? encodeCursor(last.created_at, last.id) : null,
     };

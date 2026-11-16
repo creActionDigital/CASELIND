@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
+import { TINY_PDF, TINY_PNG, uploadAsset } from './upload.js';
 
 let ctx: TestContext;
 beforeAll(async () => {
@@ -97,7 +98,7 @@ describe('jobs (lot 16a)', () => {
 
   it('keeps a private CV: create, replace, delete; skills are de-duplicated', async () => {
     const u = await user();
-    expect((await ctx.http.get('/v1/me/job-profile').set(bearer(u.token)).expect(200)).body).toEqual({ profile: null });
+    expect((await ctx.http.get('/v1/me/job-profile').set(bearer(u.token)).expect(200)).body).toEqual({ profile: null, cvFile: null });
     await saveCv(u, { headline: 'x' }).expect(400);
     const saved = await saveCv(u).expect(200);
     expect(saved.body).toMatchObject({ headline: 'Comptable junior', skills: ['Excel', 'SYSCOHADA'] });
@@ -105,7 +106,47 @@ describe('jobs (lot 16a)', () => {
     expect((await ctx.http.get('/v1/me/job-profile').set(bearer(u.token)).expect(200)).body.profile.headline).toBe('Comptable confirmé');
     await ctx.http.delete('/v1/me/job-profile').set(bearer(u.token)).expect(204);
     await ctx.http.delete('/v1/me/job-profile').set(bearer(u.token)).expect(204);
-    expect((await ctx.http.get('/v1/me/job-profile').set(bearer(u.token)).expect(200)).body).toEqual({ profile: null });
+    expect((await ctx.http.get('/v1/me/job-profile').set(bearer(u.token)).expect(200)).body).toEqual({ profile: null, cvFile: null });
+  });
+
+  it('attaches a CV PDF: owner and organisations applied to only; the application keeps its own file (lot 19m)', async () => {
+    const [owner, hr, seeker, other] = [await user(), await user(), await user(), await user()];
+    const org = await createOrg(owner);
+    await addMember(org, owner, hr, 'hr');
+    const j = (await post(org, owner, job()).expect(201)).body;
+    const put = (u: TU, assetId: string | null) => ctx.http.put('/v1/me/job-profile/cv').set(bearer(u.token)).send({ assetId });
+    const read = (u: TU, id: string) => ctx.http.get(`/v1/media/${id}/content`).set(bearer(u.token));
+    const announce = (body: Record<string, unknown>) => ctx.http.post('/v1/media/uploads').set(bearer(seeker.token)).send(body);
+    await announce({ purpose: 'cv', mime: 'image/png', sizeBytes: 100 }).expect(400);
+    await announce({ purpose: 'cv', mime: 'application/pdf', sizeBytes: 5 * 1024 * 1024 + 1 }).expect(400);
+    const a1 = await uploadAsset(ctx, seeker.token, 'cv', 'application/pdf', TINY_PDF);
+    expect((await put(seeker, a1).expect(409)).body.error.details.reason).toBe('profile_required');
+    await saveCv(seeker).expect(200);
+    await put(seeker, await uploadAsset(ctx, other.token, 'cv', 'application/pdf', TINY_PDF)).expect(400); // not mine
+    await put(seeker, await uploadAsset(ctx, seeker.token, 'listing', 'image/png', TINY_PNG)).expect(400); // wrong purpose
+    const set = await put(seeker, a1).expect(200);
+    expect(set.body.cvFile).toMatchObject({ id: a1, mime: 'application/pdf', contentUrl: `/v1/media/${a1}/content` });
+    await read(seeker, a1).expect(200);
+    await read(hr, a1).expect(404); // not applied yet
+    await read(other, a1).expect(404);
+    const app = (await apply(seeker, j.id).expect(201)).body;
+    await read(hr, a1).expect(200);
+    await read(other, a1).expect(404);
+    const rec = await ctx.http.get(`/v1/orgs/${org}/jobs/${j.id}/applications`).set(bearer(hr.token)).expect(200);
+    expect(rec.body.items[0].cvFile.id).toBe(a1);
+    // Replacing keeps the old file for the application and shows the new one to the owner only.
+    const a2 = await uploadAsset(ctx, seeker.token, 'cv', 'application/pdf', TINY_PDF);
+    expect((await put(seeker, a2).expect(200)).body.cvFile.id).toBe(a2);
+    await read(hr, a1).expect(200);
+    await read(hr, a2).expect(404);
+    // Removing deletes the unreferenced file; audited without content.
+    await put(seeker, null).expect(200);
+    await read(seeker, a2).expect(404);
+    expect((await ctx.http.get('/v1/me/job-profile').set(bearer(seeker.token)).expect(200)).body.cvFile).toBeNull();
+    const audit = await ctx.sql.query(`SELECT metadata FROM audit_events WHERE action IN ('job.cv_file_set','job.cv_file_removed') AND actor_user_id = $1`, [seeker.id]);
+    expect(audit.rows.length).toBeGreaterThanOrEqual(3);
+    expect(audit.rows.every((r: { metadata: object }) => Object.keys(r.metadata).length === 0)).toBe(true);
+    expect(app.id).toBeTruthy();
   });
 
   it('applies once with a CV snapshot, never to its own organisation, and recruiters see the snapshot not the live CV', async () => {

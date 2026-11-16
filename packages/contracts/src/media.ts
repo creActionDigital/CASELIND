@@ -14,6 +14,10 @@ export const mediaPurposeSchema = z.enum([
   'kyc_document',
   /** Classified-ad photos (lot 15): readable by any signed-in user. */
   'listing',
+  /** Lot 19m: the PDF of a CV (owner + organisations applied to), delivery files of a freelance milestone (both parties), lesson files (enrolled learners + author). */
+  'cv',
+  'delivery',
+  'lesson',
 ]);
 export type MediaPurpose = z.infer<typeof mediaPurposeSchema>;
 
@@ -61,7 +65,20 @@ export const MEDIA_ALLOWED_MIMES: Readonly<Record<MediaPurpose, readonly MediaMi
   message: [...IMAGES, ...VIDEOS, ...AUDIO, 'application/pdf'],
   document: ['application/pdf'],
   kyc_document: [...IMAGES, 'application/pdf'],
+  cv: ['application/pdf'],
+  delivery: [...IMAGES, 'application/pdf'],
+  lesson: [...IMAGES, ...VIDEOS, 'application/pdf'],
 };
+
+/** Per-purpose size cap in bytes (on top of the per-kind server limit); the lowest applies. */
+export const MEDIA_PURPOSE_MAX_BYTES: Readonly<Partial<Record<MediaPurpose, number>>> = { cv: 5 * 1024 * 1024, delivery: 10 * 1024 * 1024 };
+
+/** A file attached to a CV application, a milestone delivery or a lesson; fetch the bytes with GET contentUrl (bearer token). */
+export const attachedFileSchema = z.object({ id: z.uuid(), mime: mediaMimeSchema, sizeBytes: z.number().int().nonnegative(), contentUrl: z.string() });
+export type AttachedFile = z.infer<typeof attachedFileSchema>;
+/** PUT .../files: replaces the attached files by these ready uploads of the caller (at most 3; an empty list removes them). Removed files are deleted. */
+export const setFilesRequestSchema = z.object({ assetIds: z.array(z.uuid()).max(3) });
+export type SetFilesRequest = z.infer<typeof setFilesRequestSchema>;
 
 export function isMimeAllowedFor(purpose: MediaPurpose, mime: MediaMime): boolean {
   return MEDIA_ALLOWED_MIMES[purpose].includes(mime);

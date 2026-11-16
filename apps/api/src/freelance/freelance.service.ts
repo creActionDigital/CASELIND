@@ -30,6 +30,8 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
+import { deleteObjects, filesByKey, MILESTONE_FILES, replaceFiles } from '../media/attachments.js';
+import { MediaStorage } from '../media/storage.js';
 import { ModerationRegistry } from '../moderation/moderation-registry.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 
@@ -132,6 +134,7 @@ export class FreelanceService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly moderation: ModerationRegistry,
+    private readonly storage: MediaStorage,
   ) {}
 
   onModuleInit(): void {
@@ -422,6 +425,7 @@ export class FreelanceService implements OnModuleInit {
       WHERE c.id = ${id}::uuid AND (c.client_id = ${userId}::uuid OR c.freelancer_id = ${userId}::uuid)`);
     const c = res.rows[0];
     if (!c) throw contractNotFound();
+    const files = await filesByKey(this.db, MILESTONE_FILES, (await this.db.execute<{ id: string }>(sql`SELECT id FROM contract_milestones WHERE contract_id = ${id}::uuid`)).rows.map((m) => m.id));
     const [ms, reviews, dispute] = await Promise.all([
       this.db.execute<{ id: string; position: number; title: string; amount_minor: string; status: Contract['milestones'][number]['status']; note: string }>(sql`
         SELECT id, position, title, amount_minor, status, note FROM contract_milestones WHERE contract_id = ${id}::uuid ORDER BY position`),
@@ -442,7 +446,7 @@ export class FreelanceService implements OnModuleInit {
       client: { id: c.client_id, displayName: c.client_name, handle: c.client_handle },
       freelancer: { id: c.fl_id, displayName: c.fl_name, handle: c.fl_handle },
       role: c.client_id === userId ? 'client' : 'freelancer',
-      milestones: ms.rows.map((m) => ({ id: m.id, position: m.position, title: m.title, amountMinor: Number(m.amount_minor), status: m.status, note: m.note })),
+      milestones: ms.rows.map((m) => ({ id: m.id, position: m.position, title: m.title, amountMinor: Number(m.amount_minor), status: m.status, note: m.note, files: files.get(m.id) ?? [] })),
       myReview: mine ? { rating: mine.rating, body: mine.body } : null,
       theirReview: theirs ? { rating: theirs.rating, body: theirs.body } : null,
       dispute: dispute.rows[0] ?? null,
@@ -453,6 +457,24 @@ export class FreelanceService implements OnModuleInit {
   /** Freelancer hands in a milestone (first delivery or after a revision request). */
   async deliver(userId: string, contractId: string, milestoneId: string, note: string, meta: RequestMeta): Promise<Contract> {
     await this.moveMilestone(userId, 'freelancer', contractId, milestoneId, ['pending', 'revision'], 'delivered', note, 'freelance.milestone_delivered', meta, 'Un jalon a été livré.');
+    return this.getContract(userId, contractId);
+  }
+
+  /** The freelancer attaches up to 3 files to a milestone that is not approved yet (replaces the previous ones, which are deleted). */
+  async setDeliveryFiles(userId: string, contractId: string, milestoneId: string, assetIds: string[], meta: RequestMeta): Promise<Contract> {
+    if (!UUID_RE.test(contractId) || !UUID_RE.test(milestoneId)) throw contractNotFound();
+    const keys = await this.db.transaction(async (tx) => {
+      const res = await tx.execute<{ freelancer_id: string; status: string; m_status: string }>(sql`
+        SELECT c.freelancer_id, c.status, ms.status AS m_status FROM freelance_contracts c JOIN contract_milestones ms ON ms.contract_id = c.id
+        WHERE c.id = ${contractId}::uuid AND ms.id = ${milestoneId}::uuid FOR UPDATE OF c, ms`);
+      const row = res.rows[0];
+      if (!row || row.freelancer_id !== userId) throw contractNotFound();
+      if (row.status !== 'active' || row.m_status === 'approved') throw AppError.conflict('Files can no longer be changed on this milestone', { reason: 'invalid_transition' });
+      const removed = await replaceFiles(tx, MILESTONE_FILES, userId, 'delivery', milestoneId, assetIds);
+      await this.audit.record({ action: 'freelance.delivery_files_set', actorUserId: userId, meta, metadata: { contractId, milestoneId, count: assetIds.length } }, tx);
+      return removed;
+    });
+    await deleteObjects(this.storage, keys);
     return this.getContract(userId, contractId);
   }
 

@@ -7,6 +7,7 @@ import { useI18n } from '../../../../../i18n';
 import { ApiRequestError } from '../../../../../lib/api';
 import { errorMessage } from '../../../../../lib/errors';
 import { fetchOrgApplications, jobKeys, setApplicationStatus } from '../../../../../jobs/api';
+import { FileLinks } from '../../../../../media/FileLinks';
 import { InterviewBox } from '../../../../../jobs/InterviewBox';
 import { canPropose, nextStatuses, statusKey, type RecruiterStatus } from '../../../../../jobs/logic';
 import { Card, PagedList } from '../../../../../seller/ui';
@@ -64,6 +65,7 @@ export default function OrgApplications() {
             {item.cv.skills.length > 0 ? <Text variant="small">{item.cv.skills.join(' · ')}</Text> : null}
             {item.cv.experience ? <Text variant="small">{item.cv.experience}</Text> : null}
             {item.cv.education ? <Text variant="small">{item.cv.education}</Text> : null}
+            <FileLinks files={item.cvFile ? [item.cvFile] : []} label={t('jobs.cvFile')} />
             {item.message ? <Text>{item.message}</Text> : null}
             <InterviewBox orgId={String(orgId)} applicationId={item.id} canPropose={canPropose(item.status)} />
             <View style={styles.actions}>

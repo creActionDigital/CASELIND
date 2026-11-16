@@ -5,8 +5,10 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { ApiRequestError } from '../../../lib/api';
-import { closeListing, fetchListing, listingKeys, requestVisit } from '../../../listings/api';
-import { kindKey, parseVisitTime, priceLabel, visitErrorKey } from '../../../listings/logic';
+import { closeListing, fetchListing, listingKeys, makeOffer, requestVisit } from '../../../listings/api';
+import { toggleCompareId, useCompareIds } from '../../../listings/compare-store';
+import { kindKey, offerBounds, offerErrorKey, parseVisitTime, priceLabel, visitErrorKey } from '../../../listings/logic';
+import { formatMoney, parseMajorToMinor } from '../../../shop/format';
 import { createDirect, startChatErrorKey } from '../../../messaging/api';
 import { openReport } from '../../../report/open-report';
 import { radius, spacing } from '../../../theme/tokens';
@@ -53,6 +55,23 @@ export default function ListingDetail() {
     if (!at) setError(t('listings.visit.err.date'));
     else visit.mutate(at);
   };
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [oAmount, setOAmount] = useState('');
+  const [oMsg, setOMsg] = useState('');
+  const compareIds = useCompareIds();
+  const offer = useMutation({
+    mutationFn: (amountMinor: number) => makeOffer(String(id), { amountMinor, message: oMsg.trim() }),
+    onSuccess: () => {
+      setOfferOpen(false);
+      setVisitInfo(t('listings.offer.sent'));
+      setError(null);
+      void qc.invalidateQueries({ queryKey: listingKeys.offers });
+    },
+    onError: (e) => {
+      const key = e instanceof ApiRequestError ? offerErrorKey(e.details) : null;
+      setError(key ? t(key) : errorMessage(e, t, locale));
+    },
+  });
   const close = useMutation({
     mutationFn: () => closeListing(String(id)),
     onSuccess: () => void qc.invalidateQueries({ queryKey: listingKeys.all }),
@@ -111,6 +130,32 @@ export default function ListingDetail() {
         ) : (
           <>
             {l.status === 'active' ? <Button variant="secondary" label={t('listings.visit.ask')} onPress={() => setVisitOpen(!visitOpen)} /> : null}
+            {l.status === 'active' && l.priceMinor !== null && l.currency !== null ? (
+              <Button variant="secondary" label={t('listings.offer.ask')} onPress={() => setOfferOpen(!offerOpen)} />
+            ) : null}
+            {offerOpen && l.priceMinor !== null && l.currency !== null ? (
+              <View style={styles.body}>
+                <Text variant="small" muted>
+                  {t('listings.offer.safety')}
+                </Text>
+                <TextField
+                  label={t('listings.offer.amount', { min: formatMoney(offerBounds(l.priceMinor).min, l.currency, locale), max: formatMoney(l.priceMinor, l.currency, locale) })}
+                  value={oAmount}
+                  onChangeText={setOAmount}
+                  keyboardType="decimal-pad"
+                />
+                <TextField label={t('listings.offer.message')} value={oMsg} onChangeText={setOMsg} maxLength={300} multiline />
+                <Button
+                  label={t('listings.offer.send')}
+                  loading={offer.isPending}
+                  onPress={() => {
+                    const m = parseMajorToMinor(oAmount, l.currency!, locale);
+                    if (m === null) setError(t('listings.offer.err.amount'));
+                    else offer.mutate(m);
+                  }}
+                />
+              </View>
+            ) : null}
             {visitOpen ? (
               <View style={styles.body}>
                 <Text variant="small" muted>
@@ -126,6 +171,12 @@ export default function ListingDetail() {
               <Text variant="small" accessibilityLiveRegion="polite">
                 {visitInfo}
               </Text>
+            ) : null}
+            {l.kind === 'vehicle' && l.status === 'active' ? (
+              <>
+                <Button variant="secondary" label={t(compareIds.includes(l.id) ? 'listings.compare.remove' : 'listings.compare.add')} onPress={() => toggleCompareId(l.id)} />
+                {compareIds.length > 0 ? <Button variant="ghost" label={t('listings.compare.open', { n: compareIds.length })} onPress={() => router.push('/listings/compare')} /> : null}
+              </>
             ) : null}
             <Button label={t('listings.contact')} loading={contact.isPending} onPress={() => contact.mutate(l.owner.id)} />
             <Button variant="ghost" label={t('listings.report')} onPress={() => openReport({ targetType: 'listing', targetId: l.id })} />

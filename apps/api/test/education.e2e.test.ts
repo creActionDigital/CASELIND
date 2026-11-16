@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
+import { TINY_PDF, TINY_PNG, uploadAsset } from './upload.js';
 
 let ctx: TestContext;
 beforeAll(async () => {
@@ -103,6 +104,50 @@ describe('education: authoring (lot 17a)', () => {
     await ctx.http.put(`/v1/blocks/${learner.id}`).set(bearer(teacher.token)).expect(204);
     expect(ids(await list())).not.toContain(a.id);
     await ctx.http.get(`/v1/courses/${a.id}`).set(bearer(learner.token)).expect(404);
+  });
+});
+
+describe('education: lesson files (lot 19m)', () => {
+  it('the author attaches up to 3 files; enrolled learners and the author read them; others get 404; dropped files are deleted', async () => {
+    const { teacher, id } = await ready();
+    const [learner, stranger] = [await user(), await user()];
+    const detail = (u: TU) => ctx.http.get(`/v1/courses/${id}`).set(bearer(u.token)).expect(200);
+    const lessonId = (await detail(teacher)).body.lessons[0].id as string;
+    const put = (u: TU, assetIds: string[], lid = lessonId) => ctx.http.put(`/v1/courses/${id}/lessons/${lid}/files`).set(bearer(u.token)).send({ assetIds });
+    const read = (u: TU, aid: string) => ctx.http.get(`/v1/media/${aid}/content`).set(bearer(u.token));
+    await ctx.http.post('/v1/media/uploads').set(bearer(teacher.token)).send({ purpose: 'lesson', mime: 'video/mp4', sizeBytes: 10 }).expect(201); // videos are accepted
+    await ctx.http.post('/v1/media/uploads').set(bearer(teacher.token)).send({ purpose: 'lesson', mime: 'audio/mpeg', sizeBytes: 10 }).expect(400);
+    const pdf = await uploadAsset(ctx, teacher.token, 'lesson', 'application/pdf', TINY_PDF);
+    const png = await uploadAsset(ctx, teacher.token, 'lesson', 'image/png', TINY_PNG);
+    await put(learner, [pdf]).expect(404); // only the author
+    await put(teacher, [pdf], '00000000-0000-4000-8000-000000000000').expect(404);
+    await put(teacher, [pdf, pdf]).expect(400);
+    await put(teacher, await Promise.all([1, 2, 3, 4].map(() => uploadAsset(ctx, teacher.token, 'lesson', 'application/pdf', TINY_PDF)))).expect(400);
+    const set = await put(teacher, [pdf, png]).expect(200);
+    expect(set.body.lessons[0].files.map((f: { id: string }) => f.id)).toEqual([pdf, png]);
+    await enroll(learner, id).expect(200);
+    expect((await detail(learner)).body.lessons[0].files).toHaveLength(2);
+    expect((await detail(stranger)).body.lessons[0].files).toEqual([]);
+    for (const aid of [pdf, png]) {
+      await read(teacher, aid).expect(200);
+      await read(learner, aid).expect(200);
+      await read(stranger, aid).expect(404);
+    }
+    await put(teacher, [png]).expect(200); // still allowed with learners enrolled
+    await read(teacher, pdf).expect(404);
+    const audit = await ctx.sql.query(`SELECT metadata FROM audit_events WHERE action = 'education.lesson_files_set' AND actor_user_id = $1 ORDER BY id`, [teacher.id]);
+    expect(audit.rows.map((r: { metadata: { count: number } }) => r.metadata.count)).toEqual([2, 1]);
+  });
+
+  it('replacing the lessons deletes their files', async () => {
+    const t = await user();
+    const c = (await create(t).expect(201)).body;
+    const l = (await lessons(t, c.id).expect(200)).body.lessons[0].id as string;
+    const a = await uploadAsset(ctx, t.token, 'lesson', 'application/pdf', TINY_PDF);
+    await ctx.http.put(`/v1/courses/${c.id}/lessons/${l}/files`).set(bearer(t.token)).send({ assetIds: [a] }).expect(200);
+    await ctx.http.get(`/v1/media/${a}/content`).set(bearer(t.token)).expect(200);
+    await lessons(t, c.id).expect(200);
+    await ctx.http.get(`/v1/media/${a}/content`).set(bearer(t.token)).expect(404);
   });
 });
 

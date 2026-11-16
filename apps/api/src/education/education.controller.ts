@@ -24,6 +24,8 @@ import {
   type QuizAttemptRequest,
   quizAttemptRequestSchema,
   type QuizResult,
+  type SetFilesRequest,
+  setFilesRequestSchema,
   type SetLessonsRequest,
   setLessonsRequestSchema,
   type SetQuizRequest,
@@ -71,6 +73,11 @@ export class EducationController {
   @Put('courses/:id/lessons')
   setLessons(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new ZodPipe(setLessonsRequestSchema)) b: SetLessonsRequest): Promise<CourseDetail> {
     return this.edu.setLessons(u.userId, id, b);
+  }
+
+  @Put('courses/:id/lessons/:lessonId/files')
+  setLessonFiles(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('lessonId') lessonId: string, @Body(new ZodPipe(setFilesRequestSchema)) b: SetFilesRequest, @ReqMeta() meta: RequestMeta): Promise<CourseDetail> {
+    return this.edu.setLessonFiles(u.userId, id, lessonId, b.assetIds, meta);
   }
 
   @Put('courses/:id/quiz')
