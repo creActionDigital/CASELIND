@@ -34,6 +34,14 @@ async function seedQuestions(count = 10): Promise<void> {
 const correctAnswers = () => Array.from({ length: 10 }, () => 1);
 
 describe('quiz éclair (lot 20a)', () => {
+  it('ships a starter bank so the game can start, with a valid answer key', async () => {
+    const q = await ctx.sql.query('SELECT options, correct_index FROM game_questions WHERE active');
+    expect(q.rows.length).toBeGreaterThanOrEqual(10);
+    for (const r of q.rows) expect(r.correct_index).toBeLessThan(r.options.length);
+    const u = await user();
+    await start(u).expect(201); // before any seeding by the other tests
+  });
+
   it('is on by default, needs a session, and needs 10 active questions', async () => {
     await ctx.http.post('/v1/games/quiz/sessions').expect(401);
     await seedQuestions(9);
