@@ -8,7 +8,7 @@ import { useRealtime } from '../realtime/realtime-context';
 import { radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Button, Text } from '../ui';
-import { clKeys } from './api';
+import { callAction, clKeys } from './api';
 
 /** Bandeau « appel entrant » affiché au-dessus de tout écran quand `call.ringing` arrive ; disparaît avec `call.updated`. */
 export function IncomingCall() {
@@ -37,7 +37,8 @@ export function IncomingCall() {
   return (
     <View accessibilityLiveRegion="assertive" style={{ position: 'absolute', top: 48, left: spacing.lg, right: spacing.lg, zIndex: 50, padding: spacing.md, gap: spacing.sm, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary }}>
       <Text variant="bodyStrong">{t('calls.incoming')} · {t(call.kind === 'video' ? 'calls.video' : 'calls.audio')}</Text>
-      <Button label={t('calls.accept')} onPress={() => { const id = call.id; setCall(null); router.push({ pathname: '/calls/[id]', params: { id } }); }} />
+      <Button label={t('calls.accept')} onPress={() => { const id = call.id; setCall(null); router.push({ pathname: '/calls/[id]', params: { id, auto: '1' } }); }} />
+      <Button variant="danger" label={t('calls.decline')} onPress={() => { const id = call.id; setCall(null); void callAction(id, 'decline').catch(() => undefined); }} />
     </View>
   );
 }

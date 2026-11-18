@@ -107,7 +107,7 @@ export function createApiClient(options: ApiClientOptions) {
           return pair.accessToken;
         } catch (err) {
           // Erreur réseau : on garde la session. Rejet du serveur : déconnexion locale.
-          if (err instanceof ApiRequestError && err.status !== 0 && err.status < 500) {
+          if (err instanceof ApiRequestError && err.status !== 0 && err.status !== 429 && err.status < 500) {
             accessToken = null;
             await options.hooks.onSignedOut();
           }

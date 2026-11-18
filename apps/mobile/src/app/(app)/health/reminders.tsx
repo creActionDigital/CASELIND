@@ -51,6 +51,7 @@ export default function HealthReminders() {
   if (q.isPending) {
     return (
       <Screen edges={['bottom']}>
+        <Stack.Screen options={{ title: t('health.reminders') }} />
         <ActivityIndicator color={colors.primary} accessibilityLabel={t('common.loading')} />
       </Screen>
     );
@@ -58,6 +59,7 @@ export default function HealthReminders() {
   if (q.isError) {
     return (
       <Screen edges={['bottom']}>
+        <Stack.Screen options={{ title: t('health.reminders') }} />
         <ErrorState error={q.error} onRetry={() => q.refetch()} />
       </Screen>
     );

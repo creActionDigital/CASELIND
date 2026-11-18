@@ -77,7 +77,7 @@ export interface Debouncer<A extends unknown[]> {
 export function createDebouncer<A extends unknown[]>(
   fn: (...args: A) => void,
   ms: number,
-  timers: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: setTimeout, clear: clearTimeout },
+  timers: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: ((...a: Parameters<typeof setTimeout>) => setTimeout(...a)) as typeof setTimeout, clear: (h) => clearTimeout(h) },
 ): Debouncer<A> {
   let handle: ReturnType<typeof setTimeout> | null = null;
   let last: A | null = null;

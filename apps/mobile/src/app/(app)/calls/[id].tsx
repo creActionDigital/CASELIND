@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useAuth } from '../../../auth/auth-context';
 import { callAction, clKeys, fetchCalls } from '../../../calllive/api';
@@ -12,7 +12,7 @@ import { Button, ErrorState, Screen, Text } from '../../../ui';
 
 /** Écran d'appel : état de la sonnerie et de la communication, boutons répondre / refuser / raccrocher. La signalisation est réelle, pas le média. */
 export default function CallScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, auto } = useLocalSearchParams<{ id: string; auto?: string }>();
   const { t } = useI18n();
   const router = useRouter();
   const qc = useQueryClient();
@@ -28,6 +28,14 @@ export default function CallScreen() {
   }, [socket, qc]);
   const act = useMutation({ mutationFn: (a: 'accept' | 'decline' | 'end') => callAction(id, a), onSuccess: () => qc.invalidateQueries({ queryKey: clKeys.calls }) });
   const incoming = call?.calleeId === me?.id;
+  // « Répondre » depuis le bandeau d'appel entrant : on décroche tout de suite, une seule fois.
+  const [autoDone, setAutoDone] = useState(false);
+  useEffect(() => {
+    if (auto === '1' && !autoDone && call?.status === 'ringing' && incoming) {
+      setAutoDone(true);
+      act.mutate('accept');
+    }
+  }, [auto, autoDone, call?.status, incoming, act]);
   const over = call && !['ringing', 'active'].includes(call.status);
   return (
     <Screen>

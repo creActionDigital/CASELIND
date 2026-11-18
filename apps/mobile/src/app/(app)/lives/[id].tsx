@@ -23,7 +23,7 @@ export default function LiveRoom() {
   const isHost = live.data?.hostId === me?.id;
   const open = live.data?.status === 'live';
   const joined = useMutation({ mutationFn: () => joinLive(id), onSuccess: (l) => qc.setQueryData(clKeys.live(id), l) });
-  const messages = useQuery({ queryKey: clKeys.liveMessages(id), queryFn: () => fetchLiveMessages(id), enabled: open && (isHost || joined.isSuccess) });
+  const messages = useQuery({ queryKey: clKeys.liveMessages(id), queryFn: () => fetchLiveMessages(id), enabled: open && (isHost || joined.isSuccess), retry: false });
 
   // Un spectateur rejoint à l'ouverture et quitte en partant.
   useEffect(() => {
