@@ -409,6 +409,22 @@ describe('CatalogPort', () => {
   const db = () => ctx.app.get<Db>(DB);
   const stockOf = async (vid: string) => (await ctx.sql.query(`SELECT stock FROM product_variants WHERE id = $1`, [vid])).rows[0].stock as number;
 
+  it('reserve with an org filter ignores other shops and labels the movement', async () => {
+    const owner = await user();
+    const org = await createOrg(owner);
+    const owner2 = await user();
+    const other = await createOrg(owner2);
+    const mine = (await publishedProduct(owner, org.id, { variants: [variant({ stock: 5 })] })).variants[0]!.id;
+    const foreign = (await publishedProduct(owner2, other.id, { variants: [variant({ stock: 5 })] })).variants[0]!.id;
+    const bad = await db().transaction((tx) => port().reserve(tx, [{ variantId: foreign, quantity: 999 }], undefined, { orgId: org.id }));
+    expect(bad).toEqual({ ok: false, reason: 'unavailable', variantIds: [foreign] });
+    expect(await stockOf(foreign)).toBe(5);
+    const ok = await db().transaction((tx) => port().reserve(tx, [{ variantId: mine, quantity: 2 }], undefined, { orgId: org.id, reason: 'pos_sale' }));
+    expect(ok.ok).toBe(true);
+    const moves = await ctx.sql.query(`SELECT delta, reason FROM stock_movements WHERE variant_id = $1 AND delta < 0`, [mine]);
+    expect(moves.rows.map((r) => [r.delta, r.reason])).toEqual([[-2, 'pos_sale']]);
+  });
+
   it('reserves, prices and releases with journaled movements, all or nothing', async () => {
     const owner = await user();
     const org = await createOrg(owner);

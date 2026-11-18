@@ -23,6 +23,12 @@ export interface PricedLine {
   imageAssetId: string | null;
 }
 
+/** `orgId`: only variants of that org count (others read as unavailable); `reason`: label of the stock movement. */
+export interface ReserveOptions {
+  orgId?: string;
+  reason?: 'order_reserved' | 'pos_sale';
+}
+
 export type ReserveResult =
   | { ok: true; lines: PricedLine[] }
   | { ok: false; reason: 'unavailable' | 'insufficient_stock'; variantIds: string[] };
@@ -45,7 +51,7 @@ export class CatalogPort {
    * published, its product and org are active, and stock covers the quantity, then decrements the stock.
    * All or nothing.
    */
-  async reserve(_tx: DbExecutor, _lines: ReserveLine[], _buyerId?: string): Promise<ReserveResult> {
+  async reserve(_tx: DbExecutor, _lines: ReserveLine[], _buyerId?: string, _opts?: ReserveOptions): Promise<ReserveResult> {
     return { ok: false, reason: 'unavailable', variantIds: _lines.map((l) => l.variantId) };
   }
   /** Inside the caller's transaction: gives the stock back (order cancelled before shipping). */

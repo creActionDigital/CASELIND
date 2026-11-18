@@ -364,6 +364,8 @@ export const fr = {
   'profile.phone': 'Téléphone',
   'profile.none': 'Non renseigné',
   'profile.handleTaken': 'Cet identifiant est déjà pris.',
+  'profile.photo.change': 'Changer la photo',
+  'profile.photo.remove': 'Retirer la photo',
 
   'sessions.title': 'Sessions',
   'sessions.current': 'Cet appareil',

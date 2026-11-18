@@ -5,6 +5,7 @@ import {
   type DbExecutor,
   type PricedLine,
   type ReserveLine,
+  type ReserveOptions,
   type ReserveResult,
 } from '../commerce/catalog.port.js';
 import { DB, type Db } from '../db/db.module.js';
@@ -86,13 +87,13 @@ export class CatalogPortImpl extends CatalogPort {
     return out;
   }
 
-  override async reserve(tx: DbExecutor, lines: ReserveLine[], buyerId?: string): Promise<ReserveResult> {
+  override async reserve(tx: DbExecutor, lines: ReserveLine[], buyerId?: string, opts: ReserveOptions = {}): Promise<ReserveResult> {
     const { merged, bad } = merge(lines);
     if (bad.length > 0) return { ok: false, reason: 'unavailable', variantIds: bad };
     if (merged.size === 0) return { ok: true, lines: [] };
     const ids = [...merged.keys()].sort();
     // Row locks in id order: two concurrent reservations can never deadlock on each other.
-    const res = await tx.execute(sql`${selectVariants(buyerId)} WHERE v.id IN (${idList(ids)}) ORDER BY v.id FOR UPDATE OF v`);
+    const res = await tx.execute(sql`${selectVariants(buyerId)} WHERE v.id IN (${idList(ids)})${opts.orgId ? sql` AND v.org_id = ${opts.orgId}::uuid` : sql``} ORDER BY v.id FOR UPDATE OF v`);
     const rows = res.rows as unknown as VariantRow[];
     const byId = new Map(rows.map((r) => [r.id, r]));
 
@@ -111,7 +112,7 @@ export class CatalogPortImpl extends CatalogPort {
       await tx.execute(sql`UPDATE product_variants SET stock = stock - ${qty} WHERE id = ${id}::uuid`);
       await tx.execute(sql`
         INSERT INTO stock_movements (variant_id, org_id, delta, stock_after, reason)
-        VALUES (${id}::uuid, ${r.org_id}::uuid, ${-qty}, ${r.stock - qty}, 'order_reserved')`);
+        VALUES (${id}::uuid, ${r.org_id}::uuid, ${-qty}, ${r.stock - qty}, ${opts.reason ?? 'order_reserved'})`);
     }
     return { ok: true, lines: ids.map((id) => toLine(byId.get(id)!, merged.get(id)!)) };
   }

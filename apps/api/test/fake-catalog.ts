@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { vi } from 'vitest';
-import { CatalogPort, type PricedLine, type ReserveLine, type ReserveResult } from '../src/commerce/catalog.port.js';
+import { CatalogPort, type PricedLine, type ReserveLine, type ReserveOptions, type ReserveResult } from '../src/commerce/catalog.port.js';
 import type { TestContext } from './helpers.js';
 
 /** In-memory catalogue standing in for lot 5A: cart, orders and reviews only talk to the CatalogPort. */
@@ -46,10 +46,10 @@ export class FakeCatalog {
     return lines.filter((l) => this.variants.get(l.variantId)?.published).map((l) => this.line(l.variantId, l.quantity));
   }
 
-  reserve(lines: ReserveLine[]): ReserveResult {
+  reserve(lines: ReserveLine[], opts: ReserveOptions = {}): ReserveResult {
     const bad = lines.filter((l) => {
       const v = this.variants.get(l.variantId);
-      return !v || !v.published;
+      return !v || !v.published || (opts.orgId !== undefined && v.orgId !== opts.orgId);
     });
     if (bad.length > 0) return { ok: false, reason: 'unavailable', variantIds: bad.map((l) => l.variantId) };
     const short = lines.filter((l) => this.variants.get(l.variantId)!.stock < l.quantity);
@@ -68,7 +68,7 @@ export class FakeCatalog {
 export function installFakeCatalog(ctx: TestContext, fake: FakeCatalog): void {
   const port = ctx.app.get(CatalogPort);
   vi.spyOn(port, 'price').mockImplementation(async (lines) => fake.price(lines));
-  vi.spyOn(port, 'reserve').mockImplementation(async (_tx, lines) => fake.reserve(lines));
+  vi.spyOn(port, 'reserve').mockImplementation(async (_tx, lines, _buyerId, opts) => fake.reserve(lines, opts));
   vi.spyOn(port, 'release').mockImplementation(async (_tx, lines) => fake.release(lines));
   vi.spyOn(port, 'productExists').mockImplementation(async (id) => fake.products.has(id));
 }

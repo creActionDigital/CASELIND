@@ -46,6 +46,20 @@ const sale = (s: { owner: TU; orgId: string }, body: Record<string, unknown>, to
   ctx.http.post(`/v1/orgs/${s.orgId}/pos/sales`).set(bearer(token)).send({ clientId: randomUUID(), paymentMethod: 'cash', ...body });
 
 describe('caisse (counter sales)', () => {
+  it('retries: concurrent same key gives one sale, a reused key with another content is refused', async () => {
+    const s = await seller('USD');
+    const clientId = randomUUID();
+    const body = { clientId, lines: [{ variantId: s.variant, quantity: 2 }] };
+    const [a, b] = await Promise.all([sale(s, body), sale(s, body)]);
+    expect([a.status, b.status]).toEqual([201, 201]);
+    expect(a.body.id).toBe(b.body.id);
+    expect(fake.variants.get(s.variant)!.stock).toBe(48);
+    const other = await sale(s, { ...body, paymentMethod: 'card' }).expect(409);
+    expect(other.body.error.details).toMatchObject({ reason: 'client_id_reused' });
+    await sale(s, { ...body, lines: [{ variantId: s.variant, quantity: 3 }] }).expect(409);
+    expect(fake.variants.get(s.variant)!.stock).toBe(48);
+  });
+
   it('records a sale, takes stock, is idempotent, and sums the day per method', async () => {
     const s = await seller('USD');
     const other = await seller('USD');
@@ -81,7 +95,10 @@ describe('caisse (counter sales)', () => {
     await sale(s, { lines: [{ variantId: s.variant, quantity: 0 }] }).expect(400);
     await sale(s, { paymentMethod: 'bitcoin', lines: [{ variantId: s.variant, quantity: 1 }] }).expect(400);
     await sale(s, { lines: [{ variantId: s.variant, quantity: 999 }] }).expect(409);
-    await sale(s, { lines: [{ variantId: other.variant, quantity: 1 }] }).expect(404);
+    // A variant of another shop gives the same answer as an unknown one, whatever the quantity.
+    const foreign = await sale(s, { lines: [{ variantId: other.variant, quantity: 999 }] }).expect(409);
+    expect(foreign.body.error.details).toMatchObject({ reason: 'unavailable' });
+    expect(fake.variants.get(other.variant)!.stock).toBe(50);
     await sale(s, { lines: [{ variantId: s.variant, quantity: 1 }, { variantId: cdf, quantity: 1 }] }).expect(409);
     await sale(s, { lines: [{ variantId: s.variant, quantity: 1 }] }, stranger.token).expect(404);
     await ctx.http.get(`/v1/orgs/${s.orgId}/pos/summary`).set(bearer(stranger.token)).expect(404);

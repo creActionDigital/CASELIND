@@ -1,18 +1,22 @@
 import { StyleSheet, View } from 'react-native';
 import { useTheme } from '../theme/use-theme';
+import { AuthImage } from './AuthImage';
 import { Text } from './Text';
 
 interface Props {
   name: string;
   size?: number;
+  /** Photo de profil (`avatarUrl` de l'API) ; sans elle, les initiales. */
+  contentUrl?: string | null;
 }
 
 /**
  * Avatar à initiales. Le contenu média exige l'en-tête Authorization (voir API_CONTRACTS, lot 2b) :
- * l'affichage de la photo viendra avec le lot média ; les initiales servent de repli.
+ * la photo s'affiche via AuthImage ; les initiales servent de repli.
  */
-export function Avatar({ name, size = 40 }: Props) {
+export function Avatar({ name, size = 40, contentUrl }: Props) {
   const { colors } = useTheme();
+  if (contentUrl) return <AuthImage contentUrl={contentUrl} label={name} style={{ width: size, height: size, borderRadius: size / 2 }} />;
   const initials =
     name
       .trim()

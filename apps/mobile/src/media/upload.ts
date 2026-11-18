@@ -16,7 +16,7 @@ export function imageMime(declared: string | null | undefined, uri: string): Med
   return 'image/jpeg';
 }
 
-export type UploadPurpose = 'message' | 'story' | 'product' | 'kyc_document' | 'listing';
+export type UploadPurpose = 'message' | 'story' | 'product' | 'kyc_document' | 'listing' | 'avatar';
 
 /** Annonce (POST /media/uploads) puis envoie les octets (PUT avec X-Upload-Token). Renvoie l'id de l'asset. */
 export async function uploadImage(uri: string, mime: MediaMime, purpose: UploadPurpose): Promise<string> {
@@ -59,4 +59,5 @@ export async function uploadImage(uri: string, mime: MediaMime, purpose: UploadP
 }
 
 export const uploadMessageImage = (uri: string, mime: MediaMime) => uploadImage(uri, mime, 'message');
+export const uploadAvatarImage = (uri: string, mime: MediaMime) => uploadImage(uri, mime, 'avatar');
 export const uploadProductImage = (uri: string, mime: MediaMime) => uploadImage(uri, mime, 'product');

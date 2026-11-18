@@ -663,3 +663,10 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : écran Caisse (tuile du tableau vendeur) : panier par variante, mode de paiement, total, validation, encaissé du jour, 3 dernières ventes ; textes fr+en (pos/messages.ts).
 - Résultats observés : API 664 tests (dont pos.e2e 2), mobile 245, typechecks API et mobile propres. Écran : 2 casquettes en mobile money = 24,00 $US, total du jour et dernière vente mis à jour (une vente de test reste dans la base de dev).
 - Différé : annulation/remboursement d'une vente (remise en stock), ventes d'articles hors catalogue, ouverture/fermeture de caisse avec fond de caisse, ticket imprimable, fuseau horaire de la boutique pour « aujourd'hui » (UTC pour l'instant), pagination de l'historique (50 dernières), revues /code-review et /security-review non lancées (self-review seulement).
+
+## Caisse : correctifs de la revue /code-review (2026-11-18)
+- Migration 0060 : motif de mouvement de stock `pos_sale` (les ventes au comptoir ne sont plus étiquetées `order_reserved`) et colonne `pos_sales.request_hash`.
+- `CatalogPort.reserve` accepte `{ orgId, reason }` : une variante d'une autre boutique se lit « indisponible » (409 `unavailable`, comme un identifiant inconnu) : plus de fuite de stock ni de verrou chez une autre boutique (avant : 409 `insufficient_stock` ou 404).
+- Idempotence : verrou consultatif par (boutique, clientId), deux requêtes simultanées donnent une seule vente ; une clé réutilisée avec un autre mode de paiement ou d'autres lignes : 409 `client_id_reused`.
+- Tests ajoutés : pos (rejeu concurrent, clé réutilisée), catalog (filtre d'organisation, motif `pos_sale`).
+- Non traité (revue) : fuseau horaire du jour, historique de 50 lignes pour 3 affichées, module à part (hors module fidélité), tests de rôle sans `orders.manage` et de stock non suivi.

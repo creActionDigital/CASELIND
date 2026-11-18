@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { CreatePosSaleRequest, PosSale, PosSaleList, PosSummary } from '@caselind/contracts';
+import { createHash } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
@@ -7,7 +8,7 @@ import type { RequestMeta } from '../common/request-meta.js';
 import { CatalogPort } from '../commerce/catalog.port.js';
 import { DB, type Db } from '../db/db.module.js';
 
-type Row = { id: string; currency: string; total_minor: string; payment_method: PosSale['paymentMethod']; lines: PosSale['lines']; created_at: Date | string };
+type Row = { request_hash?: string | null; id: string; currency: string; total_minor: string; payment_method: PosSale['paymentMethod']; lines: PosSale['lines']; created_at: Date | string };
 const COLS = sql`id, currency, total_minor, payment_method, lines, created_at`;
 const toSale = (r: Row): PosSale => ({
   id: r.id,
@@ -17,6 +18,13 @@ const toSale = (r: Row): PosSale => ({
   lines: r.lines,
   createdAt: new Date(r.created_at).toISOString(),
 });
+
+/** What a retry must repeat: payment method and the variants with their summed quantities. */
+const requestHash = (req: CreatePosSaleRequest): string => {
+  const q = new Map<string, number>();
+  for (const l of req.lines) q.set(l.variantId.toLowerCase(), (q.get(l.variantId.toLowerCase()) ?? 0) + l.quantity);
+  return createHash('sha256').update(JSON.stringify([req.paymentMethod, [...q].sort(([a], [b]) => (a < b ? -1 : 1))])).digest('hex');
+};
 
 /** Counter sales (lot 16c): the seller records what was sold; stock goes down, no money moves on the platform. */
 @Injectable()
@@ -29,20 +37,25 @@ export class PosService {
 
   async create(orgId: string, cashierId: string, req: CreatePosSaleRequest, meta: RequestMeta): Promise<PosSale> {
     return this.db.transaction(async (tx) => {
-      const dup = await tx.execute<Row>(sql`SELECT ${COLS} FROM pos_sales WHERE org_id = ${orgId}::uuid AND client_id = ${req.clientId}::uuid`);
-      if (dup.rows[0]) return toSale(dup.rows[0]);
-      const reserved = await this.catalog.reserve(tx, req.lines);
+      // Serialises retries of the same sale: the second waits, then finds the first and returns it.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${orgId}:${req.clientId}`}, 0))`);
+      const hash = requestHash(req);
+      const dup = await tx.execute<Row>(sql`SELECT ${COLS}, request_hash FROM pos_sales WHERE org_id = ${orgId}::uuid AND client_id = ${req.clientId}::uuid`);
+      if (dup.rows[0]) {
+        if (dup.rows[0].request_hash && dup.rows[0].request_hash !== hash) throw AppError.conflict('This sale key was already used for a different sale', { reason: 'client_id_reused' });
+        return toSale(dup.rows[0]);
+      }
+      // Variants of other orgs read as unavailable (same answer as an unknown id): no stock leak across shops.
+      const reserved = await this.catalog.reserve(tx, req.lines, undefined, { orgId, reason: 'pos_sale' });
       if (!reserved.ok) throw AppError.conflict(reserved.reason === 'insufficient_stock' ? 'Not enough stock' : 'An item is unavailable', { reason: reserved.reason, variantIds: reserved.variantIds });
-      // Throwing rolls the whole transaction back, so the stock just taken is given back.
-      if (reserved.lines.some((l) => l.orgId !== orgId)) throw AppError.notFound('Item not found');
       const currencies = new Set(reserved.lines.map((l) => l.currency));
       if (currencies.size !== 1) throw AppError.conflict('All items of a sale must use the same currency');
       const currency = [...currencies][0]!;
       const total = reserved.lines.reduce((s, l) => s + l.unitPriceMinor * l.quantity, 0);
       const lines = reserved.lines.map((l) => ({ title: l.title, variantLabel: l.variantLabel, quantity: l.quantity, unitPriceMinor: l.unitPriceMinor }));
       const ins = await tx.execute<Row>(sql`
-        INSERT INTO pos_sales (org_id, client_id, cashier_user_id, currency, total_minor, payment_method, lines)
-        VALUES (${orgId}::uuid, ${req.clientId}::uuid, ${cashierId}::uuid, ${currency}, ${total}, ${req.paymentMethod}, ${JSON.stringify(lines)}::jsonb)
+        INSERT INTO pos_sales (org_id, client_id, cashier_user_id, currency, total_minor, payment_method, lines, request_hash)
+        VALUES (${orgId}::uuid, ${req.clientId}::uuid, ${cashierId}::uuid, ${currency}, ${total}, ${req.paymentMethod}, ${JSON.stringify(lines)}::jsonb, ${hash})
         RETURNING ${COLS}`);
       await this.audit.record({ action: 'commerce.pos_sale', actorUserId: cashierId, meta, metadata: { orgId, saleId: ins.rows[0]!.id, totalMinor: total, currency, paymentMethod: req.paymentMethod } }, tx);
       return toSale(ins.rows[0]!);

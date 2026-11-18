@@ -109,7 +109,7 @@ export default function UserProfile() {
 
   const head = (
     <View style={[styles.head, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-      <Avatar name={p.displayName} size={80} />
+      <Avatar name={p.displayName} size={80} contentUrl={p.avatarUrl} />
       <Text variant="title" style={styles.center} numberOfLines={2}>
         {p.displayName}
       </Text>

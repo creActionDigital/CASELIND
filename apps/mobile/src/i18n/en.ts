@@ -366,6 +366,8 @@ export const en: Record<MessageKey, string> = {
   'profile.phone': 'Phone',
   'profile.none': 'Not provided',
   'profile.handleTaken': 'This handle is already taken.',
+  'profile.photo.change': 'Change photo',
+  'profile.photo.remove': 'Remove photo',
 
   'sessions.title': 'Sessions',
   'sessions.current': 'This device',

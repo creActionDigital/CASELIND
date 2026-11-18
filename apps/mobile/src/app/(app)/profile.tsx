@@ -1,4 +1,5 @@
 import { meSchema } from '@caselind/contracts';
+import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { api, useAuth } from '../../auth/auth-context';
@@ -8,6 +9,7 @@ import { ApiRequestError } from '../../lib/api';
 import { errorMessage } from '../../lib/errors';
 import { spacing } from '../../theme/tokens';
 import { Avatar, Button, Screen, Text, TextField } from '../../ui';
+import { imageMime, uploadAvatarImage } from '../../media/upload';
 import { ProfileQrCard } from '../../scan/ProfileQrCard';
 
 /** MyProfile : GET/PATCH /v1/me. Les données viennent du contexte d'auth (chargées par GET /me). */
@@ -21,9 +23,29 @@ export default function Profile() {
   const [handleError, setHandleError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   useEffect(() => setSaved(false), [displayName, handle, bio]);
   if (!me) return null;
+
+  async function setPhoto(pick: boolean) {
+    setError(null);
+    setPhotoBusy(true);
+    try {
+      let assetId: string | null = null;
+      if (pick) {
+        const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+        if (res.canceled) return;
+        const a = res.assets[0]!;
+        assetId = await uploadAvatarImage(a.uri, imageMime(a.mimeType, a.uri));
+      }
+      setMe(await api.request('/me/avatar', { method: 'PATCH', body: { assetId }, schema: meSchema }));
+    } catch (e) {
+      setError(errorMessage(e, t, locale));
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   async function save() {
     setError(null);
@@ -52,7 +74,11 @@ export default function Profile() {
   return (
     <Screen edges={['bottom']}>
       <View style={{ alignItems: 'center', marginBottom: spacing.xl, gap: spacing.sm }}>
-        <Avatar name={me.displayName} size={80} />
+        <Avatar name={me.displayName} size={80} contentUrl={me.avatarUrl} />
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Button variant="secondary" label={t('profile.photo.change')} loading={photoBusy} onPress={() => setPhoto(true)} />
+          {me.avatarUrl ? <Button variant="secondary" label={t('profile.photo.remove')} disabled={photoBusy} onPress={() => setPhoto(false)} /> : null}
+        </View>
         <Text variant="small" muted>
           {t('profile.email')} : {me.email ?? t('profile.none')}
         </Text>

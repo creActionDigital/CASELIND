@@ -74,7 +74,7 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
   return (
     <SheetModal visible={visible} onClose={close}>
       <View style={styles.head}>
-        <Avatar name={me?.displayName ?? '?'} size={48} />
+        <Avatar name={me?.displayName ?? '?'} size={48} contentUrl={me?.avatarUrl} />
         <View style={{ flex: 1 }}>
           <Text variant="heading" numberOfLines={1}>
             {me?.displayName}
