@@ -3,11 +3,6 @@ import {
   type Campaign,
   type CampaignList,
   type CreateCampaignRequest,
-  type CreatePosSaleRequest,
-  type PosSale,
-  type PosSaleList,
-  type PosSummary,
-  createPosSaleRequestSchema,
   type LoyaltyProgram,
   type MarketingConsentRequest,
   type MyLoyalty,
@@ -22,7 +17,6 @@ import { RequireFlag } from '../flags/flag.guard.js';
 import { CurrentMembership, type OrgMembership, OrgPermission } from '../orgs/org.guard.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
 import { LoyaltyService } from './loyalty.service.js';
-import { PosService } from './pos.service.js';
 
 /** Buyer side: own points per shop and marketing consent. */
 @Controller('me')
@@ -69,30 +63,5 @@ export class OrgLoyaltyController {
   @OrgPermission('orders.manage')
   campaigns(@CurrentMembership() m: OrgMembership): Promise<CampaignList> {
     return this.loyalty.listCampaigns(m.orgId);
-  }
-}
-
-/** Till (`orders.manage`): counter sales. */
-@Controller('orgs/:orgId/pos')
-@RequireFlag('commerce')
-export class OrgPosController {
-  constructor(private readonly pos: PosService) {}
-
-  @Post('sales')
-  @OrgPermission('orders.manage')
-  create(@CurrentMembership() m: OrgMembership, @CurrentUser() user: AuthUser, @Body(new ZodPipe(createPosSaleRequestSchema)) body: CreatePosSaleRequest, @ReqMeta() meta: RequestMeta): Promise<PosSale> {
-    return this.pos.create(m.orgId, user.userId, body, meta);
-  }
-
-  @Get('sales')
-  @OrgPermission('orders.manage')
-  list(@CurrentMembership() m: OrgMembership): Promise<PosSaleList> {
-    return this.pos.list(m.orgId);
-  }
-
-  @Get('summary')
-  @OrgPermission('orders.manage')
-  summary(@CurrentMembership() m: OrgMembership): Promise<PosSummary> {
-    return this.pos.summary(m.orgId);
   }
 }

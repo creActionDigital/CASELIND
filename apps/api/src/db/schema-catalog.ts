@@ -55,7 +55,7 @@ export const stockMovements = pgTable('stock_movements', {
   delta: integer('delta').notNull(),
   stockAfter: integer('stock_after').notNull(),
   reason: text('reason')
-    .$type<'initial' | 'restock' | 'adjustment' | 'damage' | 'order_reserved' | 'order_released' | 'pos_sale'>()
+    .$type<'initial' | 'restock' | 'adjustment' | 'damage' | 'order_reserved' | 'order_released' | 'pos_sale' | 'pos_void'>()
     .notNull(),
   actorUserId: uuid('actor_user_id'),
   createdAt: tstz('created_at').notNull().defaultNow(),

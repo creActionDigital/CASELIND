@@ -87,8 +87,9 @@ import { CartService } from './cart/cart.service.js';
 import { CouponsService } from './orders/coupons.service.js';
 import { DocumentsService } from './orders/documents.service.js';
 import { OrdersController, OrgOrdersController } from './orders/orders.controller.js';
-import { MyLoyaltyController, OrgLoyaltyController, OrgPosController } from './loyalty/loyalty.controller.js';
-import { PosService } from './loyalty/pos.service.js';
+import { MyLoyaltyController, OrgLoyaltyController } from './loyalty/loyalty.controller.js';
+import { OrgPosController } from './pos/pos.controller.js';
+import { PosService } from './pos/pos.service.js';
 import { LoyaltyService } from './loyalty/loyalty.service.js';
 import { CallsController, LiveController } from './calls/calls.controller.js';
 import { CallsService } from './calls/calls.service.js';
@@ -170,6 +171,8 @@ import { OrgGuard } from './orgs/org.guard.js';
 import { OrgMembersService } from './orgs/org-members.service.js';
 import { MyOrgsController, OrgsController, PublicOrgsController } from './orgs/orgs.controller.js';
 import { OrgsService } from './orgs/orgs.service.js';
+import { OrgUpdatesController, PublicOrgUpdatesController } from './orgs/org-updates.controller.js';
+import { OrgUpdatesService } from './orgs/org-updates.service.js';
 import { PrivacyController } from './privacy/privacy.controller.js';
 import { PrivacyService } from './privacy/privacy.service.js';
 import { AuthGuard } from './security/auth.guard.js';
@@ -358,6 +361,8 @@ export class AppModule {
         OrgsController,
         MyOrgsController,
         PublicOrgsController,
+        OrgUpdatesController,
+        PublicOrgUpdatesController,
         MediaController,
         PublicMediaController,
         AvatarController,
@@ -439,6 +444,7 @@ export class AppModule {
         PrivacyService,
         AccountService,
         OrgsService,
+        OrgUpdatesService,
         OrgMembersService,
         // Route-level guard attached by @OrgPermission (runs after the global guards below).
         OrgGuard,

@@ -160,6 +160,8 @@ export const organizations = pgTable('organizations', {
     .$type<{ links: { label: string; url: string }[]; serviceAreas: string[]; sections: { title: string; body: string }[]; faq: { question: string; answer: string }[] }>()
     .notNull()
     .default({ links: [], serviceAreas: [], sections: [], faq: [] }),
+  /** IANA zone of the business (0063): "today" of the till summary. */
+  timezone: text('timezone').notNull().default('Africa/Lubumbashi'),
   visibility: text('visibility').$type<'public' | 'private'>().notNull().default('public'),
   status: text('status').$type<'active' | 'suspended'>().notNull().default('active'),
   verificationStatus: text('verification_status')

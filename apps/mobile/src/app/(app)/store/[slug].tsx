@@ -11,8 +11,11 @@ import { ContactSeller } from '../../../shop/ContactSeller';
 import { ProductGrid } from '../../../shop/ProductGrid';
 import { radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
-import { AuthImage, Avatar, Button, ErrorState, Text } from '../../../ui';
+import { AuthImage, Avatar, Badge, Button, ErrorState, Text } from '../../../ui';
 import { DAYS, isOpenNow } from '../../../vitrine/logic';
+import { fetchPublicUpdates, updatesKeys } from '../../../vitrine/updates-api';
+import { formatRange } from '../../../vitrine/updates-logic';
+import { openReport } from '../../../report/open-report';
 
 /** Organisations dont la vitrine présente d'abord un catalogue : sans produit on garde le message « rien en vente ». */
 const SELLING_KINDS: readonly PublicOrg['kind'][] = ['shop', 'restaurant', 'pharmacy'];
@@ -78,6 +81,7 @@ export default function StoreScreen() {
         {open === null ? '' : ` · ${t(open ? 'vitrine.public.open' : 'vitrine.public.closedNow')}`}
       </Text>
       {o.description ? <Text>{o.description}</Text> : null}
+      <Updates slug={s} />
 
       {o.gallery.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery}>
@@ -146,6 +150,32 @@ export default function StoreScreen() {
       <Stack.Screen options={{ title: o.name }} />
       <ProductGrid query={products} header={header} footer={footer} hideWhenEmpty={!selling} emptyTitle={t('shop.store.emptyTitle')} emptyBody={t('shop.store.emptyBody')} />
     </View>
+  );
+}
+
+/** Actualités de l'organisation : publications, promotions et événements en cours ; rien tant qu'il n'y en a pas. */
+function Updates({ slug }: { slug: string }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  const q = useQuery({ queryKey: updatesKeys.public(slug), queryFn: () => fetchPublicUpdates(slug) });
+  const items = q.data?.items ?? [];
+  if (items.length === 0) return null;
+  return (
+    <Block title={t('vitrine.updates.title')}>
+      {items.map((u) => (
+        <View key={u.id} style={[styles.update, { borderColor: colors.border }]}>
+          <Badge label={t(`vitrine.updates.kind.${u.kind}` as MessageKey)} tone={u.kind === 'promo' ? 'accent' : u.kind === 'event' ? 'primary' : 'neutral'} />
+          <Text variant="bodyStrong">{u.title}</Text>
+          {formatRange(u) ? (
+            <Text variant="small" muted>
+              {[formatRange(u), u.place].filter(Boolean).join(' · ')}
+            </Text>
+          ) : null}
+          <Text>{u.body}</Text>
+          <Button variant="ghost" label={t('vitrine.updates.report')} onPress={() => openReport({ targetType: 'org_update', targetId: u.id })} />
+        </View>
+      ))}
+    </Block>
   );
 }
 
@@ -230,5 +260,6 @@ const styles = StyleSheet.create({
   block: { padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, gap: spacing.xs },
   dayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
   link: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: TOUCH },
+  update: { gap: spacing.xs, alignItems: 'flex-start', paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   faqRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: TOUCH },
 });

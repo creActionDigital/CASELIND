@@ -29,7 +29,7 @@ export const storyViews = pgTable(
 export const reports = pgTable('reports', {
   id: uuid('id').primaryKey().defaultRandom(),
   reporterId: uuid('reporter_id'),
-  targetType: text('target_type').$type<'user' | 'post' | 'comment' | 'story' | 'message' | 'product' | 'review' | 'service' | 'service_review' | 'ride' | 'listing' | 'job' | 'mission' | 'course' | 'course_review' | 'scholarship'>().notNull(),
+  targetType: text('target_type').$type<'user' | 'post' | 'comment' | 'story' | 'message' | 'product' | 'review' | 'service' | 'service_review' | 'ride' | 'listing' | 'job' | 'mission' | 'course' | 'course_review' | 'scholarship' | 'org_update'>().notNull(),
   targetId: uuid('target_id').notNull(),
   reason: text('reason').notNull(),
   details: text('details'),

@@ -70,6 +70,7 @@ export function toOrg(o: OrganizationRow, location: OrgLocationValue | null = nu
     website: o.website,
     openingHours: o.openingHours as OpeningHours | null,
     page: o.page,
+    timezone: o.timezone,
     visibility: o.visibility,
     status: o.status,
     verificationStatus: o.verificationStatus,

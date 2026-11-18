@@ -1,4 +1,7 @@
 import type { MessageKey } from './fr';
+import { swChatWallet } from './sw-chat-wallet';
+import { swCommerce } from './sw-commerce';
+import { swSocial } from './sw-social';
 
 /**
  * Kiswahili : socle de l'interface (navigation, connexion, menu Plus). Les clés absentes retombent sur l'anglais
@@ -59,4 +62,7 @@ export const sw: Partial<Record<MessageKey, string>> = {
   'more.realestate': 'Mali isiyohamishika',
   'language.title': 'Lugha',
   'language.sw': 'Kiswahili',
+  ...swCommerce,
+  ...swSocial,
+  ...swChatWallet,
 };

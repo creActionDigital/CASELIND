@@ -324,6 +324,11 @@ import {
   setFilesRequestSchema,
   setOrgGalleryRequestSchema,
   orgGallerySchema,
+  createOrgUpdateRequestSchema,
+  updateOrgUpdateRequestSchema,
+  orgUpdateListQuerySchema,
+  orgUpdateListSchema,
+  orgUpdateSchema,
   setQuizRequestSchema,
   updateCourseRequestSchema,
 } from '@caselind/contracts';
@@ -543,7 +548,20 @@ import {
 } from '@caselind/contracts';
 
 // Lot 16c (caisse), separate import block.
-import { createPosSaleRequestSchema, posSaleListSchema, posSaleSchema, posSummarySchema } from '@caselind/contracts';
+import {
+  closePosShiftRequestSchema,
+  createPosSaleRequestSchema,
+  currentPosShiftSchema,
+  openPosShiftRequestSchema,
+  posSaleListQuerySchema,
+  posSaleListSchema,
+  posSaleSchema,
+  posShiftReportSchema,
+  posShiftSchema,
+  posSummarySchema,
+  posTicketSchema,
+  voidPosSaleRequestSchema,
+} from '@caselind/contracts';
 // Lot 16h (loyalty, campaigns), separate import block.
 import {
   campaignListSchema,
@@ -703,6 +721,11 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/me/org-invitations/{orgId}/accept', summary: 'Accept a pending invitation', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, response: myOrgMembershipSchema, status: 200 },
   { method: 'post', path: '/v1/me/org-invitations/{orgId}/decline', summary: 'Decline a pending invitation', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, status: 204 },
   { method: 'get', path: '/v1/public/orgs/{slug}', summary: 'Public storefront page (public and active organisations only; no token needed; contactUserId = support member, null if blocked with the caller when a token is sent)', tags: ['orgs'], auth: 'public', params: { slug: z.string() }, response: publicOrgSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/updates', summary: 'Storefront news (publications, promotions, events), newest first, hidden ones included (org.view; cursor pagination)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, query: orgUpdateListQuerySchema, response: orgUpdateListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/updates', summary: 'Publish a news item: kind post|promo|event, title, body, optional dates and place; an event needs startsAt, endsAt must follow it (400); 50 per organisation (409 limit); org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, body: createOrgUpdateRequestSchema, response: orgUpdateSchema, status: 201 },
+  { method: 'patch', path: '/v1/orgs/{orgId}/updates/{id}', summary: 'Edit a news item (at least one field; the merged result is validated again); unknown or of another organisation: 404; org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: updateOrgUpdateRequestSchema, response: orgUpdateSchema, status: 200 },
+  { method: 'delete', path: '/v1/orgs/{orgId}/updates/{id}', summary: 'Delete a news item; unknown or of another organisation: 404; org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/public/orgs/{slug}/updates', summary: 'Public news of a storefront, no token (private, suspended or unknown org: 404): not hidden, promotions and events not over; events first by date, then newest first (cursor pagination)', tags: ['orgs'], auth: 'public', params: { slug: z.string() }, query: orgUpdateListQuerySchema, response: orgUpdateListSchema, status: 200 },
 
   // Media (lot 2b)
   { method: 'post', path: '/v1/media/uploads', summary: 'Announce an upload: purpose, declared type and size (limit per kind: 400; per-user quota of unfinished uploads and bytes: 409 quota_exceeded); returns a 15-minute upload token', tags: ['media'], auth: 'user', body: createUploadRequestSchema, response: createUploadResponseSchema, status: 201 },
@@ -1165,8 +1188,13 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/orgs/{orgId}/campaigns', summary: 'Campaign history (title, date, recipient count; never the people) (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: campaignListSchema, status: 200 },
   // Lot 16c: caisse (counter sales recorded by the seller; stock goes down, no money moves). Behind the `commerce` flag.
   { method: 'post', path: '/v1/orgs/{orgId}/pos/sales', summary: 'Record a counter sale (1-50 lines, same currency, price from the catalogue, stock decremented, idempotent by clientId; 409 on stock or currency; audited) (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, body: createPosSaleRequestSchema, response: posSaleSchema, status: 201 },
-  { method: 'get', path: '/v1/orgs/{orgId}/pos/sales', summary: 'The 50 latest counter sales (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: posSaleListSchema, status: 200 },
-  { method: 'get', path: '/v1/orgs/{orgId}/pos/summary', summary: 'Counter takings of the current UTC day per currency and payment method (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: posSummarySchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/pos/sales', summary: 'Latest counter sales, newest first (limit 1-50, default 20) (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, query: posSaleListQuerySchema, response: posSaleListSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/pos/sales/{id}', summary: 'Receipt of a counter sale: the sale and the shop header (name, address, phone); 404 for another shop (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, response: posTicketSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/pos/sales/{id}/void', summary: 'Void a counter sale: stock goes back (movement pos_void), the sale leaves the day summary; idempotent (a voided sale is returned as is); optional reason max 200; 404 for another shop; 409 legacy_sale if it predates stock tracking; audited (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: voidPosSaleRequestSchema, response: posSaleSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/pos/shifts', summary: 'Open a cash drawer session with its opening float; 409 shift_open if one is already open in the shop (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, body: openPosShiftRequestSchema, response: posShiftSchema, status: 201 },
+  { method: 'get', path: '/v1/orgs/{orgId}/pos/shifts/current', summary: 'The open cash drawer session, or {shift: null} (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: currentPosShiftSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/pos/shifts/{id}/close', summary: 'Close a session with the cash counted: returns expected (float + non-voided cash sales of the session in its currency), counted and difference; closing twice returns the first report (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: closePosShiftRequestSchema, response: posShiftReportSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/pos/summary', summary: 'Counter takings (not voided) of the current day in the shop time zone, per currency and payment method (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: posSummarySchema, status: 200 },
   { method: 'get', path: '/v1/me/loyalty', summary: 'My points per shop and my marketing consent', tags: ['orders'], auth: 'user', response: myLoyaltySchema, status: 200 },
   { method: 'put', path: '/v1/me/marketing-consent', summary: 'Opt in or out of shop offers (off by default; audited)', tags: ['orders'], auth: 'user', body: marketingConsentRequestSchema, response: marketingConsentSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/ai/product-description', summary: 'Seller help (permission catalog.manage): draft product description from a title and facts typed by the seller; aiGenerated is always true, nothing is stored or published', tags: ['ai', 'catalog'], auth: 'user', params: { orgId: z.string() }, body: productDescriptionRequestSchema, response: productDescriptionResultSchema, status: 200 },

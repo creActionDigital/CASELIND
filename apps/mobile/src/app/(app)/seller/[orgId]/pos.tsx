@@ -2,10 +2,12 @@ import type { PosSale, Product } from '@caselind/contracts';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useI18n } from '../../../../i18n';
 import { uuidv4 } from '../../../../lib/uuid';
 import { createPosSale, fetchPosSales, fetchPosSummary } from '../../../../pos/api';
+import { ShiftPanel } from '../../../../pos/ShiftPanel';
+import { TicketCard } from '../../../../pos/TicketCard';
 import { fetchProducts, sk } from '../../../../seller/api';
 import { formatMinor } from '../../../../seller/money';
 import { Card, Chips, PagedList, sellerErrorMessage } from '../../../../seller/ui';
@@ -26,6 +28,7 @@ export default function Pos() {
   const [method, setMethod] = useState<Method>('cash');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [ticketId, setTicketId] = useState<string | null>(null);
   // Une même clé tant que le panier ne change pas : un nouvel appui après un échec réseau ne double pas la vente.
   const clientId = useRef(uuidv4());
 
@@ -36,7 +39,7 @@ export default function Pos() {
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
   const summary = useQuery({ queryKey: ['seller', orgId, 'pos-summary'], queryFn: () => fetchPosSummary(orgId) });
-  const history = useQuery({ queryKey: ['seller', orgId, 'pos-sales'], queryFn: () => fetchPosSales(orgId) });
+  const history = useQuery({ queryKey: ['seller', orgId, 'pos-sales'], queryFn: () => fetchPosSales(orgId, 5) });
 
   const lines = Object.entries(cart).filter(([, l]) => l.qty > 0);
   const currencies = new Set(lines.map(([, l]) => l.currency));
@@ -58,6 +61,8 @@ export default function Pos() {
       setError(null);
       clientId.current = uuidv4();
       setDone(t('pos.done', { total: formatMinor(s.totalMinor, s.currency, locale) }));
+      setTicketId(s.id);
+      void qc.invalidateQueries({ queryKey: ['seller', orgId, 'pos-shift'] });
       void qc.invalidateQueries({ queryKey: sk.products(orgId) });
       void qc.invalidateQueries({ queryKey: ['seller', orgId, 'pos-summary'] });
       void qc.invalidateQueries({ queryKey: ['seller', orgId, 'pos-sales'] });
@@ -83,6 +88,7 @@ export default function Pos() {
             ) : (
               <Text variant="small" muted>{t('pos.todayNone')}</Text>
             )}
+            <ShiftPanel orgId={orgId} />
             <Chips options={METHODS.map((m) => ({ value: m, label: t(`pos.method.${m}` as const) }))} value={method} onChange={setMethod} />
             <Text variant="caption" muted>{t('pos.methodHint')}</Text>
             <Text variant="bodyStrong" accessibilityLiveRegion="polite">{t('pos.cart', { n: count, total: formatMinor(total, currency, locale) })}</Text>
@@ -90,6 +96,7 @@ export default function Pos() {
             {error ? <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">{error}</Text> : null}
             {done ? <Text variant="small" accessibilityLiveRegion="polite">{done}</Text> : null}
             <Button label={t('pos.sell')} loading={sell.isPending} disabled={count === 0 || mixed} onPress={() => { setError(null); sell.mutate(); }} />
+            {ticketId ? <TicketCard key={ticketId} orgId={orgId} saleId={ticketId} onClose={() => setTicketId(null)} /> : null}
           </View>
         }
         empty={{ icon: 'cash-outline', title: t('pos.empty') }}
@@ -117,8 +124,10 @@ export default function Pos() {
       {history.data && history.data.items.length > 0 ? (
         <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
           <Text variant="caption" muted>{t('pos.history')}</Text>
-          {history.data.items.slice(0, 3).map((s) => (
-            <Text key={s.id} variant="small">{new Date(s.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} · {formatMinor(s.totalMinor, s.currency, locale)} · {t(`pos.method.${s.paymentMethod}` as const)}</Text>
+          {history.data.items.map((s) => (
+            <Pressable key={s.id} accessibilityRole="button" onPress={() => setTicketId(s.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <Text variant="small">{new Date(s.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} · {formatMinor(s.totalMinor, s.currency, locale)} · {t(`pos.method.${s.paymentMethod}` as const)}{s.voidedAt ? ` · ${t('pos.voidedTag')}` : ''}</Text>
+            </Pressable>
           ))}
         </View>
       ) : null}

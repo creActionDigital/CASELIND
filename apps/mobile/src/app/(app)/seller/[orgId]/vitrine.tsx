@@ -135,6 +135,7 @@ export default function Vitrine() {
   const [website, setWebsite] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
+  const [timezone, setTimezone] = useState('Africa/Lubumbashi');
   const [hours, setHours] = useState<Record<(typeof DAYS)[number], string>>({ mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '' });
   const [areas, setAreas] = useState('');
   const [links, setLinks] = useState<Row[]>([]);
@@ -156,6 +157,7 @@ export default function Vitrine() {
     setWebsite(o.website ?? '');
     setAddress(o.address ?? '');
     setCity(o.city ?? '');
+    setTimezone(o.timezone);
     setHours({ mon: formatDay(o.openingHours?.mon), tue: formatDay(o.openingHours?.tue), wed: formatDay(o.openingHours?.wed), thu: formatDay(o.openingHours?.thu), fri: formatDay(o.openingHours?.fri), sat: formatDay(o.openingHours?.sat), sun: formatDay(o.openingHours?.sun) });
     setAreas(o.page.serviceAreas.join('\n'));
     setLinks(o.page.links.map((l) => ({ ...l })));
@@ -174,6 +176,7 @@ export default function Vitrine() {
         website: website.trim() || null,
         address: address.trim() || null,
         city: city.trim() || null,
+        ...(timezone.trim() ? { timezone: timezone.trim() } : {}),
         openingHours,
         page: {
           links: complete(links, LINK_FIELDS) as { label: string; url: string }[],
@@ -252,6 +255,7 @@ export default function Vitrine() {
           <TextField label={t('vitrine.website')} value={website} onChangeText={setWebsite} keyboardType="url" autoCapitalize="none" />
           <TextField label={t('vitrine.address')} value={address} onChangeText={setAddress} maxLength={300} />
           <TextField label={t('vitrine.city')} value={city} onChangeText={setCity} maxLength={120} />
+          <TextField label={t('pos.timezone')} value={timezone} onChangeText={setTimezone} autoCapitalize="none" autoCorrect={false} maxLength={64} />
 
           <SectionTitle>{t('vitrine.hours')}</SectionTitle>
           <Text variant="caption" muted>{t('vitrine.hoursHint')}</Text>

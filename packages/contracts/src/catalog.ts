@@ -111,7 +111,7 @@ export const orgProductListQuerySchema = pageQuerySchema.extend({
 export type OrgProductListQuery = z.infer<typeof orgProductListQuerySchema>;
 
 export const stockReasonSchema = z.enum(['restock', 'adjustment', 'damage']);
-export const stockMovementReasonSchema = z.enum(['initial', 'restock', 'adjustment', 'damage', 'order_reserved', 'order_released', 'pos_sale']);
+export const stockMovementReasonSchema = z.enum(['initial', 'restock', 'adjustment', 'damage', 'order_reserved', 'order_released', 'pos_sale', 'pos_void']);
 export const adjustStockRequestSchema = z.object({
   delta: z
     .number()

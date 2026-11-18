@@ -43,6 +43,9 @@ export type AuditAction =
   | 'org.created'
   | 'org.updated'
   | 'org.gallery_set'
+  | 'org.update_created'
+  | 'org.update_changed'
+  | 'org.update_deleted'
   | 'org.member_invited'
   | 'org.invitation_accepted'
   | 'org.invitation_declined'
@@ -172,6 +175,7 @@ export type AuditAction =
   | 'commerce.loyalty_updated'
   | 'commerce.campaign_sent'
   | 'commerce.pos_sale'
+  | 'commerce.pos_void'
   | 'user.marketing_consent_updated'
   /** Services (lot 9): metadata {offerId, orgId?, fields?}. Never a booking note. */
   | 'service.created'

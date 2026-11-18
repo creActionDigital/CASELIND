@@ -1,0 +1,13 @@
+# Proxy inverse TLS (certificat Let's Encrypt automatique). Transmet X-Forwarded-For/Proto et le Upgrade WebSocket (/socket.io).
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:3000 {
+		# Les envois de médias sont plafonnés par l'API (MEDIA_MAX_*), pas ici.
+		flush_interval -1
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+}

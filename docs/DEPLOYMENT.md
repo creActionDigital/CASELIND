@@ -45,6 +45,28 @@ L'image tourne en utilisateur `node`, `NODE_ENV=production`, avec un `HEALTHCHEC
 
 Sans Docker : `npm ci`, `npm run build -w @caselind/api`, puis `npm start -w @caselind/api`.
 
+## Préparation de l'hébergement (prête, non testée : Docker absent de la machine de développement)
+
+Dossier `deploy/` à la racine : pile d'un seul serveur (VPS) quand l'hébergement sera choisi.
+
+| Fichier | Rôle |
+|---|---|
+| `deploy/docker-compose.yml` | PostgreSQL 17 (volume `pgdata`, aucun port publié) + API (image `apps/api/Dockerfile`, volume `media`) + Caddy (TLS automatique, WebSocket, `X-Forwarded-*`) |
+| `deploy/Caddyfile` | proxy inverse sur `API_DOMAIN`, en-têtes de sécurité |
+| `deploy/env.production.example` | modèle de `deploy/prod.env` (ignoré par Git) |
+| `deploy/gen-secrets.mjs` | génère les secrets obligatoires (`node deploy/gen-secrets.mjs`), n'écrit rien sur le disque |
+| `deploy/backup.sh`, `deploy/restore.sh` | sauvegarde quotidienne (base + médias, 14 jours) et restauration |
+| `apps/mobile/eas.json` | profils `development`, `preview` (APK), `production` ; l'adresse de l'API passe par `EXPO_PUBLIC_API_URL` |
+
+Mise en service, une fois un serveur et un nom de domaine disponibles :
+1. DNS : `api.<domaine>` vers l'IP du serveur ; ports 80 et 443 ouverts.
+2. `cp deploy/env.production.example deploy/prod.env`, y coller la sortie de `gen-secrets.mjs`, renseigner `API_DOMAIN` et les fournisseurs (Brevo, WhatsApp, Expo). **Sauvegarder `KYC_ENCRYPTION_KEY` hors du serveur.**
+3. `docker compose -f deploy/docker-compose.yml --env-file deploy/prod.env up -d --build` ; vérifier `https://api.<domaine>/v1/health`.
+4. Cron de sauvegarde (voir l'en-tête de `backup.sh`) et copie du dossier de sauvegarde sur une autre machine ; **tester une restauration** avant d'ouvrir au public.
+5. Mobile : renseigner l'adresse dans `eas.json`, `npx expo login`, `eas init` (le `projectId` est écrit dans `app.json`), puis `eas build --profile preview --platform android`.
+
+Pour les appels audio/vidéo : un serveur TURN (par exemple coturn sur le même VPS, UDP 3478 et plage de relais) puis les variables correspondantes ; voir « À décider ».
+
 ## À décider
 
 - **Q6, hébergement** : staging et production, base managée, stockage S3 et CDN. Pas de déploiement continu avant ce choix.

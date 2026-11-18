@@ -12,6 +12,8 @@ interface FakeVariant {
   stock: number;
   published: boolean;
   title: string;
+  /** false: stock is not tracked (never checked nor moved). */
+  trackStock?: boolean;
 }
 export class FakeCatalog {
   readonly variants = new Map<string, FakeVariant>();
@@ -24,6 +26,10 @@ export class FakeCatalog {
     this.products.add(productId);
     this.variants.set(id, { productId, title: 'Article', published: true, ...v });
     return id;
+  }
+
+  private tracked(variantId: string): boolean {
+    return this.variants.get(variantId)!.trackStock !== false;
   }
 
   private line(variantId: string, quantity: number): PricedLine {
@@ -52,15 +58,15 @@ export class FakeCatalog {
       return !v || !v.published || (opts.orgId !== undefined && v.orgId !== opts.orgId);
     });
     if (bad.length > 0) return { ok: false, reason: 'unavailable', variantIds: bad.map((l) => l.variantId) };
-    const short = lines.filter((l) => this.variants.get(l.variantId)!.stock < l.quantity);
+    const short = lines.filter((l) => this.tracked(l.variantId) && this.variants.get(l.variantId)!.stock < l.quantity);
     if (short.length > 0) return { ok: false, reason: 'insufficient_stock', variantIds: short.map((l) => l.variantId) };
-    for (const l of lines) this.variants.get(l.variantId)!.stock -= l.quantity;
+    for (const l of lines) if (this.tracked(l.variantId)) this.variants.get(l.variantId)!.stock -= l.quantity;
     return { ok: true, lines: lines.map((l) => this.line(l.variantId, l.quantity)) };
   }
 
   release(lines: ReserveLine[]): void {
     this.released.push(lines);
-    for (const l of lines) this.variants.get(l.variantId)!.stock += l.quantity;
+    for (const l of lines) if (this.tracked(l.variantId)) this.variants.get(l.variantId)!.stock += l.quantity;
   }
 }
 

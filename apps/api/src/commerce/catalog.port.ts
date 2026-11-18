@@ -26,7 +26,11 @@ export interface PricedLine {
 /** `orgId`: only variants of that org count (others read as unavailable); `reason`: label of the stock movement. */
 export interface ReserveOptions {
   orgId?: string;
-  reason?: 'order_reserved' | 'pos_sale';
+  reason?: 'order_reserved' | 'pos_sale';}
+
+/** `reason`: label of the stock movement (default `order_released`). */
+export interface ReleaseOptions {
+  reason?: 'order_released' | 'pos_void';
 }
 
 export type ReserveResult =
@@ -54,8 +58,8 @@ export class CatalogPort {
   async reserve(_tx: DbExecutor, _lines: ReserveLine[], _buyerId?: string, _opts?: ReserveOptions): Promise<ReserveResult> {
     return { ok: false, reason: 'unavailable', variantIds: _lines.map((l) => l.variantId) };
   }
-  /** Inside the caller's transaction: gives the stock back (order cancelled before shipping). */
-  async release(_tx: DbExecutor, _lines: ReserveLine[]): Promise<void> {}
+  /** Inside the caller's transaction: gives the stock back (order cancelled before shipping, counter sale voided). */
+  async release(_tx: DbExecutor, _lines: ReserveLine[], _opts?: ReleaseOptions): Promise<void> {}
   /** Whether the product exists and is visible to buyers (reviews). */
   async productExists(_productId: string, _viewerId?: string): Promise<boolean> {
     return false;

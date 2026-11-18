@@ -423,6 +423,10 @@ describe('CatalogPort', () => {
     expect(ok.ok).toBe(true);
     const moves = await ctx.sql.query(`SELECT delta, reason FROM stock_movements WHERE variant_id = $1 AND delta < 0`, [mine]);
     expect(moves.rows.map((r) => [r.delta, r.reason])).toEqual([[-2, 'pos_sale']]);
+    await db().transaction((tx) => port().release(tx, [{ variantId: mine, quantity: 2 }], { reason: 'pos_void' }));
+    expect(await stockOf(mine)).toBe(5);
+    const back = await ctx.sql.query(`SELECT delta, reason FROM stock_movements WHERE variant_id = $1 AND delta > 0 ORDER BY created_at, id`, [mine]);
+    expect(back.rows.map((r) => [r.delta, r.reason])).toEqual([[5, 'initial'], [2, 'pos_void']]);
   });
 
   it('reserves, prices and releases with journaled movements, all or nothing', async () => {

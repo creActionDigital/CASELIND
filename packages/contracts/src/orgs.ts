@@ -116,6 +116,17 @@ export const orgPageSchema = z.object({
 export type OrgPage = z.infer<typeof orgPageSchema>;
 export const EMPTY_ORG_PAGE: OrgPage = { links: [], serviceAreas: [], sections: [], faq: [] };
 
+/** IANA time zone of the business ("today" of its till summary); checked by the runtime's own tz database. */
+export const orgTimezoneSchema = z.string().trim().max(64).refine((tz) => {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}, 'must be an IANA time zone (Africa/Lubumbashi)');
+export const DEFAULT_ORG_TIMEZONE = 'Africa/Lubumbashi';
+
 /** Fields an organisation can edit about itself. Status and verification are platform-controlled. */
 const orgEditableFields = {
   name: z.string().trim().min(1).max(120),
@@ -129,6 +140,7 @@ const orgEditableFields = {
   website: orgWebsiteSchema.nullable(),
   openingHours: openingHoursSchema.nullable(),
   visibility: orgVisibilitySchema,
+  timezone: orgTimezoneSchema,
 };
 
 /**
@@ -191,6 +203,7 @@ export const orgSchema = z.object({
   website: z.string().nullable(),
   openingHours: openingHoursSchema.nullable(),
   page: orgPageSchema,
+  timezone: z.string(),
   visibility: orgVisibilitySchema,
   status: orgStatusSchema,
   verificationStatus: orgVerificationStatusSchema,

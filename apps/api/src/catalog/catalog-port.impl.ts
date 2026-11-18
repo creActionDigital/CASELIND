@@ -4,6 +4,7 @@ import {
   CatalogPort,
   type DbExecutor,
   type PricedLine,
+  type ReleaseOptions,
   type ReserveLine,
   type ReserveOptions,
   type ReserveResult,
@@ -117,7 +118,7 @@ export class CatalogPortImpl extends CatalogPort {
     return { ok: true, lines: ids.map((id) => toLine(byId.get(id)!, merged.get(id)!)) };
   }
 
-  override async release(tx: DbExecutor, lines: ReserveLine[]): Promise<void> {
+  override async release(tx: DbExecutor, lines: ReserveLine[], opts: ReleaseOptions = {}): Promise<void> {
     const { merged } = merge(lines);
     if (merged.size === 0) return;
     const ids = [...merged.keys()].sort();
@@ -130,7 +131,7 @@ export class CatalogPortImpl extends CatalogPort {
       await tx.execute(sql`UPDATE product_variants SET stock = stock + ${qty} WHERE id = ${r.id}::uuid`);
       await tx.execute(sql`
         INSERT INTO stock_movements (variant_id, org_id, delta, stock_after, reason)
-        VALUES (${r.id}::uuid, ${r.org_id}::uuid, ${qty}, ${r.stock + qty}, 'order_released')`);
+        VALUES (${r.id}::uuid, ${r.org_id}::uuid, ${qty}, ${r.stock + qty}, ${opts.reason ?? 'order_released'})`);
     }
   }
 
