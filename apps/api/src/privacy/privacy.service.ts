@@ -13,6 +13,7 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
 import { follows, userBlocks, users } from '../db/schema.js';
+import { PresenceService } from '../messaging/presence.service.js';
 
 /** Any syntactically valid UUID (what Postgres accepts); anything else cannot name a user. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,6 +49,7 @@ const settingsColumns = {
   discoverableByEmail: users.discoverableByEmail,
   contactRequestsFrom: users.contactRequestsFrom,
   readReceipts: users.readReceipts,
+  showPresence: users.showPresence,
 };
 
 @Injectable()
@@ -55,6 +57,7 @@ export class PrivacyService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly presence: PresenceService,
   ) {}
 
   async getSettings(userId: string): Promise<PrivacySettings> {
@@ -72,6 +75,7 @@ export class PrivacyService {
       meta,
       metadata: { fields: Object.keys(patch) },
     });
+    if (patch.showPresence !== undefined) await this.presence.broadcast(userId).catch(() => undefined);
     return row;
   }
 

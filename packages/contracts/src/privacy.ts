@@ -11,6 +11,8 @@ export const privacySettingsSchema = z.object({
   discoverableByEmail: z.boolean(),
   contactRequestsFrom: contactRequestsFromSchema,
   readReceipts: z.boolean(),
+  /** Online / last seen shown to direct peers; reciprocal (hiding yours hides theirs from you). */
+  showPresence: z.boolean(),
 });
 export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
 

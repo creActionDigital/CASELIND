@@ -7,6 +7,7 @@ import { chatColors } from './chat-theme';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, Text } from '../ui';
 import { messagePreview, systemText } from './api';
+import { PollCard } from './PollCard';
 import type { CachedMessage } from './cache';
 import type { MessageStatus } from './receipts';
 
@@ -44,7 +45,7 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
   const statusLabel = status ? t(`chat.status.${status}`) : '';
   const fwd = m.forwarded && !m.recalled;
   const expiry = m.expiresAt && !m.recalled ? new Date(m.expiresAt).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' }) : '';
-  const summary = m.recalled ? t('chat.recalled') : m.kind === 'media' ? t('chat.photo') : (m.body ?? '');
+  const summary = m.recalled ? t('chat.recalled') : m.kind === 'media' ? t('chat.photo') : m.kind === 'poll' ? t('social.poll.preview', { question: m.body ?? '' }) : (m.body ?? '');
 
   return (
     <View style={[styles.wrap, mine ? styles.right : styles.left]}>
@@ -80,6 +81,8 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
           <Text variant="small" color={fg} style={styles.italic}>
             {t('chat.recalled')}
           </Text>
+        ) : m.kind === 'poll' && m.poll ? (
+          <PollCard message={{ ...m, poll: m.poll }} mine={mine} fg={fg} />
         ) : m.kind === 'media' ? (
           <AuthImage contentUrl={m.media?.contentUrl ?? null} localUri={m.localUri} label={t('chat.photo')} style={styles.image} />
         ) : (

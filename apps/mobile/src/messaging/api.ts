@@ -65,6 +65,7 @@ export function messagePreview(m: Message, t: T, name: (userId: string | null) =
   if (m.recalled) return t('chat.recalled');
   if (m.kind === 'system' && m.systemEvent) return systemText(m.systemEvent, name, t);
   if (m.kind === 'media') return t('chat.photo');
+  if (m.kind === 'poll') return t('social.poll.preview', { question: m.body ?? '' });
   return m.body ?? '';
 }
 

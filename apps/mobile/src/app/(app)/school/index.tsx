@@ -18,6 +18,7 @@ export default function MyClasses() {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
         <Button variant="secondary" label={t('school.search.link')} onPress={() => router.push('/school/search' as never)} />
         <Button variant="secondary" label={t('fees.link')} onPress={() => router.push('/school/fees' as never)} />
+        <Button variant="secondary" label={t('guardians.me.link')} onPress={() => router.push('/school/children' as never)} />
         <Button variant="secondary" label={t('school.scholarships.link')} onPress={() => router.push('/school/scholarships' as never)} />
         {q.isPending ? <Loading /> : null}
         {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : null}

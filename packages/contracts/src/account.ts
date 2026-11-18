@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { exportedKycSchema } from './kyc.js';
+import { exportedGuardianSchema, exportedSchoolFeeSchema } from './school-guardians.js';
 import { myFreelanceProfileSchema } from './freelance.js';
 import { exportedHealthSchema } from './health.js';
 import { sessionSchema } from './auth.js';
@@ -8,10 +9,12 @@ import { orgMemberStatusSchema, orgRoleSchema } from './orgs.js';
 import { blockedUserSchema, privacySettingsSchema } from './privacy.js';
 import { exportedConversationSchema, exportedMessageSchema } from './messaging.js';
 import { exportedFavoriteMessageSchema } from './messaging-extras.js';
+import { exportedPollSchema, exportedPollVoteSchema } from './messaging-polls.js';
 import { exportedCommentSchema, exportedFollowSchema, exportedPostSchema } from './social.js';
 import { exportedReportSchema, exportedStorySchema } from './stories.js';
 import { exportedDeliverySchema } from './delivery.js';
 import { exportedCartItemSchema, exportedOrderSchema, exportedReviewSchema } from './orders.js';
+import { exportedOrgFeedbackSchema } from './org-feedback.js';
 import { exportedAiConversationSchema } from './ai.js';
 import { exportedMiniAppGrantSchema } from './miniapps.js';
 import { exportedSearchHistorySchema } from './search.js';
@@ -112,6 +115,8 @@ export const accountExportSchema = z.object({
   miniappGrants: z.array(exportedMiniAppGrantSchema),
   /** Lot 12: own AI assistant conversations (private to the user). */
   aiConversations: z.array(exportedAiConversationSchema),
+  /** Avis et questions posés par le compte sur des organisations (texte public ou propre au compte seulement). */
+  orgFeedback: exportedOrgFeedbackSchema,
   /** Lot 15: own classified ads (text, place and status; never the photos' bytes). */
   listings: z.array(
     z.object({
@@ -151,6 +156,9 @@ export const accountExportSchema = z.object({
   health: exportedHealthSchema,
   /** Lot 20a: own finished quiz games (date, right answers, score). */
   school: z.array(z.object({ schoolName: z.string(), className: z.string(), role: z.enum(['student', 'parent', 'teacher']) })),
+  /** Lot 17b: own fee statements as a pupil (title, due date, paid or not; no amounts of others) and own parent-pupil links (ids and relation). */
+  schoolFees: z.array(exportedSchoolFeeSchema),
+  schoolGuardians: z.array(exportedGuardianSchema),
   games: z.array(z.object({ startedAt: z.string(), correct: z.number().int(), score: z.number().int() })),
   /** Lot 17a: own courses as an author, own enrollments with progress and certificate codes. */
   education: z.object({
@@ -171,6 +179,9 @@ export const accountExportSchema = z.object({
     drafts: z.array(z.object({ conversationId: z.uuid(), body: z.string(), updatedAt: z.string() })),
     scheduled: z.array(z.object({ id: z.uuid(), conversationId: z.uuid(), kind: z.string(), body: z.string().nullable(), scheduledAt: z.string() })),
     notifications: z.array(z.object({ id: z.uuid(), category: z.string(), title: z.string(), body: z.string(), readAt: z.string().nullable(), createdAt: z.string() })),
+    /** Polls the user created, and their own votes (ids and chosen options only; other voters are never exported). */
+    polls: z.array(exportedPollSchema),
+    pollVotes: z.array(exportedPollVoteSchema),
   }),
 });
 export type AccountExport = z.infer<typeof accountExportSchema>;

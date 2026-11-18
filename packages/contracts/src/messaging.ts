@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pollSchema } from './messaging-polls.js';
 
 /* Lot 3A: messaging (conversations, messages, receipts). See docs/architecture/API_CONTRACTS.md. */
 
@@ -8,7 +9,7 @@ export type ConversationKind = z.infer<typeof conversationKindSchema>;
 export const conversationRoleSchema = z.enum(['owner', 'admin', 'member']);
 export type ConversationRole = z.infer<typeof conversationRoleSchema>;
 
-export const messageKindSchema = z.enum(['text', 'media', 'system']);
+export const messageKindSchema = z.enum(['text', 'media', 'system', 'poll']);
 export type MessageKind = z.infer<typeof messageKindSchema>;
 
 export const MESSAGE_BODY_MAX = 4000;
@@ -69,6 +70,8 @@ export const messageSchema = z.object({
   expiresAt: z.iso.datetime().nullable(),
   /** The caller has favourited this message; always false in realtime events (not per-user). */
   favorited: z.boolean(),
+  /** Kind 'poll': the question (also the body), options with counters and the caller's votes; null otherwise. */
+  poll: pollSchema.nullable(),
 });
 export type Message = z.infer<typeof messageSchema>;
 

@@ -14,6 +14,7 @@ import { Button, Text, TextField } from '../ui';
 import { rateDelivery } from './api';
 import { deliveryErrorMessage } from './errors';
 import { canRate, distanceKm, formatProofCode, stepStates } from './logic';
+import { ProofView } from './ProofSection';
 
 /** Position du livreur en direct : valeur du serveur, puis événements `delivery.location` de la room de la commande. Rien n'est stocké. */
 export function useLiveCourierLocation(orderId: string, deliveryId: string | undefined, initial: DeliveryLocation | null): DeliveryLocation | null {
@@ -193,6 +194,7 @@ export function BuyerDelivery({ orderId, delivery }: { orderId: string; delivery
         </View>
       ) : null}
 
+      <ProofView bare deliveryId={delivery.id} status={delivery.status} />
       {canRate(delivery.status, delivery.rating) ? <RateCourier orderId={orderId} /> : null}
       {delivery.rating !== null ? (
         <Text variant="small" muted accessibilityLabel={t('delivery.rate.done', { n: delivery.rating })}>

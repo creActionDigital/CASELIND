@@ -12,6 +12,7 @@ import { Badge, Button, Text } from '../ui';
 import { assignCourier, deliveryKeys, fetchOrgMembers, resetProof } from './api';
 import { deliveryErrorMessage } from './errors';
 import { canAssignCourier, courierCandidates } from './seller-logic';
+import { ProofView } from './ProofSection';
 
 /** Livraison d'une commande côté vendeur : statut, livreur, affectation / réaffectation, réinitialisation du verrou du code. */
 export function SellerDelivery({ orgId, orderId, delivery, canManage }: { orgId: string; orderId: string; delivery: DeliveryView; canManage: boolean }) {
@@ -111,6 +112,7 @@ export function SellerDelivery({ orgId, orderId, delivery, canManage }: { orgId:
           )
         ) : null}
       </Card>
+      <ProofView deliveryId={delivery.id} status={delivery.status} />
     </>
   );
 }

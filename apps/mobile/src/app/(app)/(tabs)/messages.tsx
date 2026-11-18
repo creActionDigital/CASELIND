@@ -14,6 +14,7 @@ import { ChatStories } from '../../../messaging/ChatStories';
 import { ExploreCommunities } from '../../../messaging/ExploreCommunities';
 import { GroupCards } from '../../../messaging/GroupCards';
 import { ConversationRow } from '../../../messaging/ConversationRow';
+import { MessageSearchPanel } from '../../../messaging/MessageSearchPanel';
 import { qk } from '../../../messaging/keys';
 import { NewConversationSheet } from '../../../messaging/NewConversationSheet';
 import { PushCard } from '../../../notifications/PushCard';
@@ -41,6 +42,7 @@ export default function Messages() {
   const [filter, setFilter] = useState<Filter>('all');
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const [inMessages, setInMessages] = useState(false);
   const [composing, setComposing] = useState(false);
   const [target, setTarget] = useState<Conversation | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -190,13 +192,30 @@ export default function Messages() {
           value={search}
           onChangeText={setSearch}
           autoFocus
-          accessibilityLabel={t('chat.searchPlaceholder')}
-          placeholder={t('chat.searchPlaceholder')}
+          accessibilityLabel={inMessages ? t('social.search.placeholder') : t('chat.searchPlaceholder')}
+          placeholder={inMessages ? t('social.search.placeholder') : t('chat.searchPlaceholder')}
           placeholderTextColor={colors.textMuted}
           style={[styles.search, typography.small, { color: colors.text, backgroundColor: cc.card }]}
         />
       ) : null}
-      <ChatStories />
+      {searching ? (
+        <View style={styles.pills}>
+          {[false, true].map((mode) => (
+            <Pressable
+              key={String(mode)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: inMessages === mode }}
+              onPress={() => setInMessages(mode)}
+              style={[styles.pill, { backgroundColor: inMessages === mode ? brandColor : cc.card }]}
+            >
+              <Text variant="caption" color={inMessages === mode ? '#FFFFFF' : colors.text}>
+                {mode ? t('social.search.messages') : t('social.search.chats')}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {searching && inMessages ? null : <ChatStories />}
       <View style={styles.pills}>
         {pills.map((p) => {
           const on = filter === p.id;
@@ -222,7 +241,14 @@ export default function Messages() {
           );
         })}
       </View>
-      {content}
+      {searching && inMessages ? (
+        <MessageSearchPanel
+          query={search}
+          onOpen={(hit) => router.push({ pathname: '/messages/[conversationId]', params: { conversationId: hit.conversationId, focus: hit.messageId } })}
+        />
+      ) : (
+        content
+      )}
 
       <Pressable
         accessibilityRole="button"

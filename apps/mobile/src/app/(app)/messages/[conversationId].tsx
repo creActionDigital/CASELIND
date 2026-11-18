@@ -58,6 +58,9 @@ import { createDebouncer, DRAFT_DEBOUNCE_MS, shouldApplyRemoteDraft } from '../.
 import { ForwardSheet } from '../../../messaging/ForwardSheet';
 import { qk } from '../../../messaging/keys';
 import { ScheduleSheet } from '../../../messaging/ScheduleSheet';
+import { PollSheet } from '../../../messaging/PollSheet';
+import { createPoll, usePresence } from '../../../messaging/social-api';
+import { lastSeenWhen, presenceView } from '../../../messaging/social-logic';
 import { MessageBubble } from '../../../messaging/MessageBubble';
 import { receiptsFromMembers, receiptStatus, type ReceiptMap } from '../../../messaging/receipts';
 import { useRealtime, useTypingUsers } from '../../../realtime/realtime-context';
@@ -94,6 +97,8 @@ export default function ChatRoom() {
   const [forwardId, setForwardId] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [pollBusy, setPollBusy] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [schedBusy, setSchedBusy] = useState(false);
   const [favOverrides, setFavOverrides] = useState<Map<string, boolean>>(() => new Map());
@@ -322,6 +327,19 @@ export default function ChatRoom() {
     }
   }
 
+  async function submitPoll(p: { question: string; options: string[]; multiple: boolean }) {
+    setPollBusy(true);
+    try {
+      const msg = await createPoll(id, { clientId: uuidv4(), ...p });
+      qc.setQueryData<MessagePages>(qk.messages(id), (d) => (d ? upsertServerMessage(d, msg) : d));
+      setPollOpen(false);
+    } catch (err) {
+      setNotice(errorMessage(err, t, locale));
+    } finally {
+      setPollBusy(false);
+    }
+  }
+
   async function attach() {
     setNotice(null);
     try {
@@ -390,6 +408,16 @@ export default function ChatRoom() {
   const title = conv.data ? conversationTitle(conv.data, t) : t('messages.room');
   const typingNames = typingUsers.filter((u) => u !== myId).map((u) => names.get(u) ?? t('chat.unknownUser'));
 
+  const presence = usePresence(conv.data?.kind === 'direct' ? conv.data.peer?.userId : undefined);
+  const pv = presenceView(presence.data);
+  const seen = pv.kind === 'lastSeen' ? lastSeenWhen(pv.at, new Date(), locale) : null;
+  const presenceText =
+    pv.kind === 'online'
+      ? t('social.presence.online')
+      : seen
+        ? t(seen.day === 'today' ? 'social.presence.today' : seen.day === 'yesterday' ? 'social.presence.yesterday' : 'social.presence.date', seen.day === 'date' ? { when: seen.text } : { time: seen.text })
+        : '';
+
   const header = <Stack.Screen options={{ headerShown: false }} />;
   const isGroupHdr = conv.data?.kind === 'group';
   const subtitle =
@@ -414,6 +442,14 @@ export default function ChatRoom() {
           <Text variant="caption" color={typingNames.length > 0 ? (isDark ? cc.tick : brandColor) : colors.textMuted} numberOfLines={1} accessibilityLiveRegion="polite">
             {subtitle}
           </Text>
+        ) : null}
+        {presenceText && typingNames.length === 0 ? (
+          <View style={styles.presence} accessible accessibilityLabel={presenceText}>
+            {pv.kind === 'online' ? <View style={[styles.presenceDot, { backgroundColor: colors.success }]} /> : null}
+            <Text variant="caption" color={colors.textMuted} numberOfLines={1}>
+              {presenceText}
+            </Text>
+          </View>
         ) : null}
       </View>
       {conv.data?.kind === 'direct' ? (
@@ -668,12 +704,21 @@ export default function ChatRoom() {
               void attach();
             }}
           />
+          <MenuRow
+            icon="stats-chart-outline"
+            label={t('social.poll.attach')}
+            onPress={() => {
+              setAttachOpen(false);
+              setPollOpen(true);
+            }}
+          />
           <MenuRow icon="location-outline" label={t('chat.attach.position')} soon={t('chat.attach.soon')} />
           <MenuRow icon="document-outline" label={t('chat.attach.files')} soon={t('chat.attach.soon')} />
           <MenuRow icon="person-outline" label={t('chat.attach.contacts')} soon={t('chat.attach.soon')} />
         </View>
       </SheetModal>
 
+      <PollSheet visible={pollOpen} onClose={() => setPollOpen(false)} onConfirm={(p) => void submitPoll(p)} busy={pollBusy} />
       <ForwardSheet messageId={forwardId} onClose={() => setForwardId(null)} />
       <ScheduleSheet visible={scheduling} onClose={() => setScheduling(false)} onConfirm={schedule} busy={schedBusy} />
 
@@ -708,14 +753,16 @@ export default function ChatRoom() {
             ) : null}
             {!actions.local && !actions.recalled && actions.kind !== 'system' ? (
               <>
-                <Button
-                  variant="secondary"
-                  label={t('messagesX.forward')}
-                  onPress={() => {
-                    setForwardId(actions.id);
-                    setActions(null);
-                  }}
-                />
+                {actions.kind !== 'poll' ? (
+                  <Button
+                    variant="secondary"
+                    label={t('messagesX.forward')}
+                    onPress={() => {
+                      setForwardId(actions.id);
+                      setActions(null);
+                    }}
+                  />
+                ) : null}
                 <Button
                   variant="secondary"
                   label={isFavorite(actions) ? t('messagesX.fav.remove') : t('messagesX.fav.add')}
@@ -772,6 +819,8 @@ function MenuRow({ icon, label, onPress, danger, soon }: { icon: ComponentProps<
 }
 
 const styles = StyleSheet.create({
+  presence: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  presenceDot: { width: 8, height: 8, borderRadius: 4 },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   dayPill: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill, marginVertical: spacing.sm },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: TOUCH + 4, paddingHorizontal: spacing.xs },

@@ -40,6 +40,7 @@ function msg(over: Partial<Message>): Message {
     forwarded: false,
     expiresAt: null,
     favorited: false,
+    poll: null,
     ...over,
   };
 }

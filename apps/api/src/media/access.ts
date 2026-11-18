@@ -36,6 +36,8 @@ export function canRead(viewerId: string, asset: Readable): boolean {
     case 'cv':
     case 'delivery':
     case 'lesson':
+    // Lot 8: the courier (owner) here; the buyer and the seller's order viewers in canReadAsync.
+    case 'delivery_proof':
       return false;
   }
 }
@@ -76,6 +78,14 @@ export async function canReadAsync(
       SELECT 1 FROM milestone_files f JOIN contract_milestones ms ON ms.id = f.milestone_id JOIN freelance_contracts c ON c.id = ms.contract_id
       WHERE f.media_id = ${asset.id}::uuid AND (c.client_id = ${viewerId}::uuid OR c.freelancer_id = ${viewerId}::uuid) LIMIT 1`);
     return res.rows.length > 0;
+  }
+  // Proof of delivery: the buyer of the order, and the members of the selling organisation who may view orders.
+  if (asset.purpose === 'delivery_proof') {
+    const res = await db.execute<{ buyer_id: string; role: string | null }>(sql`
+      SELECT d.buyer_id, om.role FROM delivery_proofs p JOIN deliveries d ON d.id = p.delivery_id
+      LEFT JOIN org_members om ON om.org_id = d.org_id AND om.user_id = ${viewerId}::uuid AND om.status = 'active'
+      WHERE p.media_id = ${asset.id}::uuid`);
+    return res.rows.some((r) => r.buyer_id === viewerId || (r.role !== null && roleHasPermission(r.role as OrgRole, 'orders.view')));
   }
   // Lesson files: the author of the course and its enrolled learners.
   if (asset.purpose === 'lesson') {

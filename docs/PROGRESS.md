@@ -684,3 +684,20 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 - Mobile : section « Galerie photos » de « Ma vitrine » (ajout multiple, appui sur une photo pour la retirer, enregistré tout de suite) et bandeau défilant sur la page publique.
 - Observé : e2e orgs (1 nouveau test), openapi, media : 48 OK ; typechecks mobile et web propres.
 - Différé : vidéos depuis le mobile (l'API les accepte, le sélecteur n'offre que les photos, aucune lecture dans la page), réordonner, légendes, affichage plein écran, galerie lisible sans connexion (le contenu média exige un compte).
+
+## Caisse : annulation, sessions, ticket, fuseau (2026-11-18) : testé (API + suite complète : API 684, mobile 257), écrans non vérifiés à l'écran
+- Migration 0063 : `pos_sales.voided_at/voided_by/void_reason/shift_id`, table `pos_shifts` (une session ouverte par boutique : index unique partiel), motif de stock `pos_void`, `organizations.timezone` (défaut `Africa/Lubumbashi`, contrôle IANA par `Intl`, repli UTC si PostgreSQL ne connaît pas le fuseau).
+- Module `apps/api/src/pos/` (sorti du module fidélité) : `POST /pos/sales/{id}/void` (stock remis, idempotent, audité sans lignes), `POST /pos/shifts`, `GET /pos/shifts/current`, `POST /pos/shifts/{id}/close` (attendu = fond + ventes espèces non annulées de la session ; compté ; écart), `GET /pos/sales/{id}` (ticket avec nom, adresse, téléphone de la boutique), `GET /pos/sales?limit`. « Aujourd'hui » suit le fuseau de la boutique. Les lignes de vente gardent le `variantId` ; une vente d'avant 0063 ne peut pas être annulée (409 `legacy_sale`).
+- Mobile : session (fond, clôture, écart), ticket partageable, annulation avec confirmation, fuseau dans « Ma vitrine ».
+- Différé : audit de l'ouverture et de la clôture de session ; ventes d'avant 0063 non annulables ; écrans non vérifiés à l'écran.
+
+## Vitrine : actualités (publications, promotions, événements) (2026-11-18) : testé, écrans non vérifiés
+- Migration 0064 `org_updates` (50 par organisation) et cible de signalement `org_update`. Routes `/orgs/{orgId}/updates` (org.profile.edit) et `GET /public/orgs/{slug}/updates` (sans jeton ; promos non expirées, événements à venir, masqués exclus). Écran vendeur « Actualités » et section sur la page publique. Pas d'image ; dates dans le fuseau de l'appareil.
+
+## Vitrine : avis de la boutique et questions des visiteurs (2026-11-18) : testé (ciblé par l'agent), écrans non vérifiés
+- Migration 0065 `org_reviews` (un avis par compte, commande livrée exigée, réponse de la boutique) et `org_questions` (5 par jour et par compte, publiques seulement une fois répondues, auteur non affiché), cibles de signalement `org_review` et `org_question`. `PublicOrg.rating` = `{average, count}` ou `null`. Notifications génériques ; export de compte (`orgFeedback`) et purge. Écrans : avis et questions sur la page publique, onglet « Boutique » des avis vendeur, écran « Questions ».
+- Différé : la note moyenne compte les auteurs bloqués (seule la liste les filtre) ; l'auteur ne peut pas supprimer sa question (limite quotidienne) ; la purge de compte n'a pas de test dédié.
+
+## Établissements : parents, rappels d'échéance, export (lot 17b, 2026-11-18) : testé (ciblé par l'agent), écrans non vérifiés
+- Migration 0066 `school_guardians` (lien facultatif parent-élève créé par le personnel par @handle, accepté par le parent) et `school_fees.reminded_at`. Routes `/orgs/{orgId}/school/guardians` (personnel), `/me/school/guardianships`, `/me/school/children`, `.../children/{id}/fees|classes` (404 sans lien actif). Rappel unique à J-3 pour l'élève non payé et ses parents actifs (maintenance), sans montant ni nom. Export de compte : liens et frais de l'élève (sans montants). Purge incluse. Drapeau réglementé `school` inchangé.
+- Différé : le lien n'est pas supprimé si l'élève est désinscrit de toutes les classes ; les rappels ne tiennent pas compte du drapeau par pays ; un plantage entre la prise du rappel et l'envoi perd ce rappel ; écrans non vérifiés.

@@ -37,11 +37,11 @@ function derivedClientId(clientId: string, conversationId: string): string {
   return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20, 32)}`;
 }
 
-function encodeCursor(createdAt: string, id: string): string {
+export function encodeCursor(createdAt: string, id: string): string {
   return Buffer.from(JSON.stringify([createdAt, id])).toString('base64url');
 }
 
-function decodeCursor(cursor: string): { createdAt: string; id: string } {
+export function decodeCursor(cursor: string): { createdAt: string; id: string } {
   try {
     const [createdAt, id] = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown[];
     if (typeof createdAt === 'string' && typeof id === 'string' && UUID_RE.test(id) && !Number.isNaN(Date.parse(createdAt))) {
@@ -80,7 +80,7 @@ export class MessageExtrasService {
     const found = await this.messages.visibleMessage(this.db, userId, messageId);
     if (!found) throw AppError.notFound('Message not found');
     const src = found.message;
-    if (src.kind === 'system') throw validationError('messageId', 'system messages cannot be forwarded');
+    if (src.kind === 'system' || src.kind === 'poll') throw validationError('messageId', 'this message cannot be forwarded');
     if (src.recalledAt) throw AppError.conflict('This message was recalled', { reason: 'recalled' });
 
     const destinations = [...new Set(req.conversationIds.map((c) => c.toLowerCase()))];

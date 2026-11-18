@@ -37,6 +37,7 @@ function msg(id: string, expiresAt: string | null): Message {
     forwarded: false,
     expiresAt,
     favorited: false,
+    poll: null,
   };
 }
 const pages = (items: Message[]): MessagePages => ({ pages: [{ items, hasMore: false }], pageParams: [undefined] });

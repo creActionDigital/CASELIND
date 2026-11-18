@@ -28,17 +28,21 @@ export default function Privacy() {
       return { previous };
     },
     onError: (_e, _v, ctx) => ctx?.previous && qc.setQueryData(['privacy'], ctx.previous),
-    onSuccess: (data) => qc.setQueryData(['privacy'], data),
+    onSuccess: (data) => {
+      qc.setQueryData(['privacy'], data);
+      void qc.invalidateQueries({ queryKey: ['presence'] });
+    },
   });
 
   if (query.isPending) return <Screen edges={['bottom']}><ActivityIndicator color={colors.primary} accessibilityLabel={t('common.loading')} /></Screen>;
   if (query.isError) return <Screen edges={['bottom']}><ErrorState error={query.error} onRetry={() => query.refetch()} /></Screen>;
   const s = query.data;
 
-  const toggles: { key: 'discoverableByPhone' | 'discoverableByEmail' | 'readReceipts'; label: MessageKey }[] = [
+  const toggles: { key: 'discoverableByPhone' | 'discoverableByEmail' | 'readReceipts' | 'showPresence'; label: MessageKey }[] = [
     { key: 'discoverableByPhone', label: 'privacy.discoverableByPhone' },
     { key: 'discoverableByEmail', label: 'privacy.discoverableByEmail' },
     { key: 'readReceipts', label: 'privacy.readReceipts' },
+    { key: 'showPresence', label: 'privacy.showPresence' },
   ];
 
   return (

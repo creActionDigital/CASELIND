@@ -12,6 +12,7 @@ import {
   type ConversationRow,
   mediaAssets,
   messageHidden,
+  messagePolls,
   messageReactions,
   messages,
   type MessageRow,
@@ -281,6 +282,7 @@ export class MessagesService {
         .returning();
       if (!row) return undefined;
       await tx.delete(messageReactions).where(eq(messageReactions.messageId, m.id));
+      await tx.delete(messagePolls).where(eq(messagePolls.messageId, m.id)); // options and votes cascade
       await this.audit.record(
         { action: 'message.recalled', actorUserId: userId, meta, metadata: { conversationId: m.conversationId, messageId: m.id } },
         tx,

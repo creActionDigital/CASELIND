@@ -3,7 +3,7 @@ import { conversationDrafts, conversationMembers, messages, type MessageRow } fr
 import { activeMemberRow, conversationNotFound, type Exec, lockConversation, nextSeq } from './messaging.shared.js';
 
 export interface NewUserMessage {
-  kind: 'text' | 'media';
+  kind: 'text' | 'media' | 'poll';
   clientId: string;
   body: string | null;
   mediaId: string | null;

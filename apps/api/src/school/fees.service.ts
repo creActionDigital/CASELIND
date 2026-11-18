@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ErrorCodes, type CreateFeeRequest, type FeeStatusList, type MarkFeeRequest, type MyFeeList, type SchoolFee, type SchoolFeeList } from '@caselind/contracts';
+import { ErrorCodes, type CreateFeeRequest, type ExportedSchoolFee, type FeeStatusList, type MarkFeeRequest, type MyFeeList, type SchoolFee, type SchoolFeeList } from '@caselind/contracts';
 import { sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const validDay = (d: string) => {
@@ -20,6 +21,7 @@ export class FeesService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async assertClass(orgId: string, classId: string): Promise<void> {
@@ -83,14 +85,48 @@ export class FeesService {
   }
 
   /** Fees of the classes the caller is enrolled in; `paid` is null for non-students. */
-  async mine(userId: string): Promise<MyFeeList> {
-    const r = await this.db.execute<{ id: string; class_name: string; school_name: string; title: string; amount_minor: string; currency: string; due_on: string | null; role: string; paid: boolean }>(sql`
+  async mine(userId: string, guardianId?: string): Promise<MyFeeList> {
+    // `guardianId`: a parent's view of a pupil, limited to the schools where that parent holds an ACTIVE link.
+    const scope = guardianId
+      ? sql`AND c.org_id IN (SELECT g.org_id FROM school_guardians g WHERE g.guardian_user_id = ${guardianId}::uuid AND g.student_user_id = e.user_id AND g.status = 'active')`
+      : sql``;
+    const r =await this.db.execute<{ id: string; class_name: string; school_name: string; title: string; amount_minor: string; currency: string; due_on: string | null; role: string; paid: boolean }>(sql`
       SELECT f.id, c.name AS class_name, o.name AS school_name, f.title, f.amount_minor::text AS amount_minor, f.currency::text AS currency,
         to_char(f.due_on, 'YYYY-MM-DD') AS due_on, e.role, (p.user_id IS NOT NULL) AS paid
       FROM school_enrollments e JOIN school_classes c ON c.id = e.class_id JOIN organizations o ON o.id = c.org_id
       JOIN school_fees f ON f.class_id = c.id
       LEFT JOIN school_fee_payments p ON p.fee_id = f.id AND p.user_id = e.user_id
-      WHERE e.user_id = ${userId}::uuid ORDER BY f.due_on NULLS LAST, f.created_at DESC LIMIT 100`);
+      WHERE e.user_id = ${userId}::uuid ${scope} ORDER BY f.due_on NULLS LAST, f.created_at DESC LIMIT 100`);
     return { items: r.rows.map((f) => ({ id: f.id, className: f.class_name, schoolName: f.school_name, title: f.title, amountMinor: Number(f.amount_minor), currency: f.currency, dueOn: f.due_on, paid: f.role === 'student' ? f.paid : null })) };
+  }
+
+  /** The user's own fee statements as a pupil, for the personal data export (no amounts, nothing of other pupils). */
+  async exportFor(userId: string): Promise<ExportedSchoolFee[]> {
+    return (await this.mine(userId)).items.filter((f) => f.paid !== null).map((f) => ({ title: f.title, dueOn: f.dueOn, paid: f.paid === true }));
+  }
+
+  /**
+   * Daily reminder (called by maintenance): fees due within 3 days that nobody was told about yet. The pupils who have not paid and their
+   * ACTIVE parents get ONE generic notification per run (no amount, no name). `reminded_at` is claimed first, so a fee is announced once
+   * however often this runs. Does nothing while the regulated `school` flag is off. Returns the number of people notified.
+   */
+  async remindDue(now: Date = new Date()): Promise<number> {
+    const flag = await this.db.execute<{ enabled: boolean }>(sql`SELECT enabled FROM feature_flags WHERE key = 'school'`);
+    if (!flag.rows[0]?.enabled) return 0;
+    const today = now.toISOString().slice(0, 10);
+    const r = await this.db.execute<{ user_id: string }>(sql`
+      WITH due AS (
+        UPDATE school_fees SET reminded_at = ${now.toISOString()}::timestamptz
+        WHERE reminded_at IS NULL AND due_on BETWEEN ${today}::date AND ${today}::date + 3 RETURNING id, class_id
+      ), unpaid AS (
+        SELECT due.id AS fee_id, e.user_id, c.org_id FROM due JOIN school_classes c ON c.id = due.class_id
+        JOIN school_enrollments e ON e.class_id = due.class_id AND e.role = 'student'
+        WHERE NOT EXISTS (SELECT 1 FROM school_fee_payments p WHERE p.fee_id = due.id AND p.user_id = e.user_id)
+      )
+      SELECT user_id FROM unpaid
+      UNION
+      SELECT g.guardian_user_id FROM unpaid u JOIN school_guardians g ON g.org_id = u.org_id AND g.student_user_id = u.user_id AND g.status = 'active'`);
+    await this.notifications.notifyMany(r.rows.map((t) => ({ userId: t.user_id, category: 'system' as const, title: 'Frais scolaires', body: 'Un frais scolaire arrive bientôt à échéance. Consultez le relevé dans l’application.' })));
+    return r.rows.length;
   }
 }

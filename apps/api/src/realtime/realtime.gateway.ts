@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { ENV, type Env } from '../config/env.js';
 import type { AuthUser } from '../security/auth.guard.js';
 import { SessionVerifier } from '../security/session-verifier.js';
+import { PresenceService } from '../messaging/presence.service.js';
 import {
   ConversationRoomsResolver,
   conversationRoom,
@@ -42,6 +43,7 @@ export class RealtimeGateway implements OnGatewayInit, OnApplicationShutdown {
     private readonly verifier: SessionVerifier,
     private readonly rooms: ConversationRoomsResolver,
     private readonly realtime: RealtimeService,
+    private readonly presence: PresenceService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -53,6 +55,13 @@ export class RealtimeGateway implements OnGatewayInit, OnApplicationShutdown {
         () => next(),
         () => next(new Error('unauthenticated')),
       );
+    });
+    // Presence: last_seen_at moves on connection and disconnection; peers are told (see PresenceService).
+    server.on('connection', (socket) => {
+      const userId = (socket.data as SocketData).auth?.userId;
+      if (!userId) return;
+      void this.presence.touch(userId);
+      socket.on('disconnect', () => void this.presence.touch(userId));
     });
     const every = this.env.REALTIME_SESSION_RECHECK_SECONDS;
     if (every > 0) {

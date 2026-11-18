@@ -6,6 +6,7 @@ import { Linking, View } from 'react-native';
 import { ApiRequestError } from '../../../lib/api';
 import { courierStatus, deliveryKeys, fetchMyDelivery, postLocation, setLocationConsent } from '../../../delivery/api';
 import { deliveryErrorMessage, isLocationStop, proofFailure } from '../../../delivery/errors';
+import { CourierProof } from '../../../delivery/ProofSection';
 import { canShareLocation, courierActions, createLocationPump, isCompleteCode, type CourierAction } from '../../../delivery/logic';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { getDevicePosition } from '../../../places/device-location';
@@ -207,6 +208,8 @@ export default function CourierDeliveryDetail() {
           </Card>
         </>
       ) : null}
+
+      <CourierProof deliveryId={dd.id} status={dd.status} />
 
       {error ? (
         <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">

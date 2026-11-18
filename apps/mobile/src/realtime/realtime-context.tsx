@@ -3,6 +3,8 @@ import {
   messageReactionEventSchema,
   messageSchema,
   notificationSchema,
+  pollEventSchema,
+  presenceSchema,
   receiptEventSchema,
 } from '@caselind/contracts';
 import { useQueryClient } from '@tanstack/react-query';
@@ -23,6 +25,8 @@ import {
 import { extrasKeys } from '../messaging/extras-api';
 import { qk } from '../messaging/keys';
 import { mergeReceipt, type ReceiptMap } from '../messaging/receipts';
+import { presenceKey } from '../messaging/social-api';
+import { applyPollEvent } from '../messaging/social-logic';
 import { createRealtimeSocket, isUnauthenticated } from './socket';
 import { createThrottle, TYPING_EMIT_INTERVAL_MS, TYPING_EXPIRE_MS } from './throttle';
 
@@ -61,6 +65,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       // Rattrapage des événements manqués pendant une coupure.
       void queryClient.invalidateQueries({ queryKey: qk.conversationsAll });
       void queryClient.invalidateQueries({ queryKey: ['messages'] });
+      void queryClient.invalidateQueries({ queryKey: ['presence'] });
       void queryClient.invalidateQueries({ queryKey: qk.unreadCount });
     });
     s.on('disconnect', () => setConnected(false));
@@ -106,6 +111,20 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       if (!parsed.success) return;
       const ev = parsed.data;
       queryClient.setQueryData<MessagePages>(qk.messages(ev.conversationId), (d) => applyReaction(d, ev, myId));
+    });
+    // Sondage : compteurs frais pour tous (mes votes restent ceux du cache).
+    s.on('message.poll', (raw: unknown) => {
+      const parsed = pollEventSchema.safeParse(raw);
+      if (!parsed.success) return;
+      const ev = parsed.data;
+      queryClient.setQueryData<MessagePages>(qk.messages(ev.conversationId), (d) =>
+        d ? { ...d, pages: d.pages.map((p) => ({ ...p, items: applyPollEvent(p.items, ev) })) } : d,
+      );
+    });
+    // Présence d'un pair direct (déjà filtrée côté serveur : confidentialité, blocages, réciprocité).
+    s.on('presence.updated', (raw: unknown) => {
+      const parsed = presenceSchema.safeParse(raw);
+      if (parsed.success) queryClient.setQueryData(presenceKey(parsed.data.userId), parsed.data);
     });
     s.on('receipt.updated', (raw: unknown) => {
       const parsed = receiptEventSchema.safeParse(raw);

@@ -16,6 +16,7 @@ import { DAYS, isOpenNow } from '../../../vitrine/logic';
 import { fetchPublicUpdates, updatesKeys } from '../../../vitrine/updates-api';
 import { formatRange } from '../../../vitrine/updates-logic';
 import { openReport } from '../../../report/open-report';
+import { RatingBadge, StoreQuestions, StoreReviews } from '../../../vitrine/StoreFeedback';
 
 /** Organisations dont la vitrine présente d'abord un catalogue : sans produit on garde le message « rien en vente ». */
 const SELLING_KINDS: readonly PublicOrg['kind'][] = ['shop', 'restaurant', 'pharmacy'];
@@ -75,6 +76,7 @@ export default function StoreScreen() {
           </View>
         ) : null}
       </View>
+      <RatingBadge rating={o.rating} />
       <Text muted>
         {t(`vitrine.public.kind.${o.kind}` as MessageKey)}
         {o.city ? ` · ${o.city}${o.country ? `, ${o.country}` : ''}` : ''}
@@ -137,13 +139,19 @@ export default function StoreScreen() {
     </View>
   );
 
-  const footer = o.page.faq.length > 0 ? (
-    <Block title={t('vitrine.public.faq')}>
-      {o.page.faq.map((q, i) => (
-        <Faq key={i} question={q.question} answer={q.answer} />
-      ))}
-    </Block>
-  ) : undefined;
+  const footer = (
+    <View style={styles.header}>
+      {o.page.faq.length > 0 ? (
+        <Block title={t('vitrine.public.faq')}>
+          {o.page.faq.map((q, i) => (
+            <Faq key={i} question={q.question} answer={q.answer} />
+          ))}
+        </Block>
+      ) : null}
+      <StoreReviews org={o} />
+      <StoreQuestions org={o} />
+    </View>
+  );
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>

@@ -46,6 +46,13 @@ export type AuditAction =
   | 'org.update_created'
   | 'org.update_changed'
   | 'org.update_deleted'
+  /** Avis et questions de la vitrine : ids, note et organisation seulement, jamais le texte. */
+  | 'org.review_saved'
+  | 'org.review_deleted'
+  | 'org.review_replied'
+  | 'org.question_asked'
+  | 'org.question_answered'
+  | 'org.question_deleted'
   | 'org.member_invited'
   | 'org.invitation_accepted'
   | 'org.invitation_declined'
@@ -158,11 +165,18 @@ export type AuditAction =
   | 'school.scholarship_published'
   | 'school.fee_created'
   | 'school.fee_marked'
+  | 'school.guardian_invited'
+  | 'school.guardian_accepted'
+  | 'school.guardian_declined'
+  | 'school.guardian_removed'
   | 'school.scholarship_closed'
   | 'school.scholarship_updated'
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'
+  /** Polls: ids only (conversation, message), never the question or the options. */
+  | 'message.poll_created'
+  | 'message.poll_closed'
   /** Moderation (lot 4B): metadata {targetType, targetId, action}. Never the content. */
   | 'moderation.action'
   /** Commerce (lot 5B): metadata {orgId, orderId, number, from, to} / {orgId, couponId, code}. */
@@ -210,6 +224,8 @@ export type AuditAction =
   | 'delivery.assigned'
   | 'delivery.status_changed'
   | 'delivery.proof_reset'
+  /** Photo / signature proof: ids and kinds only, never the file. */
+  | 'delivery.proof_set'
   /** Mobility (lot 11): driver decisions. metadata {driverUserId, decision}. */
   | 'mobility.driver_decided'
   /** Mini-apps (lot 10): metadata {orgId?, appId[, scopes, decision, from, to, kind, requestId, transferId]}. Never a secret, a code or a token. */

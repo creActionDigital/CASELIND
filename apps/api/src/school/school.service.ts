@@ -129,11 +129,15 @@ export class SchoolService {
 
   // ---- Enrolled people ---------------------------------------------------------------------------
 
-  async myClasses(userId: string): Promise<MyClassList> {
+  /** `guardianId`: a parent's view of a pupil, limited to the schools where that parent holds an ACTIVE link. */
+  async myClasses(userId: string, guardianId?: string): Promise<MyClassList> {
+    const scope = guardianId
+      ? sql`AND c.org_id IN (SELECT g.org_id FROM school_guardians g WHERE g.guardian_user_id = ${guardianId}::uuid AND g.student_user_id = e.user_id AND g.status = 'active')`
+      : sql``;
     const r = await this.db.execute<MineRow>(sql`
       SELECT c.id, c.name, c.year_label, o.name AS school_name, e.role
       FROM school_enrollments e JOIN school_classes c ON c.id = e.class_id JOIN organizations o ON o.id = c.org_id
-      WHERE e.user_id = ${userId}::uuid ORDER BY o.name, c.name LIMIT 100`);
+      WHERE e.user_id = ${userId}::uuid ${scope} ORDER BY o.name, c.name LIMIT 100`);
     return { items: r.rows.map(toMine) };
   }
 

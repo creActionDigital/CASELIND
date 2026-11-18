@@ -15,14 +15,18 @@ import { schoolEn } from '../school/messages';
 import { adminEn } from '../admin/messages';
 import { scholarshipsEn } from '../school/messages-scholarships';
 import { feesEn } from '../school/messages-fees';
+import { guardiansEn } from '../school/messages-guardians';
 import { salesEn } from '../seller/sales-messages';
 import { loyaltyEn } from '../loyalty/messages';
 import { posEn } from '../pos/messages';
 import { vitrineEn } from '../vitrine/messages';
 import { updatesEn } from '../vitrine/updates-messages';
+import { socialEn } from '../messaging/social-messages';
+import { reviewsEn } from '../vitrine/reviews-messages';
 import { miniappsEn } from '../miniapps/messages';
 import { callliveEn } from '../calllive/messages';
 import { deliveryEn } from '../delivery/messages';
+import { proofEn } from '../delivery/proof-messages';
 
 export const en: Record<MessageKey, string> = {
   'common.loading': 'Loading…',
@@ -1310,10 +1314,13 @@ export const en: Record<MessageKey, string> = {
   ...gamesEn,
   ...salesEn,
   ...feesEn,
+  ...guardiansEn,
   ...loyaltyEn,
   ...posEn,
   ...vitrineEn,
   ...updatesEn,
+  ...socialEn,
+  ...reviewsEn,
   ...miniappsEn,
   ...callliveEn,
   ...schoolEn,
@@ -1321,6 +1328,7 @@ export const en: Record<MessageKey, string> = {
   ...scholarshipsEn,
   ...docsEn,
   ...deliveryEn,
+  ...proofEn,
   ...aiEn,
   ...walletUiEn,
   ...mobilityEn,

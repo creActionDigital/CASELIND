@@ -45,7 +45,7 @@ export const messages = pgTable('messages', {
   conversationId: uuid('conversation_id').notNull(),
   seq: bigint('seq', { mode: 'number' }).notNull(),
   senderId: uuid('sender_id'),
-  kind: text('kind').$type<'text' | 'media' | 'system'>().notNull(),
+  kind: text('kind').$type<'text' | 'media' | 'system' | 'poll'>().notNull(),
   clientId: uuid('client_id'),
   body: text('body'),
   mediaId: uuid('media_id'),

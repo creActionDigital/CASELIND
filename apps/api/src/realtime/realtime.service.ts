@@ -5,6 +5,9 @@ export type RealtimeEvent =
   | 'message.new'
   | 'message.updated'
   | 'message.reaction'
+  | 'message.poll'
+  /** Presence of a direct peer (user room of each peer allowed to see it); payload = presenceSchema. */
+  | 'presence.updated'
   | 'receipt.updated'
   | 'conversation.updated'
   | 'conversation.member_added'
@@ -50,6 +53,7 @@ export class NoConversationRooms extends ConversationRoomsResolver {
 export interface RealtimeServer {
   to(room: string): { emit(event: string, payload: unknown): unknown };
   in(room: string): {
+    fetchSockets(): Promise<unknown[]>;
     socketsJoin(room: string): unknown;
     socketsLeave(room: string): unknown;
     disconnectSockets(close?: boolean): unknown;
@@ -73,6 +77,15 @@ export class RealtimeService {
 
   emitToUser(userId: string, event: RealtimeEvent, payload: unknown): void {
     this.run(() => this.server?.to(userRoom(userId)).emit(event, payload));
+  }
+  /** True when at least one socket of the user is connected (adapter-wide, so a Redis adapter keeps it right). */
+  async isOnline(userId: string): Promise<boolean> {
+    try {
+      return ((await this.server?.in(userRoom(userId)).fetchSockets())?.length ?? 0) > 0;
+    } catch (err) {
+      this.logger.warn(`presence lookup failed: ${(err as Error).name}`);
+      return false;
+    }
   }
   emitToConversation(conversationId: string, event: RealtimeEvent, payload: unknown): void {
     this.run(() => this.server?.to(conversationRoom(conversationId)).emit(event, payload));

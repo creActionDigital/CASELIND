@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { exportedDeliveryProofSchema } from './delivery-proof.js';
 
 /* Lot 8: delivery. Zones and fees per organisation, one delivery per order to deliver, proof by code,
  * optional courier position. No external carrier is wired: couriers are members of the organisation.
@@ -195,5 +196,7 @@ export const exportedDeliverySchema = z.object({
   failureReason: z.string().nullable(),
   createdAt: z.iso.datetime(),
   deliveredAt: z.iso.datetime().nullable(),
+  /** Photo / signature proofs attached to the delivery (existence only, never the file). */
+  proofs: z.array(exportedDeliveryProofSchema),
 });
 export type ExportedDelivery = z.infer<typeof exportedDeliverySchema>;

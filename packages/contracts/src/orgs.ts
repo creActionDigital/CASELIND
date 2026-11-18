@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { attachedFileSchema } from './media.js';
 import { handleSchema } from './users.js';
+import { orgRatingSchema } from './org-feedback.js';
 import { type Page, pageQuerySchema } from './pagination.js';
 
 /**
@@ -241,6 +242,8 @@ export const publicOrgSchema = orgSchema
     gallery: z.array(attachedFileSchema),
     /** Member to open a direct conversation with; null when none, or blocked with the caller (token optional). */
     contactUserId: z.uuid().nullable(),
+    /** Note moyenne et nombre d'avis visibles ; null sans avis. */
+    rating: orgRatingSchema.nullable(),
   });
 export type PublicOrg = z.infer<typeof publicOrgSchema>;
 

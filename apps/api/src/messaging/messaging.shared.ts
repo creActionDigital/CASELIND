@@ -1,5 +1,5 @@
 import type { Logger } from '@nestjs/common';
-import { ErrorCodes, type Message, type SystemEvent } from '@caselind/contracts';
+import { ErrorCodes, type Message, type Poll, type SystemEvent } from '@caselind/contracts';
 import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
 import type { Db } from '../db/db.module.js';
@@ -11,6 +11,9 @@ import {
   mediaAssets,
   type MessageRow,
   messageFavorites,
+  messagePollOptions,
+  messagePolls,
+  messagePollVotes,
   messageReactions,
   messages,
 } from '../db/schema.js';
@@ -149,6 +152,7 @@ export async function loadMessages(exec: Exec, rows: MessageRow[], viewerId: str
           .from(messageFavorites)
           .where(and(eq(messageFavorites.userId, viewerId), inArray(messageFavorites.messageId, ids)));
   const favorited = new Set(favRows.map((f) => f.messageId));
+  const polls = await loadPolls(exec, rows, viewerId);
   const byMessage = new Map<string, { counts: Map<string, number>; mine: string | null }>();
   for (const r of reactionRows) {
     const entry = byMessage.get(r.messageId) ?? { counts: new Map(), mine: null };
@@ -187,8 +191,57 @@ export async function loadMessages(exec: Exec, rows: MessageRow[], viewerId: str
       forwarded: row.forwarded,
       expiresAt: row.expiresAt?.toISOString() ?? null,
       favorited: favorited.has(row.id),
+      poll: recalled ? null : (polls.get(row.id) ?? null),
     };
   });
+}
+
+/** Counters per option, voters, and (for a known viewer) their own votes. Voters are never named. */
+export async function loadPolls(exec: Exec, rows: MessageRow[], viewerId: string | null): Promise<Map<string, Poll>> {
+  const out = new Map<string, Poll>();
+  const ids = rows.filter((r) => r.kind === 'poll' && !r.recalledAt).map((r) => r.id);
+  if (ids.length === 0) return out;
+  const pollRows = await exec.select().from(messagePolls).where(inArray(messagePolls.messageId, ids));
+  const options = await exec
+    .select()
+    .from(messagePollOptions)
+    .where(inArray(messagePollOptions.messageId, ids))
+    .orderBy(messagePollOptions.messageId, messagePollOptions.position);
+  const counts = await exec
+    .select({ optionId: messagePollVotes.optionId, n: sql<number>`count(*)::int` })
+    .from(messagePollVotes)
+    .where(inArray(messagePollVotes.messageId, ids))
+    .groupBy(messagePollVotes.optionId);
+  const voterRows = await exec
+    .select({ messageId: messagePollVotes.messageId, n: sql<number>`count(DISTINCT ${messagePollVotes.userId})::int` })
+    .from(messagePollVotes)
+    .where(inArray(messagePollVotes.messageId, ids))
+    .groupBy(messagePollVotes.messageId);
+  const mine =
+    viewerId === null
+      ? []
+      : await exec
+          .select({ optionId: messagePollVotes.optionId })
+          .from(messagePollVotes)
+          .where(and(eq(messagePollVotes.userId, viewerId), inArray(messagePollVotes.messageId, ids)));
+  const countOf = new Map(counts.map((c) => [c.optionId, c.n]));
+  const votersOf = new Map(voterRows.map((v) => [v.messageId, v.n]));
+  const myVotes = mine.map((v) => v.optionId);
+  const now = Date.now();
+  for (const p of pollRows) {
+    const opts = options.filter((o) => o.messageId === p.messageId);
+    const optionIds = new Set(opts.map((o) => o.id));
+    out.set(p.messageId, {
+      question: p.question,
+      multiple: p.multiple,
+      options: opts.map((o) => ({ id: o.id, label: o.label, votes: countOf.get(o.id) ?? 0 })),
+      voters: votersOf.get(p.messageId) ?? 0,
+      closesAt: p.closesAt?.toISOString() ?? null,
+      closed: p.closedAt !== null || (p.closesAt !== null && p.closesAt.getTime() <= now),
+      myVotes: myVotes.filter((id) => optionIds.has(id)),
+    });
+  }
+  return out;
 }
 
 export async function loadMessage(exec: Exec, row: MessageRow, viewerId: string | null): Promise<Message> {

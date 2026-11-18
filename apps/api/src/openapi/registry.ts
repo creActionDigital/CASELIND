@@ -71,6 +71,15 @@ import {
   updateNotificationPreferencesRequestSchema,
 } from '@caselind/contracts';
 
+// Polls, message search and presence.
+import {
+  createPollRequestSchema,
+  messageSearchQuerySchema,
+  messageSearchResultSchema,
+  pollVoteRequestSchema,
+  presenceSchema,
+} from '@caselind/contracts';
+
 // Lot 3A (messaging), separate import for the same reason.
 import {
   addConversationMembersRequestSchema,
@@ -140,6 +149,7 @@ import {
   deliveryIncidentRequestSchema,
   deliveryListQuerySchema,
   deliveryListSchema,
+  deliveryProofSchema,
   deliveryViewSchema,
   deliveryZoneListSchema,
   deliveryZoneSchema,
@@ -148,6 +158,7 @@ import {
   myDeliveryListSchema,
   orgDeliveryStatusRequestSchema,
   rateDeliveryRequestSchema,
+  setDeliveryProofRequestSchema,
   updateDeliveryZoneRequestSchema,
 } from '@caselind/contracts';
 
@@ -220,6 +231,13 @@ import {
   setUserStatusRequestSchema,
   createFeeRequestSchema,
   feeStatusListSchema,
+  childClassListSchema,
+  childFeeListSchema,
+  createGuardianRequestSchema,
+  myChildListSchema,
+  myGuardianshipListSchema,
+  schoolGuardianListSchema,
+  schoolGuardianSchema,
   markFeeRequestSchema,
   myFeeListSchema,
   schoolFeeListSchema,
@@ -329,6 +347,19 @@ import {
   orgUpdateListQuerySchema,
   orgUpdateListSchema,
   orgUpdateSchema,
+  storeReviewSchema,
+  storeReviewListQuerySchema,
+  storeReviewListSchema,
+  saveStoreReviewRequestSchema,
+  myStoreReviewSchema,
+  storeReviewReplyRequestSchema,
+  askOrgQuestionRequestSchema,
+  answerOrgQuestionRequestSchema,
+  publicOrgQuestionListSchema,
+  orgQuestionListQuerySchema,
+  orgQuestionListSchema,
+  myOrgQuestionSchema,
+  myOrgQuestionListSchema,
   setQuizRequestSchema,
   updateCourseRequestSchema,
 } from '@caselind/contracts';
@@ -724,6 +755,18 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/orgs/{orgId}/updates', summary: 'Storefront news (publications, promotions, events), newest first, hidden ones included (org.view; cursor pagination)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, query: orgUpdateListQuerySchema, response: orgUpdateListSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/updates', summary: 'Publish a news item: kind post|promo|event, title, body, optional dates and place; an event needs startsAt, endsAt must follow it (400); 50 per organisation (409 limit); org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, body: createOrgUpdateRequestSchema, response: orgUpdateSchema, status: 201 },
   { method: 'patch', path: '/v1/orgs/{orgId}/updates/{id}', summary: 'Edit a news item (at least one field; the merged result is validated again); unknown or of another organisation: 404; org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: updateOrgUpdateRequestSchema, response: orgUpdateSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/store-reviews', summary: 'Reviews of the organisation itself (not of products), newest first, hidden ones excluded; status=unanswered keeps those without a reply (org.view; cursor pagination)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, query: storeReviewListQuerySchema, response: storeReviewListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/store-reviews/{id}/reply', summary: 'Reply as the organisation to a review of the organisation (replaces the previous reply; hidden or foreign review: 404); orders.manage like product reviews; the author is notified without the text; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: storeReviewReplyRequestSchema, response: storeReviewSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/questions', summary: 'Visitor questions of the organisation, newest first, with the author handle; status pending (default) | answered | all; moderation-hidden ones excluded (org.view; cursor pagination)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, query: orgQuestionListQuerySchema, response: orgQuestionListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/questions/{id}/answer', summary: 'Answer (or edit the answer of) a visitor question, up to 1000 characters; the answer becomes public, the author is notified the first time without the text; unknown, foreign or hidden: 404; org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: answerOrgQuestionRequestSchema, status: 204 },
+  { method: 'delete', path: '/v1/orgs/{orgId}/questions/{id}', summary: 'Delete a visitor question; unknown or of another organisation: 404; org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/public/orgs/{slug}/reviews', summary: 'Public reviews of a storefront (private, suspended or unknown org: 404), newest first, cursor pagination; a valid token skips authors blocked with the reader', tags: ['orgs'], auth: 'public', params: { slug: z.string() }, query: storeReviewListQuerySchema, response: storeReviewListSchema, status: 200 },
+  { method: 'get', path: '/v1/public/orgs/{slug}/questions', summary: 'Public questions of a storefront, no token (private, suspended or unknown org: 404): only answered and not hidden ones, newest answer first, asker anonymous (cursor pagination)', tags: ['orgs'], auth: 'public', params: { slug: z.string() }, query: pageQuerySchema, response: publicOrgQuestionListSchema, status: 200 },
+  { method: 'get', path: '/v1/me/org-reviews/{orgId}', summary: 'Whether the caller can review this organisation (a delivered order, not a member) and their current review', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, response: myStoreReviewSchema, status: 200 },
+  { method: 'put', path: '/v1/me/org-reviews/{orgId}', summary: 'Create or replace the caller review of an organisation (rating 1-5, text up to 500). No delivered order: 403 not_purchased; member: 403 member; hidden by moderation: 409 moderated; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, body: saveStoreReviewRequestSchema, response: storeReviewSchema, status: 200 },
+  { method: 'delete', path: '/v1/me/org-reviews/{orgId}', summary: 'Delete the caller review of an organisation (none: 404; hidden by moderation: 409 moderated)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, status: 204 },
+  { method: 'post', path: '/v1/me/org-questions', summary: 'Ask a question to a public organisation (up to 300 characters). 5 per rolling 24 h per account (409 rate_limited); a member of the organisation: 403 member; blocked with a member or unknown org: 404; the organisation is notified without the text; audited without text', tags: ['orgs'], auth: 'user', body: askOrgQuestionRequestSchema, response: myOrgQuestionSchema, status: 201 },
+  { method: 'get', path: '/v1/me/org-questions', summary: 'The caller own questions to organisations, newest first, answered or pending (cursor pagination)', tags: ['orgs'], auth: 'user', query: pageQuerySchema, response: myOrgQuestionListSchema, status: 200 },
   { method: 'delete', path: '/v1/orgs/{orgId}/updates/{id}', summary: 'Delete a news item; unknown or of another organisation: 404; org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, status: 204 },
   { method: 'get', path: '/v1/public/orgs/{slug}/updates', summary: 'Public news of a storefront, no token (private, suspended or unknown org: 404): not hidden, promotions and events not over; events first by date, then newest first (cursor pagination)', tags: ['orgs'], auth: 'public', params: { slug: z.string() }, query: orgUpdateListQuerySchema, response: orgUpdateListSchema, status: 200 },
 
@@ -795,6 +838,16 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/orgs/{orgId}/school/classes/{classId}/fees/{feeId}/statuses', summary: 'Which enrolled students paid a fee (org.members.manage)', tags: ['school'], auth: 'user', params: { orgId: z.string(), classId: z.string(), feeId: z.string() }, response: feeStatusListSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/school/classes/{classId}/fees/{feeId}/mark', summary: 'Record that an enrolled student paid (or did not pay) outside the platform; not a student of the class: 404; audited (org.members.manage)', tags: ['school'], auth: 'user', params: { orgId: z.string(), classId: z.string(), feeId: z.string() }, body: markFeeRequestSchema, status: 204 },
   { method: 'get', path: '/v1/me/school/fees', summary: 'Fees of the classes the caller is enrolled in; paid is null for parents and teachers', tags: ['school'], auth: 'user', response: myFeeListSchema, status: 200 },
+  // Lot 17b: optional parent-pupil link (school flag). Staff invites by handle for an enrolled pupil, the parent accepts; no parent account is required.
+  { method: 'post', path: '/v1/orgs/{orgId}/school/guardians', summary: 'Invite a parent (by handle) to follow an ENROLLED pupil (by handle, optional relation up to 40 characters); the parent is notified generically; not a school: 409 not_a_school; pupil not enrolled in the school or unknown handle: 404; same person: 409 same_person; already linked: 409 duplicate_guardian; audited with ids only (org.members.manage)', tags: ['school'], auth: 'user', params: { orgId: z.string() }, body: createGuardianRequestSchema, response: schoolGuardianSchema, status: 201 },
+  { method: 'get', path: '/v1/orgs/{orgId}/school/guardians', summary: 'Parent-pupil links of the school, pending and active (org.members.manage)', tags: ['school'], auth: 'user', params: { orgId: z.string() }, response: schoolGuardianListSchema, status: 200 },
+  { method: 'delete', path: '/v1/orgs/{orgId}/school/guardians/{id}', summary: 'Remove a parent-pupil link; unknown or of another school: 404; audited with ids only (org.members.manage)', tags: ['school'], auth: 'user', params: { orgId: z.string(), id: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/me/school/guardianships', summary: 'Invitations and links where the caller is the parent', tags: ['school'], auth: 'user', response: myGuardianshipListSchema, status: 200 },
+  { method: 'post', path: '/v1/me/school/guardianships/{id}/accept', summary: 'Accept an invitation (idempotent); only the invited parent, else 404; audited with ids only', tags: ['school'], auth: 'user', params: { id: z.string() }, status: 204 },
+  { method: 'post', path: '/v1/me/school/guardianships/{id}/decline', summary: 'Decline an invitation or end an active link (the school may invite again); only the invited parent, else 404; audited with ids only', tags: ['school'], auth: 'user', params: { id: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/me/school/children', summary: 'Pupils the caller follows through an ACTIVE link', tags: ['school'], auth: 'user', response: myChildListSchema, status: 200 },
+  { method: 'get', path: '/v1/me/school/children/{studentId}/fees', summary: 'Fee status (paid or not) of a followed pupil, only in the schools of the active link; no active link: 404', tags: ['school'], auth: 'user', params: { studentId: z.string() }, response: childFeeListSchema, status: 200 },
+  { method: 'get', path: '/v1/me/school/children/{studentId}/classes', summary: 'Classes of a followed pupil with timetable and latest announcements, only in the schools of the active link; no active link: 404', tags: ['school'], auth: 'user', params: { studentId: z.string() }, response: childClassListSchema, status: 200 },
   // Platform governance (conformity audit G1): suspend or reactivate accounts and organisations, verify organisations. Admin role, reason mandatory, audited.
   { method: 'get', path: '/v1/admin/users', summary: 'Find accounts by handle or name and status (admin role); no email, no private content', tags: ['admin'], auth: 'admin', query: adminListQuerySchema, response: adminUserListSchema, status: 200 },
   { method: 'put', path: '/v1/admin/users/{id}/status', summary: 'Suspend or reactivate an account (active <-> suspended; reason 3 to 500 characters); yourself or another administrator: 409; unchanged: 409; audited with the reason (admin role)', tags: ['admin'], auth: 'admin', params: { id: z.string() }, body: setUserStatusRequestSchema, status: 204 },
@@ -961,6 +1014,11 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'put', path: '/v1/conversations/{id}/draft', summary: 'Save the caller draft for this conversation (1-4000 chars, one per member, synced by the draft.updated event)', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: draftRequestSchema, response: draftSchema, status: 200 },
   { method: 'get', path: '/v1/conversations/{id}/draft', summary: 'The caller draft for this conversation (404 when none)', tags: ['messaging'], auth: 'user', params: { id: z.string() }, response: draftSchema, status: 200 },
   { method: 'delete', path: '/v1/conversations/{id}/draft', summary: 'Delete the caller draft (idempotent); sending a message also deletes it', tags: ['messaging'], auth: 'user', params: { id: z.string() }, status: 204 },
+  { method: 'post', path: '/v1/conversations/{id}/polls', summary: 'Create a poll as a message of kind poll (question up to 200, 2 to 6 distinct options up to 80, multiple choice or not, optional closesAt 1 minute to 30 days ahead); idempotent per clientId (201 new, 200 replay); non-member: 404; blocked direct: 403; audited without content; shares the message-sending rate limit; realtime message.new', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: createPollRequestSchema, response: messageSchema, status: 201 },
+  { method: 'put', path: '/v1/messages/{id}/poll/vote', summary: 'Set the caller votes on a poll (optionIds; an empty list withdraws them; one option unless multiple); changeable while the poll is open, closed: 409 poll_closed; voters are anonymous (counters and own votes only); realtime message.poll {conversationId, messageId, poll} with fresh counters', tags: ['messaging'], auth: 'user', params: { id: z.string() }, body: pollVoteRequestSchema, response: messageSchema, status: 200 },
+  { method: 'post', path: '/v1/messages/{id}/poll/close', summary: 'Close a poll (its creator, or an admin or owner of the group; idempotent; audited without content); realtime message.poll', tags: ['messaging'], auth: 'user', params: { id: z.string() }, response: messageSchema, status: 200 },
+  { method: 'get', path: '/v1/messages/search', summary: 'Search the text (2 to 100 characters, wildcards escaped) of the messages of the caller conversations, newest first, optionally in one conversation (non-member: 404); only after their entry, never recalled, expired, hidden, system or from a blocked sender; hits carry an excerpt; cursor pagination, limit up to 50; own rate limit', tags: ['messaging'], auth: 'user', query: messageSearchQuerySchema, response: messageSearchResultSchema, status: 200 },
+  { method: 'get', path: '/v1/presence/{userId}', summary: 'Online / last seen of a direct peer: visible only with an active direct conversation, no block, and both showPresence on (otherwise visible false with nothing else); realtime presence.updated to each allowed peer on connection, disconnection and setting change', tags: ['messaging'], auth: 'user', params: { userId: z.string() }, response: presenceSchema, status: 200 },
   // Lot 4B: stories, reports, moderation. A story the caller may not see (expired, hidden, blocked, other audience) is a 404.
   { method: 'post', path: '/v1/stories', summary: 'Publish a story (ready "story" upload of the caller; followers or friends); idempotent per clientId (201 new, 200 replay); flag social.stories', tags: ['stories'], auth: 'user', body: createStoryRequestSchema, response: storySchema, status: 201 },
   { method: 'get', path: '/v1/stories/feed', summary: 'Stories bar: the caller first, then followed authors, unseen first (max 100 authors)', tags: ['stories'], auth: 'user', response: storyFeedSchema, status: 200 },
@@ -1057,6 +1115,8 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/me/deliveries/{id}/incident', summary: 'Report an incident without changing the status (event + notification to the managers)', tags: ['delivery'], auth: 'user', params: { id: z.string() }, body: deliveryIncidentRequestSchema, response: courierDeliverySchema, status: 200 },
   { method: 'put', path: '/v1/me/deliveries/{id}/location-consent', summary: 'Accept or withdraw sharing of the courier position with the buyer (withdrawing erases the last point)', tags: ['delivery'], auth: 'user', params: { id: z.string() }, body: locationConsentRequestSchema, response: courierDeliverySchema, status: 200 },
   { method: 'post', path: '/v1/me/deliveries/{id}/location', summary: 'Courier position, in transit only and after consent (403 location_consent_required, 409 not_in_transit); only the last point is kept and it is pushed as delivery.location to the order room joined by the buyer; erased when the delivery ends', tags: ['delivery'], auth: 'user', params: { id: z.string() }, body: courierLocationRequestSchema, status: 204 },
+  { method: 'put', path: '/v1/deliveries/{id}/proof', summary: 'Assigned courier sets (upload id of purpose `delivery_proof`, JPEG/PNG/WebP, 5 MB) or removes (null) the delivery photo and/or the customer signature (PNG drawing); absent key unchanged; replaced files are deleted; only picked_up, in_transit or delivered (409 invalid_transition); someone else: 404; wrong purpose or foreign/unready/reused file: 400; complements the proof code, never replaces it; audited (kinds only)', tags: ['delivery'], auth: 'user', params: { id: z.string() }, body: setDeliveryProofRequestSchema, response: deliveryProofSchema, status: 200 },
+  { method: 'get', path: '/v1/deliveries/{id}/proof', summary: 'Photo and signature of a delivery (contentUrl needs the bearer token): the buyer, the courier and the seller members with orders.view; anyone else: 404', tags: ['delivery'], auth: 'user', params: { id: z.string() }, response: deliveryProofSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/reviews/{reviewId}/reply', summary: 'Reply as the seller to a review of one of the organisation products (replaces a previous reply; orders.manage)', tags: ['reviews', 'orgs'], auth: 'user', params: { orgId: z.string(), reviewId: z.string() }, body: reviewReplyRequestSchema, response: reviewSchema, status: 200 },
   // Lot 6B: KYC tiers (manual admin review, SANDBOX wallet limits), payment PIN, signed merchant QR. Identity files: purpose kyc_document, readable by the owner and admins only.
   { method: 'get', path: '/v1/me/kyc', summary: 'KYC level (0 OTP-verified, 1 declared identity + documents, 2 + proof of address), pending request, last decision and limits per currency', tags: ['kyc'], auth: 'user', response: kycStatusViewSchema, status: 200 },

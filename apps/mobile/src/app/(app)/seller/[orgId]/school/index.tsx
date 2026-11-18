@@ -42,6 +42,7 @@ export default function SchoolClasses() {
         ) : null}
         <Button label={t('school.staff.create')} loading={create.isPending} disabled={!name.trim()} onPress={() => create.mutate()} />
         <Button variant="secondary" label={t('school.scholarships.manage')} onPress={() => router.push(`/seller/${orgId}/school/scholarships` as never)} />
+        <Button variant="secondary" label={t('guardians.staff.link')} onPress={() => router.push(`/seller/${orgId}/school/guardians` as never)} />
         {q.isPending ? <Loading /> : null}
         {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : null}
         {q.data?.items.map((c) => (

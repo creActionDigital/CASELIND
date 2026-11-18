@@ -8,6 +8,7 @@ import { auditEvents, orgMembers, otpChallenges, refreshTokens, sessions, userBl
 import { contentUrlOf, MediaService } from '../media/media.service.js';
 import { MediaStorage } from '../media/storage.js';
 import { reconcile } from '../ledger/ledger.queries.js';
+import { FeesService } from '../school/fees.service.js';
 
 /** Media of deleted accounts removed per maintenance run (files first, then rows); the rest waits for the next run. */
 const DELETED_USER_MEDIA_BATCH = 500;
@@ -62,6 +63,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     @Inject(ENV) private readonly env: Env,
     private readonly media: MediaService,
     private readonly storage: MediaStorage,
+    private readonly schoolFees: FeesService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -119,6 +121,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         await this.wipeExpiredMessages(now);
         // Lot 6A: hourly ledger reconciliation; any divergence is logged as an error.
         await this.reconcileLedger();
+        // Lot 17b: school fees due within 3 days (once per fee, generic notification); never fails the run.
+        await this.schoolFees.remindDue(now).catch((err: unknown) => this.logger.error(`school fee reminders failed: ${(err as Error).name}`));
         this.logger.log(
           `maintenance done: otpChallenges=${result.otpChallenges} refreshTokens=${result.refreshTokens} sessions=${result.sessions} deletedAccounts=${result.deletedAccounts} staleUploads=${result.staleUploads} deletedUserMedia=${result.deletedUserMedia}`,
         );
@@ -163,6 +167,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       )}]::uuid[]`;
       await this.db.execute(sql`DELETE FROM message_reactions WHERE message_id = ANY(${arr})`);
       await this.db.execute(sql`DELETE FROM message_favorites WHERE message_id = ANY(${arr})`);
+      await this.db.execute(sql`DELETE FROM message_polls WHERE message_id = ANY(${arr})`);
       this.logger.log(`maintenance: ${ids.length} expired messages erased`);
     }
     return ids.length;
@@ -301,6 +306,9 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       await tx.execute(sql`DELETE FROM message_reactions WHERE user_id = ANY(${idArray})`);
       // Lot 3b: favourites, drafts and scheduled messages of the account.
       await tx.execute(sql`DELETE FROM message_favorites WHERE user_id = ANY(${idArray})`);
+      // Polls the account created are erased with their votes (the question was its message body); its own votes go.
+      await tx.execute(sql`DELETE FROM message_polls WHERE creator_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM message_poll_votes WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM conversation_drafts WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM scheduled_messages WHERE sender_id = ANY(${idArray})`);
       await tx.execute(sql`
@@ -440,6 +448,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         ['job_profiles', ['user_id']],
         ['freelance_profiles', ['user_id']],
         ['course_reviews', ['user_id']],
+        ['org_reviews', ['user_id']],
+        ['org_questions', ['asker_user_id']],
         ['course_enrollments', ['user_id']],
         ['exam_sessions', ['user_id']],
         ['certificates', ['user_id']],
@@ -456,6 +466,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         ['game_sessions', ['user_id']],
         ['school_enrollments', ['user_id']],
         ['school_fee_payments', ['user_id']],
+        ['school_guardians', ['student_user_id', 'guardian_user_id']],
         ['loyalty_movements', ['user_id']],
         ['marketing_consents', ['user_id']],
       ] as const) {
@@ -494,6 +505,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     const { rows } = await this.db.execute<{ id: string; storage_key: string }>(sql`
       SELECT m.id, m.storage_key FROM media_assets m JOIN users u ON u.id = m.owner_user_id
       WHERE u.status = 'deleted'
+        OR EXISTS (SELECT 1 FROM delivery_proofs p JOIN deliveries d ON d.id = p.delivery_id JOIN users b ON b.id = d.buyer_id WHERE p.media_id = m.id AND b.status = 'deleted')
       ORDER BY m.id
       LIMIT ${DELETED_USER_MEDIA_BATCH}`);
     const removable: string[] = [];

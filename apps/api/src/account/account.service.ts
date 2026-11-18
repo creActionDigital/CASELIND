@@ -51,6 +51,8 @@ import { WalletService } from '../ledger/wallet.service.js';
 import { HealthService } from '../health/health.service.js';
 import { GamesService } from '../games/games.service.js';
 import { SchoolService } from '../school/school.service.js';
+import { FeesService } from '../school/fees.service.js';
+import { GuardiansService } from '../school/guardians.service.js';
 import { TwoFactorService } from '../auth/identity/two-factor.service.js';
 
 const DAY_MS = 86_400_000;
@@ -74,6 +76,8 @@ export class AccountService {
     private readonly healthData: HealthService,
     private readonly games: GamesService,
     private readonly school: SchoolService,
+    private readonly schoolFees: FeesService,
+    private readonly guardians: GuardiansService,
   ) {}
 
   /** G7: one read-only view of the consents stored by the health, loyalty and mini-app modules. */
@@ -241,11 +245,16 @@ export class AccountService {
       .innerJoin(orders, eq(orders.id, deliveries.orderId))
       .where(or(eq(deliveries.buyerId, auth.userId), eq(deliveries.courierId, auth.userId)))
       .orderBy(asc(deliveries.createdAt), asc(deliveries.id));
+    // Photo / signature proofs: that they exist (kind, size, date), never the file.
+    const proofRows = deliveryRows.length === 0 ? [] : (await this.db.execute<{ delivery_id: string; kind: 'photo' | 'signature'; size_bytes: string | number; taken_at: Date | string }>(sql`
+      SELECT p.delivery_id, p.kind, m.size_bytes, p.taken_at FROM delivery_proofs p JOIN media_assets m ON m.id = p.media_id
+      WHERE p.delivery_id = ANY(ARRAY[${sql.join(deliveryRows.map(({ d }) => sql`${d.id}`), sql`, `)}]::uuid[]) ORDER BY p.taken_at, p.kind`)).rows;
 
-    const wallet = await this.wallets.exportFor(auth.userId);
+    const wallet =await this.wallets.exportFor(auth.userId);
     const services = await this.exportServices(auth.userId);
     const mobility = await this.exportMobility(auth.userId);
     const aiConversations = await this.exportAiConversations(auth.userId);
+    const orgFeedback = await this.exportOrgFeedback(auth.userId);
     const listingRows = await this.db.execute<{ id: string; kind: string; title: string; description: string; price_minor: string | null; currency: string | null; city: string; status: string; created_at: Date }>(sql`
       SELECT id, kind, title, description, price_minor, currency, city, status, created_at FROM listings WHERE owner_id = ${auth.userId}::uuid ORDER BY created_at, id`);
     const cvRows = await this.db.execute<AccountExport['jobProfile'] & object>(sql`
@@ -297,6 +306,8 @@ export class AccountService {
     // G6: bounded (200 latest notifications); drafts and scheduled messages are the user's own text.
     const draftRows = await this.db.execute<{ conversation_id: string; body: string; updated_at: Date }>(sql`SELECT conversation_id, body, updated_at FROM conversation_drafts WHERE user_id = ${auth.userId}::uuid ORDER BY updated_at DESC`);
     const scheduledRows = await this.db.execute<{ id: string; conversation_id: string; kind: string; body: string | null; scheduled_at: Date }>(sql`SELECT id, conversation_id, kind, body, scheduled_at FROM scheduled_messages WHERE sender_id = ${auth.userId}::uuid ORDER BY scheduled_at`);
+    const pollRows = await this.db.execute<{ message_id: string; conversation_id: string; question: string; created_at: Date }>(sql`SELECT p.message_id, m.conversation_id, p.question, p.created_at FROM message_polls p JOIN messages m ON m.id = p.message_id WHERE p.creator_id = ${auth.userId}::uuid ORDER BY p.created_at LIMIT 1000`);
+    const pollVoteRows = await this.db.execute<{ message_id: string; conversation_id: string; option_ids: string[] }>(sql`SELECT v.message_id, m.conversation_id, array_agg(v.option_id ORDER BY v.option_id) AS option_ids FROM message_poll_votes v JOIN messages m ON m.id = v.message_id WHERE v.user_id = ${auth.userId}::uuid GROUP BY v.message_id, m.conversation_id ORDER BY max(v.created_at) LIMIT 1000`);
     const notificationRows = await this.db.execute<{ id: string; category: string; title: string; body: string; read_at: Date | null; created_at: Date }>(sql`SELECT id, category, title, body, read_at, created_at FROM notifications WHERE user_id = ${auth.userId}::uuid ORDER BY created_at DESC LIMIT 200`);
     // Lot 10: mini-app authorizations (history included); never a token.
     const miniappGrants = await this.exportMiniAppGrants(auth.userId);
@@ -401,6 +412,7 @@ export class AccountService {
         failureReason: d.failureReason,
         createdAt: d.createdAt.toISOString(),
         deliveredAt: d.deliveredAt?.toISOString() ?? null,
+        proofs: proofRows.filter((p) => p.delivery_id === d.id).map((p) => ({ kind: p.kind, sizeBytes: Number(p.size_bytes), takenAt: new Date(p.taken_at).toISOString() })),
       })),
       cart: cartRows.map((c) => ({ variantId: c.variantId, quantity: c.quantity, addedAt: c.createdAt.toISOString() })),
       kyc: {
@@ -426,6 +438,7 @@ export class AccountService {
       mobility,
       miniappGrants,
       aiConversations,
+      orgFeedback,
       listings: listingRows.rows.map((l) => ({
         id: l.id,
         kind: l.kind,
@@ -456,6 +469,8 @@ export class AccountService {
       health: await this.healthData.exportFor(auth.userId),
       games: await this.games.exportFor(auth.userId),
       school: await this.school.exportFor(auth.userId),
+      schoolFees: await this.schoolFees.exportFor(auth.userId),
+      schoolGuardians: await this.guardians.exportFor(auth.userId),
       education: {
         authored: eduAuthored.rows.map((c) => ({ id: c.id, title: c.title, status: c.status, createdAt: new Date(c.created_at).toISOString() })),
         enrollments: eduEnrollments,
@@ -468,6 +483,8 @@ export class AccountService {
       messaging: {
         drafts: draftRows.rows.map((d) => ({ conversationId: d.conversation_id, body: d.body, updatedAt: new Date(d.updated_at).toISOString() })),
         scheduled: scheduledRows.rows.map((r) => ({ id: r.id, conversationId: r.conversation_id, kind: r.kind, body: r.body, scheduledAt: new Date(r.scheduled_at).toISOString() })),
+        polls: pollRows.rows.map((p) => ({ messageId: p.message_id, conversationId: p.conversation_id, question: p.question, createdAt: new Date(p.created_at).toISOString() })),
+        pollVotes: pollVoteRows.rows.map((v) => ({ messageId: v.message_id, conversationId: v.conversation_id, optionIds: v.option_ids })),
         notifications: notificationRows.rows.map((n) => ({ id: n.id, category: n.category, title: n.title, body: n.body, readAt: n.read_at ? new Date(n.read_at).toISOString() : null, createdAt: new Date(n.created_at).toISOString() })),
       },
       searchHistory: (searchRows.rows as { query: string; scope: 'all' | 'users' | 'orgs' | 'products' | 'posts'; created_at: string | Date }[]).map((r) => ({
@@ -486,6 +503,20 @@ export class AccountService {
   }
 
   /** Lot 12: own assistant conversations with their messages (private to the user; never provider keys). */
+  /** Own reviews and questions about organisations, with the organisation's reply/answer (already public or addressed to the user). Hidden items stay: they are the user's own text. */
+  private async exportOrgFeedback(userId: string): Promise<AccountExport['orgFeedback']> {
+    const [rv, qs] = await Promise.all([
+      this.db.execute<{ id: string; name: string; rating: number; body: string | null; reply: string | null; created_at: Date }>(sql`SELECT r.id, o.name, r.rating, r.body, r.reply, r.created_at
+        FROM org_reviews r JOIN organizations o ON o.id = r.org_id WHERE r.user_id = ${userId}::uuid ORDER BY r.created_at, r.id`),
+      this.db.execute<{ id: string; name: string; question: string; answer: string | null; created_at: Date }>(sql`SELECT q.id, o.name, q.question, q.answer, q.created_at
+        FROM org_questions q JOIN organizations o ON o.id = q.org_id WHERE q.asker_user_id = ${userId}::uuid ORDER BY q.created_at, q.id`),
+    ]);
+    return {
+      reviews: rv.rows.map((r) => ({ id: r.id, orgName: r.name, rating: r.rating, body: r.body, reply: r.reply, createdAt: new Date(r.created_at).toISOString() })),
+      questions: qs.rows.map((q) => ({ id: q.id, orgName: q.name, question: q.question, answer: q.answer, createdAt: new Date(q.created_at).toISOString() })),
+    };
+  }
+
   private async exportAiConversations(userId: string): Promise<AccountExport['aiConversations']> {
     const iso = (v: string | Date): string => new Date(v).toISOString();
     const convs = await this.db.execute(sql`SELECT id, title, created_at FROM ai_conversations WHERE user_id = ${userId}::uuid ORDER BY created_at, id`);

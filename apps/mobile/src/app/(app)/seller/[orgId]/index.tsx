@@ -68,6 +68,7 @@ export default function SellerDashboard() {
     { icon: 'briefcase-outline', label: 'jobs.org.title', path: '/jobs', show: canManageJobs(role) },
     { icon: 'storefront-outline', label: 'vitrine.title', path: '/vitrine', show: canEditProfile(role) },
     { icon: 'newspaper-outline', label: 'vitrine.updates.title', path: '/updates', show: canEditProfile(role) },
+    { icon: 'help-circle-outline', label: 'vitrine.questions.seller.title', path: '/questions', show: canEditProfile(role) },
     { icon: 'location-outline', label: 'seller.location', path: '/location', show: canEditProfile(role) },
     { icon: 'qr-code-outline', label: 'sellerQr.title', path: '/qr', show: canViewFinance(role) || can(role, 'orders.manage') },
   ];

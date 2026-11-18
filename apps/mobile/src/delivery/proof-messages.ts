@@ -1,0 +1,31 @@
+/** Textes de la preuve de livraison par photo (audit G5) : écran livreur, suivi acheteur, détail vendeur. Fusionnés dans `fr` et `en`. */
+export const proofFr = {
+  'delivery.proof.title': 'Preuve de livraison',
+  'delivery.proof.photo': 'Photo de la livraison',
+  'delivery.proof.signature': 'Signature du client',
+  'delivery.proof.hint': 'La photo complète le code de livraison, elle ne le remplace pas.',
+  'delivery.proof.camera': 'Prendre une photo',
+  'delivery.proof.gallery': 'Choisir dans la galerie',
+  'delivery.proof.replace': 'Remplacer la photo',
+  'delivery.proof.remove': 'Retirer la photo',
+  'delivery.proof.denied': 'L’accès à l’appareil photo ou aux photos a été refusé.',
+  'delivery.proof.badType': 'Format non accepté : utilisez une photo JPEG, PNG ou WebP.',
+  'delivery.proof.takenAt': 'Prise le {date}',
+  'delivery.proof.none': 'Aucune preuve jointe.',
+  'delivery.proof.seen': 'Visible par l’acheteur et la boutique.',
+} as const;
+export const proofEn = {
+  'delivery.proof.title': 'Proof of delivery',
+  'delivery.proof.photo': 'Delivery photo',
+  'delivery.proof.signature': 'Customer signature',
+  'delivery.proof.hint': 'The photo adds to the delivery code, it does not replace it.',
+  'delivery.proof.camera': 'Take a photo',
+  'delivery.proof.gallery': 'Choose from gallery',
+  'delivery.proof.replace': 'Replace the photo',
+  'delivery.proof.remove': 'Remove the photo',
+  'delivery.proof.denied': 'Access to the camera or photos was denied.',
+  'delivery.proof.badType': 'Unsupported format: use a JPEG, PNG or WebP photo.',
+  'delivery.proof.takenAt': 'Taken on {date}',
+  'delivery.proof.none': 'No proof attached.',
+  'delivery.proof.seen': 'Visible to the buyer and the shop.',
+} as const;

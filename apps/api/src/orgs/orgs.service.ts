@@ -272,6 +272,7 @@ export class OrgsService {
       .where(and(eq(organizations.slug, slug), eq(organizations.visibility, 'public'), eq(organizations.status, 'active')))
       .limit(1);
     if (!o) throw orgNotFound();
+    const stats = (await this.db.execute<{ avg: number | null; n: number }>(sql`SELECT avg(rating)::float8 AS avg, count(*)::int AS n FROM org_reviews WHERE org_id = ${o.id}::uuid AND NOT hidden`)).rows[0];
     return {
       id: o.id,
       slug: o.slug,
@@ -291,6 +292,8 @@ export class OrgsService {
       verified: o.verificationStatus === 'verified',
       gallery: (await filesByKey(this.db, ORG_GALLERY, [o.id])).get(o.id) ?? [],
       contactUserId: await resolveContactUserId(this.db, o.id, viewerId),
+      // Includes authors blocked with the reader: the average is the same for everyone (blocks only filter the list).
+      rating: stats && stats.n > 0 && stats.avg !== null ? { average: Math.round(stats.avg * 100) / 100, count: stats.n } : null,
     };
   }
 

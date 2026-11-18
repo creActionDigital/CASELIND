@@ -30,6 +30,7 @@ describe('privacy settings', () => {
       discoverableByEmail: false,
       contactRequestsFrom: 'everyone',
       readReceipts: true,
+      showPresence: true,
     });
   });
 
@@ -45,6 +46,7 @@ describe('privacy settings', () => {
       discoverableByEmail: false,
       contactRequestsFrom: 'nobody',
       readReceipts: true,
+      showPresence: true,
     });
     const again = await ctx.http.get('/v1/me/privacy').set(bearer(a.token)).expect(200);
     expect(again.body).toEqual(res.body);

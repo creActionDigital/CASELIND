@@ -59,12 +59,19 @@ import { OrgScholarshipsController, ScholarshipsController } from './school/scho
 import { ScholarshipsService } from './school/scholarships.service.js';
 import { MyFeesController, OrgFeesController } from './school/fees.controller.js';
 import { FeesService } from './school/fees.service.js';
+import { MyGuardianshipsController, OrgGuardiansController } from './school/guardians.controller.js';
+import { GuardiansService } from './school/guardians.service.js';
 import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
 import { ScheduledMessagesService } from './messaging/scheduled-messages.service.js';
 import { ConversationsController, MessagesController, MessagingMeController, SEND_MESSAGE_HANDLER } from './messaging/messaging.controller.js';
 import { MessagingRooms } from './messaging/rooms.js';
+// Polls, message search and presence.
+import { ConversationPollsController, CREATE_POLL_HANDLER, MESSAGE_SEARCH_HANDLER, MessagePollsController, PresenceController } from './messaging/polls-search-presence.controller.js';
+import { MessageSearchService } from './messaging/message-search.service.js';
+import { PollsService } from './messaging/polls.service.js';
+import { PresenceService } from './messaging/presence.service.js';
 import { ModerationRegistry } from './moderation/moderation-registry.js';
 import { RelationsService } from './social/relations.service.js';
 // Lot 4A (social), separate import block to limit merge conflicts with parallel work.
@@ -160,6 +167,8 @@ import type { FetchLike } from './ai/llm-provider.js';
 import { BuyerDeliveryController, MyDeliveriesController, OrgDeliveryController } from './delivery/delivery.controller.js';
 import { DeliveryZonesService } from './delivery/delivery-zones.service.js';
 import { DeliveryService } from './delivery/delivery.service.js';
+import { DeliveryProofController } from './delivery/delivery-proof.controller.js';
+import { DeliveryProofService } from './delivery/delivery-proof.service.js';
 import { DeliveryCodes } from './delivery/delivery.shared.js';
 import { MaintenanceService } from './maintenance/maintenance.service.js';
 import { AvatarController } from './media/avatar.controller.js';
@@ -173,6 +182,8 @@ import { MyOrgsController, OrgsController, PublicOrgsController } from './orgs/o
 import { OrgsService } from './orgs/orgs.service.js';
 import { OrgUpdatesController, PublicOrgUpdatesController } from './orgs/org-updates.controller.js';
 import { OrgUpdatesService } from './orgs/org-updates.service.js';
+import { MyOrgFeedbackController, OrgFeedbackController, PublicOrgFeedbackController } from './orgs/org-feedback.controller.js';
+import { OrgFeedbackService } from './orgs/org-feedback.service.js';
 import { PrivacyController } from './privacy/privacy.controller.js';
 import { PrivacyService } from './privacy/privacy.service.js';
 import { AuthGuard } from './security/auth.guard.js';
@@ -271,8 +282,20 @@ export class AppModule {
               limit: env.MESSAGING_RATE_LIMIT_PER_MINUTE,
               skipIf: (ctx) =>
                 ctx.getType() !== 'http' ||
-                ctx.getClass() !== ConversationsController ||
-                ctx.getHandler().name !== SEND_MESSAGE_HANDLER,
+                !(
+                  (ctx.getClass() === ConversationsController && ctx.getHandler().name === SEND_MESSAGE_HANDLER) ||
+                  (ctx.getClass() === ConversationPollsController && ctx.getHandler().name === CREATE_POLL_HANDLER)
+                ),
+            },
+            {
+              // Search in the caller's messages (an ILIKE scan over their conversations): the universal search budget.
+              name: 'messageSearch',
+              ttl: 60_000,
+              limit: env.SEARCH_RATE_LIMIT_PER_MINUTE,
+              skipIf: (ctx) =>
+                ctx.getType() !== 'http' ||
+                ctx.getClass() !== MessagePollsController ||
+                ctx.getHandler().name !== MESSAGE_SEARCH_HANDLER,
             },
             {
               // Lot 4B: filing reports only.
@@ -346,6 +369,8 @@ export class AppModule {
         OrgSchoolController,
         OrgFeesController,
         MyFeesController,
+        OrgGuardiansController,
+        MyGuardianshipsController,
         MySchoolController,
         OrgScholarshipsController,
         ScholarshipsController,
@@ -363,6 +388,9 @@ export class AppModule {
         PublicOrgsController,
         OrgUpdatesController,
         PublicOrgUpdatesController,
+        OrgFeedbackController,
+        MyOrgFeedbackController,
+        PublicOrgFeedbackController,
         MediaController,
         PublicMediaController,
         AvatarController,
@@ -370,6 +398,9 @@ export class AppModule {
         MessagesController,
         // Lot 3b
         MessagingMeController,
+        ConversationPollsController,
+        MessagePollsController,
+        PresenceController,
         NotificationsController,
         SocialController,
         StoriesController,
@@ -425,6 +456,7 @@ export class AppModule {
         OrgDeliveryController,
         BuyerDeliveryController,
         MyDeliveriesController,
+        DeliveryProofController,
         ...extraControllers,
       ],
       providers: [
@@ -445,6 +477,7 @@ export class AppModule {
         AccountService,
         OrgsService,
         OrgUpdatesService,
+        OrgFeedbackService,
         OrgMembersService,
         // Route-level guard attached by @OrgPermission (runs after the global guards below).
         OrgGuard,
@@ -479,6 +512,7 @@ export class AppModule {
         DeliveryCodes,
         DeliveryZonesService,
         DeliveryService,
+        DeliveryProofService,
         // Lot 5B
         CartService,
         PaymentMethods,
@@ -546,11 +580,15 @@ export class AppModule {
         SchoolService,
         GovernanceService,
         FeesService,
+        GuardiansService,
         ScholarshipsService,
         MessagesService,
         // Lot 3b
         MessageExtrasService,
         ScheduledMessagesService,
+        PollsService,
+        MessageSearchService,
+        PresenceService,
         { provide: ConversationRoomsResolver, useClass: MessagingRooms },
         { provide: OtpSender, useValue: otpSender ?? createOtpSender(env) },
         { provide: APP_GUARD, useClass: HttpThrottlerGuard },

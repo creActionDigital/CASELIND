@@ -20,6 +20,8 @@ export const mediaPurposeSchema = z.enum([
   'lesson',
   /** Storefront gallery (CDC §5): photos and videos, readable by any signed-in user like product images. */
   'org_gallery',
+  /** Proof of delivery (lot 8): photo or signature PNG, readable by the courier, the buyer and the seller's order viewers only. */
+  'delivery_proof',
 ]);
 export type MediaPurpose = z.infer<typeof mediaPurposeSchema>;
 
@@ -71,10 +73,11 @@ export const MEDIA_ALLOWED_MIMES: Readonly<Record<MediaPurpose, readonly MediaMi
   delivery: [...IMAGES, 'application/pdf'],
   lesson: [...IMAGES, ...VIDEOS, 'application/pdf'],
   org_gallery: [...IMAGES, ...VIDEOS],
+  delivery_proof: ['image/jpeg', 'image/png', 'image/webp'],
 };
 
 /** Per-purpose size cap in bytes (on top of the per-kind server limit); the lowest applies. */
-export const MEDIA_PURPOSE_MAX_BYTES: Readonly<Partial<Record<MediaPurpose, number>>> = { cv: 5 * 1024 * 1024, delivery: 10 * 1024 * 1024 };
+export const MEDIA_PURPOSE_MAX_BYTES: Readonly<Partial<Record<MediaPurpose, number>>> = { cv: 5 * 1024 * 1024, delivery: 10 * 1024 * 1024, delivery_proof: 5 * 1024 * 1024 };
 
 /** A file attached to a CV application, a milestone delivery or a lesson; fetch the bytes with GET contentUrl (bearer token). */
 export const attachedFileSchema = z.object({ id: z.uuid(), mime: mediaMimeSchema, sizeBytes: z.number().int().nonnegative(), contentUrl: z.string() });

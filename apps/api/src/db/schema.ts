@@ -50,6 +50,9 @@ export const users = pgTable('users', {
     .notNull()
     .default('everyone'),
   readReceipts: boolean('read_receipts').notNull().default(true),
+  /** Online presence shown to (and seen from) direct peers (0067_polls_presence); lastSeenAt is its only trace. */
+  showPresence: boolean('show_presence').notNull().default(true),
+  lastSeenAt: tstz('last_seen_at'),
   /** Set while an account deletion is pending (0004_account_deletion). */
   deletionRequestedAt: tstz('deletion_requested_at'),
 });
@@ -199,7 +202,7 @@ export const mediaAssets = pgTable('media_assets', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerUserId: uuid('owner_user_id').notNull(),
   purpose: text('purpose')
-    .$type<'avatar' | 'post' | 'message' | 'story' | 'org_logo' | 'org_banner' | 'product' | 'document' | 'kyc_document' | 'listing' | 'cv' | 'delivery' | 'lesson' | 'org_gallery'>()
+    .$type<'avatar' | 'post' | 'message' | 'story' | 'org_logo' | 'org_banner' | 'product' | 'document' | 'kyc_document' | 'listing' | 'cv' | 'delivery' | 'lesson' | 'org_gallery' | 'delivery_proof'>()
     .notNull(),
   declaredMime: text('declared_mime').notNull(),
   mime: text('mime'),
@@ -227,3 +230,4 @@ export * from './schema-kyc.js';
 export * from './schema-messaging-extras.js';
 export * from './schema-identity.js';
 export * from './schema-delivery.js';
+export * from './schema-polls.js';

@@ -55,6 +55,7 @@ export function buildOptimisticMessage(input: {
     forwarded: false,
     expiresAt: null,
     favorited: false,
+    poll: null,
     local: 'sending',
     localUri: input.localUri,
     localMime: input.localMime,
