@@ -656,3 +656,10 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 ## Écran gouvernance (2026-11-16)
 - Mobile : `admin/governance.tsx` (onglets Comptes/Organisations, recherche, suspendre/réactiver/vérifier avec motif ≥ 3 caractères et confirmation, erreurs 409 via `details.reason`), tuile « Gouvernance » dans Plus réservée aux admins.
 - Fichiers : `admin/api.ts`, `logic.ts` (+ test), `messages.ts` fr/en ; tsc propre.
+
+## Lot 16c (suite) — Caisse (ventes au comptoir) (2026-11-18) : API testée, écran codé non vérifié dans le navigateur
+- Constat : fidélité et campagnes existaient déjà (lot 16h, migration 0055) ; BACKLOG était en retard. Reste de 16c : caisse seulement.
+- Migration 0059 (pos_sales : clé d'idempotence (org, clientId), devise USD/CDF, total, mode espèces/mobile money/carte, lignes figées en jsonb, caissier SET NULL, CASCADE organisation). Routes ,  (, drapeau commerce). Prix lus dans le catalogue côté serveur, stock décrémenté par  dans la même transaction (tout ou rien), articles d'une autre organisation refusés (404), devises mélangées refusées (409), audit sans contenu des lignes. **Aucun argent ne transite** : le mode de paiement est une simple étiquette.
+- Mobile : écran Caisse (tuile du tableau vendeur) : panier par variante, mode de paiement, total, validation, encaissé du jour, 3 dernières ventes ; textes fr+en (pos/messages.ts).
+- Résultats observés : API 664 tests (dont pos.e2e 2), mobile 245, typechecks API et mobile propres.
+- Différé : annulation/remboursement d'une vente (remise en stock), ventes d'articles hors catalogue, ouverture/fermeture de caisse avec fond de caisse, ticket imprimable, fuseau horaire de la boutique pour « aujourd'hui » (UTC pour l'instant), pagination de l'historique (50 dernières), rendu à l'écran non vérifié, revue  et  non lancées (self-review seulement).

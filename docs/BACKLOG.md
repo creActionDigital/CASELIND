@@ -19,7 +19,7 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | 15 | §15 | Petites annonces | testé |
 | 16a | §14 | Emploi : offres, CV, candidatures | testé ; modification d’offre à l’écran et alertes d’offres (16d) faites |
 | 16b | §14 | Freelance : missions, propositions, jalons, litiges | testé (paiement externe, séquestre différé) |
-| 16c | §14 | Outils pro : devis, factures, CRM, caisse | analyse de ventes, devis et factures, clients (CRM léger) testés ; caisse, fidélité, campagnes à faire |
+| 16c | §14 | Outils pro : devis, factures, CRM, caisse, fidélité, campagnes | analyse de ventes, devis et factures, clients, fidélité et campagnes (16h), **caisse** (ventes au comptoir, migration 0059) testés ; contrats, ventes sans stock, annulation de vente et fermeture de caisse différés |
 | 17a | §13 | Éducation : cours, quiz, certificats | testé ; avis et notes sur les cours (17d) faits |
 | 17b | §13 | Établissements : emplois du temps, parents, frais, bourses | testé (classes, emploi du temps, annonces, notifications aux inscrits, recherche d’établissements, bourses sans candidature en ligne ; frais scolaires différés) |
 | 18a | §12 | Santé : consentement, dossier chiffré, rappels | testé (module réglementé, coupé par défaut) |

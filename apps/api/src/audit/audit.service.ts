@@ -170,6 +170,7 @@ export type AuditAction =
   /** Loyalty and campaigns (lot 16h): ids, flags and counts only, never the campaign text. */
   | 'commerce.loyalty_updated'
   | 'commerce.campaign_sent'
+  | 'commerce.pos_sale'
   | 'user.marketing_consent_updated'
   /** Services (lot 9): metadata {offerId, orgId?, fields?}. Never a booking note. */
   | 'service.created'

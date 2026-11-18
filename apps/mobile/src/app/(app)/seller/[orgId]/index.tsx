@@ -59,6 +59,7 @@ export default function SellerDashboard() {
     { icon: 'document-text-outline', label: 'docs.title', path: '/documents', show: can(role, 'orders.view') },
     { icon: 'school-outline', label: 'school.staff.title', path: '/school', show: current.org.kind === 'school' && (role === 'owner' || role === 'admin') },
     { icon: 'people-outline', label: 'customers.title', path: '/customers', show: can(role, 'orders.view') },
+    { icon: 'cash-outline', label: 'pos.title', path: '/pos', show: can(role, 'orders.manage') },
     { icon: 'heart-outline', label: 'loyalty.seller.title', path: '/loyalty', show: can(role, 'orders.manage') },
     { icon: 'megaphone-outline', label: 'campaign.title', path: '/campaigns', show: can(role, 'orders.manage') },
     { icon: 'star-outline', label: 'seller.reviews', path: '/reviews', show: canViewReviews(role) },

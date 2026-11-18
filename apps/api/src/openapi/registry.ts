@@ -540,6 +540,8 @@ import {
   updateAiSettingsRequestSchema,
 } from '@caselind/contracts';
 
+// Lot 16c (caisse), separate import block.
+import { createPosSaleRequestSchema, posSaleListSchema, posSaleSchema, posSummarySchema } from '@caselind/contracts';
 // Lot 16h (loyalty, campaigns), separate import block.
 import {
   campaignListSchema,
@@ -1157,6 +1159,10 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'put', path: '/v1/orgs/{orgId}/loyalty', summary: 'Enable or disable the programme and set pointsPerUnit (1-100, USD or CDF) and the reward text (200 max); audited (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, body: updateLoyaltyProgramRequestSchema, response: loyaltyProgramSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/campaigns', summary: 'Send a campaign (title 80, text 300) to the shop customers who opted in, not blocked with the author; 1 per 24 h (409 campaign_rate_limited), 500 recipients max; audited without the text (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, body: createCampaignRequestSchema, response: campaignSchema, status: 201 },
   { method: 'get', path: '/v1/orgs/{orgId}/campaigns', summary: 'Campaign history (title, date, recipient count; never the people) (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: campaignListSchema, status: 200 },
+  // Lot 16c: caisse (counter sales recorded by the seller; stock goes down, no money moves). Behind the `commerce` flag.
+  { method: 'post', path: '/v1/orgs/{orgId}/pos/sales', summary: 'Record a counter sale (1-50 lines, same currency, price from the catalogue, stock decremented, idempotent by clientId; 409 on stock or currency; audited) (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, body: createPosSaleRequestSchema, response: posSaleSchema, status: 201 },
+  { method: 'get', path: '/v1/orgs/{orgId}/pos/sales', summary: 'The 50 latest counter sales (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: posSaleListSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/pos/summary', summary: 'Counter takings of the current UTC day per currency and payment method (orders.manage)', tags: ['orders', 'orgs'], auth: 'user', params: { orgId: z.string() }, response: posSummarySchema, status: 200 },
   { method: 'get', path: '/v1/me/loyalty', summary: 'My points per shop and my marketing consent', tags: ['orders'], auth: 'user', response: myLoyaltySchema, status: 200 },
   { method: 'put', path: '/v1/me/marketing-consent', summary: 'Opt in or out of shop offers (off by default; audited)', tags: ['orders'], auth: 'user', body: marketingConsentRequestSchema, response: marketingConsentSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/ai/product-description', summary: 'Seller help (permission catalog.manage): draft product description from a title and facts typed by the seller; aiGenerated is always true, nothing is stored or published', tags: ['ai', 'catalog'], auth: 'user', params: { orgId: z.string() }, body: productDescriptionRequestSchema, response: productDescriptionResultSchema, status: 200 },
