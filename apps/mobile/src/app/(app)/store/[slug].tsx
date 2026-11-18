@@ -3,7 +3,7 @@ import type { OpeningHours, PublicOrg } from '@caselind/contracts';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { fetchStore, fetchStoreProducts } from '../../../shop/api';
 import { shopKeys } from '../../../shop/hooks';
@@ -78,6 +78,14 @@ export default function StoreScreen() {
         {open === null ? '' : ` · ${t(open ? 'vitrine.public.open' : 'vitrine.public.closedNow')}`}
       </Text>
       {o.description ? <Text>{o.description}</Text> : null}
+
+      {o.gallery.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery}>
+          {o.gallery.map((f, i) => (
+            <AuthImage key={f.id} contentUrl={f.contentUrl} label={t('vitrine.gallery.photo', { n: i + 1 })} style={styles.galleryItem} />
+          ))}
+        </ScrollView>
+      ) : null}
 
       <View style={styles.actions}>
         {o.phone ? <Action label={t('vitrine.public.call')} onPress={() => Linking.openURL(`tel:${o.phone}`)} /> : null}
@@ -216,6 +224,8 @@ const styles = StyleSheet.create({
   logo: { width: 72, height: 72, borderRadius: radius.pill },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   verified: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  gallery: { gap: spacing.sm },
+  galleryItem: { width: 160, height: 120 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   block: { padding: spacing.md, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, gap: spacing.xs },
   dayRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },

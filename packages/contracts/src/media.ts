@@ -18,6 +18,8 @@ export const mediaPurposeSchema = z.enum([
   'cv',
   'delivery',
   'lesson',
+  /** Storefront gallery (CDC §5): photos and videos, readable by any signed-in user like product images. */
+  'org_gallery',
 ]);
 export type MediaPurpose = z.infer<typeof mediaPurposeSchema>;
 
@@ -68,6 +70,7 @@ export const MEDIA_ALLOWED_MIMES: Readonly<Record<MediaPurpose, readonly MediaMi
   cv: ['application/pdf'],
   delivery: [...IMAGES, 'application/pdf'],
   lesson: [...IMAGES, ...VIDEOS, 'application/pdf'],
+  org_gallery: [...IMAGES, ...VIDEOS],
 };
 
 /** Per-purpose size cap in bytes (on top of the per-kind server limit); the lowest applies. */

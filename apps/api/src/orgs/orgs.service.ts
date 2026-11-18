@@ -5,6 +5,7 @@ import {
   type MyOrgMembership,
   type OpeningHours,
   type Org,
+  type OrgGallery,
   type OrgSummary,
   type PublicOrg,
   type UpdateOrgRequest,
@@ -15,7 +16,9 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
 import { type OrganizationRow, organizations, orgMembers, type OrgMemberRow, users } from '../db/schema.js';
+import { deleteObjects, filesByKey, ORG_GALLERY, replaceFiles } from '../media/attachments.js';
 import { contentUrlOf } from '../media/media.service.js';
+import { MediaStorage } from '../media/storage.js';
 import { orgNotFound } from './org.guard.js';
 import { resolveContactUserId } from './org-contact.js';
 
@@ -131,6 +134,7 @@ export class OrgsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly storage: MediaStorage,
   ) {}
 
   /** The creator becomes the active owner, in the same transaction as the org row. */
@@ -227,6 +231,22 @@ export class OrgsService {
     });
   }
 
+  async getGallery(orgId: string): Promise<OrgGallery> {
+    return { items: (await filesByKey(this.db, ORG_GALLERY, [orgId])).get(orgId) ?? [] };
+  }
+
+  /** Replaces the gallery (12 ready `org_gallery` uploads of the caller at most); dropped files are deleted. */
+  async setGallery(orgId: string, actorUserId: string, assetIds: string[], meta: RequestMeta): Promise<OrgGallery> {
+    const keys = await this.db.transaction(async (tx) => {
+      await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, orgId)).for('update');
+      const removed = await replaceFiles(tx, ORG_GALLERY, actorUserId, 'org_gallery', orgId, assetIds);
+      await this.audit.record({ action: 'org.gallery_set', actorUserId, meta, metadata: { orgId, count: assetIds.length } }, tx);
+      return removed;
+    });
+    await deleteObjects(this.storage, keys);
+    return this.getGallery(orgId);
+  }
+
   /** Content URL of a ready upload of the caller with the given purpose; `null` removes the image. */
   private async ownImageUrl(tx: Pick<Db, 'execute'>, userId: string, mediaId: string | null, purpose: 'org_logo' | 'org_banner', path: string): Promise<string | null> {
     if (mediaId === null) return null;
@@ -268,6 +288,7 @@ export class OrgsService {
       openingHours: o.openingHours as OpeningHours | null,
       page: o.page,
       verified: o.verificationStatus === 'verified',
+      gallery: (await filesByKey(this.db, ORG_GALLERY, [o.id])).get(o.id) ?? [],
       contactUserId: await resolveContactUserId(this.db, o.id, viewerId),
     };
   }

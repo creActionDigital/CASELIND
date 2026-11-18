@@ -24,6 +24,7 @@ export function canRead(viewerId: string, asset: Readable): boolean {
     case 'org_banner':
     case 'product':
     case 'listing':
+    case 'org_gallery':
       return true;
     case 'story':
     case 'post':

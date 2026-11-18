@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../../i18n';
 import { errorMessage } from '../../../../lib/errors';
 import { imageMime, uploadImage } from '../../../../media/upload';
@@ -14,7 +14,7 @@ import { shopKeys } from '../../../../shop/hooks';
 import { spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
 import { AuthImage, Button, ErrorState, Screen, Text, TextField } from '../../../../ui';
-import { fetchOrg, updateOrg } from '../../../../vitrine/api';
+import { fetchGallery, fetchOrg, setGallery, updateOrg } from '../../../../vitrine/api';
 import { buildHours, DAYS, formatDay, parseAreas } from '../../../../vitrine/logic';
 
 type Row = Record<string, string>;
@@ -56,6 +56,62 @@ function Rows({ title, rows, onChange, fields, max }: { title: MessageKey; rows:
         </Card>
       ))}
       {rows.length < max ? <Button variant="secondary" label={t('vitrine.add')} onPress={() => onChange([...rows, {}])} /> : null}
+    </View>
+  );
+}
+
+/** Galerie de la vitrine : chaque ajout ou retrait est enregistré tout de suite (route à part). */
+function Gallery({ orgId }: { orgId: string }) {
+  const { colors } = useTheme();
+  const { t, locale } = useI18n();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['org-gallery', orgId], queryFn: () => fetchGallery(orgId) });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const items = q.data?.items ?? [];
+
+  async function apply(ids: string[]) {
+    qc.setQueryData(['org-gallery', orgId], await setGallery(orgId, ids));
+    void qc.invalidateQueries({ queryKey: ['org-full', orgId] });
+  }
+  async function add() {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 12 - items.length, quality: 0.8 });
+      if (res.canceled) return;
+      const uploaded: string[] = [];
+      for (const a of res.assets.slice(0, 12 - items.length)) uploaded.push(await uploadImage(a.uri, imageMime(a.mimeType, a.uri), 'org_gallery'));
+      await apply([...items.map((f) => f.id), ...uploaded]);
+    } catch (e) {
+      setError(errorMessage(e, t, locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(id: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      await apply(items.filter((f) => f.id !== id).map((f) => f.id));
+    } catch (e) {
+      setError(errorMessage(e, t, locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <SectionTitle>{t('vitrine.gallery')}</SectionTitle>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+        {items.map((f, i) => (
+          <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={t('vitrine.gallery.remove', { n: i + 1 })} disabled={busy} onPress={() => remove(f.id)}>
+            <AuthImage contentUrl={f.contentUrl} label={t('vitrine.gallery.photo', { n: i + 1 })} style={{ width: 88, height: 88 }} />
+          </Pressable>
+        ))}
+      </View>
+      {error ? <Text color={colors.danger} accessibilityLiveRegion="polite">{error}</Text> : null}
+      {items.length < 12 ? <Button variant="secondary" label={t('vitrine.gallery.add')} loading={busy} onPress={add} /> : null}
     </View>
   );
 }
@@ -184,6 +240,8 @@ export default function Vitrine() {
             <Button variant="secondary" label={t('vitrine.logo')} disabled={busy} onPress={() => pick('org_logo')} />
             {logoUrl || logo?.uri ? <Button variant="secondary" label={t('vitrine.removeImage')} onPress={() => setLogo({ id: null })} /> : null}
           </View>
+
+          <Gallery orgId={orgId} />
 
           <SectionTitle>{t('vitrine.about')}</SectionTitle>
           <TextField label={t('vitrine.description')} value={description} onChangeText={setDescription} multiline maxLength={2000} />

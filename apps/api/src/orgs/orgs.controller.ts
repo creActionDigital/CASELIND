@@ -1,10 +1,13 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import {
   type CreateOrgRequest,
   createOrgRequestSchema,
   type InviteOrgMemberRequest,
   inviteOrgMemberRequestSchema,
   type MyOrgMembership,
+  type OrgGallery,
+  type SetOrgGalleryRequest,
+  setOrgGalleryRequestSchema,
   type Org,
   type OrgMember,
   type OrgMemberList,
@@ -61,6 +64,23 @@ export class OrgsController {
     @ReqMeta() meta: RequestMeta,
   ): Promise<Org> {
     return this.orgs.update(m.orgId, user.userId, body, meta);
+  }
+
+  @Get(':orgId/gallery')
+  @OrgPermission('org.view')
+  gallery(@CurrentMembership() m: OrgMembership): Promise<OrgGallery> {
+    return this.orgs.getGallery(m.orgId);
+  }
+
+  @Put(':orgId/gallery')
+  @OrgPermission('org.profile.edit')
+  setGallery(
+    @CurrentMembership() m: OrgMembership,
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodPipe(setOrgGalleryRequestSchema)) body: SetOrgGalleryRequest,
+    @ReqMeta() meta: RequestMeta,
+  ): Promise<OrgGallery> {
+    return this.orgs.setGallery(m.orgId, user.userId, body.assetIds, meta);
   }
 
   @Get(':orgId/members')

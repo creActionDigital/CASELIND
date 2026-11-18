@@ -322,6 +322,8 @@ import {
   setLessonsRequestSchema,
   setCvRequestSchema,
   setFilesRequestSchema,
+  setOrgGalleryRequestSchema,
+  orgGallerySchema,
   setQuizRequestSchema,
   updateCourseRequestSchema,
 } from '@caselind/contracts';
@@ -691,6 +693,8 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/orgs', summary: 'Create an organisation; the caller becomes its owner (slug taken or owner quota reached: 409)', tags: ['orgs'], auth: 'user', body: createOrgRequestSchema, response: orgSchema, status: 201 },
   { method: 'get', path: '/v1/orgs/{orgId}', summary: 'Full organisation (active members only)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, response: orgSchema, status: 200 },
   { method: 'patch', path: '/v1/orgs/{orgId}', summary: 'Update the organisation profile (org.profile.edit; supportUserId = active member buyers are pointed to, null = oldest active owner); audited', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, body: updateOrgRequestSchema, response: orgSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/gallery', summary: 'Storefront gallery, in order (org.view)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, response: orgGallerySchema, status: 200 },
+  { method: 'put', path: '/v1/orgs/{orgId}/gallery', summary: 'Replace the storefront gallery by up to 12 ready `org_gallery` uploads of the caller (photos, mp4/webm videos), in order; dropped files are deleted; org.profile.edit; audited (count only)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, body: setOrgGalleryRequestSchema, response: orgGallerySchema, status: 200 },
   { method: 'get', path: '/v1/orgs/{orgId}/members', summary: 'Members and pending invitations, oldest first (org.members.view; cursor pagination)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, query: orgMemberListQuerySchema, response: orgMemberListSchema, status: 200 },
   { method: 'post', path: '/v1/orgs/{orgId}/invitations', summary: 'Invite a user by handle (org.members.manage; owner/admin roles need org.admins.manage)', tags: ['orgs'], auth: 'user', params: { orgId: z.string() }, body: inviteOrgMemberRequestSchema, response: orgMemberSchema, status: 201 },
   { method: 'patch', path: '/v1/orgs/{orgId}/members/{userId}', summary: "Change a member's role (last active owner cannot be demoted: 409)", tags: ['orgs'], auth: 'user', params: { orgId: z.string(), userId: z.string() }, body: updateOrgMemberRequestSchema, response: orgMemberSchema, status: 200 },

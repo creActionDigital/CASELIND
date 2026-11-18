@@ -594,3 +594,43 @@ describe('mini-site content (page, logo, banner)', () => {
     expect(gone.body.bannerUrl).toContain(banner);
   });
 });
+
+describe('storefront gallery', () => {
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  async function uploadAs(token: string, purpose: string): Promise<string> {
+    const up = await ctx.http.post('/v1/media/uploads').set(bearer(token)).send({ purpose, mime: 'image/png', sizeBytes: PNG.length }).expect(201);
+    await ctx.http.put(up.body.uploadUrl).set(bearer(token)).set('X-Upload-Token', up.body.uploadToken).set('Content-Type', 'application/octet-stream').send(PNG).expect(200);
+    return up.body.assetId as string;
+  }
+
+  it('replaces the gallery in order, shows it publicly, deletes dropped files and refuses bad input', async () => {
+    const owner = await user();
+    const org = await createOrg(owner);
+    const [a, b, c] = [await uploadAs(owner.token, 'org_gallery'), await uploadAs(owner.token, 'org_gallery'), await uploadAs(owner.token, 'org_gallery')];
+    const put = (ids: string[], token = owner.token) => ctx.http.put(`/v1/orgs/${org.id}/gallery`).set(bearer(token)).send({ assetIds: ids });
+
+    const set = await put([b, a, c]).expect(200);
+    expect(set.body.items.map((f: { id: string }) => f.id)).toEqual([b, a, c]);
+    const pub = await ctx.http.get(`/v1/public/orgs/${org.slug}`).expect(200);
+    expect(pub.body.gallery.map((f: { id: string }) => f.id)).toEqual([b, a, c]);
+    expect((await ctx.http.get(`/v1/orgs/${org.id}/gallery`).set(bearer(owner.token)).expect(200)).body.items).toHaveLength(3);
+
+    // Any signed-in user reads the content, like a product image.
+    const visitor = await user();
+    await ctx.http.get(pub.body.gallery[0].contentUrl).set(bearer(visitor.token)).expect(200);
+
+    // Dropping a file deletes it.
+    await put([a]).expect(200);
+    expect((await ctx.sql.query(`SELECT count(*)::int AS n FROM media_assets WHERE id = ANY($1::uuid[])`, [[b, c]])).rows[0].n).toBe(0);
+
+    // Wrong purpose, someone else's upload, duplicates, too many, stranger: refused.
+    await put([await uploadAs(owner.token, 'org_logo')]).expect(400);
+    await put([await uploadAs(visitor.token, 'org_gallery')]).expect(400);
+    await put([a, a]).expect(400);
+    await put(Array.from({ length: 13 }, () => randomUUID())).expect(400);
+    await put([a], visitor.token).expect(404);
+
+    await put([]).expect(200);
+    expect((await ctx.http.get(`/v1/public/orgs/${org.slug}`).expect(200)).body.gallery).toEqual([]);
+  });
+});

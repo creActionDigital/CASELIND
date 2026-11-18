@@ -9,9 +9,10 @@ import type { MediaStorage } from './storage.js';
 const logger = new Logger('MediaStorage');
 type Exec = Pick<Db, 'execute'>;
 /** A link table between one object (milestone, lesson) and its attached media (lot 19m). Names are constants, never user input. */
-export type FileLink = { table: 'milestone_files' | 'lesson_files'; col: 'milestone_id' | 'lesson_id' };
+export type FileLink = { table: 'milestone_files' | 'lesson_files' | 'org_gallery_files'; col: 'milestone_id' | 'lesson_id' | 'org_id' };
 export const MILESTONE_FILES: FileLink = { table: 'milestone_files', col: 'milestone_id' };
 export const LESSON_FILES: FileLink = { table: 'lesson_files', col: 'lesson_id' };
+export const ORG_GALLERY: FileLink = { table: 'org_gallery_files', col: 'org_id' };
 
 export const invalidAsset = (path: string, message: string) => new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path, message }]);
 const uuids = (ids: string[]) => sql`ARRAY[${sql.join(ids.map((i) => sql`${i}`), sql`, `)}]::uuid[]`;

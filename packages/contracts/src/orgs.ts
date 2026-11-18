@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { attachedFileSchema } from './media.js';
 import { handleSchema } from './users.js';
 import { type Page, pageQuerySchema } from './pagination.js';
 
@@ -167,6 +168,12 @@ export const updateOrgRequestSchema = z
   .refine((v) => Object.keys(v).length > 0, 'at least one field is required');
 export type UpdateOrgRequest = z.infer<typeof updateOrgRequestSchema>;
 
+/** PUT /orgs/:orgId/gallery: the gallery becomes these ready `org_gallery` uploads of the caller, in order (12 at most; an empty list clears it). */
+export const setOrgGalleryRequestSchema = z.object({ assetIds: z.array(z.uuid()).max(12) });
+export type SetOrgGalleryRequest = z.infer<typeof setOrgGalleryRequestSchema>;
+export const orgGallerySchema = z.object({ items: z.array(attachedFileSchema) });
+export type OrgGallery = z.infer<typeof orgGallerySchema>;
+
 /** Full organisation, as seen by its members. */
 export const orgSchema = z.object({
   id: z.uuid(),
@@ -217,6 +224,8 @@ export const publicOrgSchema = orgSchema
   })
   .extend({
     verified: z.boolean(),
+    /** Photos and videos of the storefront gallery, in order. */
+    gallery: z.array(attachedFileSchema),
     /** Member to open a direct conversation with; null when none, or blocked with the caller (token optional). */
     contactUserId: z.uuid().nullable(),
   });

@@ -42,6 +42,7 @@ export type AuditAction =
   | 'user.avatar_updated'
   | 'org.created'
   | 'org.updated'
+  | 'org.gallery_set'
   | 'org.member_invited'
   | 'org.invitation_accepted'
   | 'org.invitation_declined'
