@@ -30,7 +30,13 @@ Statuts : `planifié` · `en cours` · `implémenté` · `testé` · `validé` �
 | — | §20, paris | Trading, paris sportifs | **retiré** |
 | — | §18 | CSL Coins | bloqué : règles non spécifiées (question ouverte) |
 | M9 | §6, §4 | Appels 1:1 et lives : signalisation WebRTC relayée par le temps réel (rien de stocké), historique des appels, salons live (chat, compteur, pic), drapeaux calls/live, export et purge | **API testée** (e2e calls-live, migration 0058) ; mobile : écran d’appel, bandeau d’appel entrant, boutons dans la conversation, onglet Live ; typecheck OK, **non vérifié à l’écran**. **Média (audio/vidéo) NON fait** : exige un serveur STUN/TURN (Q6) et un appareil réel ; `react-native-webrtc` hors Expo Go |
-| 2c | §5 | Vitrine mini-site : coordonnées, horaires, zones, liens, sections libres, questions fréquentes, logo et bannière, éditeur « Ma vitrine » ; photo de profil | API testée (migration 0061), écrans vérifiés dans le navigateur ; galerie, promotions, événements, publications, avis, questions des visiteurs, SEO/URL `@nom` : différés |
+| 2c | §5 | Vitrine mini-site : coordonnées, horaires, zones, liens, sections libres, questions fréquentes, logo et bannière, éditeur « Ma vitrine » ; photo de profil | **testé** (migrations 0061 à 0065 : page, galerie, actualités, avis de la boutique, questions des visiteurs ; page et éditeur vérifiés dans le navigateur, le reste seulement au typage) ; SEO/URL `@nom`/domaine personnalisé, vidéos de galerie depuis le mobile, images des actualités : différés |
+| 16c+ | §14 | Caisse : annulation de vente, sessions avec fond, ticket, fuseau de la boutique (0063) | **testé** ; écrans non vérifiés ; contrats et ventes hors catalogue : différés |
+| 17b+ | §13 | Établissements : lien parent-élève, rappels d'échéance, export des frais (0066) | **testé** ; écrans non vérifiés ; lien invisible pour l'élève majeur : à corriger |
+| 3b+ | §6 | Messagerie : sondages, recherche dans les messages, présence en ligne (0067) | **testé** ; écrans non vérifiés ; présence fiable en multi-instance seulement avec Redis |
+| 8+ | §10 | Livraison : preuve par photo (0068) | **testé** ; tracé de la signature côté mobile différé (pas de bibliothèque de capture) |
+| 18d | §12 | Santé : résultats d'examens chiffrés (0070) | **testé** (réglementé, coupé par défaut) ; fichiers non chiffrés au repos : à traiter ; pharmacie, assurance, vidéo : différés |
+| G5+ | — | Webhooks sortants signés des organisations (0069) | **testé** ; compteur d'échecs à affiner, clé de chiffrement dédiée à prévoir |
 | Web | §27 | React + Vite, PWA | première version faite (accueil, vitrine publique, PWA) ; comptes, catalogue public, swahili, SEO à faire |
 
 ## Ordre imposé
