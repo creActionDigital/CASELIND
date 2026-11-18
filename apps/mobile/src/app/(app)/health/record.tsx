@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { createEntry, deleteEntry, fetchEntries, healthKeys } from '../../../health/api';
 import { ENTRY_KINDS, isConsentRequired, isDate, kindKey, todayLocal } from '../../../health/logic';
+import { useConsentRedirect } from '../../../health/use-consent-redirect';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
@@ -31,6 +32,7 @@ export default function HealthRecord() {
     queryFn: ({ pageParam }) => fetchEntries(filter, pageParam),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
+  useConsentRedirect(query.error);
 
   const fail = (e: unknown) => {
     if (isConsentRequired(e)) return setError(t('health.consent.title'));

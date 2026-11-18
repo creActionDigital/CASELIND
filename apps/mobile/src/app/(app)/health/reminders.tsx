@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { createReminder, deleteReminder, fetchReminders, healthKeys, setReminderActive } from '../../../health/api';
 import { deviceUtcOffsetMinutes, isConsentRequired, isDate, parseTimes, todayLocal } from '../../../health/logic';
+import { useConsentRedirect } from '../../../health/use-consent-redirect';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
@@ -23,6 +24,7 @@ export default function HealthReminders() {
   const [end, setEnd] = useState('');
   const [error, setError] = useState<string | null>(null);
   const q = useQuery({ queryKey: healthKeys.reminders, queryFn: fetchReminders });
+  useConsentRedirect(q.error);
 
   const refresh = () => {
     setError(null);

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { actOnAppointment, fetchMyAppointments, fetchPrescriptions, proKeys } from '../../../health/api';
 import { appointmentActions, healthProErrorKey } from '../../../health/logic';
+import { useConsentRedirect } from '../../../health/use-consent-redirect';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { Card, PagedList } from '../../../seller/ui';
@@ -25,6 +26,7 @@ export default function MyAppointments() {
     queryFn: ({ pageParam }) => fetchMyAppointments(pageParam),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
+  useConsentRedirect(query.error);
   const rx = useQuery({ queryKey: proKeys.prescriptions, queryFn: fetchPrescriptions });
   const act = useMutation({
     mutationFn: (v: { id: string; action: 'cancel' }) => actOnAppointment(v.id, v.action),
