@@ -218,6 +218,17 @@ describe('caisse (counter sales)', () => {
     await ctx.http.post(`${base}/shifts`).set(bearer(s.owner.token)).send({ currency: 'CDF', openingFloatMinor: 0 }).expect(201);
   });
 
+  it('void: a sale of a closed session cannot be voided (the cash report stays final)', async () => {
+    const s = await seller('USD');
+    const base = `/v1/orgs/${s.orgId}/pos`;
+    const open = await ctx.http.post(`${base}/shifts`).set(bearer(s.owner.token)).send({ currency: 'USD', openingFloatMinor: 0 }).expect(201);
+    const made = await sale(s, { lines: [{ variantId: s.variant, quantity: 1 }] }).expect(201);
+    await ctx.http.post(`${base}/shifts/${open.body.id}/close`).set(bearer(s.owner.token)).send({ countedCashMinor: 10_000 }).expect(200);
+    const res = await ctx.http.post(`${base}/sales/${made.body.id}/void`).set(bearer(s.owner.token)).send({}).expect(409);
+    expect(res.body.error.details).toMatchObject({ reason: 'shift_closed' });
+    expect(fake.variants.get(s.variant)!.stock).toBe(49);
+  });
+
   it('time zone: "today" follows the shop zone; bad zones are refused', async () => {
     const s = await seller('USD');
     expect((await ctx.http.get(`/v1/orgs/${s.orgId}`).set(bearer(s.owner.token)).expect(200)).body.timezone).toBe('Africa/Lubumbashi');

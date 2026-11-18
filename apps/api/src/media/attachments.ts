@@ -50,9 +50,13 @@ export async function filesByKey(db: Exec, link: FileLink, keys: string[]): Prom
  * (rows now, stored objects after commit through `deleteObjects` with the returned keys).
  */
 export async function replaceFiles(tx: Exec, link: FileLink, userId: string, purpose: MediaPurpose, key: string, ids: string[]): Promise<string[]> {
-  await assertOwnReady(tx, userId, purpose, ids);
   const t = sql.identifier(link.table);
   const c = sql.identifier(link.col);
+  // Files already linked to this object keep their owner (a teammate may have uploaded them); only the new ones must be the caller's.
+  const linked = ids.length > 0 ? await tx.execute<{ media_id: string }>(sql`SELECT media_id FROM ${t} WHERE ${c} = ${key}::uuid AND media_id = ANY(${uuids(ids)})`) : { rows: [] };
+  const kept = new Set(linked.rows.map((r) => r.media_id));
+  await assertOwnReady(tx, userId, purpose, ids.filter((id) => !kept.has(id)));
+  if (new Set(ids).size !== ids.length) throw invalidAsset('assetIds', 'duplicate file');
   // A file already attached to another object would be deleted with this one: refuse reuse.
   if (ids.length > 0) {
     const used = await tx.execute(sql`SELECT 1 FROM ${t} WHERE media_id = ANY(${uuids(ids)}) AND ${c} <> ${key}::uuid LIMIT 1`);

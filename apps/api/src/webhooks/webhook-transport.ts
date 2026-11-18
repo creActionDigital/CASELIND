@@ -23,7 +23,11 @@ export class WebhookTimeoutError extends Error {}
 
 export class NodeWebhookTransport implements WebhookTransport {
   async lookup(host: string): Promise<string[]> {
-    const rows = await lookup(host, { all: true, verbatim: true });
+    // shortcut: the OS lookup keeps its thread until it answers; the race only frees this caller. Use a dns.Resolver with a timeout if it ever matters.
+    const rows = await Promise.race([
+      lookup(host, { all: true, verbatim: true }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new WebhookTimeoutError('dns lookup timed out')), 3000).unref()),
+    ]);
     return rows.map((r) => r.address);
   }
 

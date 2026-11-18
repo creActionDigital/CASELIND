@@ -701,3 +701,17 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
 ## Établissements : parents, rappels d'échéance, export (lot 17b, 2026-11-18) : testé (ciblé par l'agent), écrans non vérifiés
 - Migration 0066 `school_guardians` (lien facultatif parent-élève créé par le personnel par @handle, accepté par le parent) et `school_fees.reminded_at`. Routes `/orgs/{orgId}/school/guardians` (personnel), `/me/school/guardianships`, `/me/school/children`, `.../children/{id}/fees|classes` (404 sans lien actif). Rappel unique à J-3 pour l'élève non payé et ses parents actifs (maintenance), sans montant ni nom. Export de compte : liens et frais de l'élève (sans montants). Purge incluse. Drapeau réglementé `school` inchangé.
 - Différé : le lien n'est pas supprimé si l'élève est désinscrit de toutes les classes ; les rappels ne tiennent pas compte du drapeau par pays ; un plantage entre la prise du rappel et l'envoi perd ce rappel ; écrans non vérifiés.
+
+## Revues de fin de série (2026-11-18) : sécurité et correction des lots 0059 à 0070
+- Deux relectures indépendantes (lecture seule) : aucun défaut critique ni élevé. **Corrigés** : quota de la recherche de messages jamais appliqué (nom du gestionnaire) ; résolution DNS des webhooks sans délai (3 s) ; loopback http des webhooks limité à `NODE_ENV=test` ; comptes rendus de santé et pièces KYC servis en `no-store` ; annulation d'une vente refusée une fois la session de caisse clôturée ; galerie de la vitrine utilisable par plusieurs membres ; nettoyage du journal des webhooks ne supprime plus les envois en attente ; reprise des webhooks chaque minute (le recul est de 1 et 10 minutes).
+- **Restent ouverts (faible ou moyen, à traiter)** :
+  - comptes rendus de santé : fichiers non chiffrés au repos (le texte l'est) : chiffrer le stockage ou exiger le chiffrement du volume ;
+  - preuve de livraison : le livreur peut la remplacer ou la supprimer après remise ;
+  - lien parent-élève : l'élève majeur ne le voit pas et ne peut pas le refuser ;
+  - webhooks : le compteur de 10 échecs compte les tentatives (pas les envois), pas de plafond d'événements par minute, clé de chiffrement dérivée du secret JWT sans `TOTP_ENCRYPTION_KEY` (la rotation rend les secrets illisibles) ;
+  - santé : un professionnel peut remplir le quota de résultats d'un patient ;
+  - rappel de frais : marque posée avant l'envoi, fenêtre en UTC ;
+  - colonnes `date` lues avec le fuseau du serveur (à forcer en `to_char`) ;
+  - résumé de caisse : `pg_timezone_names` évalué plusieurs fois ;
+  - annulation d'une vente si le suivi de stock a changé entre-temps ;
+  - sondage dont le créateur est purgé : bulle vide côté mobile ; `deploy/restore.sh` laisse l'API arrêtée si `pg_restore` renvoie des avertissements.

@@ -22,7 +22,7 @@ import { PresenceService } from './presence.service.js';
 /** Name of the poll-creation handler: it shares the `messaging` throttler with message sending (app.module.ts). */
 export const CREATE_POLL_HANDLER = 'createPoll';
 /** Name of the search handler (own budget in app.module.ts). */
-export const MESSAGE_SEARCH_HANDLER = 'search';
+export const MESSAGE_SEARCH_HANDLER = 'searchMessages';
 
 @Controller('conversations')
 @RequireFlag('messaging')

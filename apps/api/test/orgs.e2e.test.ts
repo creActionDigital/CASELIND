@@ -633,4 +633,20 @@ describe('storefront gallery', () => {
     await put([]).expect(200);
     expect((await ctx.http.get(`/v1/public/orgs/${org.slug}`).expect(200)).body.gallery).toEqual([]);
   });
+
+  it('a teammate can add to the gallery without losing or re-owning the files of others', async () => {
+    const owner = await user();
+    const mate = await user();
+    const org = await createOrg(owner);
+    await addMember(org.id, owner, mate, 'admin');
+    const a = await uploadAs(owner.token, 'org_gallery');
+    const b = await uploadAs(mate.token, 'org_gallery');
+    const put = (ids: string[], token: string) => ctx.http.put(`/v1/orgs/${org.id}/gallery`).set(bearer(token)).send({ assetIds: ids });
+    await put([a], owner.token).expect(200);
+    const res = await put([a, b], mate.token).expect(200);
+    expect(res.body.items.map((f: { id: string }) => f.id)).toEqual([a, b]);
+    // The mate's own upload is still checked: someone else's new file is refused.
+    await put([a, b, await uploadAs(owner.token, 'org_gallery')], mate.token).expect(400);
+    expect((await ctx.sql.query(`SELECT count(*)::int AS n FROM media_assets WHERE id = $1`, [a])).rows[0].n).toBe(1);
+  });
 });

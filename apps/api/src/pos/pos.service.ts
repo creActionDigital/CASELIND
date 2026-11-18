@@ -109,6 +109,8 @@ export class PosService {
       const row = found.rows[0];
       if (!row) throw notFound('Sale');
       if (row.voided_at) return toSale(row);
+      const closed = await tx.execute(sql`SELECT 1 FROM pos_sales s JOIN pos_shifts h ON h.id = s.shift_id WHERE s.id = ${id}::uuid AND h.closed_at IS NOT NULL`);
+      if (closed.rows.length > 0) throw AppError.conflict('The session of this sale is closed', { reason: 'shift_closed' });
       // Sales recorded before 0063 did not keep the variant: their stock cannot be given back reliably.
       if (row.lines.some((l) => !l.variantId)) throw AppError.conflict('This sale predates stock tracking and cannot be voided', { reason: 'legacy_sale' });
       await this.catalog.release(tx, row.lines.map((l) => ({ variantId: l.variantId!, quantity: l.quantity })), { reason: 'pos_void' });

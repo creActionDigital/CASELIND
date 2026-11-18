@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import {
   type CreateWebhookRequest,
   ErrorCodes,
@@ -100,7 +101,7 @@ export class WebhookService {
   /* ---------------------------------------------------------------- management */
 
   private guard(raw: string): { href: string; host: string } {
-    const g = validateWebhookUrl(raw, { production: this.env.NODE_ENV === 'production' });
+    const g = validateWebhookUrl(raw, { production: this.env.NODE_ENV !== 'test' });
     if (!g.ok) throw refused(g.reason);
     if (g.url.href.length > 500) throw refused('invalid');
     return { href: g.url.href, host: g.host };
@@ -244,6 +245,12 @@ export class WebhookService {
 
   /* ---------------------------------------------------------------- sending */
 
+  /** Runs where the scheduler is loaded (MAINTENANCE_ENABLED): the backoff is 1 and 10 minutes, so the hourly maintenance alone is too slow. */
+  @Interval('webhook-retries', 60_000)
+  async retryDue(): Promise<void> {
+    await this.processDue().catch((err: unknown) => this.logger.warn(`webhook retries failed: ${(err as Error).name}`));
+  }
+
   /** Maintenance: sends what is due (retries, deliveries a crash left behind). */
   async processDue(): Promise<number> {
     const due = await this.db.execute<{ id: string }>(sql`
@@ -259,7 +266,7 @@ export class WebhookService {
     const res = await this.db.execute(sql`
       DELETE FROM org_webhook_deliveries WHERE id IN (
         SELECT id FROM (SELECT id, row_number() OVER (PARTITION BY webhook_id ORDER BY created_at DESC, id DESC) AS rn FROM org_webhook_deliveries) t
-        WHERE rn > ${WEBHOOK_JOURNAL_KEEP})`);
+        WHERE rn > ${WEBHOOK_JOURNAL_KEEP}) AND status <> 'pending'`);
     return res.rowCount ?? 0;
   }
 
@@ -321,7 +328,7 @@ export class WebhookService {
   /** URL guard, DNS resolution checked at send time (anti-rebinding), connection to the verified address, 5 s budget. */
   private async send(d: { id: string; event: string; payload: string; webhook_id: string; url: string; secret_enc: string }): Promise<{ httpStatus: number | null; errorCode: string | null }> {
     try {
-      const g = validateWebhookUrl(d.url, { production: this.env.NODE_ENV === 'production' });
+      const g = validateWebhookUrl(d.url, { production: this.env.NODE_ENV !== 'test' });
       if (!g.ok) return { httpStatus: null, errorCode: 'blocked' };
       const addresses = await this.transport.lookup(g.host);
       if (!resolvedAddressesAllowed(addresses, g.devLoopback)) return { httpStatus: null, errorCode: 'blocked' };

@@ -93,7 +93,8 @@ export class MediaController {
   async content(@CurrentUser() user: AuthUser, @Param('id') id: string, @Res() res: Response): Promise<void> {
     const opened = await this.media.openContent(user.userId, id);
     // Content behind a bearer token: shared caches must not keep it. Assets never change once ready.
-    sendMedia(res, opened, 'private, max-age=3600', this.logger);
+    const sensitive = opened.asset.purpose === 'health_result' || opened.asset.purpose === 'kyc_document';
+    sendMedia(res, opened, sensitive ? 'private, no-store' : 'private, max-age=3600', this.logger);
   }
 
   @Delete(':id')
