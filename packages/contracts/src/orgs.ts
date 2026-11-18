@@ -102,6 +102,19 @@ export const orgWebsiteSchema = z
     }
   }, 'website must be an https:// URL');
 
+/**
+ * Mini-site content of the storefront (CDC §5): links, served areas, free sections (conditions, about...) and
+ * questions/answers written by the business. Replaced as a whole by PATCH; the caps keep a page readable.
+ */
+export const orgPageSchema = z.object({
+  links: z.array(z.object({ label: z.string().trim().min(1).max(40), url: orgWebsiteSchema })).max(8),
+  serviceAreas: z.array(z.string().trim().min(1).max(60)).max(10),
+  sections: z.array(z.object({ title: z.string().trim().min(1).max(80), body: z.string().trim().min(1).max(2000) })).max(10),
+  faq: z.array(z.object({ question: z.string().trim().min(1).max(200), answer: z.string().trim().min(1).max(1000) })).max(20),
+});
+export type OrgPage = z.infer<typeof orgPageSchema>;
+export const EMPTY_ORG_PAGE: OrgPage = { links: [], serviceAreas: [], sections: [], faq: [] };
+
 /** Fields an organisation can edit about itself. Status and verification are platform-controlled. */
 const orgEditableFields = {
   name: z.string().trim().min(1).max(120),
@@ -142,7 +155,14 @@ export type CreateOrgRequest = z.infer<typeof createOrgRequestSchema>;
 
 /** PATCH /orgs/:orgId. The slug is immutable in this lot (public URLs are shared). `null` clears a field. */
 export const updateOrgRequestSchema = z
-  .object({ ...orgEditableFields, supportUserId: supportUserIdSchema })
+  .object({
+    ...orgEditableFields,
+    supportUserId: supportUserIdSchema,
+    page: orgPageSchema,
+    /** A ready `org_logo` / `org_banner` upload of the caller; `null` removes the image. */
+    logoMediaId: z.uuid().nullable(),
+    bannerMediaId: z.uuid().nullable(),
+  })
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'at least one field is required');
 export type UpdateOrgRequest = z.infer<typeof updateOrgRequestSchema>;
@@ -163,6 +183,7 @@ export const orgSchema = z.object({
   email: z.string().nullable(),
   website: z.string().nullable(),
   openingHours: openingHoursSchema.nullable(),
+  page: orgPageSchema,
   visibility: orgVisibilitySchema,
   status: orgStatusSchema,
   verificationStatus: orgVerificationStatusSchema,
@@ -192,6 +213,7 @@ export const publicOrgSchema = orgSchema
     email: true,
     website: true,
     openingHours: true,
+    page: true,
   })
   .extend({
     verified: z.boolean(),

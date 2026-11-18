@@ -18,6 +18,7 @@ import { feesFr } from '../school/messages-fees';
 import { salesFr } from '../seller/sales-messages';
 import { loyaltyFr } from '../loyalty/messages';
 import { posFr } from '../pos/messages';
+import { vitrineFr } from '../vitrine/messages';
 import { miniappsFr } from '../miniapps/messages';
 import { callliveFr } from '../calllive/messages';
 export const fr = {
@@ -1308,6 +1309,7 @@ export const fr = {
   ...feesFr,
   ...loyaltyFr,
   ...posFr,
+  ...vitrineFr,
   ...miniappsFr,
   ...callliveFr,
   ...schoolFr,

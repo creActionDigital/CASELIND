@@ -155,6 +155,11 @@ export const organizations = pgTable('organizations', {
   website: text('website'),
   /** Shape: OpeningHours (validated by the contract before it is stored). */
   openingHours: jsonb('opening_hours').$type<Record<string, { open: string; close: string }[] | undefined>>(),
+  /** Mini-site content (0061); shape: OrgPage, validated by the contract before it is stored. */
+  page: jsonb('page')
+    .$type<{ links: { label: string; url: string }[]; serviceAreas: string[]; sections: { title: string; body: string }[]; faq: { question: string; answer: string }[] }>()
+    .notNull()
+    .default({ links: [], serviceAreas: [], sections: [], faq: [] }),
   visibility: text('visibility').$type<'public' | 'private'>().notNull().default('public'),
   status: text('status').$type<'active' | 'suspended'>().notNull().default('active'),
   verificationStatus: text('verification_status')

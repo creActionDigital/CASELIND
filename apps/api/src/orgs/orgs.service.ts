@@ -15,6 +15,7 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
 import { type OrganizationRow, organizations, orgMembers, type OrgMemberRow, users } from '../db/schema.js';
+import { contentUrlOf } from '../media/media.service.js';
 import { orgNotFound } from './org.guard.js';
 import { resolveContactUserId } from './org-contact.js';
 
@@ -65,6 +66,7 @@ export function toOrg(o: OrganizationRow, location: OrgLocationValue | null = nu
     email: o.email,
     website: o.website,
     openingHours: o.openingHours as OpeningHours | null,
+    page: o.page,
     visibility: o.visibility,
     status: o.status,
     verificationStatus: o.verificationStatus,
@@ -195,9 +197,14 @@ export class OrgsService {
         (f) => f in patch && patch[f] !== undefined && !sameValue(f, patch[f] ?? null, current[f] ?? null),
       );
       const resetVerification = changed.length > 0 && current.verificationStatus !== 'unverified';
+      const { logoMediaId, bannerMediaId, ...columns } = patch;
+      const images: { logoUrl?: string | null; bannerUrl?: string | null } = {};
+      if (logoMediaId !== undefined) images.logoUrl = await this.ownImageUrl(tx, actorUserId, logoMediaId, 'org_logo', 'logoMediaId');
+      if (bannerMediaId !== undefined) images.bannerUrl = await this.ownImageUrl(tx, actorUserId, bannerMediaId, 'org_banner', 'bannerMediaId');
+      const set = { ...columns, ...images };
       const [org] = await tx
         .update(organizations)
-        .set(resetVerification ? { ...patch, verificationStatus: 'unverified' } : patch)
+        .set(resetVerification ? { ...set, verificationStatus: 'unverified' } : set)
         .where(eq(organizations.id, orgId))
         .returning();
       if (!org) throw orgNotFound();
@@ -218,6 +225,18 @@ export class OrgsService {
       );
       return toOrg(org, await readOrgLocation(tx, orgId));
     });
+  }
+
+  /** Content URL of a ready upload of the caller with the given purpose; `null` removes the image. */
+  private async ownImageUrl(tx: Pick<Db, 'execute'>, userId: string, mediaId: string | null, purpose: 'org_logo' | 'org_banner', path: string): Promise<string | null> {
+    if (mediaId === null) return null;
+    const res = await tx.execute(
+      sql`SELECT id FROM media_assets WHERE id = ${mediaId}::uuid AND owner_user_id = ${userId}::uuid AND status = 'ready' AND purpose = ${purpose}`,
+    );
+    if (res.rows.length === 0) {
+      throw new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path, message: `must be one of your ready "${purpose}" uploads` }]);
+    }
+    return contentUrlOf(mediaId);
   }
 
   /**
@@ -247,6 +266,7 @@ export class OrgsService {
       email: o.email,
       website: o.website,
       openingHours: o.openingHours as OpeningHours | null,
+      page: o.page,
       verified: o.verificationStatus === 'verified',
       contactUserId: await resolveContactUserId(this.db, o.id, viewerId),
     };

@@ -66,6 +66,7 @@ export default function SellerDashboard() {
     { icon: 'wallet-outline', label: 'wallet.org.card', path: '/wallet', show: canViewFinance(role) },
     { icon: 'construct-outline', label: 'services.pro.orgServices', path: '/services', show: current.org.kind === 'services' && can(role, 'catalog.manage') },
     { icon: 'briefcase-outline', label: 'jobs.org.title', path: '/jobs', show: canManageJobs(role) },
+    { icon: 'storefront-outline', label: 'vitrine.title', path: '/vitrine', show: canEditProfile(role) },
     { icon: 'location-outline', label: 'seller.location', path: '/location', show: canEditProfile(role) },
     { icon: 'qr-code-outline', label: 'sellerQr.title', path: '/qr', show: canViewFinance(role) || can(role, 'orders.manage') },
   ];

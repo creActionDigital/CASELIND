@@ -47,10 +47,14 @@ interface Props {
   header?: ReactElement;
   emptyTitle: string;
   emptyBody: string;
+  /** Bloc affiché sous la grille (ex. questions fréquentes de la vitrine). */
+  footer?: ReactElement;
+  /** Sans produit : ni message ni grille (vitrine d'une organisation qui ne vend rien). */
+  hideWhenEmpty?: boolean;
 }
 
 /** Grille 2 colonnes à défilement infini, avec les 5 états (chargement, erreur, vide, rafraîchissement, page suivante). */
-export function ProductGrid({ query, header, emptyTitle, emptyBody }: Props) {
+export function ProductGrid({ query, header, emptyTitle, emptyBody, footer, hideWhenEmpty }: Props) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const [refreshing, setRefreshing] = useState(false);
@@ -59,7 +63,7 @@ export function ProductGrid({ query, header, emptyTitle, emptyBody }: Props) {
   let state: ReactElement | undefined;
   if (query.isPending) state = <ActivityIndicator style={styles.pad} color={colors.primary} accessibilityLabel={t('common.loading')} />;
   else if (query.isError && items.length === 0) state = <ErrorState error={query.error} onRetry={() => query.refetch()} />;
-  else if (items.length === 0) state = <EmptyState icon="bag-handle-outline" title={emptyTitle} body={emptyBody} />;
+  else if (items.length === 0 && !hideWhenEmpty) state = <EmptyState icon="bag-handle-outline" title={emptyTitle} body={emptyBody} />;
 
   return (
     <FlatList
@@ -81,7 +85,12 @@ export function ProductGrid({ query, header, emptyTitle, emptyBody }: Props) {
           }}
         />
       }
-      ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator style={styles.pad} color={colors.primary} accessibilityLabel={t('common.loading')} /> : undefined}
+      ListFooterComponent={
+        <>
+          {query.isFetchingNextPage ? <ActivityIndicator style={styles.pad} color={colors.primary} accessibilityLabel={t('common.loading')} /> : null}
+          {footer}
+        </>
+      }
       onEndReached={() => query.hasNextPage && !query.isFetchingNextPage && query.fetchNextPage()}
       onEndReachedThreshold={0.5}
       renderItem={({ item }) => (

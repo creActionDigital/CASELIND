@@ -538,3 +538,59 @@ describe('members list', () => {
     await ctx.http.get(`/v1/orgs/${id}/members`).query({ limit: 0 }).set(bearer(owner.token)).expect(400);
   });
 });
+
+describe('mini-site content (page, logo, banner)', () => {
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  async function uploadImage(token: string, purpose: string): Promise<string> {
+    const up = await ctx.http.post('/v1/media/uploads').set(bearer(token)).send({ purpose, mime: 'image/png', sizeBytes: PNG.length }).expect(201);
+    await ctx.http.put(up.body.uploadUrl).set(bearer(token)).set('X-Upload-Token', up.body.uploadToken).set('Content-Type', 'application/octet-stream').send(PNG).expect(200);
+    return up.body.assetId as string;
+  }
+
+  it('stores links, areas, sections and FAQ, shows them on the public page, and refuses bad content', async () => {
+    const owner = await user();
+    const org = await createOrg(owner);
+    const empty = await ctx.http.get(`/v1/public/orgs/${org.slug}`).expect(200);
+    expect(empty.body.page).toEqual({ links: [], serviceAreas: [], sections: [], faq: [] });
+
+    const page = {
+      links: [{ label: 'Facebook', url: 'https://facebook.com/boutique' }],
+      serviceAreas: ['Goma', 'Gisenyi'],
+      sections: [{ title: 'Conditions', body: 'Retours sous 7 jours.' }],
+      faq: [{ question: 'Livrez-vous ?', answer: 'Oui, dans Goma.' }],
+    };
+    await ctx.http.patch(`/v1/orgs/${org.id}`).set(bearer(owner.token)).send({ page }).expect(200);
+    expect((await ctx.http.get(`/v1/public/orgs/${org.slug}`).expect(200)).body.page).toEqual(page);
+
+    const bad = (p: unknown) => ctx.http.patch(`/v1/orgs/${org.id}`).set(bearer(owner.token)).send({ page: p }).expect(400);
+    await bad({ ...page, links: [{ label: 'X', url: 'http://insecure.example.com' }] });
+    await bad({ ...page, sections: Array.from({ length: 11 }, () => ({ title: 't', body: 'b' })) });
+    await bad({ ...page, faq: [{ question: '', answer: 'a' }] });
+    await bad({ links: [] });
+    // Only members with org.profile.edit may change it.
+    const stranger = await user();
+    await ctx.http.patch(`/v1/orgs/${org.id}`).set(bearer(stranger.token)).send({ page }).expect(404);
+  });
+
+  it('sets and removes the logo and banner from own ready uploads only', async () => {
+    const owner = await user();
+    const other = await user();
+    const org = await createOrg(owner);
+    const logo = await uploadImage(owner.token, 'org_logo');
+    const banner = await uploadImage(owner.token, 'org_banner');
+    const res = await ctx.http.patch(`/v1/orgs/${org.id}`).set(bearer(owner.token)).send({ logoMediaId: logo, bannerMediaId: banner }).expect(200);
+    expect(res.body.logoUrl).toContain(logo);
+    expect(res.body.bannerUrl).toContain(banner);
+    expect((await ctx.http.get(`/v1/public/orgs/${org.slug}`).expect(200)).body.logoUrl).toContain(logo);
+
+    // Wrong purpose, someone else's upload, unknown id: 400.
+    await ctx.http.patch(`/v1/orgs/${org.id}`).set(bearer(owner.token)).send({ logoMediaId: banner }).expect(400);
+    const foreign = await uploadImage(other.token, 'org_logo');
+    await ctx.http.patch(`/v1/orgs/${org.id}`).set(bearer(owner.token)).send({ logoMediaId: foreign }).expect(400);
+    await ctx.http.patch(`/v1/orgs/${org.id}`).set(bearer(owner.token)).send({ logoMediaId: randomUUID() }).expect(400);
+
+    const gone = await ctx.http.patch(`/v1/orgs/${org.id}`).set(bearer(owner.token)).send({ logoMediaId: null }).expect(200);
+    expect(gone.body.logoUrl).toBeNull();
+    expect(gone.body.bannerUrl).toContain(banner);
+  });
+});
