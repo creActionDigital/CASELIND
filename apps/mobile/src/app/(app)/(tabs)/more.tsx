@@ -15,7 +15,6 @@ type Icon = ComponentProps<typeof Ionicons>['name'];
 // Familles de modules du cahier des charges. `flag` : module réglementé, visible seulement si
 // GET /v1/config/flags l'autorise pour l'utilisateur.
 const MODULES: { key: MessageKey; icon: Icon; flag?: string }[] = [
-  { key: 'more.finance', icon: 'wallet-outline' },
   { key: 'more.travel', icon: 'airplane-outline' },
   { key: 'more.public', icon: 'business-outline' },
 ];
@@ -201,6 +200,17 @@ export default function More() {
             <Ionicons name="apps-outline" size={26} color={colors.primary} />
             <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
               {t('miniapps.title')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('more.finance')}
+            onPress={() => router.push('/wallet/finance')}
+            style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="wallet-outline" size={26} color={colors.primary} />
+            <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+              {t('more.finance')}
             </Text>
           </Pressable>
           {MODULES.filter((m) => !m.flag || flags.data.flags[m.flag] === true).map((m) => (

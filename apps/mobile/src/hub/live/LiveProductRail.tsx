@@ -24,7 +24,7 @@ export function LiveProductRail({ products, onPress }: { products: LiveProduct[]
             <Ionicons name="shirt-outline" size={32} color="rgba(0,0,0,0.45)" style={styles.icon} />
             {p.hot ? <Ionicons name="flame" size={20} color="#FF7A00" style={styles.hot} accessibilityLabel={t('live.hot')} /> : null}
             <View style={styles.price}>
-              <Text variant="caption" color={onMedia}>
+              <Text variant="caption" color={onMedia} numberOfLines={1} adjustsFontSizeToFit>
                 {price}
               </Text>
             </View>
@@ -36,7 +36,7 @@ export function LiveProductRail({ products, onPress }: { products: LiveProduct[]
 }
 
 const styles = StyleSheet.create({
-  rail: { width: 76, flexGrow: 0, maxHeight: 340 },
+  rail: { width: 76, flexGrow: 0, flexShrink: 0, maxHeight: 340 },
   content: { gap: 8, paddingBottom: 4 },
   tile: { width: 76, height: 76, borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: glass.border },
   icon: { position: 'absolute', top: 12, alignSelf: 'center' },

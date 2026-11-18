@@ -62,7 +62,7 @@ export default function LiveRoom() {
             <Text variant="caption" muted>{t('lives.peak', { n: live.data.peakViewers })}</Text>
             {isHost && open ? <Text variant="small" style={{ fontWeight: '600' }}>{t('lives.host')}</Text> : null}
             {!open ? <Text>{t('lives.ended')}</Text> : null}
-            <Text variant="caption" muted>{t('lives.mediaNote')}</Text>
+            {open ? <Text variant="caption" muted>{t('lives.mediaNote')}</Text> : null}
           </Card>
           {open ? (
             <>

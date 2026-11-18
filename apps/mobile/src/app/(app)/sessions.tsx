@@ -34,7 +34,7 @@ export default function Sessions() {
       ) : (
         <View style={{ gap: spacing.md }}>
           {query.data.items.map((s) => {
-            const name = s.deviceName ?? t('sessions.unknownDevice');
+            const name = s.deviceName ?? (s.platform && s.platform !== 'other' ? `CASELIND (${s.platform})` : t('sessions.unknownDevice'));
             return (
               <View key={s.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={{ flex: 1, gap: 2 }}>

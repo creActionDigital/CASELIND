@@ -75,6 +75,6 @@ const styles = StyleSheet.create({
   banner: { marginHorizontal: 12, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#FACC15', alignItems: 'center' },
   bannerText: { fontWeight: '700' },
   mid: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, paddingHorizontal: 12 },
-  chat: { flex: 1, paddingRight: 4 },
+  chat: { flex: 1, minWidth: 0, paddingRight: 4 },
   composer: { paddingHorizontal: 12, paddingTop: 12, backgroundColor: 'rgba(0,0,0,0.4)' },
 });

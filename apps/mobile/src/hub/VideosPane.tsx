@@ -11,7 +11,7 @@ import { api } from '../auth/auth-context';
 import { useReact } from '../social/hooks';
 import { nextReaction, totalReactions, type CachedPost } from '../social/logic';
 import { glass, onMedia, TAB_BAR_SPACE, TOUCH } from '../theme/tokens';
-import { Avatar, EmptyState, ErrorState, Text } from '../ui';
+import { Avatar, ErrorState, Text } from '../ui';
 import { postListSchema } from '@caselind/contracts';
 import { formatCount } from './logic';
 
@@ -136,7 +136,11 @@ export function VideosPane({ active, height }: { active: boolean; height: number
   if (items.length === 0) {
     return (
       <View style={styles.state}>
-        <EmptyState icon="videocam-outline" title={t('hub.videos.empty')} body={t('hub.videos.emptyBody')} />
+        <View style={{ alignItems: 'center', gap: 8, padding: 32 }}>
+          <Ionicons name="videocam-outline" size={40} color={onMedia} />
+          <Text variant="heading" style={{ color: onMedia, textAlign: 'center' }}>{t('hub.videos.empty')}</Text>
+          <Text style={{ color: onMedia, opacity: 0.7, textAlign: 'center' }}>{t('hub.videos.emptyBody')}</Text>
+        </View>
       </View>
     );
   }
