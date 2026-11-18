@@ -1,24 +1,14 @@
-# Lance une NOUVELLE conversation Claude Code sur les modèles gratuits d'OmniRoute, après avoir vérifié que tout est prêt.
+# Lance une NOUVELLE conversation Claude Code sur les modèles gratuits de FreeLLMAPI (installé dans C:\Users\HP\tools\freellmapi).
+# Prérequis : le serveur tourne (dans un autre terminal : cd C:\Users\HP\tools\freellmapi ; $env:HOST='127.0.0.1' ; node server\dist\index.js)
+#             et la clé unifiée « freellmapi-... » (page Keys du tableau de bord http://localhost:3001) est dans $env:FREELLMAPI_KEY.
 # Usage (PowerShell, depuis E:\CASELIND) :  .\scripts\claude-free.ps1
-# Si OmniRoute n'est pas lancé, ouvrir un autre terminal et y taper : omniroute   (attendre ~30 s, laisser ouvert)
-param([string]$Model = $(if ($env:OMNIROUTE_MODEL) { $env:OMNIROUTE_MODEL } else { 'auto/coding:free' }))
-
-if (-not $env:OMNIROUTE_KEY) { throw 'OMNIROUTE_KEY est vide dans ce terminal : fermer et rouvrir le terminal, ou la définir.' }
-
-$base = 'http://localhost:20128'
+# `launch` n'écrit rien dans ~/.claude : les identifiants ne vivent que dans le processus Claude Code lancé.
+$base = 'http://localhost:3001'
+if (-not $env:FREELLMAPI_KEY) { throw 'FREELLMAPI_KEY est vide : copier la clé unifiée (page Keys du tableau de bord) puis : $env:FREELLMAPI_KEY = "freellmapi-..."' }
 try {
-  $r = Invoke-WebRequest -Uri "$base/v1/models" -Headers @{ Authorization = "Bearer $($env:OMNIROUTE_KEY)" } -TimeoutSec 20 -UseBasicParsing
-  Write-Host "OmniRoute répond (HTTP $($r.StatusCode))."
+  $null = Invoke-WebRequest -Uri "$base/" -TimeoutSec 15 -UseBasicParsing
 } catch {
-  throw "OmniRoute ne répond pas sur $base. Dans un autre terminal, lancer : omniroute  (attendre environ 30 s), puis relancer ce script."
+  throw "FreeLLMAPI ne répond pas sur $base. Le démarrer dans un autre terminal : cd C:\Users\HP\tools\freellmapi ; `$env:HOST='127.0.0.1' ; node server\dist\index.js"
 }
-
-$env:ANTHROPIC_BASE_URL = $base
-$env:ANTHROPIC_AUTH_TOKEN = $env:OMNIROUTE_KEY
-$env:ANTHROPIC_MODEL = $Model
-$env:ANTHROPIC_SMALL_FAST_MODEL = $Model
-# Les modèles gratuits ont une fenêtre bien plus petite que celle supposée par Claude Code.
-$env:CLAUDE_CODE_MAX_CONTEXT_TOKENS = '100000'
-
-Write-Host "Modèle : $Model via $base. L'en-tête de Claude Code doit afficher ce modèle, PAS « Sonnet 5.5 · Claude Pro »."
-claude
+Write-Host "FreeLLMAPI répond. L'en-tête de Claude Code ne doit PAS afficher « Claude Pro »."
+node C:\Users\HP\tools\freellmapi\cli\dist\index.js launch --url $base --api-key $env:FREELLMAPI_KEY

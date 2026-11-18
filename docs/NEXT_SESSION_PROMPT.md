@@ -40,16 +40,13 @@ Tu reprends le projet CASELIND dans `E:\CASELIND` (Windows, Git Bash et PowerShe
 - Q2 comptes Brevo (e-mail) et Meta WhatsApp pour les codes (`docs/OTP_SETUP.md`) ; Q5 compte marchand FlexPay (Mobile Money, débloque séquestre freelance et paiements réels) ; Q8 `npx expo login` ; clé Google AI Studio (Gemini) ; Q6 hébergement, nom de domaine, WebRTC/TURN (débloque appels, entretiens et téléconsultation vidéo).
 - Mineurs et consentement parental (lot 17b) ; numéros d'urgence officiels (lot 19) ; durée de conservation des données de santé par pays ; règles CSL Coins.
 
-## Lancer Claude Code avec les modèles gratuits d'OmniRoute (PowerShell, depuis `E:\CASELIND`)
-Prérequis : OmniRoute en marche (port 20128) et la clé dans `$env:OMNIROUTE_KEY`.
-```powershell
-$env:ANTHROPIC_BASE_URL = "http://localhost:20128"
-$env:ANTHROPIC_AUTH_TOKEN = $env:OMNIROUTE_KEY
-$env:ANTHROPIC_MODEL = "auto/coding:free"
-$env:ANTHROPIC_SMALL_FAST_MODEL = "auto/coding:free"
-claude
-```
-(`scripts/claude-omniroute.ps1` fait pareil mais ajoute `--continue`, qui reprend la **dernière** conversation : pour une nouvelle conversation, utiliser les lignes ci-dessus.) Les modèles gratuits sont moins fiables : relire chaque diff, lancer **tous** les tests avant chaque commit, ne jamais déclarer « fait » sans résultat observé.
+## Lancer Claude Code avec les modèles gratuits (FreeLLMAPI, remplace OmniRoute désinstallé le 2026-11-18)
+FreeLLMAPI (MIT, projet « usage personnel ») est installé **hors du dépôt**, dans `C:UsersHP	oolsreellmapi` (dépôt tashfeenahmed/freellmapi). Il ne fournit AUCUN modèle sans clés : il faut ajouter dans son tableau de bord des clés gratuites que le propriétaire crée lui-même chez les fournisseurs (Google AI Studio, Groq, Cerebras, Mistral, OpenRouter, NVIDIA…).
+1. Terminal A (laisser ouvert) : `cd C:UsersHP	oolsreellmapi ; $env:HOST='127.0.0.1' ; node serverdistindex.js` → http://localhost:3001 (compte créé au premier lancement dans le navigateur de la machine).
+2. Page **Keys** du tableau de bord : ajouter les clés fournisseurs, copier la **clé unifiée** `freellmapi-...`.
+3. Terminal B : `cd E:CASELIND ; $env:FREELLMAPI_KEY = "freellmapi-..." ; .scriptsclaude-free.ps1` (vérifie le serveur puis lance `freellmapi launch`, qui injecte les identifiants dans le seul processus Claude Code, sans écrire dans ~/.claude). **Ne pas utiliser `setup-claude`** : il modifie la configuration globale.
+4. Vérifier l'en-tête de Claude Code : il ne doit PAS afficher « Claude Pro ». Les modèles gratuits sont moins fiables : relire chaque diff, lancer **tous** les tests avant chaque commit, ne jamais déclarer « fait » sans résultat observé.
+Limites : quotas gratuits sans garantie, qualité variable en fin de journée, Node 26 non officiellement pris en charge par le projet (Node 20 à 24 annoncé ; l'installation et la compilation ont pourtant réussi). Ne pas exposer le serveur au réseau.
 
 ## Skills à utiliser (appel par `/nom`, ou par l'outil Skill)
 - `/graphify` : au début de la session, pour interroger l'architecture du dépôt (règle globale de l'utilisateur).
@@ -58,8 +55,8 @@ claude
 - Fin de lot : `/code-review` ; pour tout module santé, argent ou authentification : `/security-review`.
 - `/reverse-engineer-anything` : seulement pour cartographier une fonction WeChat à cloner, jamais pour décompiler une application tierce (ADR-009) ; aucun serveur REA n'est connecté.
 
-## Retour d'expérience OmniRoute (modèles gratuits)
-Un essai du lot 20a avec `auto/coding:free` (`gpt-oss-120b`) a échoué : modèle de données inventé, code qui ne compile pas, compte rendu qui décrit des tables inexistantes. Avec ces modèles : tâches **courtes et fermées**, une à la fois ; vérifier soi-même `npx tsc --noEmit -p .` et les tests ; ne jamais croire un compte rendu sans lire le diff. OmniRoute met ~30 s à démarrer et manque de mémoire si le navigateur et les serveurs tournent.
+## Retour d'expérience (modèles gratuits)
+Un essai du lot 20a avec un modèle gratuit (`gpt-oss-120b`, via OmniRoute, désormais supprimé) a échoué : modèle de données inventé, code qui ne compile pas, compte rendu qui décrit des tables inexistantes. Avec ces modèles : tâches **courtes et fermées**, une à la fois ; vérifier soi-même `npx tsc --noEmit -p .` et les tests ; ne jamais croire un compte rendu sans lire le diff. La machine manque de mémoire si le navigateur, les serveurs et la passerelle tournent ensemble.
 
 ## Questions
 Les 14 questions de départ ont reçu une réponse le 2026-11-16 (voir `docs/BACKLOG.md`, « Réponses du 2026-11-16 »). Ne les reposer pas. Restent ouvertes : règles CSL Coins, compte FlexPay, Brevo/WhatsApp, hébergement et domaine, création du dépôt GitHub.
