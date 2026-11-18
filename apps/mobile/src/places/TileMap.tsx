@@ -52,6 +52,7 @@ export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, style 
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 4,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           start.current = viewRef.current.center;
         },

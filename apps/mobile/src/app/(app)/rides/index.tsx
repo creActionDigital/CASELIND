@@ -5,7 +5,8 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../i18n';
-import { formatDistance } from '../../../places/geo';
+import { formatDistance, GOMA_CENTER } from '../../../places/geo';
+import { TileMap } from '../../../places/TileMap';
 import { checkRideSchedule, formatFareRange, isLiveRide } from '../../../mobility/logic';
 import { createRide, estimateRide, fetchMyRides, rideKeys } from '../../../mobility/api';
 import { mobilityErrorMessage } from '../../../mobility/errors';
@@ -43,6 +44,9 @@ export default function RidesHome() {
 
   const active = useQuery({ queryKey: rideKeys.mine('active'), queryFn: () => fetchMyRides('active'), retry: false });
   const liveRide = active.data?.items.find((r) => isLiveRide(r.status));
+
+  const mapMarkers = (['pickup', 'stop', 'dropoff'] as const).flatMap((slot) => (points[slot] ? [{ id: slot, lat: points[slot]!.lat, lng: points[slot]!.lng, label: points[slot]!.label, selected: slot === 'dropoff' }] : []));
+  const mapPoints = mapMarkers.map((m) => ({ lat: m.lat, lng: m.lng }));
 
   const ready = !!points.pickup && !!points.dropoff;
   const route = ready ? { pickup: points.pickup!, dropoff: points.dropoff!, ...(showStop && points.stop ? { stop: points.stop } : {}) } : null;
@@ -104,6 +108,13 @@ export default function RidesHome() {
           </Text>
         </Card>
       ) : null}
+
+      <TileMap
+        style={styles.map}
+        fit={mapPoints.length > 0 ? mapPoints : [GOMA_CENTER]}
+        fitKey={mapPoints.map((p) => `${p.lat},${p.lng}`).join('|') || 'goma'}
+        markers={mapMarkers}
+      />
 
       <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
         {slots.map(({ slot, label, icon }) => {
@@ -251,6 +262,7 @@ export default function RidesHome() {
 }
 
 const styles = StyleSheet.create({
+  map: { height: 220, borderRadius: radius.lg, marginTop: spacing.md },
   line: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   place: { minHeight: TOUCH + 12, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.md, padding: spacing.md },
   option: { minHeight: TOUCH + 16, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.md, borderWidth: 1.5, padding: spacing.md },
