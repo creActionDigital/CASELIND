@@ -89,6 +89,7 @@ export default function Health() {
               </View>
             ))}
             <Button variant="secondary" label={t('health.record')} onPress={() => router.push('/health/record')} />
+            <Button variant="secondary" label={t('health.results')} onPress={() => router.push('/health/results')} />
             <Button variant="secondary" label={t('health.reminders')} onPress={() => router.push('/health/reminders')} />
             <Button variant="secondary" label={t('health.directory')} onPress={() => router.push('/health/professionals')} />
             <Button variant="secondary" label={t('health.appointments')} onPress={() => router.push('/health/appointments')} />

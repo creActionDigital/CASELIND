@@ -8,7 +8,7 @@ import { jobsEn } from '../jobs/messages';
 import { freelanceEn } from '../freelance/messages';
 import { educationEn } from '../education/messages';
 import { healthEn } from '../health/messages';
-import { healthProEn } from '../health/messages-pro';
+import { healthProEn } from '../health/messages-pro'; import { healthResultsEn } from '../health/results-messages';
 import { gamesEn } from '../games/messages';
 import { docsEn } from '../seller/documents-messages';
 import { schoolEn } from '../school/messages';
@@ -21,6 +21,7 @@ import { loyaltyEn } from '../loyalty/messages';
 import { posEn } from '../pos/messages';
 import { vitrineEn } from '../vitrine/messages';
 import { updatesEn } from '../vitrine/updates-messages';
+import { webhooksEn } from '../webhooks/messages';
 import { socialEn } from '../messaging/social-messages';
 import { reviewsEn } from '../vitrine/reviews-messages';
 import { miniappsEn } from '../miniapps/messages';
@@ -1310,7 +1311,7 @@ export const en: Record<MessageKey, string> = {
   ...freelanceEn,
   ...educationEn,
   ...healthEn,
-  ...healthProEn,
+  ...healthProEn, ...healthResultsEn,
   ...gamesEn,
   ...salesEn,
   ...feesEn,
@@ -1319,6 +1320,7 @@ export const en: Record<MessageKey, string> = {
   ...posEn,
   ...vitrineEn,
   ...updatesEn,
+  ...webhooksEn,
   ...socialEn,
   ...reviewsEn,
   ...miniappsEn,

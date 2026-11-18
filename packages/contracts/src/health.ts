@@ -100,5 +100,7 @@ export const exportedHealthSchema = z.object({
   availability: z.object({ slotMinutes: z.number().int(), utcOffsetMinutes: z.number().int(), windows: z.array(z.object({ day: z.number().int(), start: z.string(), end: z.string() })) }).nullable(),
   appointments: z.array(z.object({ startsAt: z.string(), mode: z.string(), status: z.string(), professional: z.string(), reason: z.string() })),
   prescriptions: z.array(z.object({ code: z.string(), validUntil: z.string(), items: z.array(z.object({ name: z.string(), dose: z.string(), instructions: z.string() })) })),
+  /** Lot 18d: exam results (decrypted; the report file itself is not inlined). */
+  results: z.array(z.object({ kind: z.enum(['blood', 'urine', 'imaging', 'other']), resultDate: z.string(), title: z.string(), summary: z.string(), provider: z.string().nullable(), hasFile: z.boolean() })),
 });
 export type ExportedHealth = z.infer<typeof exportedHealthSchema>;

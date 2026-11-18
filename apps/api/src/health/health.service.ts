@@ -24,6 +24,7 @@ import { DB, type Db } from '../db/db.module.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { HealthCrypto } from './health-crypto.js';
 import { HealthProService } from './health-pro.service.js';
+import { HealthResultsService } from './health-results.service.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REMINDER_INTERVAL_MS = 60_000;
@@ -66,6 +67,7 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly pro: HealthProService,
+    private readonly results: HealthResultsService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -113,15 +115,18 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
     return this.consent(userId);
   }
 
-  /** Right to erasure: every entry, reminder and dose, and the consent. */
+  /** Right to erasure: every entry, reminder, dose and exam result (report files included), and the consent. */
   async erase(userId: string, meta: RequestMeta): Promise<void> {
-    await this.db.transaction(async (tx) => {
+    const keys = await this.db.transaction(async (tx) => {
       await tx.execute(sql`DELETE FROM health_entries WHERE user_id = ${userId}::uuid`);
       await tx.execute(sql`DELETE FROM health_reminders WHERE user_id = ${userId}::uuid`);
       await this.pro.eraseFor(tx, userId);
+      const stored = await this.results.eraseFor(tx, userId);
       await tx.execute(sql`DELETE FROM health_consents WHERE user_id = ${userId}::uuid`);
       await this.audit.record({ action: 'health.erased', actorUserId: userId, meta, metadata: {} }, tx);
+      return stored;
     });
+    await this.results.deleteStored(keys);
   }
 
   private async requireConsent(userId: string): Promise<void> {
@@ -311,6 +316,7 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
     return {
       consent,
       ...(await this.pro.exportFor(userId)),
+      results: await this.results.exportFor(userId),
       entries: entries.rows.map((r) => {
         const p = this.crypto.open<EntryPayload>(userId, r.payload);
         return { kind: r.kind, recordedOn: day(r.recorded_on), title: p.title, details: p.details, severity: p.severity };

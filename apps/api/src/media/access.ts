@@ -38,6 +38,8 @@ export function canRead(viewerId: string, asset: Readable): boolean {
     case 'lesson':
     // Lot 8: the courier (owner) here; the buyer and the seller's order viewers in canReadAsync.
     case 'delivery_proof':
+    // Lot 18d: the patient (owner) here; a professional with an active share covering results in canReadAsync.
+    case 'health_result':
       return false;
   }
 }
@@ -86,6 +88,16 @@ export async function canReadAsync(
       LEFT JOIN org_members om ON om.org_id = d.org_id AND om.user_id = ${viewerId}::uuid AND om.status = 'active'
       WHERE p.media_id = ${asset.id}::uuid`);
     return res.rows.some((r) => r.buyer_id === viewerId || (r.role !== null && roleHasPermission(r.role as OrgRole, 'orders.view')));
+  }
+  // Exam result report: owned by the patient; an approved professional with an active, unexpired share covering `results`
+  // while the patient still consents. Only a file attached to a result counts.
+  if (asset.purpose === 'health_result') {
+    const res = await db.execute(sql`
+      SELECT 1 FROM health_results r JOIN health_shares s ON s.patient_id = r.user_id AND s.professional_id = ${viewerId}::uuid
+      JOIN health_professionals p ON p.user_id = s.professional_id AND p.status = 'approved'
+      JOIN health_consents c ON c.user_id = r.user_id
+      WHERE r.media_id = ${asset.id}::uuid AND s.revoked_at IS NULL AND s.expires_at > now() AND 'results' = ANY(s.kinds) LIMIT 1`);
+    return res.rows.length > 0;
   }
   // Lesson files: the author of the course and its enrolled learners.
   if (asset.purpose === 'lesson') {

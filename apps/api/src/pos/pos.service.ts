@@ -18,6 +18,7 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { CatalogPort } from '../commerce/catalog.port.js';
 import { DB, type Db } from '../db/db.module.js';
+import { WebhookService } from '../webhooks/webhooks.service.js';
 
 /** `lines` also carries `variantId` (internal: needed to give the stock back on void); the API never shows it. */
 type StoredLine = PosSale['lines'][number] & { variantId?: string };
@@ -62,10 +63,12 @@ export class PosService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly catalog: CatalogPort,
+    private readonly webhooks: WebhookService,
   ) {}
 
   async create(orgId: string, cashierId: string, req: CreatePosSaleRequest, meta: RequestMeta): Promise<PosSale> {
-    return this.db.transaction(async (tx) => {
+    let fresh: PosSale | null = null;
+    const sale = await this.db.transaction(async (tx) => {
       // Serialises retries of the same sale: the second waits, then finds the first and returns it.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`${orgId}:${req.clientId}`}, 0))`);
       const hash = requestHash(req);
@@ -89,14 +92,19 @@ export class PosService {
         VALUES (${orgId}::uuid, ${req.clientId}::uuid, ${cashierId}::uuid, ${currency}, ${total}, ${req.paymentMethod}, ${JSON.stringify(lines)}::jsonb, ${hash}, ${open.rows[0]?.id ?? null}::uuid)
         RETURNING ${COLS}`);
       await this.audit.record({ action: 'commerce.pos_sale', actorUserId: cashierId, meta, metadata: { orgId, saleId: ins.rows[0]!.id, totalMinor: total, currency, paymentMethod: req.paymentMethod } }, tx);
-      return toSale(ins.rows[0]!);
+      fresh = toSale(ins.rows[0]!);
+      return fresh;
     });
+    // After the commit, and only for a new sale (a retry returns the first one). Amounts and ids only: no cashier, no item titles.
+    if (fresh) this.webhooks.emit(orgId, 'pos.sale_created', { saleId: sale.id, totalMinor: sale.totalMinor, currency: sale.currency, paymentMethod: sale.paymentMethod, lineCount: sale.lines.length });
+    return sale;
   }
 
   /** Gives the stock back and marks the sale voided; a second call returns the sale unchanged. */
   async voidSale(orgId: string, id: string, actorId: string, reason: string | undefined, meta: RequestMeta): Promise<PosSale> {
     if (!UUID_RE.test(id)) throw notFound('Sale');
-    return this.db.transaction(async (tx) => {
+    let voided = false;
+    const sale = await this.db.transaction(async (tx) => {
       const found = await tx.execute<Row>(sql`SELECT ${COLS} FROM pos_sales WHERE id = ${id}::uuid AND org_id = ${orgId}::uuid FOR UPDATE`);
       const row = found.rows[0];
       if (!row) throw notFound('Sale');
@@ -108,8 +116,11 @@ export class PosService {
         UPDATE pos_sales SET voided_at = now(), voided_by = ${actorId}::uuid, void_reason = ${reason?.length ? reason : null}
         WHERE id = ${id}::uuid RETURNING ${COLS}`);
       await this.audit.record({ action: 'commerce.pos_void', actorUserId: actorId, meta, metadata: { orgId, saleId: id, totalMinor: Number(row.total_minor), currency: row.currency.trim() } }, tx);
+      voided = true;
       return toSale(upd.rows[0]!);
     });
+    if (voided) this.webhooks.emit(orgId, 'pos.sale_voided', { saleId: sale.id, totalMinor: sale.totalMinor, currency: sale.currency });
+    return sale;
   }
 
   async ticket(orgId: string, id: string): Promise<PosTicket> {

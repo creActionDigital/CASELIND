@@ -7,6 +7,7 @@ import { ApiRequestError } from '../../../../lib/api';
 import { useI18n, type MessageKey } from '../../../../i18n';
 import { fetchOrders, fetchProducts, sk, useMyOrgs } from '../../../../seller/api';
 import { can, canEditProfile, canReadCatalog, canViewReviews } from '../../../../seller/permissions';
+import { canManageWebhooks } from '../../../../webhooks/logic';
 import { Card, Chips, Loading, SectionTitle } from '../../../../seller/ui';
 import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
@@ -70,6 +71,7 @@ export default function SellerDashboard() {
     { icon: 'newspaper-outline', label: 'vitrine.updates.title', path: '/updates', show: canEditProfile(role) },
     { icon: 'help-circle-outline', label: 'vitrine.questions.seller.title', path: '/questions', show: canEditProfile(role) },
     { icon: 'location-outline', label: 'seller.location', path: '/location', show: canEditProfile(role) },
+    { icon: 'git-network-outline', label: 'webhooks.title', path: '/webhooks', show: canManageWebhooks(role) },
     { icon: 'qr-code-outline', label: 'sellerQr.title', path: '/qr', show: canViewFinance(role) || can(role, 'orders.manage') },
   ];
 

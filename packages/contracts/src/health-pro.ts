@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { healthEntryKindSchema } from './health.js';
+import { healthShareKindSchema } from './health-results.js';
 import { pageQuerySchema } from './pagination.js';
 
 /**
@@ -105,7 +106,7 @@ export type AppointmentList = z.infer<typeof appointmentListSchema>;
 
 export const createShareRequestSchema = z.object({
   professionalId: z.uuid(),
-  kinds: z.array(healthEntryKindSchema).min(1).max(7).transform((k) => [...new Set(k)]),
+  kinds: z.array(healthShareKindSchema).min(1).max(8).transform((k) => [...new Set(k)]),
   /** 1 to 30 days; default 7. */
   days: z.number().int().min(1).max(30).default(7),
 });
@@ -113,7 +114,7 @@ export type CreateShareRequest = z.infer<typeof createShareRequestSchema>;
 export const shareSchema = z.object({
   id: z.uuid(),
   professional: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }),
-  kinds: z.array(healthEntryKindSchema),
+  kinds: z.array(healthShareKindSchema),
   expiresAt: z.string(),
   revokedAt: z.string().nullable(),
   active: z.boolean(),
@@ -136,7 +137,7 @@ export const sharedRecordSchema = z.object({
 export type SharedRecord = z.infer<typeof sharedRecordSchema>;
 /** The patients who currently share something with the caller. */
 export const sharedPatientsSchema = z.object({
-  items: z.array(z.object({ shareId: z.uuid(), patient: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }), kinds: z.array(healthEntryKindSchema), expiresAt: z.string() })),
+  items: z.array(z.object({ shareId: z.uuid(), patient: z.object({ id: z.uuid(), displayName: z.string(), handle: z.string() }), kinds: z.array(healthShareKindSchema), expiresAt: z.string() })),
 });
 export type SharedPatients = z.infer<typeof sharedPatientsSchema>;
 

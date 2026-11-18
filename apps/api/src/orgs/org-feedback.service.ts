@@ -21,6 +21,7 @@ import { DB, type Db } from '../db/db.module.js';
 import { ModerationRegistry } from '../moderation/moderation-registry.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { decodeCursor, encodeCursor, UUID_RE } from '../orders/orders.shared.js';
+import { WebhookService } from '../webhooks/webhooks.service.js';
 import { orgNotFound } from './org.guard.js';
 
 const PUBLIC_ORG: SQL = sql`o.visibility = 'public' AND o.status = 'active'`;
@@ -74,6 +75,7 @@ export class OrgFeedbackService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly moderation: ModerationRegistry,
     private readonly notifications: NotificationsService,
+    private readonly webhooks: WebhookService,
   ) {}
 
   onModuleInit(): void {
@@ -237,6 +239,8 @@ export class OrgFeedbackService implements OnModuleInit {
       await this.audit.record({ action: 'org.question_asked', actorUserId: userId, meta, metadata: { orgId: org.id, questionId: r.rows[0]!.id } }, tx);
       return r.rows[0]!.id;
     });
+    // Webhook: the question id only (never the text nor the asker).
+    this.webhooks.emit(org.id, 'org.question_asked', { questionId: id });
     const staff = await this.db.execute<{ user_id: string }>(sql`SELECT user_id FROM org_members WHERE org_id = ${org.id}::uuid AND status = 'active' AND role IN ('owner', 'admin') AND user_id <> ${userId}::uuid`);
     for (const s of staff.rows) {
       await this.notifications.notify({ userId: s.user_id, category: 'commerce', title: 'Nouvelle question', body: 'Un visiteur a posé une question sur votre vitrine.', data: { orgId: org.id, questionId: id } });

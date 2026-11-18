@@ -43,6 +43,12 @@ export type AuditAction =
   | 'org.created'
   | 'org.updated'
   | 'org.gallery_set'
+  /** Webhooks sortants : id, evenements et hote seulement, jamais l'URL complete ni le secret. */
+  | 'org.webhook_created'
+  | 'org.webhook_updated'
+  | 'org.webhook_deleted'
+  | 'org.webhook_secret_rotated'
+  | 'org.webhook_disabled'
   | 'org.update_created'
   | 'org.update_changed'
   | 'org.update_deleted'
@@ -153,6 +159,11 @@ export type AuditAction =
   | 'health.availability_updated'
   | 'health.record_read'
   | 'health.prescription_issued'
+  /** Exam results (lot 18d): ids and kind only. */
+  | 'health.result_created'
+  | 'health.result_updated'
+  | 'health.result_deleted'
+  | 'health.results_read'
   /** Games (lot 20a): session id and score only, never an answer. */
   | 'games.session_started'
   | 'games.session_finished'

@@ -51,6 +51,8 @@ import { HealthCrypto } from './health/health-crypto.js';
 import { HealthService } from './health/health.service.js';
 import { AdminHealthController, HealthProController } from './health/health-pro.controller.js';
 import { HealthProService } from './health/health-pro.service.js';
+import { HealthResultsController } from './health/health-results.controller.js';
+import { HealthResultsService } from './health/health-results.service.js';
 import { AdminGamesController, AdminTournamentsController, GamesController } from './games/games.controller.js';
 import { GamesService } from './games/games.service.js';
 import { MySchoolController, OrgSchoolController } from './school/school.controller.js';
@@ -182,6 +184,8 @@ import { MyOrgsController, OrgsController, PublicOrgsController } from './orgs/o
 import { OrgsService } from './orgs/orgs.service.js';
 import { OrgUpdatesController, PublicOrgUpdatesController } from './orgs/org-updates.controller.js';
 import { OrgUpdatesService } from './orgs/org-updates.service.js';
+import { WebhooksController } from './webhooks/webhooks.controller.js';
+import { WebhookService } from './webhooks/webhooks.service.js';
 import { MyOrgFeedbackController, OrgFeedbackController, PublicOrgFeedbackController } from './orgs/org-feedback.controller.js';
 import { OrgFeedbackService } from './orgs/org-feedback.service.js';
 import { PrivacyController } from './privacy/privacy.controller.js';
@@ -361,6 +365,7 @@ export class AppModule {
         EducationController,
         PublicCertificatesController,
         PersonalHealthController,
+        HealthResultsController,
         HealthProController,
         AdminHealthController,
         GamesController,
@@ -388,6 +393,7 @@ export class AppModule {
         PublicOrgsController,
         OrgUpdatesController,
         PublicOrgUpdatesController,
+        WebhooksController,
         OrgFeedbackController,
         MyOrgFeedbackController,
         PublicOrgFeedbackController,
@@ -477,6 +483,7 @@ export class AppModule {
         AccountService,
         OrgsService,
         OrgUpdatesService,
+        WebhookService,
         OrgFeedbackService,
         OrgMembersService,
         // Route-level guard attached by @OrgPermission (runs after the global guards below).
@@ -575,6 +582,7 @@ export class AppModule {
         EducationService,
         HealthCrypto,
         HealthProService,
+        HealthResultsService,
         HealthService,
         GamesService,
         SchoolService,

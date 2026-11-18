@@ -9,7 +9,7 @@ import { jobsFr } from '../jobs/messages';
 import { freelanceFr } from '../freelance/messages';
 import { educationFr } from '../education/messages';
 import { healthFr } from '../health/messages';
-import { healthProFr } from '../health/messages-pro';
+import { healthProFr } from '../health/messages-pro'; import { healthResultsFr } from '../health/results-messages';
 import { gamesFr } from '../games/messages';
 import { docsFr } from '../seller/documents-messages';
 import { schoolFr } from '../school/messages';
@@ -22,6 +22,7 @@ import { loyaltyFr } from '../loyalty/messages';
 import { posFr } from '../pos/messages';
 import { vitrineFr } from '../vitrine/messages';
 import { updatesFr } from '../vitrine/updates-messages';
+import { webhooksFr } from '../webhooks/messages';
 import { socialFr } from '../messaging/social-messages';
 import { reviewsFr } from '../vitrine/reviews-messages';
 import { miniappsFr } from '../miniapps/messages';
@@ -1308,7 +1309,7 @@ export const fr = {
   ...freelanceFr,
   ...educationFr,
   ...healthFr,
-  ...healthProFr,
+  ...healthProFr, ...healthResultsFr,
   ...gamesFr,
   ...salesFr,
   ...feesFr,
@@ -1317,6 +1318,7 @@ export const fr = {
   ...posFr,
   ...vitrineFr,
   ...updatesFr,
+  ...webhooksFr,
   ...socialFr,
   ...reviewsFr,
   ...miniappsFr,

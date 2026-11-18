@@ -9,6 +9,7 @@ import { contentUrlOf, MediaService } from '../media/media.service.js';
 import { MediaStorage } from '../media/storage.js';
 import { reconcile } from '../ledger/ledger.queries.js';
 import { FeesService } from '../school/fees.service.js';
+import { WebhookService } from '../webhooks/webhooks.service.js';
 
 /** Media of deleted accounts removed per maintenance run (files first, then rows); the rest waits for the next run. */
 const DELETED_USER_MEDIA_BATCH = 500;
@@ -64,6 +65,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     private readonly media: MediaService,
     private readonly storage: MediaStorage,
     private readonly schoolFees: FeesService,
+    private readonly webhooks: WebhookService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -123,6 +125,9 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         await this.reconcileLedger();
         // Lot 17b: school fees due within 3 days (once per fee, generic notification); never fails the run.
         await this.schoolFees.remindDue(now).catch((err: unknown) => this.logger.error(`school fee reminders failed: ${(err as Error).name}`));
+        // Webhooks: retries that are due, then the journal bound (100 per subscription); never fails the run.
+        await this.webhooks.processDue().catch((err: unknown) => this.logger.error(`webhook retries failed: ${(err as Error).name}`));
+        await this.webhooks.purge().catch((err: unknown) => this.logger.error(`webhook journal purge failed: ${(err as Error).name}`));
         this.logger.log(
           `maintenance done: otpChallenges=${result.otpChallenges} refreshTokens=${result.refreshTokens} sessions=${result.sessions} deletedAccounts=${result.deletedAccounts} staleUploads=${result.staleUploads} deletedUserMedia=${result.deletedUserMedia}`,
         );
@@ -461,6 +466,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         ['health_shares', ['patient_id']],
         ['health_access_log', ['patient_id', 'accessor_id']],
         ['health_prescriptions', ['patient_id']],
+        ['health_results', ['user_id']],
         ['health_appointments', ['patient_id', 'professional_id']],
         ['health_professionals', ['user_id']],
         ['game_sessions', ['user_id']],

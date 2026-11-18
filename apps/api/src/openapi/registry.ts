@@ -320,6 +320,14 @@ import {
   updateReminderRequestSchema,
 } from '@caselind/contracts';
 import {
+  createHealthResultRequestSchema,
+  healthResultListQuerySchema,
+  healthResultListSchema,
+  healthResultSchema,
+  sharedResultsSchema,
+  updateHealthResultRequestSchema,
+} from '@caselind/contracts';
+import {
   certificateListSchema,
   certificateVerificationSchema,
   courseDetailSchema,
@@ -342,6 +350,13 @@ import {
   setFilesRequestSchema,
   setOrgGalleryRequestSchema,
   orgGallerySchema,
+  createWebhookRequestSchema,
+  updateWebhookRequestSchema,
+  webhookSchema,
+  webhookWithSecretSchema,
+  webhookListSchema,
+  webhookDeliverySchema,
+  webhookDeliveryListSchema,
   createOrgUpdateRequestSchema,
   updateOrgUpdateRequestSchema,
   orgUpdateListQuerySchema,
@@ -768,6 +783,13 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/me/org-questions', summary: 'Ask a question to a public organisation (up to 300 characters). 5 per rolling 24 h per account (409 rate_limited); a member of the organisation: 403 member; blocked with a member or unknown org: 404; the organisation is notified without the text; audited without text', tags: ['orgs'], auth: 'user', body: askOrgQuestionRequestSchema, response: myOrgQuestionSchema, status: 201 },
   { method: 'get', path: '/v1/me/org-questions', summary: 'The caller own questions to organisations, newest first, answered or pending (cursor pagination)', tags: ['orgs'], auth: 'user', query: pageQuerySchema, response: myOrgQuestionListSchema, status: 200 },
   { method: 'delete', path: '/v1/orgs/{orgId}/updates/{id}', summary: 'Delete a news item; unknown or of another organisation: 404; org.profile.edit; audited without text', tags: ['orgs'], auth: 'user', params: { orgId: z.string(), id: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/orgs/{orgId}/webhooks', summary: 'Outgoing webhooks of the organisation (never the secret); owners only (org.admins.manage)', tags: ['orgs', 'webhooks'], auth: 'user', params: { orgId: z.string() }, response: webhookListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/webhooks', summary: 'Subscribe an https URL to events (order.created, order.status_changed, pos.sale_created, pos.sale_voided, org.question_asked); the signing secret (whsec_...) is returned ONCE; refused with 400 url_* for http, credentials, ports other than 443/8443, private or local hosts; 5 per organisation (409 limit); owners only; audited with host, never the URL', tags: ['orgs', 'webhooks'], auth: 'user', params: { orgId: z.string() }, body: createWebhookRequestSchema, response: webhookWithSecretSchema, status: 201 },
+  { method: 'patch', path: '/v1/orgs/{orgId}/webhooks/{id}', summary: 'Change URL, events or active flag; switching back on resets the failure counter; unknown or of another organisation: 404; owners only', tags: ['orgs', 'webhooks'], auth: 'user', params: { orgId: z.string(), id: z.string() }, body: updateWebhookRequestSchema, response: webhookSchema, status: 200 },
+  { method: 'delete', path: '/v1/orgs/{orgId}/webhooks/{id}', summary: 'Delete a webhook with its journal; unknown or of another organisation: 404; owners only', tags: ['orgs', 'webhooks'], auth: 'user', params: { orgId: z.string(), id: z.string() }, status: 204 },
+  { method: 'post', path: '/v1/orgs/{orgId}/webhooks/{id}/rotate-secret', summary: 'New signing secret, returned once; the old one stops working at once; owners only', tags: ['orgs', 'webhooks'], auth: 'user', params: { orgId: z.string(), id: z.string() }, response: webhookWithSecretSchema, status: 200 },
+  { method: 'get', path: '/v1/orgs/{orgId}/webhooks/{id}/deliveries', summary: '50 latest deliveries (event, status, HTTP status, attempt; never the body); owners only', tags: ['orgs', 'webhooks'], auth: 'user', params: { orgId: z.string(), id: z.string() }, response: webhookDeliveryListSchema, status: 200 },
+  { method: 'post', path: '/v1/orgs/{orgId}/webhooks/{id}/test', summary: 'Sends a ping event now (no retry, does not count as a failure); 5 per minute (409 rate_limited); owners only', tags: ['orgs', 'webhooks'], auth: 'user', params: { orgId: z.string(), id: z.string() }, response: webhookDeliverySchema, status: 200 },
   { method: 'get', path: '/v1/public/orgs/{slug}/updates', summary: 'Public news of a storefront, no token (private, suspended or unknown org: 404): not hidden, promotions and events not over; events first by date, then newest first (cursor pagination)', tags: ['orgs'], auth: 'public', params: { slug: z.string() }, query: orgUpdateListQuerySchema, response: orgUpdateListSchema, status: 200 },
 
   // Media (lot 2b)
@@ -892,6 +914,13 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/me/health/professional/patients/{patientId}/record', summary: 'Read the kinds a patient shared with me. No active share (revoked, expired, patient withdrew, me suspended): 404. Every read is logged for the patient and audited', tags: ['health'], auth: 'user', params: { patientId: z.string() }, response: sharedRecordSchema, status: 200 },
   { method: 'post', path: '/v1/me/health/professional/appointments/{id}/prescription', summary: 'Issue an electronic prescription after a completed appointment (regulated `health.prescriptions` flag, else 403; once per appointment: 409 already_issued; validity within a year); notifies the patient; audited', tags: ['health'], auth: 'user', params: { id: z.string() }, body: createPrescriptionRequestSchema, response: prescriptionSchema, status: 201 },
   { method: 'get', path: '/v1/me/health/prescriptions', summary: 'Prescriptions issued to me, decrypted', tags: ['health'], auth: 'user', response: prescriptionListSchema, status: 200 },
+  // Lot 18d: exam results (regulated `health` flag, health consent, content sealed with the patient key; no laboratory integration).
+  { method: 'get', path: '/v1/me/health/results', summary: 'My exam results, newest first (filter kind blood|urine|imaging|other; keyset cursor), decrypted, with the report file when attached (fetch GET file.contentUrl). Without consent: 403 consent_required', tags: ['health'], auth: 'user', query: healthResultListQuerySchema, response: healthResultListSchema, status: 200 },
+  { method: 'post', path: '/v1/me/health/results', summary: 'Add a result: kind, title, free-text values, exam date (not in the future), optional assetId (my ready upload of purpose `health_result`, PDF or image up to 10 MB; wrong purpose, foreign, unready or reused file: 400); at most 200 per user (409 limit_reached); audited without content', tags: ['health'], auth: 'user', body: createHealthResultRequestSchema, response: healthResultSchema, status: 201 },
+  { method: 'patch', path: '/v1/me/health/results/{id}', summary: 'Edit a result of mine; assetId null removes the file, another upload replaces it and the old file is deleted; anyone else: 404', tags: ['health'], auth: 'user', params: { id: z.string() }, body: updateHealthResultRequestSchema, response: healthResultSchema, status: 200 },
+  { method: 'delete', path: '/v1/me/health/results/{id}', summary: 'Delete a result of mine and its file (idempotent)', tags: ['health'], auth: 'user', params: { id: z.string() }, status: 204 },
+  { method: 'get', path: '/v1/health/patients/{patientId}/results', summary: 'Professional reads a patient’s results: needs an active share covering `results` (revoked, expired, not covering results, patient withdrew consent, me suspended: 404). The report files are readable through the same share. Every read is logged for the patient and audited', tags: ['health'], auth: 'user', params: { patientId: z.string() }, response: sharedResultsSchema, status: 200 },
+  { method: 'post', path: '/v1/health/patients/{patientId}/results', summary: 'An approved professional adds a result for a consenting patient who has a confirmed or completed appointment with them (else 404); the file is then owned by the patient; notifies the patient without content; audited', tags: ['health'], auth: 'user', params: { patientId: z.string() }, body: createHealthResultRequestSchema, response: z.object({ id: z.uuid() }), status: 201 },
   { method: 'get', path: '/v1/admin/health/professionals', summary: 'Professional applications with their licence number (admin role; filter status)', tags: ['health'], auth: 'admin', query: adminProfessionalsQuerySchema, response: adminProfessionalListSchema, status: 200 },
   { method: 'post', path: '/v1/admin/health/professionals/{userId}/review', summary: 'Approve, reject or suspend a professional after checking the licence; a suspension cuts access to every shared record; notifies the professional; audited', tags: ['health'], auth: 'admin', params: { userId: z.string() }, body: reviewProfessionalRequestSchema, status: 204 },
   // Lot 17a: education (CDC §13). Behind the `education` flag, except the public certificate check. The quiz answer key never leaves the server.

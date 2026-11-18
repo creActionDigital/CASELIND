@@ -3,7 +3,10 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { fetchSharedRecord, proKeys } from '../../../../health/api';
 import { kindKey } from '../../../../health/logic';
+import { fetchSharedResults, resultKeys } from '../../../../health/results-api';
+import { resultKindKey } from '../../../../health/results-logic';
 import { useI18n } from '../../../../i18n';
+import { FileLinks } from '../../../../media/FileLinks';
 import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
 import { Badge, ErrorState, Screen, Text } from '../../../../ui';
@@ -14,6 +17,8 @@ export default function SharedRecordScreen() {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const q = useQuery({ queryKey: proKeys.record(String(id)), queryFn: () => fetchSharedRecord(String(id)), gcTime: 0, staleTime: 0 });
+  // 404 tant que le partage ne couvre pas les résultats : la section reste simplement absente.
+  const results = useQuery({ queryKey: resultKeys.shared(String(id)), queryFn: () => fetchSharedResults(String(id)), gcTime: 0, staleTime: 0, retry: false });
 
   if (q.isPending) {
     return (
@@ -49,6 +54,25 @@ export default function SharedRecordScreen() {
             {e.severity !== null ? <Text variant="small">{t('health.severityOf', { n: e.severity })}</Text> : null}
           </View>
         ))}
+        {results.data ? (
+          <>
+            <Text variant="heading" accessibilityRole="header">
+              {t('health.results.sharedTitle')}
+            </Text>
+            {results.data.items.length === 0 ? <Text muted>{t('health.results.sharedEmpty')}</Text> : null}
+            {results.data.items.map((r) => (
+              <View key={r.id} style={[styles.card, { backgroundColor: colors.surface }]}>
+                <Badge tone="neutral" label={t(resultKindKey(r.kind))} />
+                <Text variant="bodyStrong">{r.title}</Text>
+                <Text variant="small" muted>
+                  {r.resultDate}
+                </Text>
+                {r.summary ? <Text variant="small">{r.summary}</Text> : null}
+                {r.file ? <FileLinks files={[r.file]} label={t('health.results.file')} /> : null}
+              </View>
+            ))}
+          </>
+        ) : null}
       </View>
     </Screen>
   );

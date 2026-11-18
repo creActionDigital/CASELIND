@@ -1,9 +1,9 @@
-import type { HealthEntryKind } from '@caselind/contracts';
+import type { HealthEntryKind, HealthShareKind } from '@caselind/contracts';
 import { ApiRequestError } from '../lib/api';
 import type { MessageKey } from '../i18n';
 
 export const ENTRY_KINDS: HealthEntryKind[] = ['allergy', 'condition', 'medication', 'vaccination', 'measurement', 'symptom', 'note'];
-export const kindKey = (k: HealthEntryKind): MessageKey => `health.kind.${k}` as MessageKey;
+export const kindKey = (k: HealthShareKind): MessageKey => `health.kind.${k}` as MessageKey;
 
 /** Le serveur répond 403 `consent_required` tant que le consentement n'est pas donné (ou après son retrait). */
 export const isConsentRequired = (err: unknown): boolean => err instanceof ApiRequestError && err.status === 403 && err.detail<string>('reason') === 'consent_required';

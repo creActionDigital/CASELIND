@@ -1,10 +1,11 @@
-import type { HealthEntryKind } from '@caselind/contracts';
+import type { HealthShareKind } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { createShare, fetchAccessLog, fetchShares, proKeys, revokeShare } from '../../../health/api';
-import { ENTRY_KINDS, healthProErrorKey, kindKey } from '../../../health/logic';
+import { healthProErrorKey, kindKey } from '../../../health/logic';
+import { SHARE_KINDS } from '../../../health/results-logic';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { radius, spacing } from '../../../theme/tokens';
@@ -17,7 +18,7 @@ export default function Sharing() {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const qc = useQueryClient();
-  const [kinds, setKinds] = useState<HealthEntryKind[]>(['allergy', 'condition', 'medication']);
+  const [kinds, setKinds] = useState<HealthShareKind[]>(['allergy', 'condition', 'medication']);
   const [days, setDays] = useState('7');
   const [error, setError] = useState<string | null>(null);
   const shares = useQuery({ queryKey: proKeys.shares, queryFn: fetchShares });
@@ -38,7 +39,7 @@ export default function Sharing() {
     onError: (e) => (e instanceof Error && e.message === 'invalid' ? setError(t('health.err.invalid')) : fail(e)),
   });
   const revoke = useMutation({ mutationFn: (id: string) => revokeShare(id), onSuccess: done, onError: fail });
-  const toggle = (k: HealthEntryKind) => setKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
+  const toggle = (k: HealthShareKind) => setKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
 
   return (
     <Screen edges={['bottom']}>
@@ -54,7 +55,7 @@ export default function Sharing() {
             <Text variant="heading">{name}</Text>
             <Text variant="bodyStrong">{t('health.share.kinds')}</Text>
             <View style={styles.wrap}>
-              {ENTRY_KINDS.map((k) => (
+              {SHARE_KINDS.map((k) => (
                 <Button key={k} variant={kinds.includes(k) ? 'primary' : 'secondary'} label={kinds.includes(k) ? `✓ ${t(kindKey(k))}` : t(kindKey(k))} onPress={() => toggle(k)} />
               ))}
             </View>

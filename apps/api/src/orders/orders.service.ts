@@ -24,6 +24,7 @@ import { DeliveryCodes, hydrateDeliveries } from '../delivery/delivery.shared.js
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { ORG_ROLE_PERMISSIONS } from '../orgs/org-permissions.js';
 import { LoyaltyService } from '../loyalty/loyalty.service.js';
+import { WebhookService } from '../webhooks/webhooks.service.js';
 import { resolveContactUserId } from '../orgs/org-contact.js';
 import { pgErrorOf, type Tx } from '../orgs/orgs.service.js';
 import { CouponsService } from './coupons.service.js';
@@ -69,6 +70,7 @@ export class OrdersService {
     private readonly zones: DeliveryZonesService,
     private readonly codes: DeliveryCodes,
     private readonly loyalty: LoyaltyService,
+    private readonly webhooks: WebhookService,
   ) {}
 
   /* ------------------------------------------------------------------ checkout */
@@ -101,6 +103,8 @@ export class OrdersService {
     if (outcome.created) {
       for (const o of hydrated) {
         await this.notifyOrgManagers(o.orgId, 'Nouvelle commande', `Commande ${o.number} - total ${o.totalMinor} ${o.currency}`, o);
+        // Webhook: ids, status, amounts only (no buyer, address or note).
+        this.webhooks.emit(o.orgId, 'order.created', { orderId: o.id, number: o.number, status: o.status, totalMinor: o.totalMinor, currency: o.currency, fulfillment: o.fulfillment, itemCount: o.items.length });
       }
     }
     return { orders: hydrated, created: outcome.created };
@@ -402,6 +406,7 @@ export class OrdersService {
 
     // Lot 16h: loyalty points are best effort, an error here must never break the status change.
     if (to === 'delivered') await this.loyalty.awardForOrder(orderId).catch(() => undefined);
+    this.webhooks.emit(row.orgId, 'order.status_changed', { orderId: row.id, number: row.number, from, to, totalMinor: row.totalMinor, currency: row.currency.trim() });
     const detail = await this.withDelivery(await hydrateDetail(this.db, row), actor.kind === 'org' ? 'org' : 'buyer');
     await this.notifications.notifyMany(
       orphanedCouriers.map((userId) => ({
