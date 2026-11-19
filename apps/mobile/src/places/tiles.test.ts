@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GOMA_CENTER } from './geo';
-import { clampZoom, fitPoints, panCenter, project, radiusPoints, toScreen, unproject, visibleTiles } from './tiles';
+import { clampZoom, fitPoints, isDoubleTap, isTap, linePoints, panCenter, pinchZoom, project, radiusPoints, screenToLatLng, toScreen, touchDistance, unproject, visibleTiles } from './tiles';
 
 const URL_T = 'https://t.example/{z}/{x}/{y}.png';
 
@@ -69,5 +69,48 @@ describe('cadrage', () => {
   });
   it('un rayon plus petit donne un zoom plus fort', () => {
     expect(fitPoints(radiusPoints(GOMA_CENTER, 1), 375, 400).zoom).toBeGreaterThan(fitPoints(radiusPoints(GOMA_CENTER, 25), 375, 400).zoom);
+  });
+});
+
+describe('toucher, pincer, tracer', () => {
+  it('écran → point est l’inverse de point → écran', () => {
+    const center = { lat: -1.68, lng: 29.22 };
+    for (const [x, y] of [[0, 0], [187.5, 200], [300, 50], [12, 399]] as const) {
+      const p = screenToLatLng(x, y, center, 15, 375, 400);
+      const s = toScreen(p, center, 15, 375, 400);
+      expect(s.x).toBeCloseTo(x, 4);
+      expect(s.y).toBeCloseTo(y, 4);
+    }
+    const mid = screenToLatLng(187.5, 200, center, 15, 375, 400);
+    expect(mid.lat).toBeCloseTo(center.lat, 6);
+    expect(mid.lng).toBeCloseTo(center.lng, 6);
+  });
+  it('distance entre deux doigts', () => {
+    expect(touchDistance([{ pageX: 0, pageY: 0 }, { pageX: 30, pageY: 40 }])).toBe(50);
+    expect(touchDistance([{ pageX: 0, pageY: 0 }])).toBe(0);
+  });
+  it('le pincement change le zoom d’un cran par doublement, avec seuil', () => {
+    expect(pinchZoom(12, 100, 100)).toBe(12);
+    expect(pinchZoom(12, 100, 120)).toBe(12);
+    expect(pinchZoom(12, 100, 150)).toBe(13);
+    expect(pinchZoom(12, 100, 400)).toBe(14);
+    expect(pinchZoom(12, 100, 60)).toBe(11);
+    expect(pinchZoom(18, 100, 800)).toBe(18);
+    expect(pinchZoom(3, 100, 10)).toBe(3);
+    expect(pinchZoom(12, 0, 50)).toBe(12);
+  });
+  it('appui court et double appui', () => {
+    expect(isTap(2, 3, 120)).toBe(true);
+    expect(isTap(20, 0, 120)).toBe(false);
+    expect(isTap(0, 0, 900)).toBe(false);
+    expect(isDoubleTap({ x: 10, y: 10, at: 1000 }, 15, 12, 1200)).toBe(true);
+    expect(isDoubleTap({ x: 10, y: 10, at: 1000 }, 15, 12, 1400)).toBe(false);
+    expect(isDoubleTap({ x: 10, y: 10, at: 1000 }, 200, 12, 1100)).toBe(false);
+    expect(isDoubleTap(null, 0, 0, 0)).toBe(false);
+  });
+  it('polyligne : un point par sommet, au centre pour le centre', () => {
+    const pts = linePoints([GOMA_CENTER, GOMA_CENTER], GOMA_CENTER, 14, 400, 200);
+    expect(pts).toBe('200.0,100.0 200.0,100.0');
+    expect(linePoints([], GOMA_CENTER, 14, 400, 200)).toBe('');
   });
 });

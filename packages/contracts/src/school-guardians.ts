@@ -43,6 +43,18 @@ export type MyGuardianship = z.infer<typeof myGuardianshipSchema>;
 export const myGuardianshipListSchema = z.object({ items: z.array(myGuardianshipSchema) });
 export type MyGuardianshipList = z.infer<typeof myGuardianshipListSchema>;
 
+/** The pupil's own view of the parent links that concern them (they can end any of them). */
+export const myStudentGuardianSchema = z.object({
+  id: z.uuid(),
+  schoolName: z.string(),
+  guardianDisplayName: z.string(),
+  relation: z.string(),
+  status: guardianStatusSchema,
+});
+export type MyStudentGuardian = z.infer<typeof myStudentGuardianSchema>;
+export const myStudentGuardianListSchema = z.object({ items: z.array(myStudentGuardianSchema) });
+export type MyStudentGuardianList = z.infer<typeof myStudentGuardianListSchema>;
+
 /** A child the caller follows through an ACTIVE link. */
 export const myChildSchema = z.object({
   /** The link: the parent can end it through the decline route. */

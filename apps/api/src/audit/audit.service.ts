@@ -180,6 +180,7 @@ export type AuditAction =
   | 'school.guardian_accepted'
   | 'school.guardian_declined'
   | 'school.guardian_removed'
+  | 'school.guardian_removed_by_student'
   | 'school.scholarship_closed'
   | 'school.scholarship_updated'
   | 'conversation.member_removed'

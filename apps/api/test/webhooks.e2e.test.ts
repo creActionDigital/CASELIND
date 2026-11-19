@@ -1,9 +1,9 @@
-import { createHmac, randomUUID } from 'node:crypto';
+import { createCipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type Env, ENV } from '../src/config/env.js';
 import { MaintenanceService } from '../src/maintenance/maintenance.service.js';
 import type { WebhookPostRequest, WebhookTransport } from '../src/webhooks/webhook-transport.js';
-import { WebhookService } from '../src/webhooks/webhooks.service.js';
+import { WEBHOOK_EVENTS_PER_MINUTE, WebhookService } from '../src/webhooks/webhooks.service.js';
 import { FakeCatalog, installFakeCatalog } from './fake-catalog.js';
 import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
 
@@ -90,7 +90,7 @@ describe('management', () => {
     expect(JSON.stringify(list)).not.toContain(res.body.secret);
     expect(list.items[0].secret).toBeUndefined();
     const raw = await ctx.sql.query('SELECT secret_enc FROM org_webhooks WHERE id = $1', [res.body.id]);
-    expect(raw.rows[0].secret_enc).toMatch(/^v1:/);
+    expect(raw.rows[0].secret_enc).toMatch(/^v2:[0-9a-f]{8}:/);
     expect(raw.rows[0].secret_enc).not.toContain(res.body.secret);
     const audit = JSON.stringify((await ctx.sql.query(`SELECT metadata FROM audit_events WHERE action = 'org.webhook_created' AND metadata->>'webhookId' = $1`, [res.body.id])).rows);
     expect(audit).toContain('hooks.example.com');
@@ -446,5 +446,91 @@ describe('journal', () => {
     await ctx.sql.query('DELETE FROM organizations WHERE id = $1', [s.orgId]);
     expect((await ctx.sql.query('SELECT count(*)::int AS n FROM org_webhooks WHERE id = $1', [h.id])).rows[0].n).toBe(0);
     expect((await ctx.sql.query('SELECT count(*)::int AS n FROM org_webhook_deliveries WHERE webhook_id = $1', [h.id])).rows[0].n).toBe(0);
+  });
+});
+
+describe('review fixes: emission cap, key ids and secret errors', () => {
+  const secretOf = (id: string) => ctx.sql.query('SELECT secret_enc FROM org_webhooks WHERE id = $1', [id]).then((r) => r.rows[0].secret_enc as string);
+
+  it('drops the events of an organisation past the per-minute cap without failing anything', async () => {
+    reset();
+    const s = await seller();
+    const h = (await subscribe(s, { events: ['pos.sale_created'] }).expect(201)).body;
+    const before = hooks.droppedEvents;
+    for (let i = 0; i < WEBHOOK_EVENTS_PER_MINUTE + 5; i++) hooks.emit(s.orgId, 'pos.sale_created', { saleId: randomUUID() });
+    await hooks.idle();
+    const sent = await ctx.sql.query('SELECT count(*)::int AS n FROM org_webhook_deliveries WHERE webhook_id = $1', [h.id]);
+    expect(sent.rows[0].n).toBe(WEBHOOK_EVENTS_PER_MINUTE);
+    expect(hooks.droppedEvents - before).toBe(5);
+    // Another organisation is not affected.
+    const t = await seller();
+    const h2 = (await subscribe(t, { events: ['pos.sale_created'] }).expect(201)).body;
+    hooks.emit(t.orgId, 'pos.sale_created', { saleId: randomUUID() });
+    await hooks.idle();
+    expect(await deliveries(t, h2.id)).toHaveLength(1);
+  });
+
+  it('still reads secrets sealed as v1 and carries a key id on new ones', async () => {
+    reset();
+    const s = await seller();
+    const h = (await subscribe(s, { events: ['pos.sale_created'] }).expect(201)).body;
+    expect(await secretOf(h.id)).toMatch(/^v2:[0-9a-f]{8}:/);
+    // Re-seal the secret the way v1 did (key derived from the JWT secret, no key id).
+    const key = createHash('sha256').update('webhook-secret:').update(Buffer.from(ctx.app.get<Env>(ENV).JWT_ACCESS_SECRET)).digest();
+    const iv = randomBytes(12);
+    const c = createCipheriv('aes-256-gcm', key, iv);
+    c.setAAD(Buffer.from(`webhook:${h.id}`));
+    const ct = Buffer.concat([c.update('whsec_legacy', 'utf8'), c.final()]);
+    const v1 = ['v1', iv.toString('base64url'), c.getAuthTag().toString('base64url'), ct.toString('base64url')].join(':');
+    await ctx.sql.query('UPDATE org_webhooks SET secret_enc = $1 WHERE id = $2', [v1, h.id]);
+    hooks.emit(s.orgId, 'pos.sale_created', { saleId: randomUUID() });
+    await hooks.idle();
+    const call = net.calls[net.calls.length - 1]!;
+    expect(call.headers['X-Caselind-Signature']).toBe(signature('whsec_legacy', call.headers['X-Caselind-Timestamp']!, call.body));
+  });
+
+  it('a secret that cannot be opened is a "secret" error, never counted against the subscription', async () => {
+    reset();
+    const s = await seller();
+    const h = (await subscribe(s, { events: ['pos.sale_created'] }).expect(201)).body;
+    await ctx.sql.query('UPDATE org_webhooks SET secret_enc = $1 WHERE id = $2', ['v2:00000000:AAAA:AAAA:AAAA', h.id]);
+    for (let i = 0; i < 12; i++) {
+      hooks.emit(s.orgId, 'pos.sale_created', { saleId: randomUUID() });
+      await hooks.idle();
+    }
+    for (let round = 0; round < 2; round++) {
+      await due();
+      await hooks.processDue();
+    }
+    const mine = async () => {
+      const ids = (await deliveries(s, h.id)).map((d: { id: string }) => d.id);
+      return net.calls.filter((c) => ids.includes(c.headers['X-Caselind-Delivery']!));
+    };
+    expect(await mine()).toHaveLength(0); // nothing was sent: the secret could not sign it
+    expect(await hookOf(s, h.id)).toMatchObject({ active: true, failureCount: 0 });
+    const list = await deliveries(s, h.id);
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.every((d: { errorCode: string }) => d.errorCode === 'secret')).toBe(true);
+    // Rotating the secret repairs it.
+    await ctx.http.post(`/v1/orgs/${s.orgId}/webhooks/${h.id}/rotate-secret`).set(bearer(s.owner.token)).expect(200);
+    hooks.emit(s.orgId, 'pos.sale_created', { saleId: randomUUID() });
+    await hooks.idle();
+    expect(await mine()).toHaveLength(1);
+  });
+
+  it('uses the dedicated key when set, keeps reading older secrets, and requires a key in production', () => {
+    const base = ctx.app.get<Env>(ENV);
+    const make = (env: Partial<Env>) => new WebhookService(null as never, { ...base, ...env } as Env, null as never, null as never);
+    const hex = (c: string) => c.repeat(64);
+    const old = make({ TOTP_ENCRYPTION_KEY: hex('a') }) as unknown as { seal(id: string, v: string): string; open(id: string, s: string): string };
+    const next = make({ WEBHOOK_ENCRYPTION_KEY: hex('b'), TOTP_ENCRYPTION_KEY: hex('a') }) as unknown as typeof old;
+    const sealedOld = old.seal('id1', 'whsec_x');
+    const sealedNew = next.seal('id1', 'whsec_y');
+    expect(sealedNew.split(':')[1]).not.toBe(sealedOld.split(':')[1]); // different key ids
+    expect(next.open('id1', sealedOld)).toBe('whsec_x'); // old key kept as a fallback
+    expect(next.open('id1', sealedNew)).toBe('whsec_y');
+    expect(() => old.open('id1', sealedNew)).toThrow(); // the old config does not know the new key
+    expect(() => make({ NODE_ENV: 'production', WEBHOOK_ENCRYPTION_KEY: undefined, TOTP_ENCRYPTION_KEY: undefined })).toThrow(/WEBHOOK_ENCRYPTION_KEY or TOTP_ENCRYPTION_KEY/);
+    expect(() => make({ NODE_ENV: 'production', WEBHOOK_ENCRYPTION_KEY: hex('b'), TOTP_ENCRYPTION_KEY: undefined })).not.toThrow();
   });
 });

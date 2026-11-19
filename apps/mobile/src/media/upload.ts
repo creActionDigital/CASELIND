@@ -21,9 +21,16 @@ export type UploadPurpose = 'message' | 'story' | 'product' | 'kyc_document' | '
 /** Annonce (POST /media/uploads) puis envoie les octets (PUT avec X-Upload-Token). Renvoie l'id de l'asset. */
 export async function uploadImage(uri: string, mime: MediaMime, purpose: UploadPurpose): Promise<string> {
   const blob = await (await fetch(uri)).blob();
+  return uploadBody(blob, blob.size, mime, purpose);
+}
+
+/** Même envoi pour des octets déjà en mémoire (ex. signature PNG tracée à l'écran) : le Uint8Array part tel quel comme corps. */
+export const uploadBytes = (bytes: Uint8Array, mime: MediaMime, purpose: UploadPurpose): Promise<string> => uploadBody(bytes, bytes.byteLength, mime, purpose);
+
+async function uploadBody(body: Blob | Uint8Array, sizeBytes: number, mime: MediaMime, purpose: UploadPurpose): Promise<string> {
   const announce = await api.request('/media/uploads', {
     method: 'POST',
-    body: { purpose, mime, sizeBytes: blob.size },
+    body: { purpose, mime, sizeBytes },
     schema: createUploadResponseSchema,
   });
 
@@ -31,7 +38,7 @@ export async function uploadImage(uri: string, mime: MediaMime, purpose: UploadP
     fetch(absoluteUrl(announce.uploadUrl), {
       method: 'PUT',
       headers: { Authorization: `Bearer ${token}`, 'X-Upload-Token': announce.uploadToken, 'Content-Type': mime },
-      body: blob,
+      body: body as BodyInit,
     });
   let token = api.getAccessToken() ?? (await api.restore());
   let res: Response;

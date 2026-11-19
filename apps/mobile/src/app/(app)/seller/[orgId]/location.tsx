@@ -6,11 +6,12 @@ import { useI18n } from '../../../../i18n';
 import { ApiRequestError } from '../../../../lib/api';
 import { fetchOrgLocation, removeOrgLocation, setOrgLocation, updateOrgLocation } from '../../../../places/api';
 import { getDevicePosition } from '../../../../places/device-location';
-import { parseCoordinate, roundCoordinate } from '../../../../places/geo';
+import { GOMA_CENTER, parseCoordinate, roundCoordinate } from '../../../../places/geo';
+import { TileMap } from '../../../../places/TileMap';
 import { useMembership } from '../../../../seller/api';
 import { canEditProfile } from '../../../../seller/permissions';
 import { Loading, sellerErrorMessage } from '../../../../seller/ui';
-import { spacing } from '../../../../theme/tokens';
+import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
 import { Button, ErrorState, Screen, Text, TextField } from '../../../../ui';
 
@@ -26,6 +27,7 @@ export default function SellerLocation() {
   const [submitted, setSubmitted] = useState(false);
   const [locating, setLocating] = useState(false);
   const [info, setInfo] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
+  const [fitTick, setFitTick] = useState(0); // recadre la carte à la lecture de l'existant et à « position actuelle », pas à chaque appui
 
   const current = useQuery({ queryKey: ['org-location', orgId], queryFn: () => fetchOrgLocation(orgId), enabled: !!orgId });
   const [prefilled, setPrefilled] = useState(false);
@@ -33,6 +35,7 @@ export default function SellerLocation() {
     if (prefilled || !current.isSuccess) return;
     setPrefilled(true);
     if (current.data) {
+      setFitTick((n) => n + 1);
       setLat(String(current.data.lat));
       setLng(String(current.data.lng));
       setLabel(current.data.label ?? '');
@@ -91,6 +94,7 @@ export default function SellerLocation() {
     if (r.ok) {
       setLat(String(roundCoordinate(r.position.lat)));
       setLng(String(roundCoordinate(r.position.lng)));
+      setFitTick((n) => n + 1);
     } else {
       setInfo({ text: t(r.reason === 'denied' ? 'seller.location.denied' : 'places.unavailable'), tone: 'error' });
     }
@@ -104,6 +108,19 @@ export default function SellerLocation() {
           {t('seller.location.intro')}
         </Text>
         <Button label={locating ? t('places.locating') : t('seller.location.current')} variant="secondary" loading={locating} onPress={useCurrent} style={{ marginBottom: spacing.lg }} />
+        <TileMap
+          style={{ height: 240, borderRadius: radius.lg, marginBottom: spacing.sm }}
+          fit={valid ? [{ lat: latN, lng: lngN }] : [GOMA_CENTER]}
+          fitKey={`loc-${fitTick}`}
+          markers={valid ? [{ id: 'shop', lat: latN, lng: lngN, label: label.trim() || t('seller.location.title'), selected: true }] : []}
+          onPick={(p) => {
+            setLat(String(roundCoordinate(p.lat)));
+            setLng(String(roundCoordinate(p.lng)));
+          }}
+        />
+        <Text variant="small" muted style={{ marginBottom: spacing.lg }}>
+          {t('places.pickHint')}
+        </Text>
         <TextField label={t('seller.location.lat')} value={lat} onChangeText={setLat} keyboardType="numbers-and-punctuation" autoCapitalize="none" error={submitted && latN === null ? t('seller.location.invalid') : null} />
         <TextField label={t('seller.location.lng')} value={lng} onChangeText={setLng} keyboardType="numbers-and-punctuation" autoCapitalize="none" error={submitted && lngN === null ? t('seller.location.invalid') : null} />
         <TextField label={t('seller.location.label')} hint={t('seller.location.labelHint')} value={label} onChangeText={setLabel} maxLength={120} />

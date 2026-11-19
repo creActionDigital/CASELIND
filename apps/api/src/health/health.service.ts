@@ -34,12 +34,12 @@ const MINUTE_MS = 60_000;
 const invalid = (path: string, message: string) => new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path, message }]);
 const consentRequired = () => new AppError(403, ErrorCodes.forbidden, 'Health data needs your explicit consent first', { reason: 'consent_required' });
 const iso = (d: Date | string) => new Date(d).toISOString();
-const day = (d: Date | string) => iso(d).slice(0, 10);
 
 type EntryPayload = { title: string; details: string; severity: number | null };
 type ReminderPayload = { title: string; dose: string };
 
-const encodeCursor = (on: Date | string, id: string) => Buffer.from(JSON.stringify([day(on), id])).toString('base64url');
+/** `date` columns are selected with to_char (YYYY-MM-DD): a Date would be read in the server's time zone. */
+const encodeCursor = (on: string, id: string) => Buffer.from(JSON.stringify([on, id])).toString('base64url');
 function decodeCursor(cursor: string): { on: string; id: string } {
   try {
     const v: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
@@ -178,8 +178,8 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
       const c = decodeCursor(q.cursor);
       f.push(sql`(recorded_on, id) < (${c.on}::date, ${c.id}::uuid)`);
     }
-    const res = await this.db.execute<{ id: string; kind: HealthEntry['kind']; recorded_on: Date | string; payload: string; created_at: Date }>(sql`
-      SELECT id, kind, recorded_on, payload, created_at FROM health_entries WHERE ${sql.join(f, sql` AND `)} ORDER BY recorded_on DESC, id DESC LIMIT ${q.limit + 1}`);
+    const res = await this.db.execute<{ id: string; kind: HealthEntry['kind']; recorded_on: string; payload: string; created_at: Date }>(sql`
+      SELECT id, kind, to_char(recorded_on, 'YYYY-MM-DD') AS recorded_on, payload, created_at FROM health_entries WHERE ${sql.join(f, sql` AND `)} ORDER BY recorded_on DESC, id DESC LIMIT ${q.limit + 1}`);
     const rows = res.rows.slice(0, q.limit);
     const last = rows[rows.length - 1];
     return { items: rows.map((r) => this.toEntry(userId, r)), nextCursor: res.rows.length > q.limit && last ? encodeCursor(last.recorded_on, last.id) : null };
@@ -187,15 +187,15 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
 
   private async entry(userId: string, id: string): Promise<HealthEntry> {
     if (!UUID_RE.test(id)) throw AppError.notFound('Entry not found');
-    const res = await this.db.execute<{ id: string; kind: HealthEntry['kind']; recorded_on: Date | string; payload: string; created_at: Date }>(sql`
-      SELECT id, kind, recorded_on, payload, created_at FROM health_entries WHERE id = ${id}::uuid AND user_id = ${userId}::uuid`);
+    const res = await this.db.execute<{ id: string; kind: HealthEntry['kind']; recorded_on: string; payload: string; created_at: Date }>(sql`
+      SELECT id, kind, to_char(recorded_on, 'YYYY-MM-DD') AS recorded_on, payload, created_at FROM health_entries WHERE id = ${id}::uuid AND user_id = ${userId}::uuid`);
     if (!res.rows[0]) throw AppError.notFound('Entry not found');
     return this.toEntry(userId, res.rows[0]);
   }
 
-  private toEntry(userId: string, r: { id: string; kind: HealthEntry['kind']; recorded_on: Date | string; payload: string; created_at: Date }): HealthEntry {
+  private toEntry(userId: string, r: { id: string; kind: HealthEntry['kind']; recorded_on: string; payload: string; created_at: Date }): HealthEntry {
     const p = this.crypto.open<EntryPayload>(userId, r.payload);
-    return { id: r.id, kind: r.kind, recordedOn: day(r.recorded_on), title: p.title, details: p.details, severity: p.severity, createdAt: iso(r.created_at) };
+    return { id: r.id, kind: r.kind, recordedOn: r.recorded_on, title: p.title, details: p.details, severity: p.severity, createdAt: iso(r.created_at) };
   }
 
   // ---- Reminders --------------------------------------------------------------------------------
@@ -218,7 +218,7 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
   async listReminders(userId: string): Promise<ReminderList> {
     await this.requireConsent(userId);
     const res = await this.db.execute<ReminderRow>(sql`
-      SELECT id, payload, times, utc_offset_minutes, starts_on, ends_on, active FROM health_reminders WHERE user_id = ${userId}::uuid ORDER BY created_at DESC, id DESC LIMIT 100`);
+      SELECT id, payload, times, utc_offset_minutes, to_char(starts_on, 'YYYY-MM-DD') AS starts_on, to_char(ends_on, 'YYYY-MM-DD') AS ends_on, active FROM health_reminders WHERE user_id = ${userId}::uuid ORDER BY created_at DESC, id DESC LIMIT 100`);
     return { items: res.rows.map((r) => this.toReminder(userId, r)) };
   }
 
@@ -240,14 +240,14 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
 
   private async reminder(userId: string, id: string): Promise<Reminder> {
     if (!UUID_RE.test(id)) throw AppError.notFound('Reminder not found');
-    const res = await this.db.execute<ReminderRow>(sql`SELECT id, payload, times, utc_offset_minutes, starts_on, ends_on, active FROM health_reminders WHERE id = ${id}::uuid AND user_id = ${userId}::uuid`);
+    const res = await this.db.execute<ReminderRow>(sql`SELECT id, payload, times, utc_offset_minutes, to_char(starts_on, 'YYYY-MM-DD') AS starts_on, to_char(ends_on, 'YYYY-MM-DD') AS ends_on, active FROM health_reminders WHERE id = ${id}::uuid AND user_id = ${userId}::uuid`);
     if (!res.rows[0]) throw AppError.notFound('Reminder not found');
     return this.toReminder(userId, res.rows[0]);
   }
 
   private toReminder(userId: string, r: ReminderRow): Reminder {
     const p = this.crypto.open<ReminderPayload>(userId, r.payload);
-    return { id: r.id, title: p.title, dose: p.dose, times: r.times, utcOffsetMinutes: r.utc_offset_minutes, startsOn: day(r.starts_on), endsOn: r.ends_on ? day(r.ends_on) : null, active: r.active };
+    return { id: r.id, title: p.title, dose: p.dose, times: r.times, utcOffsetMinutes: r.utc_offset_minutes, startsOn: r.starts_on, endsOn: r.ends_on, active: r.active };
   }
 
   // ---- Doses ------------------------------------------------------------------------------------
@@ -282,8 +282,8 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
    */
   async runDue(now: Date = new Date()): Promise<number> {
     // shortcut: loads every active reminder each minute, add a next-due column when volumes need it.
-    const res = await this.db.execute<{ id: string; user_id: string; times: string[]; utc_offset_minutes: number; starts_on: Date | string; ends_on: Date | string | null }>(sql`
-      SELECT r.id, r.user_id, r.times, r.utc_offset_minutes, r.starts_on, r.ends_on
+    const res = await this.db.execute<{ id: string; user_id: string; times: string[]; utc_offset_minutes: number; starts_on: string; ends_on: string | null }>(sql`
+      SELECT r.id, r.user_id, r.times, r.utc_offset_minutes, to_char(r.starts_on, 'YYYY-MM-DD') AS starts_on, to_char(r.ends_on, 'YYYY-MM-DD') AS ends_on
       FROM health_reminders r JOIN health_consents c ON c.user_id = r.user_id WHERE r.active`);
     const minute = Math.floor(now.getTime() / MINUTE_MS) * MINUTE_MS;
     let sent = 0;
@@ -293,7 +293,7 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
         const local = new Date(instant + r.utc_offset_minutes * MINUTE_MS).toISOString(); // wall clock of the user, read as UTC fields
         if (!r.times.includes(local.slice(11, 16))) continue;
         const localDay = local.slice(0, 10);
-        if (localDay < day(r.starts_on) || (r.ends_on && localDay > day(r.ends_on))) continue;
+        if (localDay < r.starts_on || (r.ends_on && localDay > r.ends_on)) continue;
         const ins = await this.db.execute<{ id: string }>(sql`
           INSERT INTO health_doses (reminder_id, user_id, due_at) VALUES (${r.id}::uuid, ${r.user_id}::uuid, ${new Date(instant).toISOString()}::timestamptz)
           ON CONFLICT (reminder_id, due_at) DO NOTHING RETURNING id`);
@@ -311,23 +311,23 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
   /** Decrypted copy of the user's own data for the personal data export. Empty entries when no consent is on file. */
   async exportFor(userId: string): Promise<ExportedHealth> {
     const consent = await this.consent(userId);
-    const entries = await this.db.execute<{ kind: HealthEntry['kind']; recorded_on: Date | string; payload: string }>(sql`SELECT kind, recorded_on, payload FROM health_entries WHERE user_id = ${userId}::uuid ORDER BY recorded_on, id`);
-    const reminders = await this.db.execute<ReminderRow>(sql`SELECT id, payload, times, utc_offset_minutes, starts_on, ends_on, active FROM health_reminders WHERE user_id = ${userId}::uuid ORDER BY created_at, id`);
+    const entries = await this.db.execute<{ kind: HealthEntry['kind']; recorded_on: string; payload: string }>(sql`SELECT kind, to_char(recorded_on, 'YYYY-MM-DD') AS recorded_on, payload FROM health_entries WHERE user_id = ${userId}::uuid ORDER BY recorded_on, id`);
+    const reminders = await this.db.execute<ReminderRow>(sql`SELECT id, payload, times, utc_offset_minutes, to_char(starts_on, 'YYYY-MM-DD') AS starts_on, to_char(ends_on, 'YYYY-MM-DD') AS ends_on, active FROM health_reminders WHERE user_id = ${userId}::uuid ORDER BY created_at, id`);
     return {
       consent,
       ...(await this.pro.exportFor(userId)),
       results: await this.results.exportFor(userId),
       entries: entries.rows.map((r) => {
         const p = this.crypto.open<EntryPayload>(userId, r.payload);
-        return { kind: r.kind, recordedOn: day(r.recorded_on), title: p.title, details: p.details, severity: p.severity };
+        return { kind: r.kind, recordedOn: r.recorded_on, title: p.title, details: p.details, severity: p.severity };
       }),
       reminders: reminders.rows.map((r) => {
         const p = this.crypto.open<ReminderPayload>(userId, r.payload);
-        return { title: p.title, dose: p.dose, times: r.times, startsOn: day(r.starts_on), endsOn: r.ends_on ? day(r.ends_on) : null, active: r.active };
+        return { title: p.title, dose: p.dose, times: r.times, startsOn: r.starts_on, endsOn: r.ends_on, active: r.active };
       }),
     };
   }
 }
 
-type ReminderRow = { id: string; payload: string; times: string[]; utc_offset_minutes: number; starts_on: Date | string; ends_on: Date | string | null; active: boolean };
+type ReminderRow = { id: string; payload: string; times: string[]; utc_offset_minutes: number; starts_on: string; ends_on: string | null; active: boolean };
 type DoseRow = { id: string; reminder_id: string; due_at: Date; status: Dose['status']; payload: string };

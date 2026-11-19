@@ -162,6 +162,15 @@ const envSchema = z
       .string()
       .optional()
       .refine((v) => v === undefined || decodeKeyMaterial(v).length >= 32, 'HEALTH_ENCRYPTION_KEY must be hex or base64 of at least 32 bytes'),
+    /**
+     * Dedicated key sealing webhook secrets (AES-256-GCM). Hex or base64 of at least 32 bytes. Optional: without it the
+     * secrets use TOTP_ENCRYPTION_KEY (required in production anyway). Sealed secrets carry a key id, so a key can be
+     * changed while keeping the old one in TOTP_ENCRYPTION_KEY or JWT_ACCESS_SECRET until the secrets are rotated.
+     */
+    WEBHOOK_ENCRYPTION_KEY: z
+      .string()
+      .optional()
+      .refine((v) => v === undefined || decodeKeyMaterial(v).length >= 32, 'WEBHOOK_ENCRYPTION_KEY must be hex or base64 of at least 32 bytes'),
     /** Lot 18a: minute job turning due medication reminders into doses and notifications. */
     HEALTH_REMINDERS_ENABLED: z
       .enum(['true', 'false'])

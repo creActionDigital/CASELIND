@@ -114,6 +114,7 @@ export default function RidesHome() {
         fit={mapPoints.length > 0 ? mapPoints : [GOMA_CENTER]}
         fitKey={mapPoints.map((p) => `${p.lat},${p.lng}`).join('|') || 'goma'}
         markers={mapMarkers}
+        line={mapPoints}
       />
 
       <View style={{ gap: spacing.sm, marginTop: spacing.md }}>

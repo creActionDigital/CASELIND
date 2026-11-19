@@ -1,4 +1,7 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ENV, type Env } from '../src/config/env.js';
 import { MaintenanceService } from '../src/maintenance/maintenance.service.js';
 import { bearer, createTestContext, PASSWORD, signUp, type TestContext } from './helpers.js';
 import { TINY_PDF, TINY_PNG, uploadAsset } from './upload.js';
@@ -233,6 +236,61 @@ describe('exam results (lot 18d)', () => {
     await api('delete', u, '/me/health/data').expect(204);
     expect((await ctx.sql.query('SELECT 1 FROM health_results WHERE user_id = $1', [u.id])).rows).toHaveLength(0);
     expect(await mediaCount(file)).toBe(0);
+  });
+
+  it('seals report files and identity documents at rest, reads them back, and still reads a legacy clear file', async () => {
+    const [patient, pro] = [await consenting(), await approvedPro()];
+    const bytes = async (u: TU, id: string): Promise<Buffer> => {
+      const res = await ctx.http.get(`/v1/media/${id}/content`).set(bearer(u.token)).buffer(true).parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (c: Buffer) => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      }).expect(200);
+      return res.body as Buffer;
+    };
+    const onDisk = async (id: string) => {
+      const key = (await ctx.sql.query('SELECT storage_key FROM media_assets WHERE id = $1', [id])).rows[0].storage_key as string;
+      return join(ctx.app.get<Env>(ENV).MEDIA_STORAGE_DIR, 'objects', ...key.split('/'));
+    };
+    const file = await upload(patient);
+    await api('post', patient, '/me/health/results', result({ assetId: file })).expect(201);
+    const stored = await readFile(await onDisk(file));
+    expect(stored.includes('%PDF')).toBe(false);
+    expect(stored.subarray(0, 7).toString('latin1')).toBe('CLSEAL1');
+    expect((await bytes(patient, file)).equals(TINY_PDF)).toBe(true);
+    await api('post', patient, '/me/health/shares', { professionalId: pro.id, kinds: ['results'], days: 2 }).expect(201);
+    expect((await bytes(pro, file)).equals(TINY_PDF)).toBe(true); // an authorised professional gets the original
+
+    const kyc = await upload(patient, 'kyc_document', 'image/png', TINY_PNG);
+    expect((await readFile(await onDisk(kyc))).includes(Buffer.from('PNG'))).toBe(false);
+    expect((await bytes(patient, kyc)).equals(TINY_PNG)).toBe(true);
+
+    // A file stored before sealing existed (no magic prefix) stays readable.
+    await writeFile(await onDisk(file), TINY_PDF);
+    expect((await bytes(patient, file)).equals(TINY_PDF)).toBe(true);
+    // A sealed file moved under another media id does not open.
+    const other = await upload(patient);
+    await writeFile(await onDisk(other), stored);
+    await read(patient, other).expect(404);
+  });
+
+  it('limits what a professional can add: 20 per patient and 10 per day', async () => {
+    const [patient, pro] = [await consenting(), await approvedPro()];
+    await confirmed(patient, pro);
+    const add = (p: TU, target: TU) => api('post', p, `/health/patients/${target.id}/results`, result());
+    await ctx.sql.query(
+      `INSERT INTO health_results (user_id, kind, payload, result_date, provider_user_id, created_at)
+       SELECT $1::uuid, 'blood', 'v1:x', '2026-03-10', $2::uuid, now() - interval '2 days' FROM generate_series(1, 20)`,
+      [patient.id, pro.id],
+    );
+    const full = await add(pro, patient).expect(409);
+    expect(full.body.error.details).toMatchObject({ reason: 'limit_reached', limit: 20 });
+
+    const [p2, pro2] = [await consenting(), await approvedPro()];
+    await confirmed(p2, pro2);
+    for (let i = 0; i < 10; i++) await add(pro2, p2).expect(201);
+    expect((await add(pro2, p2).expect(409)).body.error.details).toMatchObject({ reason: 'limit_reached', limit: 10 });
+    expect((await api('get', p2, '/me/health/results').expect(200)).body.items).toHaveLength(10);
   });
 
   it('is purged, files included, with the deleted account', async () => {

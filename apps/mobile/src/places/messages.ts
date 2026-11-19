@@ -7,6 +7,7 @@ export const placesFr = {
   'places.nearby': 'Autour de vous',
   'places.results': '{n} lieu(x)',
   'places.searchPlaceholder': 'Rechercher un lieu ou une boutique',
+  'places.pickHint': 'Touchez la carte pour poser ou déplacer le repère ; pincez ou double-touchez pour zoomer.',
 } as const;
 export const placesEn = {
   'places.mapA11y': 'Map of places around you',
@@ -16,4 +17,5 @@ export const placesEn = {
   'places.nearby': 'Around you',
   'places.results': '{n} place(s)',
   'places.searchPlaceholder': 'Search a place or a shop',
+  'places.pickHint': 'Tap the map to place or move the pin; pinch or double-tap to zoom.',
 } as const;

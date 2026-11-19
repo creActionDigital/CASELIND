@@ -7,6 +7,8 @@ import { decodeKeyMaterial, ENV, type Env } from '../config/env.js';
  * Format `v1:<iv>:<tag>:<ciphertext>` (base64url). Outside production without HEALTH_ENCRYPTION_KEY, a key is derived
  * from JWT_ACCESS_SECRET. Plaintext never reaches logs or audit.
  */
+const SEALED_MAGIC = Buffer.from('CLSEAL1\0', 'latin1');
+
 @Injectable()
 export class HealthCrypto {
   private readonly key: Buffer;
@@ -31,5 +33,27 @@ export class HealthCrypto {
     decipher.setAAD(Buffer.from(`health:${userId}`));
     decipher.setAuthTag(Buffer.from(tag, 'base64url'));
     return JSON.parse(Buffer.concat([decipher.update(Buffer.from(ct, 'base64url')), decipher.final()]).toString('utf8')) as T;
+  }
+
+  /**
+   * Seals a file (health results, identity documents) at rest: `CLSEAL1\0` + iv(12) + tag(16) + ciphertext, the
+   * media id as AAD so a sealed file copied under another id fails to open. Small files only (sealed in memory).
+   */
+  sealBytes(aad: string, data: Buffer): Buffer {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.key, iv);
+    cipher.setAAD(Buffer.from(`file:${aad}`));
+    const ct = Buffer.concat([cipher.update(data), cipher.final()]);
+    return Buffer.concat([SEALED_MAGIC, iv, cipher.getAuthTag(), ct]);
+  }
+
+  /** Opens a stored file: one without the magic prefix is a legacy clear file and is returned unchanged. */
+  openBytes(aad: string, stored: Buffer): Buffer {
+    if (!stored.subarray(0, SEALED_MAGIC.length).equals(SEALED_MAGIC)) return stored;
+    const o = SEALED_MAGIC.length;
+    const decipher = createDecipheriv('aes-256-gcm', this.key, stored.subarray(o, o + 12));
+    decipher.setAAD(Buffer.from(`file:${aad}`));
+    decipher.setAuthTag(stored.subarray(o + 12, o + 28));
+    return Buffer.concat([decipher.update(stored.subarray(o + 28)), decipher.final()]);
   }
 }

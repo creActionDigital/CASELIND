@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, PanResponder, Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { memo, type ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
+import { Image, PanResponder, Platform, Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import Svg, { Polyline } from 'react-native-svg';
 import { useI18n } from '../i18n';
 import { spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Text } from '../ui';
 import type { LatLng } from './geo';
-import { clampZoom, fitPoints, panCenter, toScreen, visibleTiles } from './tiles';
+import { clampZoom, fitPoints, isDoubleTap, isTap, linePoints, panCenter, pinchZoom, screenToLatLng, toScreen, touchDistance, visibleTiles } from './tiles';
 
 export interface MapMarker {
   id: string;
@@ -26,14 +27,18 @@ interface Props {
   onSelect?: (id: string) => void;
   /** Bouton « ma position » (facultatif). */
   onLocate?: () => void;
+  /** Trace une ligne (ex. départ → arrêt → arrivée) entre ces points. */
+  line?: readonly LatLng[];
+  /** Un appui court sur la carte (sans déplacement) pose un point. */
+  onPick?: (p: LatLng) => void;
   style?: StyleProp<ViewStyle>;
 }
 
 /**
  * Carte à tuiles (OpenStreetMap) sans module natif : tourne sur Android, iOS et web.
- * Un doigt déplace, les boutons +/− zooment. Les tuiles viennent d'un serveur de tuiles (voir TILE_URL).
+ * Un doigt déplace, deux doigts (ou la molette sur le web) et le double appui zooment, les boutons +/− aussi. Les tuiles viennent d'un serveur de tuiles (voir TILE_URL).
  */
-export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, style }: Props) {
+export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, line, onPick, style }: Props) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -47,19 +52,79 @@ export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, style 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `fit` est recréé à chaque rendu : `fitKey` le résume.
   }, [fitKey, size.w > 0 && size.h > 0]);
 
-  const start = useRef<LatLng>(view.center);
+  const mapRef = useRef<ComponentRef<typeof View>>(null);
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
+  const g = useRef({ center: view.center, t0: 0, moved: false, pinch: null as { dist: number; zoom: number } | null, lastTap: null as { x: number; y: number; at: number } | null });
   const pan = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 4,
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_e, s) => Math.abs(s.dx) + Math.abs(s.dy) > 4,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
-          start.current = viewRef.current.center;
+          g.current.center = viewRef.current.center;
+          g.current.moved = false;
+          g.current.t0 = Date.now();
+          g.current.pinch = null;
         },
-        onPanResponderMove: (_e, g) => setView((v) => ({ ...v, center: panCenter(start.current, v.zoom, g.dx, g.dy) })),
+        onPanResponderMove: (e, s) => {
+          const st = g.current;
+          const touches = e.nativeEvent.touches;
+          if (touches.length >= 2) {
+            const dist = touchDistance(touches);
+            st.moved = true;
+            if (!st.pinch) st.pinch = { dist, zoom: viewRef.current.zoom };
+            else {
+              const zoom = pinchZoom(st.pinch.zoom, st.pinch.dist, dist);
+              setView((v) => (v.zoom === zoom ? v : { ...v, zoom }));
+            }
+            return;
+          }
+          if (st.pinch) return; // un doigt levé après un pincement : on n'enchaîne pas sur un déplacement
+          if (!st.moved && !isTap(s.dx, s.dy, 0)) st.moved = true;
+          if (st.moved) setView((v) => ({ ...v, center: panCenter(st.center, v.zoom, s.dx, s.dy) }));
+        },
+        onPanResponderRelease: (_e, s) => {
+          const st = g.current;
+          const at = Date.now();
+          if (st.moved || !isTap(s.dx, s.dy, at - st.t0)) return;
+          const x0 = s.x0;
+          const y0 = s.y0;
+          if (isDoubleTap(st.lastTap, x0, y0, at)) {
+            st.lastTap = null;
+            setView((v) => ({ ...v, zoom: clampZoom(v.zoom + 1) }));
+            return;
+          }
+          st.lastTap = { x: x0, y: y0, at };
+          // pageX/pageY moins la position de la carte dans la fenêtre : locationX/Y n'est pas fiable (web, enfants).
+          if (onPickRef.current) {
+            mapRef.current?.measureInWindow((ox, oy) => {
+              const { w, h } = sizeRef.current;
+              const v = viewRef.current;
+              onPickRef.current?.(screenToLatLng(x0 - ox, y0 - oy, v.center, v.zoom, w, h));
+            });
+          }
+        },
       }),
     [],
   );
+
+  // Molette (web) : un cran par coup, au plus un toutes les 150 ms.
+  const lastWheel = useRef(0);
+  const webWheel =
+    Platform.OS === 'web'
+      ? {
+          onWheel: (e: { deltaY: number }) => {
+            const now = Date.now();
+            if (now - lastWheel.current < 150 || e.deltaY === 0) return;
+            lastWheel.current = now;
+            setView((v) => ({ ...v, zoom: clampZoom(v.zoom + (e.deltaY < 0 ? 1 : -1)) }));
+          },
+        }
+      : {};
 
   const tiles = useMemo(() => (size.w > 0 ? visibleTiles(view.center, view.zoom, size.w, size.h) : []), [view, size]);
   const at = (p: LatLng) => toScreen(p, view.center, view.zoom, size.w, size.h);
@@ -67,10 +132,15 @@ export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, style 
   const onLayout = (e: LayoutChangeEvent) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height });
 
   return (
-    <View style={[styles.map, { backgroundColor: '#e8e6e0' }, style]} onLayout={onLayout} accessibilityLabel={t('places.mapA11y')} {...pan.panHandlers}>
+    <View ref={mapRef} style={[styles.map, { backgroundColor: '#e8e6e0' }, style]} onLayout={onLayout} accessibilityLabel={t('places.mapA11y')} {...pan.panHandlers} {...webWheel}>
       {tiles.map((tile) => (
         <Image key={tile.key} source={{ uri: tile.url }} style={[styles.tile, { left: tile.left, top: tile.top }]} accessibilityElementsHidden />
       ))}
+      {size.w > 0 && line && line.length >= 2 ? (
+        <Svg pointerEvents="none" width={size.w} height={size.h} style={StyleSheet.absoluteFill}>
+          <Polyline points={linePoints(line, view.center, view.zoom, size.w, size.h)} fill="none" stroke="#4F46E5" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      ) : null}
       {size.w > 0 ? markers.map((m) => <Pin key={m.id} marker={m} {...at(m)} onSelect={onSelect} color={colors.primary} />) : null}
       {size.w > 0 && user ? <View pointerEvents="none" style={[styles.user, { left: at(user).x - 9, top: at(user).y - 9 }]} /> : null}
       <View style={styles.controls}>

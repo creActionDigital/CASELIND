@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createWriteStream } from 'node:fs';
-import { mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Readable, Writable } from 'node:stream';
+import { Readable, type Writable } from 'node:stream';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   type CreateUploadRequest,
@@ -21,6 +21,7 @@ import {
 import { and, eq, lt, ne, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
+import { HealthCrypto } from '../health/health-crypto.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
@@ -37,6 +38,9 @@ import { signUploadToken, UPLOAD_TOKEN_TTL_MS, verifyUploadToken } from './uploa
 export const STALE_UPLOAD_MS = 24 * 3_600_000;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Purposes whose bytes are sealed at rest (AES-256-GCM, whole file in memory: both are capped at 20 MB). */
+const SEALED_PURPOSES: ReadonlySet<string> = new Set(['health_result', 'kyc_document']);
 
 export const contentUrlOf = (id: string) => `/v1/media/${id}/content`;
 
@@ -113,6 +117,7 @@ export class MediaService {
     private readonly audit: AuditService,
     private readonly users: UsersService,
     private readonly storyAccess: StoryAccessService,
+    private readonly crypto: HealthCrypto,
   ) {
     this.stagingDir = join(env.MEDIA_STORAGE_DIR, 'tmp');
   }
@@ -277,7 +282,12 @@ export class MediaService {
         const [row] = await tx.select().from(mediaAssets).where(eq(mediaAssets.id, asset.id)).for('update');
         if (!row) throw AppError.notFound('Media not found');
         if (row.status !== 'pending') throw AppError.conflict(`This upload is already ${row.status}`);
-        await this.storage.putFile(row.storageKey, tempPath);
+        let toStore = tempPath;
+        if (SEALED_PURPOSES.has(row.purpose)) {
+          toStore = `${tempPath}.sealed`;
+          await writeFile(toStore, this.crypto.sealBytes(row.id, await readFile(tempPath)));
+        }
+        await this.storage.putFile(row.storageKey, toStore);
         const [ready] = await tx
           .update(mediaAssets)
           .set({
@@ -305,6 +315,7 @@ export class MediaService {
     } finally {
       // Already moved on success; removes the staging file when another request won the race.
       await rm(tempPath, { force: true, maxRetries: 3 });
+      await rm(`${tempPath}.sealed`, { force: true, maxRetries: 3 });
     }
   }
 
@@ -329,7 +340,20 @@ export class MediaService {
       this.logger.error({ err, assetId: row.id }, 'stored media is missing');
       throw AppError.notFound('Media not found');
     }
+    if (SEALED_PURPOSES.has(row.purpose)) stream = await this.unseal(row.id, stream);
     return { asset: toDto(row), stream, filename: `${row.id}.${EXTENSIONS[row.mime as MediaMime]}` };
+  }
+
+  /** Decrypts a sealed file in memory; a legacy clear file (no magic prefix) passes through unchanged. */
+  private async unseal(id: string, stream: Readable): Promise<Readable> {
+    const chunks: Buffer[] = [];
+    for await (const c of stream) chunks.push(c as Buffer);
+    try {
+      return Readable.from([this.crypto.openBytes(id, Buffer.concat(chunks))]);
+    } catch (err) {
+      this.logger.error({ err, assetId: id }, 'stored media could not be decrypted');
+      throw AppError.notFound('Media not found');
+    }
   }
 
   /**

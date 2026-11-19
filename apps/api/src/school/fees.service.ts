@@ -107,26 +107,32 @@ export class FeesService {
 
   /**
    * Daily reminder (called by maintenance): fees due within 3 days that nobody was told about yet. The pupils who have not paid and their
-   * ACTIVE parents get ONE generic notification per run (no amount, no name). `reminded_at` is claimed first, so a fee is announced once
-   * however often this runs. Does nothing while the regulated `school` flag is off. Returns the number of people notified.
+   * ACTIVE parents get ONE generic notification per run (no amount, no name). The fees are locked (FOR UPDATE SKIP LOCKED, so a second
+   * instance skips them), the notifications are sent, and only then is `reminded_at` set: a failed send rolls everything back and the
+   * next run tries again. Does nothing while the regulated `school` flag is off. Returns the number of people notified.
+   * Limit: "today" and the 3-day window are UTC dates, so near midnight a school far from UTC may be reminded a few hours early or late.
    */
   async remindDue(now: Date = new Date()): Promise<number> {
     const flag = await this.db.execute<{ enabled: boolean }>(sql`SELECT enabled FROM feature_flags WHERE key = 'school'`);
     if (!flag.rows[0]?.enabled) return 0;
     const today = now.toISOString().slice(0, 10);
-    const r = await this.db.execute<{ user_id: string }>(sql`
-      WITH due AS (
-        UPDATE school_fees SET reminded_at = ${now.toISOString()}::timestamptz
-        WHERE reminded_at IS NULL AND due_on BETWEEN ${today}::date AND ${today}::date + 3 RETURNING id, class_id
-      ), unpaid AS (
-        SELECT due.id AS fee_id, e.user_id, c.org_id FROM due JOIN school_classes c ON c.id = due.class_id
-        JOIN school_enrollments e ON e.class_id = due.class_id AND e.role = 'student'
-        WHERE NOT EXISTS (SELECT 1 FROM school_fee_payments p WHERE p.fee_id = due.id AND p.user_id = e.user_id)
-      )
-      SELECT user_id FROM unpaid
-      UNION
-      SELECT g.guardian_user_id FROM unpaid u JOIN school_guardians g ON g.org_id = u.org_id AND g.student_user_id = u.user_id AND g.status = 'active'`);
-    await this.notifications.notifyMany(r.rows.map((t) => ({ userId: t.user_id, category: 'system' as const, title: 'Frais scolaires', body: 'Un frais scolaire arrive bientôt à échéance. Consultez le relevé dans l’application.' })));
-    return r.rows.length;
+    return this.db.transaction(async (tx) => {
+      const due = await tx.execute<{ id: string }>(sql`
+        SELECT id FROM school_fees WHERE reminded_at IS NULL AND due_on BETWEEN ${today}::date AND ${today}::date + 3 FOR UPDATE SKIP LOCKED`);
+      if (due.rows.length === 0) return 0;
+      const ids = sql.join(due.rows.map((f) => sql`${f.id}::uuid`), sql`, `);
+      const r = await tx.execute<{ user_id: string }>(sql`
+        WITH unpaid AS (
+          SELECT f.id AS fee_id, e.user_id, c.org_id FROM school_fees f JOIN school_classes c ON c.id = f.class_id
+          JOIN school_enrollments e ON e.class_id = f.class_id AND e.role = 'student'
+          WHERE f.id IN (${ids}) AND NOT EXISTS (SELECT 1 FROM school_fee_payments p WHERE p.fee_id = f.id AND p.user_id = e.user_id)
+        )
+        SELECT user_id FROM unpaid
+        UNION
+        SELECT g.guardian_user_id FROM unpaid u JOIN school_guardians g ON g.org_id = u.org_id AND g.student_user_id = u.user_id AND g.status = 'active'`);
+      await this.notifications.notifyMany(r.rows.map((t) => ({ userId: t.user_id, category: 'system' as const, title: 'Frais scolaires', body: 'Un frais scolaire arrive bientôt à échéance. Consultez le relevé dans l’application.' })));
+      await tx.execute(sql`UPDATE school_fees SET reminded_at = ${now.toISOString()}::timestamptz WHERE id IN (${ids})`);
+      return r.rows.length;
+    });
   }
 }

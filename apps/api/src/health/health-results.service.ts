@@ -28,7 +28,9 @@ const invalid = (path: string, message: string) => new AppError(400, ErrorCodes.
 const consentRequired = () => new AppError(403, ErrorCodes.forbidden, 'Health data needs your explicit consent first', { reason: 'consent_required' });
 const notFound = (what: string) => AppError.notFound(`${what} not found`);
 const iso = (d: Date | string) => new Date(d).toISOString();
-const day = (d: Date | string) => iso(d).slice(0, 10);
+/** Per professional and patient / per day: a professional cannot fill the patient's quota nor flood them with notifications. */
+export const PRO_RESULTS_PER_PATIENT = 20;
+export const PRO_RESULTS_PER_DAY = 10;
 
 type Tx = Pick<Db, 'execute'>;
 type Payload = { title: string; summary: string };
@@ -36,7 +38,7 @@ type Row = {
   id: string;
   kind: HealthResultKind;
   payload: string;
-  result_date: Date | string;
+  result_date: string; // `date` column read with to_char: no server time zone involved
   created_at: Date;
   media_id: string | null;
   provider_user_id: string | null;
@@ -46,7 +48,7 @@ type Row = {
   m_size: string | number | null;
 };
 
-const encodeCursor = (on: Date | string, id: string) => Buffer.from(JSON.stringify([day(on), id])).toString('base64url');
+const encodeCursor = (on: string, id: string) => Buffer.from(JSON.stringify([on, id])).toString('base64url');
 function decodeCursor(cursor: string): { on: string; id: string } {
   try {
     const v: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
@@ -65,7 +67,7 @@ function assertResultDate(value: string): void {
 }
 
 const SELECT = sql`
-  SELECT r.id, r.kind, r.payload, r.result_date, r.created_at, r.media_id, r.provider_user_id, pu.display_name AS pro_name,
+  SELECT r.id, r.kind, r.payload, to_char(r.result_date, 'YYYY-MM-DD') AS result_date, r.created_at, r.media_id, r.provider_user_id, pu.display_name AS pro_name,
          m.id AS m_id, m.mime AS m_mime, m.size_bytes AS m_size
   FROM health_results r LEFT JOIN users pu ON pu.id = r.provider_user_id
   LEFT JOIN media_assets m ON m.id = r.media_id AND m.status = 'ready'`;
@@ -93,7 +95,7 @@ export class HealthResultsService {
       kind: r.kind,
       title: p.title,
       summary: p.summary,
-      resultDate: day(r.result_date),
+      resultDate: r.result_date,
       provider: r.provider_user_id && r.pro_name !== null ? { id: r.provider_user_id, displayName: r.pro_name } : null,
       file: r.m_id ? { id: r.m_id, mime: r.m_mime as MediaMime, sizeBytes: Number(r.m_size), contentUrl: contentUrlOf(r.m_id) } : null,
       createdAt: iso(r.created_at),
@@ -170,8 +172,8 @@ export class HealthResultsService {
     if (body.resultDate !== undefined) assertResultDate(body.resultDate);
     const removed = await this.db.transaction(async (tx) => {
       await this.lockConsent(tx, userId);
-      const cur = (await tx.execute<{ kind: HealthResultKind; payload: string; result_date: Date | string; media_id: string | null }>(sql`
-        SELECT kind, payload, result_date, media_id FROM health_results WHERE id = ${id}::uuid AND user_id = ${userId}::uuid FOR UPDATE`)).rows[0];
+      const cur = (await tx.execute<{ kind: HealthResultKind; payload: string; result_date: string; media_id: string | null }>(sql`
+        SELECT kind, payload, to_char(result_date, 'YYYY-MM-DD') AS result_date, media_id FROM health_results WHERE id = ${id}::uuid AND user_id = ${userId}::uuid FOR UPDATE`)).rows[0];
       if (!cur) throw notFound('Result');
       const p = this.crypto.open<Payload>(userId, cur.payload);
       const payload = this.crypto.seal(userId, { title: body.title ?? p.title, summary: body.summary ?? p.summary } satisfies Payload);
@@ -180,7 +182,7 @@ export class HealthResultsService {
       if (replaced && mediaId) await this.attach(tx, userId, userId, mediaId);
       const kind = body.kind ?? cur.kind;
       await tx.execute(sql`
-        UPDATE health_results SET kind = ${kind}, payload = ${payload}, result_date = ${body.resultDate ?? day(cur.result_date)}::date, media_id = ${mediaId}::uuid, updated_at = now()
+        UPDATE health_results SET kind = ${kind}, payload = ${payload}, result_date = ${body.resultDate ?? cur.result_date}::date, media_id = ${mediaId}::uuid, updated_at = now()
         WHERE id = ${id}::uuid`);
       const keys = replaced ? await this.dropMedia(tx, cur.media_id) : [];
       await this.audit.record({ action: 'health.result_updated', actorUserId: userId, meta, metadata: { resultId: id, kind, fileChanged: replaced } }, tx);
@@ -223,6 +225,13 @@ export class HealthResultsService {
         FOR UPDATE OF c`);
       if (ok.rows.length === 0) throw notFound('Patient');
       await this.assertRoom(tx, patientId);
+      // The daily cap spans several patients: serialise this professional's inserts.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`health-results:${professionalId}`}))`);
+      const n = await tx.execute<{ per_patient: number; today: number }>(sql`
+        SELECT count(*) FILTER (WHERE user_id = ${patientId}::uuid)::int AS per_patient, count(*) FILTER (WHERE created_at > now() - interval '1 day')::int AS today
+        FROM health_results WHERE provider_user_id = ${professionalId}::uuid`);
+      if ((n.rows[0]?.per_patient ?? 0) >= PRO_RESULTS_PER_PATIENT) throw AppError.conflict('Too many results added for this patient', { reason: 'limit_reached', limit: PRO_RESULTS_PER_PATIENT });
+      if ((n.rows[0]?.today ?? 0) >= PRO_RESULTS_PER_DAY) throw AppError.conflict('Daily limit of added results reached', { reason: 'limit_reached', limit: PRO_RESULTS_PER_DAY });
       if (body.assetId) await this.attach(tx, professionalId, patientId, body.assetId);
       const res = await tx.execute<{ id: string }>(sql`
         INSERT INTO health_results (user_id, kind, payload, result_date, provider_user_id, media_id)

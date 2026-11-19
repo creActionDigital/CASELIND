@@ -28,6 +28,8 @@ Aucune valeur secrète ici ; les secrets s'injectent par le gestionnaire de secr
 
 **Commerce et portefeuille** : `COMMERCE_CURRENCIES`, `WALLET_SANDBOX_TOPUP_ENABLED` (laisser absent ou `false` en production), `WALLET_SANDBOX_TOPUP_MAX_MINOR`.
 
+**Clés de chiffrement** : `TOTP_ENCRYPTION_KEY` et `HEALTH_ENCRYPTION_KEY` (obligatoires en production, 32 octets minimum en hex ou base64, à sauvegarder hors du serveur : la clé santé protège aussi les fichiers de comptes rendus et pièces d'identité stockés, scellés AES-256-GCM ; les fichiers antérieurs au chiffrement restent lisibles). `WEBHOOK_ENCRYPTION_KEY` (facultative, même format) scelle les secrets des webhooks ; sans elle, `TOTP_ENCRYPTION_KEY` est utilisée, et au moins l'une des deux est exigée au démarrage en production. Les secrets scellés portent un identifiant de clé : pour changer de clé, ajouter la nouvelle `WEBHOOK_ENCRYPTION_KEY` en gardant l'ancienne `TOTP_ENCRYPTION_KEY`, les anciens secrets restent lisibles ; un secret illisible donne l'erreur de livraison `secret` (sans désactiver la souscription) : le faire tourner. Plafond : 120 événements webhook par organisation et par minute (par instance).
+
 **KYC et paiements** : `KYC_ENCRYPTION_KEY` (obligatoire en production, 32 octets minimum en hex ou base64 ; sa perte rend les numéros de pièces illisibles, la sauvegarder), `PAYMENT_QR_SECRET` (obligatoire en production, >= 32 car.), `KYC_LIMITS` (JSON optionnel), `PAYMENT_PIN_MAX_ATTEMPTS`, `PAYMENT_PIN_LOCK_MINUTES`.
 
 Le démarrage échoue avec la liste des variables invalides ; c'est le premier contrôle à lire en cas d'échec.

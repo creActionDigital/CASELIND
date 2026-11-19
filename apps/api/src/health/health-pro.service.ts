@@ -41,7 +41,6 @@ const invalid = (path: string, message: string) => new AppError(400, ErrorCodes.
 const consentRequired = () => new AppError(403, ErrorCodes.forbidden, 'Health data needs your explicit consent first', { reason: 'consent_required' });
 const notFound = (what: string) => AppError.notFound(`${what} not found`);
 const iso = (d: Date | string) => new Date(d).toISOString();
-const day = (d: Date | string) => iso(d).slice(0, 10);
 const newCode = (): string => Array.from({ length: 12 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -413,8 +412,8 @@ export class HealthProService {
       ORDER BY s.created_at DESC LIMIT 1`);
     const s = share.rows[0];
     if (!s) throw notFound('Record');
-    const entries = await this.db.execute<{ kind: SharedRecord['entries'][number]['kind']; recorded_on: Date | string; payload: string }>(sql`
-      SELECT kind, recorded_on, payload FROM health_entries WHERE user_id = ${patientId}::uuid AND kind IN (${sql.join(s.kinds.map((k) => sql`${k}`), sql`, `)}) ORDER BY recorded_on DESC, id DESC LIMIT 500`);
+    const entries = await this.db.execute<{ kind: SharedRecord['entries'][number]['kind']; recorded_on: string; payload: string }>(sql`
+      SELECT kind, to_char(recorded_on, 'YYYY-MM-DD') AS recorded_on, payload FROM health_entries WHERE user_id = ${patientId}::uuid AND kind IN (${sql.join(s.kinds.map((k) => sql`${k}`), sql`, `)}) ORDER BY recorded_on DESC, id DESC LIMIT 500`);
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`INSERT INTO health_access_log (patient_id, accessor_id, share_id, entries_count) VALUES (${patientId}::uuid, ${professionalId}::uuid, ${s.id}::uuid, ${entries.rows.length})`);
       await this.audit.record({ action: 'health.record_read', actorUserId: professionalId, meta, metadata: { shareId: s.id, entries: entries.rows.length } }, tx);
@@ -424,7 +423,7 @@ export class HealthProService {
       expiresAt: iso(s.expires_at),
       entries: entries.rows.map((r) => {
         const p = this.crypto.open<{ title: string; details: string; severity: number | null }>(patientId, r.payload);
-        return { kind: r.kind, recordedOn: day(r.recorded_on), title: p.title, details: p.details, severity: p.severity };
+        return { kind: r.kind, recordedOn: r.recorded_on, title: p.title, details: p.details, severity: p.severity };
       }),
     };
   }
@@ -470,14 +469,14 @@ export class HealthProService {
 
   private async prescriptions(where: { id?: string; patient?: string }, patientId: string): Promise<Prescription[]> {
     const f = where.id ? sql`rx.id = ${where.id}::uuid` : sql`rx.patient_id = ${where.patient!}::uuid`;
-    const res = await this.db.execute<{ id: string; appointment_id: string; code: string; valid_until: Date | string; items_enc: string; created_at: Date; pro_id: string; pro_name: string }>(sql`
-      SELECT rx.id, rx.appointment_id, rx.code, rx.valid_until, rx.items_enc, rx.created_at, u.id AS pro_id, u.display_name AS pro_name
+    const res = await this.db.execute<{ id: string; appointment_id: string; code: string; valid_until: string; items_enc: string; created_at: Date; pro_id: string; pro_name: string }>(sql`
+      SELECT rx.id, rx.appointment_id, rx.code, to_char(rx.valid_until, 'YYYY-MM-DD') AS valid_until, rx.items_enc, rx.created_at, u.id AS pro_id, u.display_name AS pro_name
       FROM health_prescriptions rx JOIN users u ON u.id = rx.professional_id WHERE ${f} AND rx.patient_id = ${patientId}::uuid ORDER BY rx.created_at DESC LIMIT 50`);
     return res.rows.map((r) => ({
       id: r.id,
       appointmentId: r.appointment_id,
       code: r.code,
-      validUntil: day(r.valid_until),
+      validUntil: r.valid_until,
       items: this.crypto.open<{ items: { name: string; dose: string; instructions: string }[] }>(patientId, r.items_enc).items,
       professional: { id: r.pro_id, displayName: r.pro_name },
       createdAt: iso(r.created_at),

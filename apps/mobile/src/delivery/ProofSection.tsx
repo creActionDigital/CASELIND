@@ -4,11 +4,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useI18n } from '../i18n';
-import { imageMime, uploadImage } from '../media/upload';
+import { imageMime, uploadBytes, uploadImage } from '../media/upload';
 import { Card, SectionTitle } from '../seller/ui';
 import { radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, Button, Text } from '../ui';
+import { SignaturePad } from './SignaturePad';
 import { proofKeys, setProof, useDeliveryProof } from './proof-api';
 import { canAttachProof, hasProof, isProofMime, showsProof } from './proof-logic';
 import { deliveryErrorMessage } from './errors';
@@ -58,7 +59,7 @@ export function ProofView({ deliveryId, status, bare }: { deliveryId: string; st
 
 /**
  * Écran livreur : joindre (caméra ou galerie), remplacer ou retirer la photo de remise.
- * La signature du client reste affichée si elle existe, mais son tracé n'est pas encore proposé sur mobile.
+ * La signature du client se trace au doigt (PNG fabriqué sans lib de capture) ; l'API refuse de remplacer une preuve déjà remise.
  */
 export function CourierProof({ deliveryId, status }: { deliveryId: string; status: DeliveryStatus }) {
   const { colors } = useTheme();
@@ -67,9 +68,10 @@ export function CourierProof({ deliveryId, status }: { deliveryId: string; statu
   const q = useDeliveryProof(deliveryId, canAttachProof(status));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [signing, setSigning] = useState(false);
 
   const save = useMutation({
-    mutationFn: (photoAssetId: string | null) => setProof(deliveryId, { photoAssetId }),
+    mutationFn: (body: { photoAssetId?: string | null; signatureAssetId?: string | null }) => setProof(deliveryId, body),
     onSuccess: (p) => qc.setQueryData(proofKeys.one(deliveryId), p),
     onError: (e) => setError(deliveryErrorMessage(e, t, locale)),
   });
@@ -94,7 +96,21 @@ export function CourierProof({ deliveryId, status }: { deliveryId: string; statu
       const mime = imageMime(a.mimeType, a.uri);
       if (!isProofMime(mime)) return setError(t('delivery.proof.badType'));
       const assetId = await uploadImage(a.uri, mime, 'delivery_proof');
-      await save.mutateAsync(assetId);
+      await save.mutateAsync({ photoAssetId: assetId });
+    } catch (e) {
+      setError(deliveryErrorMessage(e, t, locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sign(png: Uint8Array) {
+    setError(null);
+    setBusy(true);
+    try {
+      const assetId = await uploadBytes(png, 'image/png', 'delivery_proof');
+      await save.mutateAsync({ signatureAssetId: assetId });
+      setSigning(false);
     } catch (e) {
       setError(deliveryErrorMessage(e, t, locale));
     } finally {
@@ -114,8 +130,17 @@ export function CourierProof({ deliveryId, status }: { deliveryId: string; statu
         <View style={{ gap: spacing.sm }}>
           {Platform.OS !== 'web' ? <Button variant="secondary" label={photo ? t('delivery.proof.replace') : t('delivery.proof.camera')} loading={busy} onPress={() => void pick(true)} /> : null}
           <Button variant="secondary" label={t('delivery.proof.gallery')} loading={busy} onPress={() => void pick(false)} />
-          {photo ? <Button variant="ghost" label={t('delivery.proof.remove')} disabled={busy} loading={save.isPending && save.variables === null} onPress={() => save.mutate(null)} /> : null}
+          {photo ? <Button variant="ghost" label={t('delivery.proof.remove')} disabled={busy} loading={save.isPending && save.variables?.photoAssetId === null} onPress={() => save.mutate({ photoAssetId: null })} /> : null}
+          <Button variant="secondary" label={q.data?.signature ? t('delivery.signature.redo') : t('delivery.signature.open')} disabled={busy} onPress={() => setSigning((v) => !v)} />
         </View>
+        {signing ? (
+          <View style={{ gap: spacing.sm }}>
+            <Text variant="small" muted>
+              {t('delivery.signature.hint')}
+            </Text>
+            <SignaturePad onSubmit={(png) => void sign(png)} busy={busy} />
+          </View>
+        ) : null}
         {error ? (
           <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">
             {error}

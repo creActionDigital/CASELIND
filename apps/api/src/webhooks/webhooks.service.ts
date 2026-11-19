@@ -35,6 +35,12 @@ const BACKOFF_MINUTES = [1, 10] as const;
 /** A claimed delivery is not retried by another worker for this long (crash safety). */
 const LEASE_MINUTES = 2;
 const DUE_BATCH = 100;
+/** Events one organisation may emit per minute (per API instance); past it they are dropped with a warning. */
+export const WEBHOOK_EVENTS_PER_MINUTE = 120;
+const MINUTE_MS = 60_000;
+
+/** The stored secret cannot be opened (wrong or missing key): a configuration problem, not a network failure. */
+class SecretError extends Error {}
 
 type Data = Record<string, string | number | boolean | null>;
 type Hook = { id: string; org_id: string; url: string; secret_enc: string; events: string[]; active: boolean; failure_count: number; last_status: number | null; last_delivery_at: Date | null; disabled_at: Date | null; created_at: Date };
@@ -63,7 +69,11 @@ export const signPayload = (secret: string, timestamp: string, body: string): st
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
-  private readonly key: Buffer;
+  /** Sealing keys, current first. New secrets use the first; stored ones are opened with the key their id names (v1: any). */
+  private readonly keys: { kid: string; key: Buffer }[];
+  private readonly emitWindows = new Map<string, { from: number; n: number }>();
+  /** Events dropped by the per-organisation cap since start (a counter for monitoring). */
+  droppedEvents = 0;
   private readonly inflight = new Set<Promise<void>>();
   /** Replaced in tests. */
   transport: WebhookTransport = new NodeWebhookTransport();
@@ -74,28 +84,50 @@ export class WebhookService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
   ) {
-    const material = env.TOTP_ENCRYPTION_KEY ? decodeKeyMaterial(env.TOTP_ENCRYPTION_KEY) : Buffer.from(env.JWT_ACCESS_SECRET);
-    this.key = createHash('sha256').update('webhook-secret:').update(material).digest();
+    if (env.NODE_ENV === 'production' && !env.WEBHOOK_ENCRYPTION_KEY && !env.TOTP_ENCRYPTION_KEY) {
+      throw new Error('WEBHOOK_ENCRYPTION_KEY or TOTP_ENCRYPTION_KEY is required in production to seal webhook secrets');
+    }
+    const materials = [
+      env.WEBHOOK_ENCRYPTION_KEY ? decodeKeyMaterial(env.WEBHOOK_ENCRYPTION_KEY) : undefined,
+      env.TOTP_ENCRYPTION_KEY ? decodeKeyMaterial(env.TOTP_ENCRYPTION_KEY) : undefined,
+      // Outside production only: the fallback that sealed secrets before any dedicated key existed.
+      env.NODE_ENV === 'production' ? undefined : Buffer.from(env.JWT_ACCESS_SECRET),
+    ].filter((m): m is Buffer => m !== undefined);
+    this.keys = materials.map((m) => {
+      const key = createHash('sha256').update('webhook-secret:').update(m).digest();
+      return { key, kid: createHash('sha256').update('kid:').update(key).digest('hex').slice(0, 8) };
+    });
   }
 
   /* ---------------------------------------------------------------- secrets */
 
-  /** AES-256-GCM bound to the subscription id (AAD): `v1:<iv>:<tag>:<ciphertext>`. */
+  /** AES-256-GCM bound to the subscription id (AAD): `v2:<kid>:<iv>:<tag>:<ciphertext>` (v1, without kid, is still read). */
   private seal(id: string, plain: string): string {
+    const { kid, key } = this.keys[0]!;
     const iv = randomBytes(12);
-    const c = createCipheriv('aes-256-gcm', this.key, iv);
+    const c = createCipheriv('aes-256-gcm', key, iv);
     c.setAAD(Buffer.from(`webhook:${id}`));
     const ct = Buffer.concat([c.update(plain, 'utf8'), c.final()]);
-    return ['v1', iv.toString('base64url'), c.getAuthTag().toString('base64url'), ct.toString('base64url')].join(':');
+    return ['v2', kid, iv.toString('base64url'), c.getAuthTag().toString('base64url'), ct.toString('base64url')].join(':');
   }
 
   private open(id: string, stored: string): string {
-    const [v, iv, tag, ct] = stored.split(':');
-    if (v !== 'v1' || !iv || !tag || !ct) throw new Error('unsupported ciphertext');
-    const d = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'));
-    d.setAAD(Buffer.from(`webhook:${id}`));
-    d.setAuthTag(Buffer.from(tag, 'base64url'));
-    return Buffer.concat([d.update(Buffer.from(ct, 'base64url')), d.final()]).toString('utf8');
+    const parts = stored.split(':');
+    const [v, kid] = parts;
+    const [iv, tag, ct] = v === 'v2' ? parts.slice(2) : parts.slice(1);
+    if ((v !== 'v1' && v !== 'v2') || !iv || !tag || !ct) throw new SecretError('unsupported ciphertext');
+    // v2 names its key; v1 predates key ids: try each known key (the GCM tag tells which one is right).
+    for (const k of v === 'v2' ? this.keys.filter((x) => x.kid === kid) : this.keys) {
+      try {
+        const d = createDecipheriv('aes-256-gcm', k.key, Buffer.from(iv, 'base64url'));
+        d.setAAD(Buffer.from(`webhook:${id}`));
+        d.setAuthTag(Buffer.from(tag, 'base64url'));
+        return Buffer.concat([d.update(Buffer.from(ct, 'base64url')), d.final()]).toString('utf8');
+      } catch {
+        // wrong key: try the next one
+      }
+    }
+    throw new SecretError('no key opens this secret');
   }
 
   /* ---------------------------------------------------------------- management */
@@ -213,10 +245,27 @@ export class WebhookService {
    * call it after the commit of the originating operation; it never throws and never waits.
    */
   emit(orgId: string, event: WebhookEvent, data: Data): void {
+    if (this.overLimit(orgId)) return;
     const p: Promise<void> = this.enqueue(orgId, event, data)
       .catch((err: unknown) => this.logger.warn(`webhook emit failed: ${(err as Error).name}`))
       .finally(() => this.inflight.delete(p));
     this.inflight.add(p);
+  }
+
+  /** Fixed one-minute window per organisation. shortcut: per instance, not shared between instances: move to the database if several API instances share one organisation's traffic. */
+  private overLimit(orgId: string): boolean {
+    const now = Date.now();
+    if (this.emitWindows.size > 1000) for (const [k, w] of this.emitWindows) if (now - w.from >= MINUTE_MS) this.emitWindows.delete(k);
+    const w = this.emitWindows.get(orgId);
+    if (!w || now - w.from >= MINUTE_MS) {
+      this.emitWindows.set(orgId, { from: now, n: 1 });
+      return false;
+    }
+    w.n += 1;
+    if (w.n <= WEBHOOK_EVENTS_PER_MINUTE) return false;
+    this.droppedEvents += 1;
+    if (w.n === WEBHOOK_EVENTS_PER_MINUTE + 1) this.logger.warn(`webhook events over ${WEBHOOK_EVENTS_PER_MINUTE}/min for organization ${orgId}: dropping until the window ends`);
+    return true;
   }
 
   /** Resolves when every emission started so far has been sent (tests; graceful stop). */
@@ -293,6 +342,11 @@ export class WebhookService {
         next_attempt_at = ${final ? sql`NULL` : sql`now() + make_interval(mins => ${wait})`}
       WHERE id = ${d.id}::uuid`);
     if (d.event === 'ping') return; // a test never moves the failure counter
+    // A secret that cannot be opened is our configuration, not the receiver's fault: it must not switch the subscription off.
+    if (out.errorCode === 'secret') {
+      this.logger.warn(`webhook ${d.webhook_id}: its secret cannot be opened (encryption key changed?): rotate the secret`);
+      return;
+    }
     if (ok) {
       await this.db.execute(sql`UPDATE org_webhooks SET failure_count = 0, last_status = ${out.httpStatus}, last_delivery_at = now() WHERE id = ${d.webhook_id}::uuid`);
       return;
@@ -334,7 +388,12 @@ export class WebhookService {
       const addresses = await this.transport.lookup(g.host);
       if (!resolvedAddressesAllowed(addresses, g.devLoopback)) return { httpStatus: null, errorCode: 'blocked' };
       const timestamp = String(Math.floor(Date.now() / 1000));
-      const secret = this.open(d.webhook_id, d.secret_enc);
+      let secret: string;
+      try {
+        secret = this.open(d.webhook_id, d.secret_enc);
+      } catch {
+        return { httpStatus: null, errorCode: 'secret' };
+      }
       const res = await this.transport.post({
         url: g.url,
         address: addresses[0]!,

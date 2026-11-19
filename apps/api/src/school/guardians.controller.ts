@@ -6,6 +6,7 @@ import {
   createGuardianRequestSchema,
   type MyChildList,
   type MyGuardianshipList,
+  type MyStudentGuardianList,
   type SchoolGuardian,
   type SchoolGuardianList,
 } from '@caselind/contracts';
@@ -47,6 +48,18 @@ export class OrgGuardiansController {
 @RequireFlag('school')
 export class MyGuardianshipsController {
   constructor(private readonly g: GuardiansService) {}
+
+  /** The pupil's own view of the links that concern them, and the right to end them. */
+  @Get('guardians')
+  asStudent(@CurrentUser() u: AuthUser): Promise<MyStudentGuardianList> {
+    return this.g.forStudent(u.userId);
+  }
+
+  @Delete('guardians/:id')
+  @HttpCode(204)
+  removeAsStudent(@CurrentUser() u: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<void> {
+    return this.g.removeByStudent(u.userId, id, meta);
+  }
 
   @Get('guardianships')
   mine(@CurrentUser() u: AuthUser): Promise<MyGuardianshipList> {

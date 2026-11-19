@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { NotificationsService } from '../src/notifications/notifications.service.js';
 import { FeesService } from '../src/school/fees.service.js';
 import { MaintenanceService } from '../src/maintenance/maintenance.service.js';
 import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
@@ -130,6 +131,35 @@ describe('parent-pupil links, fee reminders and export (lot 17b leftovers)', () 
     expect(audits.rows[0].n).toBeGreaterThanOrEqual(2);
   });
 
+  it('the pupil sees the links that concern them and can end them; the parent is told generically', async () => {
+    const [head, pupil, mum, other] = [await user(), await user(), await user(), await user()];
+    const org = await school(head);
+    const cls = (await call('post', head, `/orgs/${org}/school/classes`, { name: '2e B', yearLabel: '2026-2027' }).expect(201)).body;
+    await call('post', head, `/orgs/${org}/school/classes/${cls.id}/members`, { handle: pupil.handle, role: 'student' }).expect(204);
+    const link = (await call('post', head, `/orgs/${org}/school/guardians`, { studentHandle: pupil.handle, guardianHandle: mum.handle, relation: 'Mere' }).expect(201)).body;
+    await call('post', mum, `/me/school/guardianships/${link.id}/accept`).expect(204);
+
+    const seen = (await call('get', pupil, '/me/school/guardians').expect(200)).body.items;
+    expect(seen).toEqual([{ id: link.id, schoolName: 'Ecole Parents', guardianDisplayName: 'Test User', relation: 'Mere', status: 'active' }]);
+    expect((await call('get', other, '/me/school/guardians').expect(200)).body.items).toEqual([]);
+
+    await call('delete', other, `/me/school/guardians/${link.id}`).expect(404); // not theirs
+    await call('delete', mum, `/me/school/guardians/${link.id}`).expect(404); // the parent uses the decline route
+    await call('delete', pupil, '/me/school/guardians/not-a-uuid').expect(404);
+    await call('delete', pupil, `/me/school/guardians/${link.id}`).expect(204);
+    await call('delete', pupil, `/me/school/guardians/${link.id}`).expect(404);
+    expect((await call('get', pupil, '/me/school/guardians').expect(200)).body.items).toEqual([]);
+    expect((await call('get', head, `/orgs/${org}/school/guardians`).expect(200)).body.items).toEqual([]);
+    await call('get', mum, `/me/school/children/${pupil.id}/classes`).expect(404); // access is gone
+
+    const note = (await call('get', mum, '/notifications').expect(200)).body.items.filter((x: { title: string }) => x.title === 'Suivi scolaire');
+    expect(note).toHaveLength(1);
+    expect(JSON.stringify(note)).not.toContain(pupil.handle);
+    const audit = await ctx.sql.query(`SELECT metadata::text AS md FROM audit_events WHERE action = 'school.guardian_removed_by_student' AND actor_user_id = $1`, [pupil.id]);
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0].md).not.toContain('Test User');
+  });
+
   it('the regulated school flag cuts everything', async () => {
     const [head, mum] = [await user(), await user()];
     const org = await school(head);
@@ -170,6 +200,31 @@ describe('parent-pupil links, fee reminders and export (lot 17b leftovers)', () 
     expect(JSON.stringify(await reminders(late))).not.toMatch(/7000|Minerval/);
     const rows = await ctx.sql.query(`SELECT title, reminded_at IS NOT NULL AS done FROM school_fees WHERE class_id = $1 ORDER BY title`, [cls.id]);
     expect(rows.rows).toEqual([{ title: 'Lointain', done: false }, { title: 'Minerval T2', done: true }]);
+  });
+
+  it('the reminder is marked done only after the send: a failed send is retried, and two runs at once notify once', async () => {
+    const [head, pupil, dad] = [await user(), await user(), await user()];
+    const org = await school(head);
+    const cls = (await call('post', head, `/orgs/${org}/school/classes`, { name: '5e E', yearLabel: '2026-2027' }).expect(201)).body;
+    const base = `/orgs/${org}/school/classes/${cls.id}`;
+    await call('post', head, `${base}/members`, { handle: pupil.handle, role: 'student' }).expect(204);
+    const l = (await call('post', head, `/orgs/${org}/school/guardians`, { studentHandle: pupil.handle, guardianHandle: dad.handle }).expect(201)).body;
+    await call('post', dad, `/me/school/guardianships/${l.id}/accept`).expect(204);
+    await call('post', head, `${base}/fees`, { title: 'Minerval T3', amountMinor: 900, currency: 'USD', dueOn: day(1) }).expect(201);
+    const fees = ctx.app.get(FeesService);
+    const reminded = async () => (await ctx.sql.query('SELECT reminded_at IS NOT NULL AS done FROM school_fees WHERE class_id = $1', [cls.id])).rows[0].done as boolean;
+
+    const spy = vi.spyOn(ctx.app.get(NotificationsService), 'notifyMany').mockRejectedValueOnce(new Error('push down'));
+    await expect(fees.remindDue(new Date())).rejects.toThrow('push down');
+    spy.mockRestore();
+    expect(await reminded()).toBe(false);
+    expect(await reminders(pupil)).toHaveLength(0);
+
+    const [a, b] = await Promise.all([fees.remindDue(new Date()), fees.remindDue(new Date())]);
+    expect(a + b).toBe(2); // pupil + parent, once
+    expect(await reminded()).toBe(true);
+    expect(await reminders(pupil)).toHaveLength(1);
+    expect(await reminders(dad)).toHaveLength(1);
   });
 
   it('the reminder does nothing while the school flag is off', async () => {

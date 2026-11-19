@@ -13,6 +13,13 @@ export const proofFr = {
   'delivery.proof.takenAt': 'Prise le {date}',
   'delivery.proof.none': 'Aucune preuve jointe.',
   'delivery.proof.seen': 'Visible par l’acheteur et la boutique.',
+  'delivery.signature.open': 'Signature du client',
+  'delivery.signature.redo': 'Refaire la signature',
+  'delivery.signature.cancel': 'Fermer',
+  'delivery.signature.hint': 'Faites signer le client du doigt dans le cadre. Une preuve ne peut plus être remplacée une fois la livraison remise.',
+  'delivery.signature.pad': 'Zone de signature du client',
+  'delivery.signature.clear': 'Effacer',
+  'delivery.signature.submit': 'Valider',
 } as const;
 export const proofEn = {
   'delivery.proof.title': 'Proof of delivery',
@@ -28,4 +35,11 @@ export const proofEn = {
   'delivery.proof.takenAt': 'Taken on {date}',
   'delivery.proof.none': 'No proof attached.',
   'delivery.proof.seen': 'Visible to the buyer and the shop.',
+  'delivery.signature.open': 'Customer signature',
+  'delivery.signature.redo': 'Redo the signature',
+  'delivery.signature.cancel': 'Close',
+  'delivery.signature.hint': 'Have the customer sign with a finger in the box. Proof can no longer be replaced once the delivery is handed over.',
+  'delivery.signature.pad': 'Customer signature area',
+  'delivery.signature.clear': 'Clear',
+  'delivery.signature.submit': 'Confirm',
 } as const;

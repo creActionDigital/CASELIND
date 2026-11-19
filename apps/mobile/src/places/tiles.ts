@@ -97,3 +97,39 @@ export function radiusPoints(center: LatLng, km: number): LatLng[] {
     { lat: center.lat, lng: center.lng - dLng },
   ];
 }
+
+/** Inverse de `toScreen` : le point de la carte sous le pixel (x, y) d'une fenêtre w×h. */
+export function screenToLatLng(x: number, y: number, center: LatLng, zoom: number, w: number, h: number): LatLng {
+  const c = project(center, zoom);
+  return unproject(c.x + x - w / 2, c.y + y - h / 2, zoom);
+}
+
+/** Distance (px) entre deux touches ; 0 s'il n'y en a pas deux. */
+export function touchDistance(touches: readonly { pageX: number; pageY: number }[]): number {
+  const [a, b] = touches;
+  return a && b ? Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY) : 0;
+}
+
+/** Zoom entier après un pincement : un cran par doublement (ou division par deux) de l'écart des doigts, seuil à ×1,41. */
+export function pinchZoom(startZoom: number, startDist: number, dist: number): number {
+  if (startDist <= 0 || dist <= 0) return startZoom;
+  return clampZoom(startZoom + Math.round(Math.log2(dist / startDist)));
+}
+
+/** Appui court : peu de déplacement, peu de durée. */
+export const isTap = (dx: number, dy: number, ms: number): boolean => Math.abs(dx) + Math.abs(dy) <= 8 && ms < 500;
+
+/** Deuxième appui proche du précédent (en temps et en position) : double appui. */
+export function isDoubleTap(prev: { x: number; y: number; at: number } | null, x: number, y: number, at: number): boolean {
+  return !!prev && at - prev.at < 300 && Math.hypot(x - prev.x, y - prev.y) < 30;
+}
+
+/** Points d'une polyligne SVG (« x,y x,y ») pour les points de la carte, en pixels d'écran. */
+export function linePoints(line: readonly LatLng[], center: LatLng, zoom: number, w: number, h: number): string {
+  return line
+    .map((p) => {
+      const s = toScreen(p, center, zoom, w, h);
+      return `${s.x.toFixed(1)},${s.y.toFixed(1)}`;
+    })
+    .join(' ');
+}

@@ -79,6 +79,22 @@ describe('personal health: flag and consent (lot 18a)', () => {
       expect((await ctx.sql.query('SELECT count(*)::int AS n FROM health_entries WHERE user_id = $1', [u.id])).rows[0].n).toBe(0);
     });
 
+    it('reads date columns as calendar days whatever the server time zone', async () => {
+      const u = await consenting();
+      const tz = process.env.TZ;
+      process.env.TZ = 'Pacific/Kiritimati'; // UTC+14: a Date parsed from a date column would land on the previous day in UTC
+      try {
+        const e = (await addEntry(u, entry({ recordedOn: '2026-03-10' })).expect(201)).body;
+        expect(e.recordedOn).toBe('2026-03-10');
+        expect((await get(u, '/entries').expect(200)).body.items[0].recordedOn).toBe('2026-03-10');
+        const r = (await send('post', u, '/reminders', reminder({ startsOn: '2026-03-10', endsOn: '2026-03-12' })).expect(201)).body;
+        expect(r).toMatchObject({ startsOn: '2026-03-10', endsOn: '2026-03-12' });
+      } finally {
+        if (tz === undefined) delete process.env.TZ;
+        else process.env.TZ = tz;
+      }
+    });
+
     it('records entries: validates, pages by date, filters by kind, edits keeping untouched fields, deletes', async () => {
       const u = await consenting();
       await addEntry(u, entry({ title: '' })).expect(400);

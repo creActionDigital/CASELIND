@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ChildClassList, ChildFeeList, CreateGuardianRequest, ExportedGuardian, GuardianStatus, MyChildList, MyGuardianshipList, SchoolGuardian, SchoolGuardianList } from '@caselind/contracts';
+import type { ChildClassList, ChildFeeList, CreateGuardianRequest, ExportedGuardian, GuardianStatus, MyChildList, MyGuardianshipList, MyStudentGuardianList, SchoolGuardian, SchoolGuardianList } from '@caselind/contracts';
 import { sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
@@ -98,6 +98,30 @@ export class GuardiansService {
     const r = await this.db.execute<{ org_id: string; student_user_id: string }>(sql`DELETE FROM school_guardians WHERE id = ${id}::uuid AND guardian_user_id = ${guardianId}::uuid RETURNING org_id, student_user_id`);
     if (!r.rows[0]) throw AppError.notFound('Invitation not found');
     await this.audit.record({ action: 'school.guardian_declined', actorUserId: guardianId, meta, metadata: { orgId: r.rows[0].org_id, guardianshipId: id, studentId: r.rows[0].student_user_id } });
+  }
+
+  // ---- Pupil ------------------------------------------------------------------------------------
+
+  /** The pupil sees every parent link that concerns them (a school linked them without asking). */
+  async forStudent(studentId: string): Promise<MyStudentGuardianList> {
+    const r = await this.db.execute<{ id: string; school_name: string; guardian_name: string; relation: string; status: GuardianStatus }>(sql`
+      SELECT g.id, o.name AS school_name, p.display_name AS guardian_name, g.relation, g.status
+      FROM school_guardians g JOIN organizations o ON o.id = g.org_id JOIN users p ON p.id = g.guardian_user_id
+      WHERE g.student_user_id = ${studentId}::uuid ORDER BY g.created_at DESC, g.id LIMIT 100`);
+    return { items: r.rows.map((g) => ({ id: g.id, schoolName: g.school_name, guardianDisplayName: g.guardian_name, relation: g.relation, status: g.status })) };
+  }
+
+  /** The pupil ends a link that concerns them (pending or active); the parent is told generically. Anyone else's link: 404. */
+  async removeByStudent(studentId: string, id: string, meta: RequestMeta): Promise<void> {
+    if (!UUID_RE.test(id)) throw AppError.notFound('Link not found');
+    const r = await this.db.execute<{ org_id: string; guardian_user_id: string }>(sql`DELETE FROM school_guardians WHERE id = ${id}::uuid AND student_user_id = ${studentId}::uuid RETURNING org_id, guardian_user_id`);
+    if (!r.rows[0]) throw AppError.notFound('Link not found');
+    await this.audit.record({ action: 'school.guardian_removed_by_student', actorUserId: studentId, subjectUserId: r.rows[0].guardian_user_id, meta, metadata: { orgId: r.rows[0].org_id, guardianshipId: id, studentId } });
+    try {
+      await this.notifications.notify({ userId: r.rows[0].guardian_user_id, category: 'system', title: 'Suivi scolaire', body: 'Un lien de suivi scolaire a été retiré.', data: { guardianshipId: id } });
+    } catch {
+      // not essential: the link is already gone
+    }
   }
 
   async children(guardianId: string): Promise<MyChildList> {
