@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { alertConfirm } from '../lib/confirm';
 import type { OrgRating, PublicOrg, StoreReview } from '@caselind/contracts';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../i18n';
 import { ApiRequestError } from '../lib/api';
 import { errorMessage } from '../lib/errors';
@@ -147,7 +148,7 @@ function MyReview({ org }: { org: Pick<PublicOrg, 'id' | 'slug'> }) {
               variant="ghost"
               label={t('vitrine.reviews.delete')}
               disabled={remove.isPending}
-              onPress={() => Alert.alert(t('vitrine.reviews.delete'), undefined, [{ text: t('common.cancel'), style: 'cancel' }, { text: t('vitrine.reviews.delete'), style: 'destructive', onPress: () => remove.mutate() }])}
+              onPress={() => alertConfirm(t('vitrine.reviews.delete'), undefined, [{ text: t('common.cancel'), style: 'cancel' }, { text: t('vitrine.reviews.delete'), style: 'destructive', onPress: () => remove.mutate() }])}
             />
           ) : null}
         </>

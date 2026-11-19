@@ -1,8 +1,9 @@
 import type { OrgQuestion } from '@caselind/contracts';
+import { alertConfirm } from '../../../../lib/confirm';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { useI18n } from '../../../../i18n';
 import { useMembership } from '../../../../seller/api';
 import { canEditProfile } from '../../../../seller/permissions';
@@ -71,7 +72,7 @@ function QuestionCard({ orgId, question: x, canAnswer }: { orgId: string; questi
   });
   const remove = useMutation({ mutationFn: () => deleteQuestion(orgId, x.id), onSuccess: refresh, onError: (e) => setError(sellerErrorMessage(e, t, locale)) });
   const confirmDelete = () =>
-    Alert.alert(x.question, undefined, [
+    alertConfirm(x.question, undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('vitrine.questions.seller.delete'), style: 'destructive', onPress: () => remove.mutate() },
     ]);

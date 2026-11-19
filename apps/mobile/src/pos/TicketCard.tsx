@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Share, View } from 'react-native';
+import { alertConfirm } from '../lib/confirm';
+import { Share, View } from 'react-native';
 import { useI18n } from '../i18n';
 import { sk } from '../seller/api';
 import { formatMinor } from '../seller/money';
@@ -38,7 +39,7 @@ export function TicketCard({ orgId, saleId, onClose }: { orgId: string; saleId: 
     void Share.share({ message });
   };
   const confirmVoid = () =>
-    Alert.alert(t('pos.void'), t('pos.void.confirm'), [
+    alertConfirm(t('pos.void'), t('pos.void.confirm'), [
       { text: t('pos.void.keep'), style: 'cancel' },
       { text: t('pos.void'), style: 'destructive', onPress: () => voided.mutate() },
     ]);

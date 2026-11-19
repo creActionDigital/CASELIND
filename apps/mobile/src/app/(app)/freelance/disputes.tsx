@@ -1,8 +1,9 @@
 import type { AdminDispute } from '@caselind/contracts';
+import { alertConfirm } from '../../../lib/confirm';
 import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData, type UseInfiniteQueryResult } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useAuth } from '../../../auth/auth-context';
 import { fetchAdminDisputes, frKeys, resolveAdminDispute } from '../../../freelance/api';
 import { useI18n } from '../../../i18n';
@@ -41,7 +42,7 @@ export default function AdminDisputes() {
       if (globalThis.confirm?.(msg)) resolve.mutate({ id, outcome });
       return;
     }
-    Alert.alert(t('freelance.admin.title'), msg, [{ text: t('common.cancel'), style: 'cancel' }, { text: t('freelance.admin.confirm'), onPress: () => resolve.mutate({ id, outcome }) }]);
+    alertConfirm(t('freelance.admin.title'), msg, [{ text: t('common.cancel'), style: 'cancel' }, { text: t('freelance.admin.confirm'), onPress: () => resolve.mutate({ id, outcome }) }]);
   };
 
   if (!isAdmin) {

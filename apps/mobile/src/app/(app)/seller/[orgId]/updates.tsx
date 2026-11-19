@@ -1,8 +1,9 @@
 import type { OrgUpdate } from '@caselind/contracts';
+import { alertConfirm } from '../../../../lib/confirm';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../../i18n';
 import { ApiRequestError } from '../../../../lib/api';
 import { useMembership } from '../../../../seller/api';
@@ -59,7 +60,7 @@ export default function OrgUpdates() {
   if (!canEditProfile(role)) return <>{title}<Screen><Text muted>{t('vitrine.updates.forbidden')}</Text></Screen></>;
 
   const confirmDelete = (u: OrgUpdate) =>
-    Alert.alert(u.title, undefined, [
+    alertConfirm(u.title, undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('vitrine.updates.delete'), style: 'destructive', onPress: () => remove.mutate(u.id) },
     ]);

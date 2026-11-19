@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { alertConfirm } from '../../../../lib/confirm';
 import { WEBHOOK_EVENTS, type Webhook, type WebhookEvent } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Share, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../../i18n';
 import { ApiRequestError } from '../../../../lib/api';
 import { useMembership } from '../../../../seller/api';
@@ -78,7 +79,7 @@ export default function OrgWebhooks() {
   if (list.isError) return <>{title}<ErrorState error={list.error} onRetry={() => list.refetch()} /></>;
 
   const confirm = (message: string, action: string, run: () => void, destructive = true) =>
-    Alert.alert(message, undefined, [{ text: t('common.cancel'), style: 'cancel' }, { text: action, style: destructive ? 'destructive' : 'default', onPress: run }]);
+    alertConfirm(message, undefined, [{ text: t('common.cancel'), style: 'cancel' }, { text: action, style: destructive ? 'destructive' : 'default', onPress: run }]);
 
   return (
     <>
