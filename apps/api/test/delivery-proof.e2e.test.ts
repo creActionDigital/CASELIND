@@ -108,14 +108,16 @@ describe('delivery proof by photo and signature (audit G5)', () => {
     await courierStatus(s.courier, s.deliveryId, { status: 'in_transit' }).expect(200);
     await courierStatus(s.courier, s.deliveryId, { status: 'delivered', code: s.proofCode }).expect(200);
     const sig2 = await photoOf(s.courier);
-    await put(s.courier, s.deliveryId, { signatureAssetId: sig2 }).expect(200); // still allowed once delivered
+    // Once delivered the proof is evidence: it cannot be replaced or removed any more.
+    expect((await put(s.courier, s.deliveryId, { signatureAssetId: sig2 }).expect(409)).body.error.details.reason).toBe('proof_final');
+    expect((await put(s.courier, s.deliveryId, { photoAssetId: null }).expect(409)).body.error.details.reason).toBe('proof_final');
     const after = (await get(s.buyer, s.deliveryId).expect(200)).body;
     expect(after.photo.id).toBe(photo);
-    expect(after.signature.id).toBe(sig2);
-    await read(s.courier, sig).expect(404); // replaced signature is gone
+    expect(after.signature.id).toBe(sig);
+    await read(s.courier, sig).expect(200);
 
     const audit = await ctx.sql.query(`SELECT metadata FROM audit_events WHERE action = 'delivery.proof_set' AND actor_user_id = $1 ORDER BY id`, [s.courier.id]);
-    expect(audit.rows).toHaveLength(2);
+    expect(audit.rows).toHaveLength(1);
     expect(JSON.stringify(audit.rows[0].metadata)).not.toContain('png');
     expect(audit.rows[0].metadata.changes).toEqual([{ kind: 'photo', action: 'set' }, { kind: 'signature', action: 'set' }]);
   });

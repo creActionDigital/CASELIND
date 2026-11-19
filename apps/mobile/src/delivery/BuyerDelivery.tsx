@@ -6,6 +6,7 @@ import { Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../i18n';
 import { directionsUrl, formatDistance } from '../places/geo';
 import { getDevicePosition } from '../places/device-location';
+import { TileMap } from '../places/TileMap';
 import { useRealtime } from '../realtime/realtime-context';
 import { shopKeys } from '../shop/hooks';
 import { radius, spacing, TOUCH } from '../theme/tokens';
@@ -122,6 +123,14 @@ export function BuyerDelivery({ orderId, delivery }: { orderId: string; delivery
           {t('delivery.noCourier')}
         </Text>
       )}
+      {live && !bad && delivery.status !== 'delivered' ? (
+        <TileMap
+          style={styles.map}
+          fit={[live]}
+          fitKey={`${live.lat},${live.lng}`}
+          markers={[{ id: 'courier', lat: live.lat, lng: live.lng, label: delivery.courier?.displayName ?? t('delivery.courier'), selected: true }]}
+        />
+      ) : null}
       {delivery.estimatedMinutes && !bad && delivery.status !== 'delivered' ? (
         <Text variant="small" muted>
           {t('delivery.eta', { n: delivery.estimatedMinutes })}
@@ -246,6 +255,7 @@ function RateCourier({ orderId }: { orderId: string }) {
 }
 
 const styles = StyleSheet.create({
+  map: { height: 200, borderRadius: radius.lg },
   card: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: spacing.md, gap: spacing.md },
   step: { flexDirection: 'row', gap: spacing.md, minHeight: 36 },
   rail: { alignItems: 'center', width: 16 },

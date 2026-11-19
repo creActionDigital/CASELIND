@@ -294,7 +294,8 @@ describe('delivery', () => {
     expect(d).toMatchObject({ status: 'failed', attempt: 3, nextAttemptAt: null });
     await due();
     expect(await hooks.processDue()).toBe(0);
-    expect((await hookOf(s, h.id)).failureCount).toBe(3);
+    // Three attempts of one delivery are one failure: only a delivery that gave up counts.
+    expect((await hookOf(s, h.id)).failureCount).toBe(1);
   });
 
   it('a retry that succeeds delivers and resets the failure counter', async () => {
@@ -304,7 +305,7 @@ describe('delivery', () => {
     const h = (await subscribe(s, { events: ['pos.sale_created'] }).expect(201)).body;
     await ctx.http.post(`/v1/orgs/${s.orgId}/pos/sales`).set(bearer(s.owner.token)).send({ clientId: randomUUID(), paymentMethod: 'cash', lines: [{ variantId: s.variant, quantity: 1 }] }).expect(201);
     await hooks.idle();
-    expect((await hookOf(s, h.id)).failureCount).toBe(1);
+    expect((await hookOf(s, h.id)).failureCount).toBe(0); // a retry is still scheduled: not a failure yet
     net.respond = 204;
     await due();
     await hooks.processDue();
@@ -325,6 +326,11 @@ describe('delivery', () => {
     for (let i = 0; i < 10; i++) {
       hooks.emit(s.orgId, 'pos.sale_created', { saleId: randomUUID() });
       await hooks.idle();
+    }
+    // Each delivery gives up after its third attempt; the tenth giving up switches the subscription off.
+    for (let round = 0; round < 2; round++) {
+      await due();
+      await hooks.processDue();
     }
     const dead = await hookOf(s, h.id);
     expect(dead).toMatchObject({ active: false, failureCount: 10, lastStatus: 500 });

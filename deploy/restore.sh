@@ -11,7 +11,7 @@ read -r -p "Remplacer la base et les médias actuels ? (oui/non) " ANSWER
 [ "$ANSWER" = "oui" ] || { echo "Annulé."; exit 1; }
 
 $COMPOSE stop api
-$COMPOSE exec -T db pg_restore -U caselind -d caselind --clean --if-exists --no-owner < "$DB_DUMP"
+$COMPOSE exec -T db pg_restore -U caselind -d caselind --clean --if-exists --no-owner < "$DB_DUMP" || echo "pg_restore a signalé des avertissements (souvent sans gravité) : relisez les lignes ci-dessus."
 $COMPOSE run --rm -T --no-deps --entrypoint sh api -c 'rm -rf /data/media/* && tar -C /data -xzf -' < "$MEDIA_TAR"
 $COMPOSE up -d api
 echo "Restauration terminée."

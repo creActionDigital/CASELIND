@@ -715,3 +715,8 @@ Constats sans correctif : Assistant IA affiche « Aucun modèle disponible » ta
   - résumé de caisse : `pg_timezone_names` évalué plusieurs fois ;
   - annulation d'une vente si le suivi de stock a changé entre-temps ;
   - sondage dont le créateur est purgé : bulle vide côté mobile ; `deploy/restore.sh` laisse l'API arrêtée si `pg_restore` renvoie des avertissements.
+
+## Cartes et défauts fermés (2026-11-19)
+- **Maps** : vraie carte à tuiles OpenStreetMap sans module natif (`apps/mobile/src/places/TileMap.tsx`, projection testée dans `tiles.test.ts`) : déplacement au doigt, zoom +/−, repères, « ma position », panneau des lieux avec filtres. Vérifié dans le navigateur à 375 px. La même carte est sur l'écran « Commander une course » (départ, arrêt, arrivée) et dans le suivi de livraison de l'acheteur (position en direct du livreur, non vérifié à l'écran). **Avant la production : un fournisseur de tuiles** (`EXPO_PUBLIC_TILE_URL`), le serveur public d'OpenStreetMap n'étant autorisé que pour un usage léger. Pas encore : pincement, tracé d'itinéraire, choix d'un point en touchant la carte.
+- **Fermés** : preuve de livraison figée après remise (409 `proof_final`, ajout d'un genre absent seulement) ; compteur d'échecs des webhooks = livraisons abandonnées (pas chaque tentative) ; `deploy/restore.sh` ne laisse plus l'API arrêtée si `pg_restore` signale des avertissements.
+- **Toujours ouverts** : fichiers des comptes rendus de santé non chiffrés au repos ; lien parent-élève invisible pour l'élève majeur ; plafond d'événements par minute et clé dédiée des webhooks ; quota de résultats de santé rempli par un professionnel ; rappel de frais marqué avant l'envoi ; colonnes `date` lues au fuseau du serveur.

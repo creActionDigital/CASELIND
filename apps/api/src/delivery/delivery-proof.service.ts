@@ -52,6 +52,7 @@ export class DeliveryProofService {
         if (next === undefined) continue;
         const cur = (await tx.execute<{ media_id: string }>(sql`SELECT media_id FROM delivery_proofs WHERE delivery_id = ${deliveryId}::uuid AND kind = ${kind}`)).rows[0]?.media_id;
         if (next === cur) continue;
+        if (cur && d.status === 'delivered') throw AppError.conflict('The proof of a delivered order can no longer be changed', { reason: 'proof_final' });
         if (next) {
           await assertOwnReady(tx, userId, 'delivery_proof', [next], key);
           const used = await tx.execute(sql`SELECT 1 FROM delivery_proofs WHERE media_id = ${next}::uuid LIMIT 1`);

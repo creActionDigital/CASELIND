@@ -297,6 +297,7 @@ export class WebhookService {
       await this.db.execute(sql`UPDATE org_webhooks SET failure_count = 0, last_status = ${out.httpStatus}, last_delivery_at = now() WHERE id = ${d.webhook_id}::uuid`);
       return;
     }
+    if (!final) return; // a retry is still scheduled: only a delivery that gave up counts
     const upd = await this.db.execute<{ just_disabled: boolean }>(sql`
       UPDATE org_webhooks SET failure_count = failure_count + 1, last_status = ${out.httpStatus ?? 0}, last_delivery_at = now(),
         active = CASE WHEN failure_count + 1 >= ${WEBHOOK_MAX_FAILURES} THEN false ELSE active END,
