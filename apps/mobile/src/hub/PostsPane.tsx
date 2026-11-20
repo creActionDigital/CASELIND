@@ -3,6 +3,9 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../auth/auth-context';
+import { useImpressionReporting } from '../creator/hooks';
+import { dedupeById } from '../creator/logic';
 import { useI18n } from '../i18n';
 import { fetchFeed } from '../social/api';
 import { sk } from '../social/keys';
@@ -23,11 +26,15 @@ export function PostsPane() {
     queryFn: ({ pageParam }) => fetchFeed(pageParam),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
-  const items = (feed.data?.pages.flatMap((p) => p.items) ?? []) as CachedPost[];
+  const items = dedupeById((feed.data?.pages.flatMap((p) => p.items) ?? []) as CachedPost[]);
+  const { me } = useAuth();
+  const impressions = useImpressionReporting<CachedPost>((p) => (!p.local && p.author.id !== me?.id ? p.id : null));
   return (
     <FlatList
       style={styles.flex}
       data={items}
+      onViewableItemsChanged={impressions.onViewableItemsChanged}
+      viewabilityConfig={impressions.viewabilityConfig}
       keyExtractor={(p) => p.id}
       renderItem={({ item }) => (
         <View style={styles.card}>

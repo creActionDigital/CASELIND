@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
+import { splitMentions } from '../ai/assist-logic';
 import { useI18n } from '../i18n';
 import { radius, spacing, TOUCH } from '../theme/tokens';
 import { chatColors } from './chat-theme';
@@ -10,6 +11,7 @@ import { messagePreview, systemText } from './api';
 import { PollCard } from './PollCard';
 import type { CachedMessage } from './cache';
 import type { MessageStatus } from './receipts';
+import type { TranslationView } from './translate';
 
 interface Props {
   message: CachedMessage;
@@ -21,9 +23,15 @@ interface Props {
   name: (userId: string | null) => string;
   onLongPress: (m: CachedMessage) => void;
   onRetry: (m: CachedMessage) => void;
+  /** Traduction automatique affichée sous le texte (l'original reste à un toucher). */
+  translation?: TranslationView;
+  translating?: boolean;
+  onToggleTranslation?: (m: CachedMessage) => void;
+  /** Pseudos des membres mentionnés dans ce message : rendus en gras. */
+  mentionHandles?: readonly string[];
 }
 
-function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPress, onRetry }: Props) {
+function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPress, onRetry, translation, translating, onToggleTranslation, mentionHandles }: Props) {
   const { colors, isDark } = useTheme();
   const cc = chatColors(colors, isDark);
   const { t, locale } = useI18n();
@@ -86,8 +94,31 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
         ) : m.kind === 'media' ? (
           <AuthImage contentUrl={m.media?.contentUrl ?? null} localUri={m.localUri} label={t('chat.photo')} style={styles.image} />
         ) : (
-          <Text color={fg} style={styles.body}>{m.body}</Text>
+          <Text color={fg} style={styles.body}>
+            {translation && !translation.showOriginal
+              ? translation.text
+              : splitMentions(m.body ?? '', mentionHandles ?? []).map((seg, i) => (seg.bold ? <RNText key={i} style={styles.mention}>{seg.text}</RNText> : seg.text))}
+          </Text>
         )}
+        {translating ? (
+          <Text variant="caption" color={sub}>
+            {t('translate.loading')}
+          </Text>
+        ) : null}
+        {translation ? (
+          <View style={styles.translation}>
+            {!translation.showOriginal ? (
+              <Text variant="caption" color={sub} style={styles.italic}>
+                {t('translate.label')}
+              </Text>
+            ) : null}
+            <Pressable accessibilityRole="button" onPress={() => onToggleTranslation?.(m)} hitSlop={8}>
+              <Text variant="caption" color={mine ? cc.onMine : colors.primary} style={styles.link}>
+                {translation.showOriginal ? t('translate.showTranslation') : t('translate.showOriginal')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
         {!m.recalled && m.reactions.length > 0 ? (
           <View style={styles.reactions}>
             {m.reactions.map((r) => (
@@ -153,6 +184,9 @@ const styles = StyleSheet.create({
   fwd: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   quote: { borderLeftWidth: 3, borderRadius: radius.sm, padding: spacing.xs },
   italic: { fontStyle: 'italic' },
+  mention: { fontWeight: '700' },
+  translation: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+  link: { fontWeight: '600', textDecorationLine: 'underline' },
   image: { width: 220, height: 220 },
   reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   pill: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },

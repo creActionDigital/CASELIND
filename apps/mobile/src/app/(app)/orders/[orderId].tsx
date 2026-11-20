@@ -10,6 +10,7 @@ import { shopKeys } from '../../../shop/hooks';
 import { canCancel, canReview, mediaContentUrl } from '../../../shop/order-logic';
 import { BuyerDelivery } from '../../../delivery/BuyerDelivery';
 import { ContactSeller } from '../../../shop/ContactSeller';
+import { BuyerReturns } from '../../../returns/BuyerReturns';
 import { StatusPill } from '../../../shop/parts';
 import { radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -161,6 +162,8 @@ export default function OrderDetail() {
             </View>
           ))}
         </View>
+
+        <BuyerReturns order={o} />
 
         <ContactSeller contactUserId={o.contactUserId} />
 

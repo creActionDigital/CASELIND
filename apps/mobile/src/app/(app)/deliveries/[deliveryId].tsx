@@ -6,6 +6,7 @@ import { Linking, View } from 'react-native';
 import { ApiRequestError } from '../../../lib/api';
 import { courierStatus, deliveryKeys, fetchMyDelivery, postLocation, setLocationConsent } from '../../../delivery/api';
 import { deliveryErrorMessage, isLocationStop, proofFailure } from '../../../delivery/errors';
+import { formatSlot } from '../../../delivery/schedule-logic';
 import { CourierProof } from '../../../delivery/ProofSection';
 import { canShareLocation, courierActions, createLocationPump, isCompleteCode, type CourierAction } from '../../../delivery/logic';
 import { useI18n, type MessageKey } from '../../../i18n';
@@ -133,6 +134,12 @@ export default function CourierDeliveryDetail() {
         <Badge tone="neutral" label={t(`delivery.status.${dd.status}` as MessageKey)} />
       </View>
       <Text muted>{dd.orgName}</Text>
+      {dd.speed === 'express' || dd.scheduledFor ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          {dd.speed === 'express' ? <Badge tone="accent" label={t('courier.speed.express')} /> : null}
+          {dd.scheduledFor ? <Badge tone="neutral" label={t('courier.slot.at', { when: formatSlot(dd.scheduledFor, locale) })} /> : null}
+        </View>
+      ) : null}
 
       <SectionTitle>{t('delivery.courier.address')}</SectionTitle>
       <Card>

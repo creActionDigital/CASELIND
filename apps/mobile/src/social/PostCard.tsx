@@ -4,6 +4,10 @@ import { useRouter } from 'expo-router';
 import { memo, useState, type ComponentProps } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useAuth } from '../auth/auth-context';
+import { useBookmark } from '../creator/hooks';
+import { HashtagText } from '../creator/HashtagText';
+import { PaySheet, type PayTarget } from '../creator/PaySheet';
+import { useWalletEnabled } from '../wallet/hooks';
 import { SheetModal } from '../components/SheetModal';
 import { useI18n, type MessageKey } from '../i18n';
 import { errorMessage } from '../lib/errors';
@@ -45,6 +49,9 @@ export const PostCard = memo(function PostCard({ post, detail }: Props) {
   const router = useRouter();
   const qc = useQueryClient();
   const react = useReact(post);
+  const bookmark = useBookmark(post);
+  const walletOn = useWalletEnabled() === true;
+  const [pay, setPay] = useState<PayTarget | null>(null);
 
   const [expanded, setExpanded] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -82,6 +89,11 @@ export const PostCard = memo(function PostCard({ post, detail }: Props) {
               {post.author.displayName}
             </Text>
             <View style={styles.meta}>
+              {post.sponsored ? (
+                <Text variant="caption" color={colors.primary} accessibilityLabel={t('creator.sponsoredA11y')} style={{ fontWeight: '700' }}>
+                  {t('creator.sponsored')} ·
+                </Text>
+              ) : null}
               <Text variant="caption" muted numberOfLines={1} style={styles.flexShrink}>
                 @{post.author.handle} · {formatRelativeTime(post.createdAt, locale)}
               </Text>
@@ -112,9 +124,9 @@ export const PostCard = memo(function PostCard({ post, detail }: Props) {
 
       {body ? (
         <View>
-          <Text numberOfLines={detail || expanded ? undefined : COLLAPSED_LINES} selectable={detail}>
+          <HashtagText numberOfLines={detail || expanded ? undefined : COLLAPSED_LINES} selectable={detail}>
             {body}
-          </Text>
+          </HashtagText>
           {long && !detail ? (
             <Pressable
               accessibilityRole="button"
@@ -196,8 +208,29 @@ export const PostCard = memo(function PostCard({ post, detail }: Props) {
               </Text>
             ) : null}
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={post.bookmarked ? t('creator.bookmark.remove') : t('creator.bookmark.add')}
+            accessibilityState={{ selected: !!post.bookmarked }}
+            onPress={() => bookmark.mutate(!post.bookmarked)}
+            style={[styles.action, styles.pushRight]}
+          >
+            <Ionicons name={post.bookmarked ? 'bookmark' : 'bookmark-outline'} size={21} color={post.bookmarked ? colors.primary : colors.textMuted} />
+          </Pressable>
+          {walletOn && !mine ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('creator.tip.action')}
+              onPress={() => setPay({ mode: 'tip', postId: post.id, name: post.author.displayName })}
+              style={styles.action}
+            >
+              <Ionicons name="gift-outline" size={21} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
         </View>
       )}
+
+      <PaySheet target={pay} onClose={() => setPay(null)} />
 
       {picking ? (
         <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityViewIsModal>
@@ -221,6 +254,8 @@ export const PostCard = memo(function PostCard({ post, detail }: Props) {
       <PostMenu
         post={post}
         mine={mine}
+        canBoost={mine && walletOn && post.visibility === 'public' && post.moderation === 'visible'}
+        onBoost={() => setPay({ mode: 'boost', postId: post.id })}
         state={menu}
         setState={setMenu}
         onDeleted={() => {
@@ -234,12 +269,16 @@ export const PostCard = memo(function PostCard({ post, detail }: Props) {
 function PostMenu({
   post,
   mine,
+  canBoost,
+  onBoost,
   state,
   setState,
   onDeleted,
 }: {
   post: CachedPost;
   mine: boolean;
+  canBoost: boolean;
+  onBoost: () => void;
   state: 'closed' | 'main' | 'delete' | 'edit';
   setState: (s: 'closed' | 'main' | 'delete' | 'edit') => void;
   onDeleted: () => void;
@@ -273,6 +312,12 @@ function PostMenu({
                 setVis(post.visibility);
                 setState('edit');
               })}
+              {canBoost
+                ? item('rocket-outline', t('creator.boost.action'), () => {
+                    close();
+                    onBoost();
+                  })
+                : null}
               {item('trash-outline', t('feed.delete'), () => setState('delete'), true)}
             </>
           ) : (
@@ -349,6 +394,7 @@ const styles = StyleSheet.create({
   notice: { borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, alignSelf: 'flex-start' },
   more: { minHeight: TOUCH, justifyContent: 'center' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  pushRight: { marginLeft: 'auto' },
   action: { minHeight: TOUCH, minWidth: TOUCH, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingRight: spacing.md },
   picker: {
     position: 'absolute',

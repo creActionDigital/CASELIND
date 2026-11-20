@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { hasAdminAccess } from '../../../admin/console-logic';
 import { api, useAuth } from '../../../auth/auth-context';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { radius, spacing, TAB_BAR_SPACE } from '../../../theme/tokens';
@@ -11,6 +12,21 @@ import { Badge, ErrorState, Screen, Text } from '../../../ui';
 import type { ComponentProps } from 'react';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
+
+// Entrées sans drapeau de module : chemin, libellé, icône.
+const EXTRA_TILES: { path: string; label: MessageKey; icon: Icon }[] = [
+  { path: '/wishlist', label: 'wish.open', icon: 'heart-outline' },
+  { path: '/courier', label: 'courier.title', icon: 'cube-outline' },
+  { path: '/work', label: 'work.title', icon: 'briefcase-outline' },
+  { path: '/downloads', label: 'dig.downloads.title', icon: 'download-outline' },
+  { path: '/creator', label: 'creator.tile.dashboard', icon: 'bar-chart-outline' },
+  { path: '/bookmarks', label: 'creator.tile.bookmarks', icon: 'bookmark-outline' },
+  { path: '/my-sanctions', label: 'ops2.mine.title', icon: 'shield-half-outline' },
+  { path: '/announcements', label: 'ops2.annUser.title', icon: 'notifications-outline' },
+  { path: '/carpool', label: 'carpool.title', icon: 'people-outline' },
+  { path: '/rentals', label: 'rentals.title', icon: 'car-sport-outline' },
+  { path: '/roadside', label: 'roadside.title', icon: 'build-outline' },
+];
 
 // Familles de modules du cahier des charges. `flag` : module réglementé, visible seulement si
 // GET /v1/config/flags l'autorise pour l'utilisateur.
@@ -167,16 +183,30 @@ export default function More() {
               </Text>
             </Pressable>
           ) : null}
-          {me?.roles.includes('admin') ? (
+          {EXTRA_TILES.map((x) => (
+            <Pressable
+              key={x.path}
+              accessibilityRole="button"
+              accessibilityLabel={t(x.label)}
+              onPress={() => router.push(x.path as never)}
+              style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name={x.icon} size={26} color={colors.primary} />
+              <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
+                {t(x.label)}
+              </Text>
+            </Pressable>
+          ))}
+          {hasAdminAccess(me?.roles) ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t('admin.title')}
-              onPress={() => router.push('/admin/governance')}
+              accessibilityLabel={t('adm.hub.title')}
+              onPress={() => router.push('/admin')}
               style={({ pressed }) => [styles.tile, { backgroundColor: colors.surface, borderColor: colors.primary, opacity: pressed ? 0.8 : 1 }]}
             >
               <Ionicons name="shield-checkmark-outline" size={26} color={colors.primary} />
               <Text variant="small" style={{ textAlign: 'center', fontWeight: '600' }}>
-                {t('admin.title')}
+                {t('adm.hub.title')}
               </Text>
             </Pressable>
           ) : null}

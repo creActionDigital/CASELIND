@@ -13,6 +13,17 @@ import { swSecurity } from './sw-security';
 import { swSeller } from './sw-seller';
 import { swServices } from './sw-services';
 import { swVitrine } from './sw-vitrine';
+import { swAiActions } from './sw-ai-actions';
+import { swWalletFinance2 } from './sw-wallet-finance-2';
+import { swAdmin2 } from './sw-admin-2';
+import { swBusiness2 } from './sw-business-2';
+import { swReturnsCourier2 } from './sw-returns-courier-2';
+import { swCreatorOps2 } from './sw-creator-ops-2';
+import { swMiniapps2 } from './sw-miniapps-2';
+import { swShopPrivacy2 } from './sw-shop-privacy-2';
+import { swMobilityExtra2 } from './sw-mobility-extra-2';
+import { swAdminOps3 } from './sw-admin-ops-3';
+import { swMiniapps3 } from './sw-miniapps-3';
 
 /**
  * Kiswahili : socle de l'interface (navigation, connexion, menu Plus). Les clés absentes retombent sur l'anglais
@@ -87,4 +98,15 @@ export const sw: Partial<Record<MessageKey, string>> = {
   ...swSeller,
   ...swServices,
   ...swVitrine,
+  ...swAiActions,
+  ...swWalletFinance2,
+  ...swAdmin2,
+  ...swBusiness2,
+  ...swReturnsCourier2,
+  ...swCreatorOps2,
+  ...swMiniapps2,
+  ...swShopPrivacy2,
+  ...swMobilityExtra2,
+  ...swAdminOps3,
+  ...swMiniapps3,
 };

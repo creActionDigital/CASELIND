@@ -62,6 +62,9 @@ import { PollSheet } from '../../../messaging/PollSheet';
 import { createPoll, usePresence } from '../../../messaging/social-api';
 import { lastSeenWhen, presenceView } from '../../../messaging/social-logic';
 import { MessageBubble } from '../../../messaging/MessageBubble';
+import { MentionBar } from '../../../messaging/MentionBar';
+import { useMessageTranslation } from '../../../messaging/translate';
+import { applyMention, mentionIds, mentionQuery, suggestMembers } from '../../../ai/assist-logic';
 import { receiptsFromMembers, receiptStatus, type ReceiptMap } from '../../../messaging/receipts';
 import { useRealtime, useTypingUsers } from '../../../realtime/realtime-context';
 import { chatColors } from '../../../messaging/chat-theme';
@@ -202,6 +205,11 @@ export default function ChatRoom() {
     (userId: string | null) => (userId === myId ? t('chat.you') : ((userId && names.get(userId)) || t('chat.unknownUser'))),
     [names, myId, t],
   );
+  const memberList = members.data?.items ?? [];
+  const handles = useMemo(() => new Map(memberList.map((m) => [m.userId, m.handle])), [memberList]);
+  const translation = useMessageTranslation(setNotice);
+  // @pseudo en cours de saisie dans un groupe : suggestions parmi les membres actifs.
+  const mq = conv.data?.kind === 'group' ? mentionQuery(text) : null;
 
   // Marque lu quand l'écran est visible et qu'un message plus récent est arrivé.
   const newest = newestServerSeq(data);
@@ -246,6 +254,7 @@ export default function ChatRoom() {
           body: m.kind === 'media' ? undefined : (m.body ?? ''),
           mediaId,
           replyToId: m.replyToId ?? undefined,
+          mentions: m.mentions.length > 0 ? m.mentions : undefined,
         });
         qc.setQueryData<MessagePages>(qk.messages(id), (d) => upsertServerMessage(d, server));
         qc.setQueriesData<ConversationPages>({ queryKey: qk.conversationsAll }, (d) =>
@@ -275,6 +284,7 @@ export default function ChatRoom() {
     const body = text.trim();
     if (!body) return;
     const msg = buildOptimisticMessage({ conversationId: id, senderId: myId, clientId: uuidv4(), kind: 'text', body, replyToId: replyTo?.id });
+    msg.mentions = conv.data?.kind === 'group' ? mentionIds(body, memberList, myId) : [];
     setText('');
     drafter.cancel();
     lastSaved.current = null;
@@ -544,6 +554,10 @@ export default function ChatRoom() {
               name={nameOf}
               onLongPress={setActions}
               onRetry={retry}
+              translation={translation.views.get(item.id)}
+              translating={translation.busyId === item.id}
+              onToggleTranslation={(m) => translation.toggle(m.id)}
+              mentionHandles={item.mentions.map((uid) => handles.get(uid)).filter((h): h is string => !!h)}
             />
             </View>
           );
@@ -611,6 +625,8 @@ export default function ChatRoom() {
           <IconButton icon="close" label={t('chat.cancelReply')} onPress={() => setReplyTo(null)} />
         </View>
       ) : null}
+
+      {mq ? <MentionBar members={suggestMembers(memberList, mq.query, myId)} onPick={(m) => setText((v) => applyMention(v, mq, m.handle))} /> : null}
 
       {peerGone ? (
         <Text variant="small" muted style={styles.typing}>
@@ -784,11 +800,23 @@ export default function ChatRoom() {
                 }}
               />
             ) : null}
+            {!actions.local && !actions.recalled && actions.kind === 'text' && actions.body ? (
+              <Button
+                variant="secondary"
+                label={t('translate.action')}
+                onPress={() => {
+                  const target = actions.id;
+                  setActions(null);
+                  translation.request(target);
+                }}
+              />
+            ) : null}
             <Button variant="secondary" label={actions.local ? t('chat.discard') : t('chat.hide')} onPress={() => hide(actions)} />
             <Button variant="ghost" label={t('common.cancel')} onPress={() => setActions(null)} />
           </View>
         ) : null}
       </SheetModal>
+      {translation.sheet}
     </SafeAreaView>
   );
 }

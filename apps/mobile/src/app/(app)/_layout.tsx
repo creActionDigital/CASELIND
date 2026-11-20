@@ -26,6 +26,8 @@ export default function AppLayout() {
       <Stack.Screen name="profile" options={{ title: t('profile.title') }} />
       <Stack.Screen name="sessions" options={{ title: t('sessions.title') }} />
       <Stack.Screen name="privacy" options={{ title: t('privacy.title') }} />
+      <Stack.Screen name="my-data" options={{ title: t('mydata.title') }} />
+      <Stack.Screen name="consents" options={{ title: t('consents.title') }} />
       <Stack.Screen name="language" options={{ title: t('language.title') }} />
       <Stack.Screen name="search" options={{ title: t('search.title') }} />
       <Stack.Screen name="wallet" options={{ title: t('wallet.title') }} />

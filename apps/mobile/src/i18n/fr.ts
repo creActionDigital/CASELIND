@@ -1,4 +1,7 @@
 import { mobilityFr } from '../mobility/messages';
+import { businessFr } from '../business/messages';
+import { hrFr } from '../business/hr/messages';
+import { inventoryFr } from '../business/inventory/messages';
 import { aiFr } from '../ai/messages';
 import { walletUiFr } from '../wallet/messages';
 import { deliveryFr } from '../delivery/messages';
@@ -14,19 +17,34 @@ import { gamesFr } from '../games/messages';
 import { docsFr } from '../seller/documents-messages';
 import { schoolFr } from '../school/messages';
 import { adminFr } from '../admin/messages';
+import { consoleFr } from '../admin/console-messages';
+import { ops2Fr } from '../admin/ops2-messages';
 import { scholarshipsFr } from '../school/messages-scholarships';
 import { feesFr } from '../school/messages-fees';
 import { guardiansFr } from '../school/messages-guardians';
 import { salesFr } from '../seller/sales-messages';
 import { loyaltyFr } from '../loyalty/messages';
+import { compareFr } from '../shop/compare-messages';
+import { digitalFr } from '../digital/messages';
 import { placesFr } from '../places/messages';
 import { posFr } from '../pos/messages';
 import { vitrineFr } from '../vitrine/messages';
 import { updatesFr } from '../vitrine/updates-messages';
+import { extraFr } from '../mobility/extra/messages';
+import { walletFinanceFr } from '../wallet/finance/messages';
+import { creatorFr } from '../creator/messages';
+import { assistFr } from '../ai/assist-messages';
+import { courierFr } from '../courier/messages';
+import { promotionsFr } from '../promotions/messages';
+import { privacyFr } from '../privacy/messages';
+import { adminOpsFr } from '../admin-ops/messages';
+import { returnsFr } from '../returns/messages';
 import { webhooksFr } from '../webhooks/messages';
 import { socialFr } from '../messaging/social-messages';
 import { reviewsFr } from '../vitrine/reviews-messages';
 import { miniappsFr } from '../miniapps/messages';
+import { devFr } from '../miniapps/developer/messages';
+import { platformFr } from '../miniapps/platform-messages';
 import { callliveFr } from '../calllive/messages';
 export const fr = {
   'common.loading': 'Chargement…',
@@ -1316,17 +1334,32 @@ export const fr = {
   ...feesFr,
   ...guardiansFr,
   ...loyaltyFr,
+  ...compareFr,
+  ...digitalFr,
   ...placesFr,
   ...posFr,
   ...vitrineFr,
   ...updatesFr,
+  ...extraFr,
+  ...walletFinanceFr,
+  ...creatorFr,
+  ...assistFr,
+  ...courierFr,
+  ...promotionsFr,
+  ...privacyFr,
+  ...adminOpsFr,
+  ...returnsFr,
   ...webhooksFr,
   ...socialFr,
   ...reviewsFr,
   ...miniappsFr,
+  ...devFr,
+  ...platformFr,
   ...callliveFr,
   ...schoolFr,
   ...adminFr,
+  ...consoleFr,
+  ...ops2Fr,
   ...scholarshipsFr,
   ...docsFr,
   ...deliveryFr,
@@ -1334,6 +1367,9 @@ export const fr = {
   ...aiFr,
   ...walletUiFr,
   ...mobilityFr,
+  ...businessFr,
+  ...hrFr,
+  ...inventoryFr,
 } as const;
 
 export type MessageKey = keyof typeof fr;

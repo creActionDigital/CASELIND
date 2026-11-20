@@ -6,9 +6,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../../i18n';
+import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
+import { useToggleWish } from '../../../promotions/hooks';
+import { PromoBadge, PromoCountdown, PromoPrice } from '../../../promotions/parts';
 import { openReport } from '../../../report/open-report';
 import { fetchCategories, fetchProduct, fetchReviews } from '../../../shop/api';
+import { toggleCompareProductId, useCompareProductIds } from '../../../shop/compare-store';
 import { quantityOf } from '../../../shop/cart-logic';
 import { formatMoney } from '../../../shop/format';
 import { shopKeys, useCart, useSetCartItem } from '../../../shop/hooks';
@@ -30,6 +34,7 @@ export default function ProductScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const id = String(productId);
 
+  const compareIds = useCompareProductIds();
   const product = useQuery({ queryKey: shopKeys.product(id), queryFn: () => fetchProduct(id) });
   const reviews = useInfiniteQuery({
     queryKey: shopKeys.reviews(id),
@@ -40,6 +45,7 @@ export default function ProductScreen() {
   const categories = useQuery({ queryKey: shopKeys.categories, queryFn: fetchCategories, staleTime: 10 * 60_000 });
   const cart = useCart();
   const setItem = useSetCartItem();
+  const wish = useToggleWish(id);
   const listRef = useRef<FlatList>(null);
 
   const variants = product.data?.variants;
@@ -137,7 +143,29 @@ export default function ProductScreen() {
           )}
           <View style={[styles.topBar, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
             <RoundButton icon="chevron-back" label={t('product.back')} onPress={() => router.back()} />
-            <RoundButton icon="share-outline" label={t('product.share')} onPress={() => void Share.share({ message: p.title }).catch(() => undefined)} />
+            <View style={styles.topRight}>
+              <RoundButton
+                icon={p.wished ? 'heart' : 'heart-outline'}
+                label={t(p.wished ? 'wish.remove' : 'wish.add')}
+                pressed={!!p.wished}
+                onPress={() =>
+                  wish.mutate(!p.wished, {
+                    onError: (e) => setNotice({ text: e instanceof ApiRequestError && e.detail<string>('reason') === 'wishlist_full' ? t('wish.full') : errorMessage(e, t, locale), ok: false }),
+                  })
+                }
+              />
+              <RoundButton
+                icon="git-compare-outline"
+                label={t('cmp.button')}
+                pressed={compareIds.includes(p.id)}
+                onPress={() => {
+                  const next = toggleCompareProductId(p.id);
+                  if (next.length >= 2 && next.includes(p.id)) router.push('/product/compare');
+                  else if (next.includes(p.id)) setNotice({ text: t('cmp.added'), ok: true });
+                }}
+              />
+              <RoundButton icon="share-outline" label={t('product.share')} onPress={() => void Share.share({ message: p.title }).catch(() => undefined)} />
+            </View>
           </View>
           {p.media.length > 1 ? (
             <View style={styles.arrows} pointerEvents="box-none">
@@ -190,7 +218,8 @@ export default function ProductScreen() {
               {p.title}
             </Text>
             <View style={styles.priceCol}>
-              <Text variant="title">{price ? formatMoney(price.priceMinor, price.currency, locale) : ''}</Text>
+              {price ? <PromoPrice priceMinor={price.priceMinor} compareAtMinor={price.compareAtPriceMinor} currency={price.currency} variant="title" /> : null}
+              {price ? <PromoBadge priceMinor={price.priceMinor} compareAtMinor={price.compareAtPriceMinor} /> : null}
               {summary && summary.ratingCount > 0 ? (
                 <View
                   style={styles.avgRow}
@@ -205,6 +234,15 @@ export default function ProductScreen() {
               ) : null}
             </View>
           </View>
+
+          {price?.promotion ? (
+            <View style={styles.promoLine} accessibilityLiveRegion="none">
+              <Text variant="bodyStrong" color={colors.danger}>
+                {price.promotion.label}
+              </Text>
+              <PromoCountdown endsAt={price.promotion.endsAt} />
+            </View>
+          ) : null}
 
           {axes.map((axis) => (
             <View key={axis.name} style={styles.group}>
@@ -359,17 +397,17 @@ export default function ProductScreen() {
 }
 
 /** Bouton rond translucide posé sur la photo (voile noir uni, icône blanche : contraste AA). */
-function RoundButton({ icon, label, onPress, disabled }: { icon: 'chevron-back' | 'chevron-forward' | 'share-outline'; label: string; onPress: () => void; disabled?: boolean }) {
+function RoundButton({ icon, label, onPress, disabled, pressed: on }: { icon: 'chevron-back' | 'chevron-forward' | 'share-outline' | 'heart' | 'heart-outline' | 'git-compare-outline'; label: string; onPress: () => void; disabled?: boolean; pressed?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled }}
+      accessibilityState={{ disabled: !!disabled, ...(on === undefined ? {} : { selected: on }) }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.round, { opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}
     >
-      <Ionicons name={icon} size={22} color={onMedia} />
+      <Ionicons name={icon} size={22} color={icon === 'heart' ? '#FF6961' : onMedia} />
     </Pressable>
   );
 }
@@ -430,6 +468,8 @@ const styles = StyleSheet.create({
   thumb: { width: 56, height: 56, borderRadius: radius.pill },
   tag: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  topRight: { flexDirection: 'row', gap: spacing.sm },
+  promoLine: { gap: 2 },
   priceCol: { alignItems: 'flex-end', gap: 2 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   link: { minHeight: TOUCH, justifyContent: 'center' },

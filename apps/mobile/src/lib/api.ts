@@ -46,6 +46,8 @@ export interface RequestOptions<T> {
   schema?: ZodType<T>;
   /** false pour les routes publiques (pas d'en-tête, pas de refresh). */
   auth?: boolean;
+  /** Réponse texte brute (export CSV) : renvoyée telle quelle, sans schéma. */
+  text?: boolean;
 }
 
 export function createApiClient(options: ApiClientOptions) {
@@ -59,7 +61,7 @@ export function createApiClient(options: ApiClientOptions) {
     for (const [k, v] of Object.entries(opts.query ?? {})) {
       if (v !== undefined) url.searchParams.set(k, String(v));
     }
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const headers: Record<string, string> = { Accept: opts.text ? 'text/csv' : 'application/json' };
     if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
     if (token && opts.auth !== false) headers.Authorization = `Bearer ${token}`;
     try {
@@ -133,6 +135,7 @@ export function createApiClient(options: ApiClientOptions) {
     }
 
     if (!res.ok) throw await toError(res);
+    if (opts.text) return (await res.text()) as T;
     if (res.status === 204 || !opts.schema) return undefined as T;
     let json: unknown;
     try {

@@ -15,7 +15,7 @@ import { Avatar, Badge, Button, Text } from '../ui';
 import { SheetModal } from './SheetModal';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
-type Path = '/profile' | '/sessions' | '/security/2fa' | '/security/identifier' | '/kyc' | '/privacy' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/deliveries' | '/bookings' | '/rides/history' | '/provider/me' | '/seller' | '/seller/new';
+type Path = '/profile' | '/sessions' | '/security/2fa' | '/security/identifier' | '/kyc' | '/privacy' | '/my-data' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/deliveries' | '/bookings' | '/rides/history' | '/provider/me' | '/seller' | '/seller/new';
 
 /** Menu Compte : MyProfile, Sessions, Confidentialité, Langue, Déconnexion (avec confirmation). */
 export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -56,6 +56,7 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
     { icon: 'notifications-outline', label: t('account.notifications'), path: '/notifications' },
     { icon: 'options-outline', label: t('account.notificationPreferences'), path: '/notification-preferences' },
     { icon: 'shield-checkmark-outline', label: t('account.privacy'), path: '/privacy' },
+    { icon: 'download-outline', label: t('mydata.title'), path: '/my-data' },
     { icon: 'flag-outline', label: t('report.mine.title'), path: '/my-reports' },
     { icon: 'star-outline', label: t('messagesX.fav.title'), path: '/favorites' },
     { icon: 'time-outline', label: t('messagesX.scheduled.menu'), path: '/scheduled' },

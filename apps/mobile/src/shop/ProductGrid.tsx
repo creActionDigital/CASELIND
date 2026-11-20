@@ -7,6 +7,7 @@ import { useI18n } from '../i18n';
 import { onMedia, radius, shadow, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, EmptyState, ErrorState, Text } from '../ui';
+import { PromoBadge, PromoPrice } from '../promotions/parts';
 import { formatMoney } from './format';
 
 /** Carte produit : image arrondie, pastille « Rupture » posée dessus (voile uni sombre), nom puis prix. */
@@ -24,6 +25,9 @@ export const ProductCard = memo(function ProductCard({ product, width }: { produ
     >
       <View>
         <AuthImage contentUrl={product.coverUrl} label={product.title} style={styles.image} />
+        <View style={styles.promo} pointerEvents="none">
+          <PromoBadge priceMinor={product.minPriceMinor} compareAtMinor={product.compareAtPriceMinor} />
+        </View>
         {product.inStock ? null : (
           <View style={styles.badge} importantForAccessibility="no-hide-descendants">
             <Text variant="caption" color={onMedia}>
@@ -36,7 +40,7 @@ export const ProductCard = memo(function ProductCard({ product, width }: { produ
         <Text variant="small" numberOfLines={2} style={styles.name}>
           {product.title}
         </Text>
-        <Text variant="bodyStrong">{price}</Text>
+        <PromoPrice priceMinor={product.minPriceMinor} compareAtMinor={product.compareAtPriceMinor} currency={product.currency} />
       </View>
     </Pressable>
   );
@@ -110,6 +114,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.xl, padding: spacing.sm },
   image: { width: '100%', aspectRatio: 1, borderRadius: radius.lg },
   badge: { position: 'absolute', top: spacing.sm, left: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: 'rgba(0,0,0,0.72)' },
+  promo: { position: 'absolute', top: spacing.sm, right: spacing.sm },
   info: { paddingHorizontal: spacing.xs, paddingTop: spacing.sm, paddingBottom: spacing.xs, gap: 2 },
   name: { fontWeight: '600', minHeight: 40 },
 });

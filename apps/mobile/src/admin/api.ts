@@ -1,4 +1,5 @@
 import { adminOrgListSchema, adminUserListSchema } from '@caselind/contracts';
+import { z } from 'zod';
 import { api } from '../auth/auth-context';
 
 export const admk = {
@@ -16,6 +17,7 @@ const qs = (q: string, status: string) => {
 
 export const fetchAdminUsers = (q: string, status: string) => api.request(`/admin/users?${qs(q, status)}`, { schema: adminUserListSchema });
 export const fetchAdminOrgs = (q: string, status: string) => api.request(`/admin/orgs?${qs(q, status)}`, { schema: adminOrgListSchema });
-export const setUserStatus = (id: string, body: { status: 'active' | 'suspended'; reason: string }) => api.request(`/admin/users/${id}/status`, { method: 'PUT', body });
+const maybePendingSchema = z.object({ approvalId: z.string().optional() }).passthrough();
+export const setUserStatus = (id: string, body: { status: 'active' | 'suspended'; reason: string }) => api.request(`/admin/users/${id}/status`, { method: 'PUT', body, schema: maybePendingSchema });
 export const setOrgStatus = (id: string, body: { status: 'active' | 'suspended'; reason: string }) => api.request(`/admin/orgs/${id}/status`, { method: 'PUT', body });
 export const setOrgVerification = (id: string, body: { status: 'unverified' | 'pending' | 'verified'; reason?: string }) => api.request(`/admin/orgs/${id}/verification`, { method: 'PUT', body });

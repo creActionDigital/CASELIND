@@ -1,4 +1,4 @@
-import type { DeliveryZone, Fulfillment } from '@caselind/contracts';
+import type { DeliverySpeed, DeliveryZone, Fulfillment } from '@caselind/contracts';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
@@ -7,8 +7,9 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deliveryKeys, fetchPublicZones } from '../../delivery/api';
 import { deliveryErrorMessage, zoneRefusal } from '../../delivery/errors';
-import { addressRequired, feeFor, plannedTotals, totalsByCurrencyWithFees, usableZones, zoneChoices, zoneCovers, zoneFee, type OrderPlan } from '../../delivery/logic';
-import { useI18n } from '../../i18n';
+import { checkSlot, expressOffered } from '../../delivery/schedule-logic';
+import { addressRequired, expressSupplement, feeFor, plannedTotals, totalsByCurrencyWithFees, usableZones, zoneChoices, zoneCovers, zoneFee, type OrderPlan } from '../../delivery/logic';
+import { useI18n, type MessageKey } from '../../i18n';
 import { uuidv4 } from '../../lib/uuid';
 import { loadAddress, saveAddress, type SavedAddress } from '../../shop/address-store';
 import { checkout } from '../../shop/api';
@@ -42,6 +43,10 @@ export default function Checkout() {
   const [mode, setMode] = useState<Fulfillment>('delivery');
   const [zoneSel, setZoneSel] = useState<Record<string, string | undefined>>({});
   const [zoneErrors, setZoneErrors] = useState<Record<string, string>>({});
+  const [speed, setSpeed] = useState<DeliverySpeed>('standard');
+  const [slotOn, setSlotOn] = useState(false);
+  const [slotText, setSlotText] = useState('');
+  const [slotError, setSlotError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -57,6 +62,8 @@ export default function Checkout() {
         clientId: clientId.current,
         paymentMethod: 'cash_on_delivery',
         fulfillment: mode,
+        speed: mode === 'delivery' ? speed : 'standard',
+        ...(mode === 'delivery' && slotOn ? { scheduledFor: slotIso! } : {}),
         // Adresse obligatoire en livraison seulement ; en retrait, jamais envoyée.
         ...(needsAddress
           ? {
@@ -117,8 +124,11 @@ export default function Checkout() {
   });
   const modes = Object.fromEntries(groups.map((g) => [g.orgId, mode])) as Record<string, Fulfillment>;
   const activeCounts = Object.fromEntries(groups.map((g) => [g.orgId, (zonesByOrg[g.orgId] ?? []).length]));
+  const expressOk = expressOffered(groups, zonesByOrg, zoneSel);
+  const slot = slotOn ? checkSlot(slotText) : null;
+  const slotIso = slot?.ok ? slot.iso : null;
   const plans: Record<string, OrderPlan> = Object.fromEntries(
-    groups.map((g) => [g.orgId, { fulfillment: mode, zone: zonesByOrg[g.orgId]?.find((z) => z.id === zoneSel[g.orgId]) ?? null } satisfies OrderPlan]),
+    groups.map((g) => [g.orgId, { fulfillment: mode, speed: expressOk ? speed : 'standard', zone: zonesByOrg[g.orgId]?.find((z) => z.id === zoneSel[g.orgId]) ?? null } satisfies OrderPlan]),
   );
   const totals = totalsByCurrencyWithFees(plannedTotals(groups, plans));
   const needsAddress = addressRequired(groups, modes);
@@ -133,6 +143,9 @@ export default function Checkout() {
       if (!form.line1.trim()) next.line1 = t('field.required');
     }
     setErrors(next);
+    setSlotError(null);
+    if (mode === 'delivery' && slot && !slot.ok) return setSlotError(t(`courier.slot.${slot.reason}` as MessageKey));
+    if (mode === 'delivery' && speed === 'express' && !expressOk) return setFormError(t('courier.error.express_unavailable'));
     setZoneErrors(Object.fromEntries(chosenZones.missing.map((id) => [id, t('delivery.error.zone_required')])));
     if (Object.keys(next).length > 0 || chosenZones.missing.length > 0) return;
     setFormError(null);
@@ -199,6 +212,51 @@ export default function Checkout() {
           <Text variant="small" muted>
             {t('delivery.pickupBody')}
           </Text>
+        ) : null}
+
+        {mode === 'delivery' ? (
+          <>
+            <Text variant="heading" accessibilityRole="header">
+              {t('courier.speed.title')}
+            </Text>
+            <View style={styles.row} accessibilityRole="radiogroup">
+              {(['standard', 'express'] as const).map((s) => {
+                const disabled = s === 'express' && !expressOk;
+                const extra = s === 'express' ? groups.map((g) => zonesByOrg[g.orgId]?.find((z) => z.id === zoneSel[g.orgId])).map((z, i) => (z ? expressSupplement(z, groups[i]!.currency) : null)) : [];
+                const label = s === 'express' ? `${t('courier.speed.express')}${extra.length === 1 && extra[0] !== null && extra[0] !== undefined ? ` (+${formatMoney(extra[0], groups[0]!.currency, locale)})` : ''}` : t('courier.speed.standard');
+                return (
+                  <Pressable
+                    key={s}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: speed === s, disabled }}
+                    accessibilityLabel={label}
+                    disabled={disabled}
+                    onPress={() => setSpeed(s)}
+                    style={[styles.mode, { opacity: disabled ? 0.5 : 1, borderColor: speed === s ? colors.primary : colors.border, backgroundColor: speed === s ? colors.primarySoft : colors.surface }]}
+                  >
+                    <Ionicons name={s === 'express' ? 'flash-outline' : 'time-outline'} size={22} color={colors.primary} />
+                    <Text variant="bodyStrong" style={styles.flex}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {!expressOk ? (
+              <Text variant="small" muted>
+                {t('courier.speed.expressHint')}
+              </Text>
+            ) : null}
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: slotOn }} accessibilityLabel={t('courier.slot.toggle')} onPress={() => setSlotOn((v) => !v)} style={styles.row}>
+              <Ionicons name={slotOn ? 'checkbox' : 'square-outline'} size={24} color={colors.primary} />
+              <Text variant="bodyStrong" style={styles.flex}>
+                {t('courier.slot.toggle')}
+              </Text>
+            </Pressable>
+            {slotOn ? (
+              <TextField label={t('courier.slot.field')} hint={t('courier.slot.hint')} value={slotText} onChangeText={setSlotText} maxLength={16} placeholder="2026-12-24 09:30" keyboardType="numbers-and-punctuation" autoCorrect={false} error={slotError ?? undefined} />
+            ) : null}
+          </>
         ) : null}
 
         {needsAddress ? (

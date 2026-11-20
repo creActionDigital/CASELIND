@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { createZone, deliveryKeys, fetchZones, patchZone } from '../../../../../delivery/api';
 import { deliveryErrorMessage } from '../../../../../delivery/errors';
+import { ApiRequestError } from '../../../../../lib/api';
 import { emptyZoneDraft, toZoneRequest, validateZone, zoneToDraft, type ZoneDraft, type ZoneErrors } from '../../../../../delivery/zone-form';
 import { useI18n } from '../../../../../i18n';
 import { SELLER_CURRENCIES } from '../../../../../seller/money';
@@ -43,6 +44,7 @@ export default function SellerZoneForm() {
 
   if (!isNew && zones.isPending) return <Loading />;
   if (!isNew && zones.isError) return <ErrorState error={zones.error} onRetry={() => zones.refetch()} />;
+  if (!isNew && zones.data && !zones.data.items.some((x) => x.id === zoneId)) return <ErrorState error={new ApiRequestError(404, 'not_found', 'zone not found')} />;
 
   function submit() {
     setFormError(null);
@@ -75,6 +77,22 @@ export default function SellerZoneForm() {
           value={draft.fees[c] ?? ''}
           onChangeText={(v) => setDraft((d) => ({ ...d, fees: { ...d.fees, [c]: v } }))}
           error={errors.fees ? t('delivery.zones.feesInvalid') : undefined}
+          keyboardType="decimal-pad"
+        />
+      ))}
+      <Text variant="small" style={{ fontWeight: '600' }}>
+        {t('courier.zone.express')}
+      </Text>
+      <Text variant="small" muted>
+        {t('courier.zone.expressHint')}
+      </Text>
+      {SELLER_CURRENCIES.map((c) => (
+        <TextField
+          key={c}
+          label={`${t('courier.zone.expressFee')} (${c})`}
+          value={draft.expressFees[c] ?? ''}
+          onChangeText={(v) => setDraft((d) => ({ ...d, expressFees: { ...d.expressFees, [c]: v } }))}
+          error={errors.expressFees ? t('delivery.zones.feesInvalid') : undefined}
           keyboardType="decimal-pad"
         />
       ))}

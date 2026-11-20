@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useAuth } from '../../../auth/auth-context';
+import { useImpressionReporting } from '../../../creator/hooks';
+import { dedupeById } from '../../../creator/logic';
 import { mixFeed } from '../../../home/feed-mix';
 import { HomeBanner, PromoCard, SectionHeader, VideoCard } from '../../../home/parts';
 import { useI18n } from '../../../i18n';
@@ -42,10 +44,13 @@ export default function Home() {
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
   const products = useQuery({ queryKey: ['home-products', 6], queryFn: () => fetchRecentProducts(6), staleTime: 60_000 });
-  const items = (feed.data?.pages.flatMap((p) => p.items) ?? []) as CachedPost[];
+  // Une publication sponsorisée peut revenir sur la page suivante : une seule carte par id.
+  const items = useMemo(() => dedupeById((feed.data?.pages.flatMap((p) => p.items) ?? []) as CachedPost[]), [feed.data]);
   const productItems = products.data?.items ?? [];
   const sectionProducts = productItems.slice(0, SECTION_COUNT);
   const mixed = useMemo(() => mixFeed(items, productItems.slice(SECTION_COUNT), NO_PROMOS, 4), [items, productItems]);
+
+  const impressions = useImpressionReporting<(typeof mixed)[number]>((e) => (e.type === 'post' && !e.post.local && e.post.author.id !== me?.id ? e.post.id : null));
 
   let state: 'loading' | 'error' | 'empty' | 'list';
   if (feed.isPending) state = 'loading';
@@ -57,6 +62,8 @@ export default function Home() {
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <FlatList
         data={mixed}
+        onViewableItemsChanged={impressions.onViewableItemsChanged}
+        viewabilityConfig={impressions.viewabilityConfig}
         keyExtractor={(e) => e.key}
         renderItem={({ item }) => {
           if (item.type === 'product')

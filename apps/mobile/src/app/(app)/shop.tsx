@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SheetModal } from '../../components/SheetModal';
 import { useI18n } from '../../i18n';
+import { FlashStrip } from '../../promotions/FlashStrip';
 import { fetchCategories, fetchProducts, type ShopFilters } from '../../shop/api';
 import { parseMajorToMinor } from '../../shop/format';
 import { shopKeys } from '../../shop/hooks';
@@ -89,6 +90,7 @@ export default function Shop() {
           <CategoryPill key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)} />
         ))}
       </ScrollView>
+      <FlashStrip />
     </View>
   );
 
@@ -117,10 +119,10 @@ export default function Shop() {
           <Text variant="bodyStrong">{t('shop.price')}</Text>
           <View style={styles.priceRow}>
             <View style={styles.flex}>
-              <TextField label={t('shop.minPrice')} value={draft.min} onChangeText={(v) => setDraft({ ...draft, min: v })} keyboardType="decimal-pad" />
+              <TextField label={t('shop.minPrice')} value={draft.min} onChangeText={(v) => setDraft({ ...draft, min: v })} maxLength={12} keyboardType="decimal-pad" />
             </View>
             <View style={styles.flex}>
-              <TextField label={t('shop.maxPrice')} value={draft.max} onChangeText={(v) => setDraft({ ...draft, max: v })} keyboardType="decimal-pad" />
+              <TextField label={t('shop.maxPrice')} value={draft.max} onChangeText={(v) => setDraft({ ...draft, max: v })} maxLength={12} keyboardType="decimal-pad" />
             </View>
           </View>
           <Button label={t('shop.apply')} onPress={apply} />

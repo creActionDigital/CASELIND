@@ -140,6 +140,13 @@ export default function Wallet() {
           <Action icon="arrow-down" label={t('wallet.action.receive')} onPress={() => router.push('/wallet/receive')} />
           <Action icon="scan-outline" label={t('wallet.action.scan')} onPress={() => router.push('/scan')} />
         </View>
+        <View style={[styles.actions, { borderTopColor: colors.border }]} accessibilityLabel={t('wf.menu.title')}>
+          <Action icon="cash-outline" label={t('wf.menu.requests')} onPress={() => router.push('/wallet/requests')} />
+          <Action icon="people-outline" label={t('wf.menu.split')} onPress={() => router.push('/wallet/split')} />
+          <Action icon="calendar-outline" label={t('wf.menu.scheduled')} onPress={() => router.push('/wallet/scheduled')} />
+          <Action icon="flag-outline" label={t('wf.menu.savings')} onPress={() => router.push('/wallet/savings')} />
+          <Action icon="warning-outline" label={t('wf.menu.alerts')} onPress={() => router.push('/wallet/alerts')} />
+        </View>
       </View>
 
       <View style={styles.sectionRow}>

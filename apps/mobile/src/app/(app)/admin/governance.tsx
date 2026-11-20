@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import { grantRole } from '../../../admin/ops2-api';
+import { alertConfirm } from '../../../lib/confirm';
 import { useState } from 'react';
 import { Alert, Platform, StyleSheet, View } from 'react-native';
 import { admk, fetchAdminOrgs, fetchAdminUsers, setOrgStatus, setOrgVerification, setUserStatus } from '../../../admin/api';
@@ -25,6 +27,7 @@ export default function Governance() {
   const [open, setOpen] = useState<{ id: string; action: GovAction } | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const isAdmin = me?.roles.includes('admin') ?? false;
 
   const users = useQuery({ queryKey: admk.users(q, ''), queryFn: () => fetchAdminUsers(q, ''), enabled: isAdmin && tab === 'users' });
@@ -32,17 +35,45 @@ export default function Governance() {
   const query = tab === 'users' ? users : orgs;
 
   const run = useMutation({
-    mutationFn: (v: { id: string; action: GovAction; reason: string }) => {
+    mutationFn: (v: { id: string; action: GovAction; reason: string }): Promise<{ approvalId?: string } | void> => {
       if (tab === 'users') return setUserStatus(v.id, { status: v.action === 'suspend' ? 'suspended' : 'active', reason: v.reason });
       if (v.action === 'verify') return setOrgVerification(v.id, { status: 'verified', reason: v.reason });
       if (v.action === 'unverify') return setOrgVerification(v.id, { status: 'unverified', reason: v.reason });
       return setOrgStatus(v.id, { status: v.action === 'suspend' ? 'suspended' : 'active', reason: v.reason });
     },
-    onSuccess: () => { setOpen(null); setReason(''); setError(null); void qc.invalidateQueries({ queryKey: admk.all }); },
+    onSuccess: (data) => {
+      setOpen(null);
+      setReason('');
+      setError(null);
+      // 202 : la demande attend la validation d'un second administrateur, rien n'est encore appliqué.
+      setNotice(data && typeof data === 'object' && 'approvalId' in data && data.approvalId ? t('adm.flags.awaitingApproval') : null);
+      void qc.invalidateQueries({ queryKey: admk.all });
+    },
     onError: (e) => {
       // 409 : `details.reason` donne la cause précise (soi-même, administrateur, inchangé...).
       const why = e instanceof ApiRequestError ? e.detail<string>('reason') : undefined;
       const key = `admin.err.${why}` as MessageKey;
+      setError(why && t(key) !== key ? t(key) : errorMessage(e, t, locale));
+    },
+  });
+
+  // « Donner un rôle » : 204, ou 202 quand la double validation est active (rien n'est appliqué avant la validation d'un second administrateur).
+  const router = useRouter();
+  const [roleFor, setRoleFor] = useState<string | null>(null);
+  const [role, setRole] = useState<'moderator' | 'support' | 'admin'>('moderator');
+  const [roleReason, setRoleReason] = useState('');
+  const grant = useMutation({
+    mutationFn: (id: string) => grantRole(id, role, roleReason.trim()),
+    onSuccess: (data) => {
+      setRoleFor(null);
+      setRoleReason('');
+      setError(null);
+      setNotice(data && 'approvalId' in data && data.approvalId ? t('adm.flags.awaitingApproval') : t('ops2.role.done'));
+      void qc.invalidateQueries({ queryKey: admk.all });
+    },
+    onError: (e) => {
+      const why = e instanceof ApiRequestError ? e.detail<string>('reason') : undefined;
+      const key = `adm.err.${why}` as MessageKey;
       setError(why && t(key) !== key ? t(key) : errorMessage(e, t, locale));
     },
   });
@@ -75,6 +106,7 @@ export default function Governance() {
         onChange={(v) => { setTab(v); setOpen(null); setError(null); }}
         options={[{ value: 'users', label: t('admin.tab.users') }, { value: 'orgs', label: t('admin.tab.orgs') }]}
       />
+      {notice ? <Text variant="small" accessibilityLiveRegion="polite">{notice}</Text> : null}
       <TextField label={t('admin.search')} value={q} onChangeText={setQ} maxLength={60} autoCapitalize="none" />
       {query.isPending ? null : query.isError ? (
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
@@ -109,6 +141,28 @@ export default function Governance() {
                 ))}
               </View>
             )}
+            {tab === 'users' && open?.id !== r.id ? (
+              roleFor === r.id ? (
+                <>
+                  <Text variant="bodyStrong">{t('ops2.role.title')}</Text>
+                  <Chips<'moderator' | 'support' | 'admin'> value={role} onChange={setRole} options={(['moderator', 'support', 'admin'] as const).map((k) => ({ value: k, label: t(`ops2.role.${k}` as MessageKey) }))} />
+                  <TextField label={t('admin.reason')} value={roleReason} onChangeText={setRoleReason} multiline maxLength={300} />
+                  {error ? <Text variant="small" color="#B91C1C" accessibilityLiveRegion="polite">{error}</Text> : null}
+                  <Button
+                    label={t('ops2.role.give')}
+                    loading={grant.isPending}
+                    disabled={roleReason.trim().length < 3}
+                    onPress={() => alertConfirm(t('admin.title'), t('ops2.role.confirm', { role: t(`ops2.role.${role}` as MessageKey), name: r.name }), [{ text: t('admin.cancel'), style: 'cancel' }, { text: t('ops2.role.give'), onPress: () => grant.mutate(r.id) }])}
+                  />
+                  <Button variant="ghost" label={t('admin.cancel')} onPress={() => { setRoleFor(null); setError(null); }} />
+                </>
+              ) : (
+                <View style={styles.badges}>
+                  <Button variant="ghost" label={t('ops2.sanctions.new')} onPress={() => router.push({ pathname: '/admin/sanctions', params: { userId: r.id } } as never)} />
+                  <Button variant="ghost" label={t('ops2.role.give')} onPress={() => { setRoleFor(r.id); setRoleReason(''); setError(null); }} />
+                </View>
+              )
+            ) : null}
           </Card>
         ))
       )}

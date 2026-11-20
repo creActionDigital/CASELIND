@@ -22,7 +22,7 @@ import { emptyZoneDraft, parseFee, toZoneRequest, validateZone } from './zone-fo
 
 const ID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const zone = (o: Partial<DeliveryZone> = {}): DeliveryZone => ({
-  id: ID(1), orgId: ID(9), name: 'Centre', areas: ['Goma', 'Himbi'], fees: { USD: 300, CDF: 5000 }, etaMinutes: 45, active: true,
+  id: ID(1), orgId: ID(9), name: 'Centre', areas: ['Goma', 'Himbi'], fees: { USD: 300, CDF: 5000 }, expressFees: null, etaMinutes: 45, active: true,
   createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', ...o,
 });
 const group = (orgId: string, currency: string, subtotalMinor: number): CartGroup => ({ orgId, orgName: 'S', orgSlug: 's', currency, subtotalMinor, lines: [] });

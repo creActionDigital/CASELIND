@@ -1,4 +1,7 @@
 import { mobilityEn } from '../mobility/messages';
+import { businessEn } from '../business/messages';
+import { hrEn } from '../business/hr/messages';
+import { inventoryEn } from '../business/inventory/messages';
 import type { MessageKey } from './fr';
 import { aiEn } from '../ai/messages';
 import { walletUiEn } from '../wallet/messages';
@@ -13,19 +16,34 @@ import { gamesEn } from '../games/messages';
 import { docsEn } from '../seller/documents-messages';
 import { schoolEn } from '../school/messages';
 import { adminEn } from '../admin/messages';
+import { consoleEn } from '../admin/console-messages';
+import { ops2En } from '../admin/ops2-messages';
 import { scholarshipsEn } from '../school/messages-scholarships';
 import { feesEn } from '../school/messages-fees';
 import { guardiansEn } from '../school/messages-guardians';
 import { salesEn } from '../seller/sales-messages';
 import { loyaltyEn } from '../loyalty/messages';
+import { compareEn } from '../shop/compare-messages';
+import { digitalEn } from '../digital/messages';
 import { placesEn } from '../places/messages';
 import { posEn } from '../pos/messages';
 import { vitrineEn } from '../vitrine/messages';
 import { updatesEn } from '../vitrine/updates-messages';
+import { extraEn } from '../mobility/extra/messages';
+import { walletFinanceEn } from '../wallet/finance/messages';
+import { creatorEn } from '../creator/messages';
+import { assistEn } from '../ai/assist-messages';
+import { courierEn } from '../courier/messages';
+import { promotionsEn } from '../promotions/messages';
+import { privacyEn } from '../privacy/messages';
+import { adminOpsEn } from '../admin-ops/messages';
+import { returnsEn } from '../returns/messages';
 import { webhooksEn } from '../webhooks/messages';
 import { socialEn } from '../messaging/social-messages';
 import { reviewsEn } from '../vitrine/reviews-messages';
 import { miniappsEn } from '../miniapps/messages';
+import { devEn } from '../miniapps/developer/messages';
+import { platformEn } from '../miniapps/platform-messages';
 import { callliveEn } from '../calllive/messages';
 import { deliveryEn } from '../delivery/messages';
 import { proofEn } from '../delivery/proof-messages';
@@ -1318,17 +1336,32 @@ export const en: Record<MessageKey, string> = {
   ...feesEn,
   ...guardiansEn,
   ...loyaltyEn,
+  ...compareEn,
+  ...digitalEn,
   ...placesEn,
   ...posEn,
   ...vitrineEn,
   ...updatesEn,
+  ...extraEn,
+  ...walletFinanceEn,
+  ...creatorEn,
+  ...assistEn,
+  ...courierEn,
+  ...promotionsEn,
+  ...privacyEn,
+  ...adminOpsEn,
+  ...returnsEn,
   ...webhooksEn,
   ...socialEn,
   ...reviewsEn,
   ...miniappsEn,
+  ...devEn,
+  ...platformEn,
   ...callliveEn,
   ...schoolEn,
   ...adminEn,
+  ...consoleEn,
+  ...ops2En,
   ...scholarshipsEn,
   ...docsEn,
   ...deliveryEn,
@@ -1336,4 +1369,7 @@ export const en: Record<MessageKey, string> = {
   ...aiEn,
   ...walletUiEn,
   ...mobilityEn,
+  ...businessEn,
+  ...hrEn,
+  ...inventoryEn,
 };

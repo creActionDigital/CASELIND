@@ -35,7 +35,7 @@ export const fetchMembers = (id: string) =>
 
 export const postMessage = (
   conversationId: string,
-  body: { clientId: string; kind: 'text' | 'media'; body?: string; mediaId?: string; replyToId?: string },
+  body: { clientId: string; kind: 'text' | 'media'; body?: string; mediaId?: string; replyToId?: string; mentions?: string[] },
 ): Promise<Message> =>
   api.request(`/conversations/${conversationId}/messages`, { method: 'POST', body, schema: messageSchema });
 

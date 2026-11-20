@@ -1,4 +1,4 @@
-import { AI_MESSAGE_MAX_CHARS, type AiMessage, type AiMessageList } from '@caselind/contracts';
+import { AI_MESSAGE_MAX_CHARS, type AiActionList, type AiMessage, type AiMessageList } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { aiKeys, deleteAiConversation, fetchAiMessages, fetchAiModels, fetchAiSettings, sendAiMessage } from '../../../ai/api';
 import { aiErrorKey, effectiveModel } from '../../../ai/logic';
+import { ActionCards } from '../../../ai/ActionCards';
+import { assistKeys, fetchAiActions } from '../../../ai/assist-api';
+import { consentNeeded } from '../../../ai/assist-logic';
+import { ConsentSheet } from '../../../ai/ConsentSheet';
+import { setConsent } from '../../../privacy/api';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { radius, spacing, TOUCH, typography } from '../../../theme/tokens';
@@ -26,6 +31,11 @@ export default function AiChat() {
   const settings = useQuery({ queryKey: aiKeys.settings, queryFn: fetchAiSettings });
   const model = models.data && settings.data ? effectiveModel(models.data.items, settings.data, models.data.defaultModelId) : undefined;
   const autoSent = useRef(false);
+  const actionsQ = useQuery({ queryKey: assistKeys.actions(id), queryFn: () => fetchAiActions(id) });
+  // Consentement ai_processing manquant : feuille d'information, puis on relance ce qui a échoué.
+  const retryRef = useRef<(() => void) | null>(null);
+  const [needConsent, setNeedConsent] = useState(false);
+  const [accepting, setAccepting] = useState(false);
 
   const send = useMutation({
     mutationFn: (content: string) => sendAiMessage(id, content),
@@ -33,10 +43,20 @@ export default function AiChat() {
       qc.setQueryData<AiMessageList>(aiKeys.messages(id), (old) => ({
         items: [...(old?.items ?? []), res.userMessage, res.reply],
       }));
+      qc.setQueryData<AiActionList>(assistKeys.actions(id), (old) => ({ items: [...(old?.items ?? []), ...res.actions] }));
       setNotice(res.fallbackUsed ? t('ai.fallbackUsed', { model: res.modelId }) : null);
       void qc.invalidateQueries({ queryKey: aiKeys.conversations });
     },
-    onError: (err, content) => setDraft(content), // garde la question pour pouvoir la renvoyer
+    onError: (err, content) => {
+      setDraft(content); // garde la question pour pouvoir la renvoyer
+      if (consentNeeded(err) === 'ai_processing') {
+        retryRef.current = () => {
+          setDraft('');
+          send.mutate(content);
+        };
+        setNeedConsent(true);
+      }
+    },
   });
 
   const remove = useMutation({
@@ -75,7 +95,22 @@ export default function AiChat() {
     ]);
   }
 
-  const sendError = send.isError ? (aiErrorKey(send.error) ? t(aiErrorKey(send.error)!) : errorMessage(send.error, t, locale)) : null;
+  async function acceptConsent() {
+    setAccepting(true);
+    try {
+      await setConsent('ai_processing', true);
+      setNeedConsent(false);
+      retryRef.current?.();
+    } catch (err) {
+      setNeedConsent(false);
+      setNotice(errorMessage(err, t, locale));
+    } finally {
+      setAccepting(false);
+    }
+  }
+
+  const removeError = remove.isError ? errorMessage(remove.error, t, locale) : null;
+  const sendError = send.isError && !consentNeeded(send.error) ? (aiErrorKey(send.error) ? t(aiErrorKey(send.error)!) : errorMessage(send.error, t, locale)) : null;
   const items = messages.data?.items ?? [];
 
   return (
@@ -141,9 +176,16 @@ export default function AiChat() {
                   </Text>
                 ) : null}
                 {notice ? <Text variant="small" muted>{notice}</Text> : null}
-                {sendError ? (
+                <ActionCards
+                  actions={actionsQ.data?.items ?? []}
+                  onNeedConsent={(retry) => {
+                    retryRef.current = retry;
+                    setNeedConsent(true);
+                  }}
+                />
+                {sendError ?? removeError ? (
                   <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">
-                    {sendError}
+                    {sendError ?? removeError}
                   </Text>
                 ) : null}
               </View>
@@ -167,6 +209,7 @@ export default function AiChat() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <ConsentSheet kind={needConsent ? 'ai_processing' : null} busy={accepting} onAccept={() => void acceptConsent()} onRefuse={() => setNeedConsent(false)} />
     </Screen>
   );
 }
@@ -199,7 +242,7 @@ const styles = StyleSheet.create({
   list: { padding: spacing.lg, gap: spacing.sm, flexGrow: 1 },
   bubbleRow: { flexDirection: 'row' },
   bubble: { maxWidth: '85%', borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, minHeight: 36, borderRadius: radius.pill, maxWidth: 220 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, minHeight: TOUCH, borderRadius: radius.pill, maxWidth: 220 },
   suggestion: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: TOUCH + 12, padding: spacing.md, borderRadius: radius.lg },
   sugIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   mic: { width: TOUCH, height: TOUCH, borderRadius: TOUCH / 2, alignItems: 'center', justifyContent: 'center', opacity: 0.6 },

@@ -1,4 +1,4 @@
-import type { CartGroup, DeliveryStatus, DeliveryZone, Fulfillment } from '@caselind/contracts';
+import type { CartGroup, DeliverySpeed, DeliveryStatus, DeliveryZone, Fulfillment } from '@caselind/contracts';
 
 /* Logique pure de la livraison (lot 8) : totaux avec frais, transitions du livreur, minuterie de position. */
 
@@ -12,6 +12,12 @@ export function normalizeArea(v: string): string {
 /** Frais de la zone dans la devise de la commande ; null si la zone n'a pas de tarif pour cette devise. */
 export function zoneFee(zone: Pick<DeliveryZone, 'fees'>, currency: string): number | null {
   const f = zone.fees[currency];
+  return typeof f === 'number' ? f : null;
+}
+
+/** Supplément express de la zone dans la devise ; null = express non proposé (zone sans supplément pour cette devise). */
+export function expressSupplement(zone: Pick<DeliveryZone, 'expressFees'>, currency: string): number | null {
+  const f = zone.expressFees?.[currency];
   return typeof f === 'number' ? f : null;
 }
 
@@ -42,6 +48,8 @@ export function zoneRequired(fulfillment: Fulfillment, activeZoneCount: number):
 export interface OrderPlan {
   fulfillment: Fulfillment;
   zone: DeliveryZone | null;
+  /** Défaut : standard. */
+  speed?: DeliverySpeed;
 }
 
 export interface PlannedTotal {
@@ -55,7 +63,8 @@ export interface PlannedTotal {
 /** Frais d'une commande (retrait ou sans zone : 0). */
 export function feeFor(plan: OrderPlan | undefined, currency: string): number {
   if (!plan || plan.fulfillment === 'pickup' || !plan.zone) return 0;
-  return zoneFee(plan.zone, currency) ?? 0;
+  const base = zoneFee(plan.zone, currency) ?? 0;
+  return plan.speed === 'express' ? base + (expressSupplement(plan.zone, currency) ?? 0) : base;
 }
 
 /** Total par boutique : sous-total + frais (la remise éventuelle est calculée par le serveur). */

@@ -1,11 +1,12 @@
 import { privacySettingsSchema, type PrivacySettings } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { api } from '../../auth/auth-context';
 import { useI18n, type MessageKey } from '../../i18n';
 import { radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
-import { ErrorState, Screen, Text } from '../../ui';
+import { Button, ErrorState, Screen, Text } from '../../ui';
 
 const FROM: PrivacySettings['contactRequestsFrom'][] = ['everyone', 'contacts_of_contacts', 'nobody'];
 
@@ -14,6 +15,7 @@ export default function Privacy() {
   const { colors } = useTheme();
   const { t } = useI18n();
   const qc = useQueryClient();
+  const router = useRouter();
   const query = useQuery({
     queryKey: ['privacy'],
     queryFn: () => api.request('/me/privacy', { schema: privacySettingsSchema }),
@@ -82,6 +84,10 @@ export default function Privacy() {
             </Pressable>
           );
         })}
+      </View>
+      <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
+        <Button variant="secondary" label={t('privacy.myConsents')} onPress={() => router.push('/consents')} />
+        <Button variant="secondary" label={t('privacy.myData')} onPress={() => router.push('/my-data')} />
       </View>
     </Screen>
   );

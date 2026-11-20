@@ -115,6 +115,11 @@ export default function Cart() {
                   <Text variant="small" muted>
                     {t('cart.unit', { price: formatMoney(l.unitPriceMinor, g.currency, locale) })}
                   </Text>
+                  {l.compareAtPriceMinor ? (
+                    <Text variant="caption" muted style={{ textDecorationLine: 'line-through' }}>
+                      {formatMoney(l.compareAtPriceMinor, g.currency, locale)}
+                    </Text>
+                  ) : null}
                   <View style={styles.lineFoot}>
                     <Stepper value={l.quantity} max={99} removable onChange={(n) => setItem.mutate({ variantId: l.variantId, quantity: n })} />
                     <Text variant="bodyStrong">{formatMoney(l.lineTotalMinor, g.currency, locale)}</Text>

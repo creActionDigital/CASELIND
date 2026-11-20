@@ -8,6 +8,7 @@ import {
 } from '@caselind/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 import { isLocale, useI18n } from '../i18n';
@@ -37,7 +38,10 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+// Libellé de l'appareil pour l'écran Sessions (modèle, ex. « Pixel 8 ») ; absent sur le web.
+const deviceLabel = (Device.deviceName ?? Device.modelName ?? '').trim().slice(0, 100);
 const device = {
+  ...(deviceLabel ? { name: deviceLabel } : {}),
   platform: (Platform.OS === 'ios' || Platform.OS === 'android' || Platform.OS === 'web' ? Platform.OS : 'other') as
     | 'ios'
     | 'android'

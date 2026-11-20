@@ -51,6 +51,7 @@ const REASON_KEYS: Record<string, MessageKey> = {
   zone_not_found: 'delivery.error.zone_not_found',
   zone_not_covered: 'delivery.error.zone_not_covered',
   zone_currency_unsupported: 'delivery.error.zone_currency_unsupported',
+  express_unavailable: 'courier.error.express_unavailable',
 };
 
 /** Message localisé, avec les raisons propres à la livraison ; sinon le message générique. */

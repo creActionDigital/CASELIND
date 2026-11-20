@@ -128,6 +128,7 @@ export const swVitrine: Partial<Record<MessageKey, string>> = {
   'webhooks.event.pos.sale_created': 'Mauzo ya kaunta',
   'webhooks.event.pos.sale_voided': 'Mauzo ya kaunta yaliyobatilishwa',
   'webhooks.event.org.question_asked': 'Swali la mgeni',
+  'webhooks.event.order.return_requested': 'Ombi la kurudisha oda',
   'webhooks.create': 'Tengeneza',
   'webhooks.secret.title': 'Siri ya kusaini',
   'webhooks.secret.once': 'Inakili sasa: haitaonyeshwa tena kamwe. Inatumika kukagua kichwa cha X-Caselind-Signature (HMAC-SHA256 ya "timestamp.body").',

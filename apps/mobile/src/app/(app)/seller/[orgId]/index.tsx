@@ -6,7 +6,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { ApiRequestError } from '../../../../lib/api';
 import { useI18n, type MessageKey } from '../../../../i18n';
 import { fetchOrders, fetchProducts, sk, useMyOrgs } from '../../../../seller/api';
-import { can, canEditProfile, canReadCatalog, canViewReviews } from '../../../../seller/permissions';
+import { can, canEditProfile, canManageHr, canManageInventory, canReadCatalog, canViewReviews } from '../../../../seller/permissions';
 import { canManageWebhooks } from '../../../../webhooks/logic';
 import { Card, Chips, Loading, SectionTitle } from '../../../../seller/ui';
 import { radius, spacing } from '../../../../theme/tokens';
@@ -71,6 +71,16 @@ export default function SellerDashboard() {
     { icon: 'newspaper-outline', label: 'vitrine.updates.title', path: '/updates', show: canEditProfile(role) },
     { icon: 'help-circle-outline', label: 'vitrine.questions.seller.title', path: '/questions', show: canEditProfile(role) },
     { icon: 'location-outline', label: 'seller.location', path: '/location', show: canEditProfile(role) },
+    { icon: 'return-down-back-outline', label: 'returns.tile', path: '/returns', show: can(role, 'orders.manage') },
+    { icon: 'pricetag-outline', label: 'seller.promo.title', path: '/promotions', show: can(role, 'catalog.manage') },
+    { icon: 'cart-outline', label: 'biz.purchasing.title', path: '/purchasing', show: can(role, 'inventory.manage') },
+    { icon: 'wallet-outline', label: 'biz.expenses.title', path: '/expenses', show: can(role, 'finance.view') },
+    { icon: 'trending-up-outline', label: 'biz.profit.title', path: '/profitability', show: can(role, 'finance.view') },
+    { icon: 'people-circle-outline', label: 'hr.title', path: '/hr', show: canManageHr(role) },
+    { icon: 'hourglass-outline', label: 'inv.batches.title', path: '/batches', show: canManageInventory(role) },
+    { icon: 'clipboard-outline', label: 'inv.count.title', path: '/inventory', show: canManageInventory(role) },
+    { icon: 'receipt-outline', label: 'ops2.comm.sellerTitle', path: '/commissions', show: canViewFinance(role) },
+    { icon: 'car-sport-outline', label: 'rentals.org.title', path: '/rentals', show: can(role, 'catalog.manage') },
     { icon: 'git-network-outline', label: 'webhooks.title', path: '/webhooks', show: canManageWebhooks(role) },
     { icon: 'qr-code-outline', label: 'sellerQr.title', path: '/qr', show: canViewFinance(role) || can(role, 'orders.manage') },
   ];

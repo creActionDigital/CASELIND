@@ -11,7 +11,9 @@ import { startChatErrorKey } from '../../../../messaging/api';
 import { fetchProfile, fetchStats, fetchUserPosts, openDirect, setFollow } from '../../../../social/api';
 import { sk } from '../../../../social/keys';
 import type { CachedPost } from '../../../../social/logic';
+import { PaySheet, type PayTarget } from '../../../../creator/PaySheet';
 import { PostCard } from '../../../../social/PostCard';
+import { useWalletEnabled } from '../../../../wallet/hooks';
 import type { SocialStats } from '../../../../social/types';
 import { spacing, TOUCH } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
@@ -28,6 +30,8 @@ export default function UserProfile() {
   const id = String(userId);
   const mine = me?.id === id;
   const [refreshing, setRefreshing] = useState(false);
+  const walletOn = useWalletEnabled() === true;
+  const [pay, setPay] = useState<PayTarget | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const profile = useQuery({ queryKey: sk.profile(id), queryFn: () => fetchProfile(id) });
@@ -143,9 +147,11 @@ export default function UserProfile() {
               style={styles.flex}
             />
             <Button label={t('profile.social.message')} variant="secondary" loading={message.isPending} onPress={() => message.mutate()} style={styles.flex} />
+            {walletOn ? <Button label={t('creator.tip.action')} variant="secondary" onPress={() => setPay({ mode: 'tip', userId: id, name: p.displayName })} style={styles.flex} /> : null}
           </>
         )}
       </View>
+      <PaySheet target={pay} onClose={() => setPay(null)} />
       <Text variant="bodyStrong" style={styles.section}>
         {t('profile.social.posts')}
       </Text>

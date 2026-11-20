@@ -8,6 +8,7 @@ import { useI18n, type MessageKey } from '../../../i18n';
 import { Card, Chips, PagedList } from '../../../seller/ui';
 import { formatMoney } from '../../../shop/format';
 import { spacing } from '../../../theme/tokens';
+import { formatSlot } from '../../../delivery/schedule-logic';
 import { Badge, Text } from '../../../ui';
 
 type Scope = 'active' | 'done';
@@ -49,6 +50,12 @@ export default function MyDeliveries() {
               </Text>
               <Badge tone={d.proofLocked ? 'accent' : 'neutral'} label={d.proofLocked ? t('delivery.locked') : t(`delivery.status.${d.status}` as MessageKey)} />
             </View>
+            {d.speed === 'express' || d.scheduledFor ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                {d.speed === 'express' ? <Badge tone="accent" label={t('courier.speed.express')} /> : null}
+                {d.scheduledFor ? <Badge tone="neutral" label={t('courier.slot.at', { when: formatSlot(d.scheduledFor, locale) })} /> : null}
+              </View>
+            ) : null}
             {d.address ? (
               <Text variant="small" muted numberOfLines={2}>
                 {d.address.line1}, {d.address.city}

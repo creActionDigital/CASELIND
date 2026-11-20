@@ -4,15 +4,16 @@ import type { OrgRole } from '@caselind/contracts';
  * Miroir en lecture seule de `apps/api/src/orgs/org-permissions.ts`, uniquement pour masquer ce que le rôle
  * ne permet pas. Le serveur reste la référence (un 403 est toujours possible).
  */
-export type SellerPermission = 'catalog.manage' | 'orders.view' | 'orders.manage' | 'inventory.manage';
+export type SellerPermission = 'catalog.manage' | 'orders.view' | 'orders.manage' | 'inventory.manage' | 'finance.view' | 'finance.manage';
 
 const ALL: SellerPermission[] = ['catalog.manage', 'orders.view', 'orders.manage', 'inventory.manage'];
+const WITH_FINANCE: SellerPermission[] = [...ALL, 'finance.view', 'finance.manage'];
 
 const BY_ROLE: Record<OrgRole, readonly SellerPermission[]> = {
-  owner: ALL,
-  admin: ALL,
+  owner: WITH_FINANCE,
+  admin: WITH_FINANCE,
   manager: ALL,
-  finance: ['orders.view'],
+  finance: ['orders.view', 'finance.view', 'finance.manage'],
   stock: ['inventory.manage'],
   sales: ['catalog.manage', 'orders.view', 'orders.manage'],
   hr: [],
@@ -48,4 +49,19 @@ export function hasSellerAccess(role: OrgRole | undefined): boolean {
 /** Emplacement de la boutique : permission `org.profile.edit` (propriétaire et administrateur). */
 export function canEditProfile(role: OrgRole | undefined): boolean {
   return role === 'owner' || role === 'admin';
+}
+
+/** Miroir de `hr.manage` : fiches, congés à traiter et plannings (propriétaire, administrateur, RH). */
+export function canManageHr(role: OrgRole | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'hr';
+}
+
+/** Miroir de `payroll.manage` : registre de salaire saisi à la main (propriétaire, administrateur, finance, RH). */
+export function canManagePayroll(role: OrgRole | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'finance' || role === 'hr';
+}
+
+/** Miroir de `inventory.manage` pour les lots et l'inventaire physique. */
+export function canManageInventory(role: OrgRole | undefined): boolean {
+  return can(role, 'inventory.manage');
 }

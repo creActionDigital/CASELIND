@@ -1,13 +1,18 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
+import { errorMessage } from '../../../lib/errors';
+import { CertBadge, ManifestSummary } from '../../../miniapps/ManifestSummary';
+import { fetchMiniApp } from '../../../miniapps/api';
+import { setAppMuted } from '../../../miniapps/platform-api';
 import { confirmPayment, declinePayment, fetchDirectory, fetchGrants, fetchPaymentRequests, maKeys, revokeGrant } from '../../../miniapps/api';
 import { Card, Chips, Loading } from '../../../seller/ui';
 import { formatMoney } from '../../../shop/format';
 import { spacing } from '../../../theme/tokens';
+import { useTheme } from '../../../theme/use-theme';
 import { Badge, Button, ErrorState, Screen, Text, TextField } from '../../../ui';
 
 type Tab = 'directory' | 'mine' | 'payments';
@@ -15,10 +20,12 @@ type Tab = 'directory' | 'mine' | 'payments';
 /** Annuaire des mini-apps, apps autorisées (révocation) et demandes de paiement (confirmation par PIN). */
 export default function MiniApps() {
   const { t } = useI18n();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>('directory');
   return (
     <Screen>
       <Stack.Screen options={{ title: t('miniapps.title') }} />
+      <Button variant="secondary" label={t('miniapps.dev.open')} onPress={() => router.push('/miniapps/developer' as never)} />
       <Chips<Tab>
         value={tab}
         onChange={setTab}
@@ -57,10 +64,14 @@ function Directory() {
         <Card key={a.id}>
           <Text variant="bodyStrong">{a.name}</Text>
           <Text variant="small" muted>{t('miniapps.by', { name: a.organization.name })}</Text>
-          {a.organization.verified ? <Badge tone="accent" label={t('miniapps.verified')} /> : null}
+          <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
+            <CertBadge level={a.certification} />
+            {a.organization.verified ? <Badge tone="accent" label={t('miniapps.verified')} /> : null}
+          </View>
           {a.description ? <Text>{a.description}</Text> : null}
           <Text variant="small" style={{ fontWeight: '600' }}>{t('miniapps.scopes')}</Text>
           {a.scopes.map((s) => <Text key={s} variant="small">• {t(scopeKey(s))}</Text>)}
+          <Details id={a.id} />
           <Text variant="caption" muted>{t('miniapps.openHint')}</Text>
           <Button variant="secondary" label={t('miniapps.open')} onPress={() => void Linking.openURL(a.launchUrl)} />
         </Card>
@@ -70,11 +81,31 @@ function Directory() {
   );
 }
 
+/** Manifeste approuvé de l'application (données consultées, coûts, conditions), chargé à la demande. */
+function Details({ id }: { id: string }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const q = useQuery({ queryKey: ['miniapps', 'one', id], queryFn: () => fetchMiniApp(id), enabled: open });
+  return (
+    <>
+      <Button variant="ghost" label={t(open ? 'mp.details.hide' : 'mp.details.show')} onPress={() => setOpen(!open)} />
+      {open && q.isPending ? <Loading /> : null}
+      {open && q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : null}
+      {open && q.data ? <ManifestSummary manifest={q.data.manifest} /> : null}
+    </>
+  );
+}
+
 function Mine() {
   const { t, locale } = useI18n();
+  const router = useRouter();
   const qc = useQueryClient();
   const [confirming, setConfirming] = useState<string | null>(null);
   const q = useQuery({ queryKey: maKeys.grants, queryFn: fetchGrants });
+  const mute = useMutation({
+    mutationFn: (v: { appId: string; muted: boolean }) => setAppMuted(v.appId, v.muted),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: maKeys.grants }),
+  });
   const revoke = useMutation({
     mutationFn: revokeGrant,
     onSuccess: () => {
@@ -93,6 +124,7 @@ function Mine() {
           <Text variant="bodyStrong">{g.name}</Text>
           <Text variant="small" muted>{t('miniapps.by', { name: g.organizationName })}</Text>
           {g.scopes.map((s) => <Text key={s} variant="small">• {t(scopeKey(s))}</Text>)}
+          {g.reconsentRequired ? <Text variant="small">{t('miniapps.mine.reconsent')}</Text> : null}
           <Text variant="caption" muted>{t('miniapps.mine.since', { date: new Date(g.grantedAt).toLocaleDateString(locale) })}</Text>
           {confirming === g.appId ? (
             <>
@@ -102,7 +134,18 @@ function Mine() {
               {revoke.isError ? <ErrorState error={revoke.error} /> : null}
             </>
           ) : (
-            <Button variant="secondary" label={t('miniapps.revoke')} onPress={() => setConfirming(g.appId)} />
+            <>
+              {g.scopes.includes('notify') ? (
+                <Button
+                  variant="ghost"
+                  label={t(g.notificationsMuted ? 'mp.notify.unmute' : 'mp.notify.mute')}
+                  loading={mute.isPending}
+                  onPress={() => mute.mutate({ appId: g.appId, muted: !g.notificationsMuted })}
+                />
+              ) : null}
+              <Button variant="ghost" label={t('miniapps.activity.open')} onPress={() => router.push(`/miniapps/activity/${g.appId}` as never)} />
+              <Button variant="secondary" label={t('miniapps.revoke')} onPress={() => setConfirming(g.appId)} />
+            </>
           )}
         </Card>
       ))}
@@ -112,6 +155,7 @@ function Mine() {
 
 function Payments() {
   const { t, locale } = useI18n();
+  const { colors } = useTheme();
   const qc = useQueryClient();
   const [paying, setPaying] = useState<string | null>(null);
   const [pin, setPin] = useState('');
@@ -129,7 +173,7 @@ function Payments() {
     onError: (e) => {
       const reason = e instanceof ApiRequestError ? e.detail<string>('reason') : undefined;
       if (reason === 'request_closed') return done();
-      setErr(t(reason === 'pin_locked' ? 'miniapps.err.locked' : 'miniapps.err.pin'));
+      setErr(reason === 'pin_locked' ? t('miniapps.err.locked') : reason === 'pin_invalid' ? t('miniapps.err.pin') : errorMessage(e, t, locale));
     },
   });
   const decline = useMutation({ mutationFn: declinePayment, onSuccess: done });
@@ -156,6 +200,7 @@ function Payments() {
             <>
               <Button label={t('miniapps.pay.pay')} onPress={() => setPaying(r.id)} />
               <Button variant="ghost" label={t('miniapps.pay.decline')} loading={decline.isPending} onPress={() => decline.mutate(r.id)} />
+              {decline.isError && decline.variables === r.id ? <Text color={colors.danger}>{errorMessage(decline.error, t, locale)}</Text> : null}
             </>
           )}
         </Card>

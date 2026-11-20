@@ -16,10 +16,12 @@ import {
   useDebouncedValue,
 } from '../../search/api';
 import { SEARCH_TABS, effectiveQuery, groupResults, type Category } from '../../search/logic';
+import { NaturalSearch } from '../../search/NaturalSearch';
 import { OrgHitRow, PostHitRow, ProductHitRow, UserHitRow } from '../../search/rows';
 import { Chips } from '../../seller/ui';
 import { spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
+import { errorMessage } from '../../lib/errors';
 import { EmptyState, ErrorState, Text, TextField } from '../../ui';
 
 type Row =
@@ -47,6 +49,7 @@ export default function Search() {
   const { t } = useI18n();
   const [raw, setRaw] = useState('');
   const [tab, setTab] = useState<SearchScope>('all');
+  const [natural, setNatural] = useState(false);
   const q = effectiveQuery(useDebouncedValue(raw));
   const typing = raw.trim().length > 0;
 
@@ -95,6 +98,8 @@ export default function Search() {
     return null;
   })();
 
+  if (natural) return <NaturalSearch onBack={() => setNatural(false)} />;
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <View style={styles.top}>
@@ -109,6 +114,11 @@ export default function Search() {
           autoCorrect={false}
           maxLength={100}
         />
+        <Pressable accessibilityRole="button" onPress={() => setNatural(true)} hitSlop={8} style={styles.moreBtn}>
+          <Text variant="small" color={colors.primary} style={{ fontWeight: '600' }}>
+            {t('natsearch.mode')}
+          </Text>
+        </Pressable>
         {typing ? <Chips options={SEARCH_TABS.map((s) => ({ value: s, label: t(`search.tab.${s}` as MessageKey) }))} value={tab} onChange={setTab} /> : null}
       </View>
       {showHistory ? (
@@ -170,13 +180,14 @@ function CategoryHeader({ category, more, onMore }: { category: Category; more: 
 /** Recherches récentes sous le champ vide : supprimer une entrée, tout effacer, activer/désactiver l'enregistrement. */
 function History({ onPick }: { onPick: (e: { query: string; scope: SearchScope }) => void }) {
   const { colors } = useTheme();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const qc = useQueryClient();
   const history = useQuery({ queryKey: searchKeys.history, queryFn: fetchHistory, refetchOnMount: 'always' });
   const refresh = () => qc.invalidateQueries({ queryKey: searchKeys.history });
   const remove = useMutation({ mutationFn: deleteHistoryEntry, onSuccess: refresh });
   const clear = useMutation({ mutationFn: clearHistory, onSuccess: refresh });
   const toggle = useMutation({ mutationFn: setHistoryEnabled, onSuccess: refresh });
+  const mutationError = remove.error ?? clear.error ?? toggle.error;
   const data = history.data;
   const items = data?.items ?? [];
   const enabled = toggle.isPending ? !!toggle.variables : (data?.enabled ?? true);
@@ -188,6 +199,11 @@ function History({ onPick }: { onPick: (e: { query: string; scope: SearchScope }
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <View style={styles.histHead}>
+          {mutationError ? (
+            <Text color={colors.danger} accessibilityRole="alert">
+              {errorMessage(mutationError, t, locale)}
+            </Text>
+          ) : null}
           <View style={styles.toggleRow}>
             <View style={styles.flex}>
               <Text variant="bodyStrong">{t('search.history.toggle')}</Text>

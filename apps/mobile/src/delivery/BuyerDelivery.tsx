@@ -16,6 +16,7 @@ import { rateDelivery } from './api';
 import { deliveryErrorMessage } from './errors';
 import { canRate, distanceKm, formatProofCode, stepStates } from './logic';
 import { ProofView } from './ProofSection';
+import { formatSlot } from './schedule-logic';
 
 /** Position du livreur en direct : valeur du serveur, puis événements `delivery.location` de la room de la commande. Rien n'est stocké. */
 export function useLiveCourierLocation(orderId: string, deliveryId: string | undefined, initial: DeliveryLocation | null): DeliveryLocation | null {
@@ -114,6 +115,12 @@ export function BuyerDelivery({ orderId, delivery }: { orderId: string; delivery
         </View>
       ) : null}
 
+      {delivery.speed === 'express' || delivery.scheduledFor ? (
+        <Text variant="small" muted>
+          {delivery.speed === 'express' ? t('courier.speed.express') : t('courier.speed.standard')}
+          {delivery.scheduledFor ? ` · ${t('courier.slot.at', { when: formatSlot(delivery.scheduledFor, locale) })}` : ''}
+        </Text>
+      ) : null}
       {delivery.courier ? (
         <Text accessibilityLabel={t('delivery.courierIs', { name: delivery.courier.displayName })}>
           {t('delivery.courier')} : <Text variant="bodyStrong">{delivery.courier.displayName}</Text>
