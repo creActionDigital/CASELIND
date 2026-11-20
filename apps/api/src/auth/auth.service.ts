@@ -146,7 +146,7 @@ export class AuthService {
     if (user.status === 'pending_verification') {
       throw new AppError(403, ErrorCodes.accountNotVerified, 'Verify your account before signing in');
     }
-    if (user.status !== 'active') {
+    if (user.status !== 'active' && !(await this.isSanctioned(user))) {
       throw new AppError(403, ErrorCodes.accountSuspended, 'This account is not active');
     }
 
@@ -157,11 +157,18 @@ export class AuthService {
     return this.completeLogin(user, cancelDeletion, req.device, meta);
   }
 
+  /** Suspended by a sanction still in force: the session is then restricted (sanctions and appeal only, see AllowRestricted). */
+  private async isSanctioned(user: UserRow): Promise<boolean> {
+    if (user.status !== 'suspended') return false;
+    const r = await this.db.execute(sql`SELECT 1 FROM user_sanctions s WHERE s.user_id = ${user.id}::uuid AND s.kind IN ('suspension_temp', 'ban') AND s.status IN ('active', 'appealed') AND (s.ends_at IS NULL OR s.ends_at > now())`);
+    return r.rows.length > 0;
+  }
+
   /** Second step of a login on an account with 2FA. */
   async verifyTwoFactor(req: TwoFactorVerifyRequest, meta: RequestMeta): Promise<TokenPair> {
     const { userId, device } = await this.twoFactor.completeLoginChallenge(req, meta);
     const [user] = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
-    if (!user || user.status !== 'active') {
+    if (!user || (user.status !== 'active' && !(await this.isSanctioned(user)))) {
       throw new AppError(403, ErrorCodes.accountSuspended, 'This account is not active');
     }
     const cancelDeletion = this.assertDeletionNotDue(user);
@@ -257,7 +264,7 @@ export class AuthService {
       found.session.revokedAt ||
       found.session.expiresAt <= now ||
       found.token.expiresAt <= now ||
-      found.user.status !== 'active'
+      (found.user.status !== 'active' && !(await this.isSanctioned(found.user)))
     ) {
       throw invalid();
     }

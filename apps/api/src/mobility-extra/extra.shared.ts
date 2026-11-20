@@ -41,8 +41,11 @@ export function encodeCursor(ts: string, id: string): string {
 export function decodeCursor(raw: string): { ts: string; id: string } | null {
   try {
     const v = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as { t?: unknown; i?: unknown };
-    if (typeof v.t !== 'string' || typeof v.i !== 'string' || Number.isNaN(Date.parse(v.t))) return null;
-    return { ts: v.t, id: v.i };
+    if (typeof v.t !== 'string' || typeof v.i !== 'string') return null;
+    const d = new Date(v.t);
+    // Canonical ISO text for Postgres; out-of-range years (5-digit, signed) are refused.
+    if (Number.isNaN(d.getTime()) || d.getUTCFullYear() < 1970 || d.getUTCFullYear() > 9999) return null;
+    return { ts: d.toISOString(), id: v.i };
   } catch {
     return null;
   }

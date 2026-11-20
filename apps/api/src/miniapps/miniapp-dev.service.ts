@@ -27,7 +27,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { type OrgPermissionKey, roleHasPermission } from '../orgs/org-permissions.js';
 import { decodeCursor, encodeCursor, validationError } from '../social/social.shared.js';
 import { MiniAppUsageService } from './miniapp-usage.service.js';
-import { APP_COLUMNS, type AppRow, appNotFound, iso, jsonbOf, manifestError, textArray, toApp } from './miniapps.shared.js';
+import { APP_COLUMNS, type AppRow, appNotFound, assertIndependentReviewer, iso, jsonbOf, manifestError, textArray, toApp } from './miniapps.shared.js';
 
 type Executor = Pick<Db, 'execute'>;
 const MANAGE: OrgPermissionKey = 'org.admins.manage';
@@ -205,6 +205,7 @@ export class MiniAppDevService {
       const pre = await this.loadVersion(tx, versionId);
       const app = await tx.execute<{ status: string; scopes: string[]; org_id: string }>(sql`SELECT status, scopes, org_id FROM miniapps WHERE id = ${pre.miniapp_id}::uuid FOR UPDATE`);
       const a = app.rows[0]!;
+      await assertIndependentReviewer(tx, pre.miniapp_id, a.org_id, reviewerId);
       const cur = await this.loadVersion(tx, versionId, true);
       if (cur.status !== 'submitted') throw AppError.conflict('Only a submitted version can be reviewed', { reason: 'invalid_transition', status: cur.status });
       if (a.status === 'suspended') throw AppError.conflict('The application is suspended', { reason: 'app_suspended' });

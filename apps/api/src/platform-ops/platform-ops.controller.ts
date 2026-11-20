@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import {
   type AdminAnnouncement,
@@ -17,6 +17,7 @@ import {
   type AppealRequest,
   appealRequestSchema,
   type ApprovalPending,
+  ErrorCodes,
   type CommissionQuery,
   commissionQuerySchema,
   type CreatePlatformAnnouncementRequest,
@@ -49,11 +50,12 @@ import {
   updateAnnouncementRequestSchema,
 } from '@caselind/contracts';
 import { AdminApprovalsService } from '../admin/approvals.service.js';
+import { AppError } from '../common/app-error.js';
 import { ReqMeta, type RequestMeta } from '../common/request-meta.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { RequireFlag } from '../flags/flag.guard.js';
 import { CurrentMembership, type OrgMembership, OrgPermission } from '../orgs/org.guard.js';
-import { type AuthUser, CurrentUser, Public, Roles } from '../security/auth.guard.js';
+import { AllowRestricted, type AuthUser, CurrentUser, Public, Roles } from '../security/auth.guard.js';
 import { AnnouncementsService } from './announcements.service.js';
 import { CommissionService } from './commission.service.js';
 import { SanctionsService } from './sanctions.service.js';
@@ -98,7 +100,7 @@ export class AdminSanctionsController {
   }
 
   @Get('users/:id/sanctions')
-  forUser(@Param('id') id: string, @Query(new ZodPipe(sanctionListQuerySchema)) q: SanctionListQuery): Promise<SanctionList> {
+  forUser(@Param('id', new ParseUUIDPipe({ exceptionFactory: () => new AppError(400, ErrorCodes.validationFailed, 'Invalid user id') })) id: string, @Query(new ZodPipe(sanctionListQuerySchema)) q: SanctionListQuery): Promise<SanctionList> {
     return this.sanctions.list({ ...q, userId: id }, null, true);
   }
 
@@ -126,6 +128,7 @@ export class AdminSanctionsController {
 }
 
 /** What the signed-in user sees of their own sanctions and appeal. */
+@AllowRestricted()
 @Controller('me/sanctions')
 export class MySanctionsController {
   constructor(private readonly sanctions: SanctionsService) {}
@@ -214,8 +217,20 @@ export class AdminPlatformController {
     return this.commissions.forPlatform(q);
   }
 
+  /** 200, or 202 `{approvalId, status}` when the double validation is active (an organisation's rate is as sensitive as the default). */
   @Put('orgs/:id/commission')
-  setOrgCommission(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body(new ZodPipe(setOrgCommissionRequestSchema)) b: SetOrgCommissionRequest, @ReqMeta() meta: RequestMeta): Promise<{ orgId: string; bps: number | null }> {
+  async setOrgCommission(
+    @CurrentUser() u: AuthUser,
+    @Param('id') id: string,
+    @Body(new ZodPipe(setOrgCommissionRequestSchema)) b: SetOrgCommissionRequest,
+    @ReqMeta() meta: RequestMeta,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ orgId: string; bps: number | null } | ApprovalPending> {
+    const pending = await this.approvals.guard({ kind: 'setting.sensitive', subjectId: id, payload: { key: 'org.commissionBps', orgId: id, bps: b.bps }, reason: b.reason, actorId: u.userId, meta, precheck: () => this.commissions.assertOrg(id) });
+    if (pending) {
+      res.status(202);
+      return pending;
+    }
     return this.commissions.setOrgBps(u.userId, id, b, meta);
   }
 }

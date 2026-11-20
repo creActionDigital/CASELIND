@@ -129,3 +129,21 @@ describe('savings goals', () => {
     expect(await svc.remindDeadlines()).toBe(1);
   });
 });
+
+describe('savings hardening', () => {
+  it('scopes the idempotency key per goal and refuses archiving when a deposit landed', async () => {
+    k.limits();
+    k.pinOk();
+    const a = await k.user();
+    await k.topup(a, 2000);
+    const g1 = (await goal(a).expect(201)).body.id;
+    const g2 = (await goal(a, { title: 'Moto' }).expect(201)).body.id;
+    const clientId = randomUUID();
+    await move(a, g1, 'deposit', 300, clientId).expect(201);
+    await move(a, g2, 'deposit', 300, clientId).expect(201); // same clientId, other goal: its own movement
+    expect(await pool(a)).toBe(600);
+    // A movement recorded after the goal was read is seen by archive (balance is read under the goal lock).
+    await ctx.sql.query(`UPDATE savings_goals SET archived = false WHERE id = $1`, [g2]);
+    await k.post(a, `/v1/wallet/savings/${g2}/archive`).expect(409);
+  });
+});

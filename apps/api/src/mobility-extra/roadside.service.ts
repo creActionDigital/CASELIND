@@ -272,14 +272,16 @@ export class RoadsideService {
       const other = byId.get((asRequester ? r.provider_id : r.requester_id) ?? '');
       const st = effective(r, now);
       const underWay = st === 'accepted' || st === 'on_the_way';
+      // A provider only learns where the requester is, and what they wrote, once they are on the job.
+      const hide = !asRequester && !underWay;
       return {
         id: r.id,
         role: asRequester ? ('requester' as const) : ('provider' as const),
         kind: r.kind,
         status: st,
-        position: { lat: r.lat, lng: r.lng, label: r.label },
+        position: hide ? { lat: 0, lng: 0, label: '' } : { lat: r.lat, lng: r.lng, label: r.label },
         vehicleLabel: r.vehicle_label,
-        note: r.note,
+        note: hide ? null : r.note,
         etaMinutes: r.eta_minutes,
         counterpart: other ? { id: other.id, handle: other.handle, displayName: other.display_name } : null,
         locationSharing: r.location_consent,

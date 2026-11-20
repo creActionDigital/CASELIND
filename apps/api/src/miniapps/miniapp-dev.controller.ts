@@ -203,6 +203,7 @@ export class AdminMiniAppVersionsController {
   }
 
   @Post(':appId/certify')
+  @Roles('admin')
   @HttpCode(200)
   certify(
     @CurrentUser() user: AuthUser,
@@ -220,6 +221,7 @@ export class AdminMiniAppVersionsController {
   }
 
   @Patch(':appId/revenue-share')
+  @Roles('admin')
   revenueShare(
     @CurrentUser() user: AuthUser,
     @Param('appId') appId: string,
@@ -230,6 +232,7 @@ export class AdminMiniAppVersionsController {
   }
 
   @Patch(':appId/quota')
+  @Roles('admin')
   setQuota(
     @CurrentUser() user: AuthUser,
     @Param('appId') appId: string,

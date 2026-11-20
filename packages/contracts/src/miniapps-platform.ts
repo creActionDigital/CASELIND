@@ -181,7 +181,7 @@ export type MiniAppNotifyResponse = z.infer<typeof miniappNotifyResponseSchema>;
 export const setMiniAppMuteRequestSchema = z.object({ muted: z.boolean() });
 export type SetMiniAppMuteRequest = z.infer<typeof setMiniAppMuteRequestSchema>;
 
-const LINK_RE = /(?:[a-z][a-z0-9+.-]*:\/\/[^\s]+|www\.[^\s]+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|io|app|dev|co|cd|me|info|biz|xyz|link|site|online|shop|fr|be|uk|us|ly)\b[^\s]*)/gi;
+const LINK_RE = /(?:[a-z][a-z0-9+.-]*:\/\/[^\s]+|www\.[^\s]+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,24}\b[^\s]*)/gi;
 
 /** Hôtes (minuscules) des liens que contient un texte. */
 export function linkHostsIn(text: string): string[] {

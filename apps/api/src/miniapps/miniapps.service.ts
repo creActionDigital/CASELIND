@@ -24,6 +24,7 @@ import {
   APP_COLUMNS,
   type AppRow,
   appNotFound,
+  assertIndependentReviewer,
   jsonbOf,
   manifestError,
   newClientId,
@@ -201,6 +202,7 @@ export class MiniAppsService {
       const res = await tx.execute<AppRow>(sql`SELECT ${sql.raw(APP_COLUMNS)} FROM miniapps WHERE id = ${appId}::uuid FOR UPDATE`);
       const cur = res.rows[0];
       if (!cur) throw appNotFound();
+      await assertIndependentReviewer(tx, appId, cur.org_id, reviewerId);
       if (cur.status !== t.from) {
         throw AppError.conflict('This decision does not apply to the application status', { reason: 'invalid_transition', status: cur.status });
       }

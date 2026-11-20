@@ -35,6 +35,8 @@ import { blockedBetween, decodeCursor, encodeCursor, type Exec, isoOf, isUniqueV
 const BOOKING_OPEN_MAX = 5;
 /** The driver may mark the departure from one hour before the announced time. */
 const DEPART_EARLY_MINUTES = 60;
+/** A trip cannot be completed sooner than this after it was marked departed. */
+const COMPLETE_MIN_MINUTES = 10;
 
 const tripNotFound = () => AppError.notFound('Trip not found');
 const bookingNotFound = () => AppError.notFound('Booking not found');
@@ -50,6 +52,7 @@ interface TripRow {
   dest_label: string;
   distance_km: number;
   departs_at: Date;
+  departed_at: Date | null;
   seats_total: number;
   seats_free: number;
   price_per_seat_minor: string | number;
@@ -303,6 +306,7 @@ export class CarpoolService implements OnModuleInit {
   async complete(driverId: string, tripId: string, meta: RequestMeta): Promise<CarpoolTrip> {
     const riding = await this.withLockedTrip(tripId, driverId, async (tx, t) => {
       if (t.status !== 'departed') throw conflict(`A ${t.status} trip cannot be completed`, 'invalid_transition', { from: t.status });
+      if (t.departed_at && Date.now() - t.departed_at.getTime() < COMPLETE_MIN_MINUTES * 60_000) throw conflict('Too early to complete', 'too_early');
       const done = await rowsOf<{ passenger_id: string }>(tx, sql`UPDATE carpool_bookings SET status = 'completed', updated_at = now() WHERE trip_id = ${t.id}::uuid AND status = 'accepted' RETURNING passenger_id`);
       await this.setTrip(tx, t, 'completed', driverId, meta);
       return done.map((d) => d.passenger_id);
@@ -367,7 +371,7 @@ export class CarpoolService implements OnModuleInit {
   }
 
   private async setTrip(tx: Tx, t: TripRow, to: CarpoolTripStatus, actor: string, meta: RequestMeta): Promise<void> {
-    await tx.execute(sql`UPDATE carpool_trips SET status = ${to} WHERE id = ${t.id}::uuid`);
+    await tx.execute(sql`UPDATE carpool_trips SET status = ${to}, departed_at = CASE WHEN ${to} = 'departed' THEN now() ELSE departed_at END WHERE id = ${t.id}::uuid`);
     await this.audit.record({ action: 'carpool.trip_status_changed', actorUserId: actor, meta, metadata: { tripId: t.id, from: t.status, to } }, tx);
   }
 

@@ -267,6 +267,7 @@ export class RentalsService {
       if (scope.renterId !== undefined ? b.renter_id !== scope.renterId : v.org_id !== scope.orgId) throw bookingNotFound();
       if (!from.includes(b.status)) throw conflict(`A ${b.status} rental cannot become ${to}`, 'invalid_transition', { from: b.status, to });
       if (to === 'confirmed' && (await this.overlaps(tx, b.vehicle_id, b.starts_on, b.ends_on, b.id))) throw conflict('The vehicle is not available on this period', 'unavailable');
+      if (to === 'confirmed' && b.starts_on < todayUtc()) throw conflict('The requested period has already started', 'too_late');
       if (to === 'picked_up' && b.starts_on > todayUtc()) throw conflict('The rental has not started yet', 'too_early');
       await tx.execute(sql`UPDATE rental_bookings SET status = ${to}, updated_at = now() WHERE id = ${id}::uuid`);
       await this.audit.record({ action: 'rental.booking_status_changed', actorUserId: actor, meta, metadata: { orgId: v.org_id, vehicleId: b.vehicle_id, bookingId: id, from: b.status, to } }, tx);

@@ -20,7 +20,7 @@ import {
 import { AppError } from '../common/app-error.js';
 import { ReqMeta, type RequestMeta } from '../common/request-meta.js';
 import { ZodPipe } from '../common/zod.pipe.js';
-import { type AuthUser, CurrentUser, Public } from '../security/auth.guard.js';
+import { AllowRestricted, type AuthUser, CurrentUser, Public } from '../security/auth.guard.js';
 import { AuthService } from './auth.service.js';
 import { OtpService } from './otp.service.js';
 
@@ -89,6 +89,7 @@ export class AuthController {
     return this.auth.refresh(body.refreshToken, meta);
   }
 
+  @AllowRestricted()
   @Post('logout')
   @HttpCode(204)
   logout(@CurrentUser() user: AuthUser, @ReqMeta() meta: RequestMeta): Promise<void> {

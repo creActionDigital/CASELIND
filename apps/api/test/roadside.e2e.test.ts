@@ -265,3 +265,16 @@ describe('expiry and export', () => {
     expect(exp2.body.mobilityExtra.roadsideRequests[0]).toMatchObject({ role: 'provider' });
   });
 });
+
+describe('provider privacy', () => {
+  it('hides the requester position, label and note from the provider once the job is no longer under way', async () => {
+    const u = await user();
+    const p = await provider();
+    const req = await make(u);
+    await post(p, `/v1/roadside/requests/${req.id}/accept`).expect(200);
+    const done = (await post(p, `/v1/roadside/requests/${req.id}/done`).expect(200)).body;
+    expect(done.note).toBeNull();
+    expect(done.position).toEqual({ lat: 0, lng: 0, label: '' });
+    expect((await get(u, `/v1/roadside/requests/${req.id}`)).body).toMatchObject({ note: NOTE, position: { label: POS.label } });
+  });
+});

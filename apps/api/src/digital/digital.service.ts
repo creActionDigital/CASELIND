@@ -26,9 +26,10 @@ export class DigitalProductsService {
 
   /** Replaces the files (ready `digital_file` uploads of the caller); dropped files are deleted. */
   async setFiles(orgId: string, userId: string, productId: string, assetIds: string[], meta: RequestMeta): Promise<ProductFiles> {
+    if (!UUID_RE.test(productId)) throw AppError.notFound('Product not found');
     const keys = await this.db.transaction(async (tx) => {
       const own = await tx.execute(sql`SELECT 1 FROM products WHERE id = ${productId}::uuid AND org_id = ${orgId}::uuid FOR UPDATE`);
-      if (own.rows.length === 0 || !UUID_RE.test(productId)) throw AppError.notFound('Product not found');
+      if (own.rows.length === 0) throw AppError.notFound('Product not found');
       const removed = await replaceFiles(tx, PRODUCT_FILES, userId, 'digital_file', productId, assetIds);
       await this.audit.record({ action: 'catalog.product_files_set', actorUserId: userId, meta, metadata: { orgId, productId, count: assetIds.length } }, tx);
       return removed;

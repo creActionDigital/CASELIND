@@ -109,7 +109,7 @@ export class SanctionsService {
    */
   async issue(actor: Actor, targetId: string, body: IssueSanctionRequest, meta: RequestMeta): Promise<Sanction> {
     const id = await this.issueTx(actor, targetId, body, meta, this.db, false);
-    await this.notifyUser(targetId, id, 'Une mesure de modération a été appliquée à votre compte.');
+    await this.notifyIssued(targetId, id);
     return this.one(id, true);
   }
 
@@ -290,12 +290,13 @@ export class SanctionsService {
   async decide(actor: Actor, appealId: string, body: DecideAppealRequest, meta: RequestMeta): Promise<AdminAppeal> {
     if (!UUID_RE.test(appealId)) throw AppError.notFound('Appeal not found');
     const out = await this.db.transaction(async (tx) => {
-      const r = await tx.execute<{ id: string; sanction_id: string; user_id: string; status: string; kind: SanctionKind; in_force: boolean }>(sql`
-        SELECT a.id, a.sanction_id, a.user_id, a.status, s.kind, (${IN_FORCE}) AS in_force
+      const r = await tx.execute<{ id: string; sanction_id: string; user_id: string; status: string; kind: SanctionKind; in_force: boolean; issued_by: string }>(sql`
+        SELECT a.id, a.sanction_id, a.user_id, a.status, s.kind, s.issued_by, (${IN_FORCE}) AS in_force
         FROM sanction_appeals a JOIN user_sanctions s ON s.id = a.sanction_id WHERE a.id = ${appealId}::uuid FOR UPDATE OF a, s`);
       const a = r.rows[0];
       if (!a) throw AppError.notFound('Appeal not found');
       if (a.user_id === actor.userId) throw AppError.conflict('You cannot decide the appeal of your own sanction', { reason: 'self' });
+      if (a.issued_by === actor.userId) throw AppError.conflict('The issuer of a sanction cannot decide its appeal', { reason: 'issuer' });
       if (!actor.roles.includes('admin') && !moderatorMayHandle(a.kind)) throw AppError.forbidden();
       if (a.status !== 'pending') throw AppError.conflict('This appeal was already decided', { reason: 'already_decided' });
       if (body.decision === 'accepted') {
@@ -319,6 +320,11 @@ export class SanctionsService {
       FROM sanction_appeals a JOIN user_sanctions s ON s.id = a.sanction_id JOIN users u ON u.id = a.user_id WHERE a.id = ${id}::uuid`);
     const x = r.rows[0]!;
     return { id: x.id, sanctionId: x.sanction_id, userId: x.user_id, userHandle: x.handle, message: x.message, status: x.status, decisionNote: x.decision_note, decidedBy: x.decided_by, createdAt: iso(x.created_at)!, sanctionKind: x.kind, sanctionReason: x.reason, sanctionStatus: x.s_status };
+  }
+
+  /** Tells the target a sanction now applies (after the commit; also used by the double validation). */
+  async notifyIssued(userId: string, sanctionId: string): Promise<void> {
+    await this.notifyUser(userId, sanctionId, 'Une mesure de modération a été appliquée à votre compte.');
   }
 
   private async notifyUser(userId: string, sanctionId: string, body: string): Promise<void> {

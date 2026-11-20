@@ -136,3 +136,17 @@ export const manifestError = (problems: readonly { path: string; message: string
 
 /** The manifest as jsonb for a SQL parameter (null stays NULL). */
 export const jsonbOf = (v: unknown): SQL => (v == null ? sql`NULL::jsonb` : sql`${JSON.stringify(v)}::jsonb`);
+
+/** Un relecteur ne valide pas sa propre application : refus s'il est membre actif de l'organisation ou créateur de l'app. */
+export async function assertIndependentReviewer(
+  tx: { execute: (q: SQL) => Promise<{ rows: unknown[] }> },
+  appId: string,
+  orgId: string,
+  reviewerId: string,
+): Promise<void> {
+  const r = await tx.execute(sql`
+    SELECT 1 FROM miniapps a WHERE a.id = ${appId}::uuid AND a.created_by = ${reviewerId}::uuid
+    UNION ALL
+    SELECT 1 FROM org_members m WHERE m.org_id = ${orgId}::uuid AND m.user_id = ${reviewerId}::uuid AND m.status = 'active' LIMIT 1`);
+  if (r.rows.length > 0) throw AppError.forbidden('You cannot review an application of your own organisation');
+}

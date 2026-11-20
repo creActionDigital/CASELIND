@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { MaintenanceService } from '../src/maintenance/maintenance.service.js';
 import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
 
 let ctx: TestContext;
@@ -288,5 +289,22 @@ describe('bookings', () => {
     await rent(renter, v.id, 4, 5, { note: 'Pour l’export' }).expect(201);
     const exp = await get(renter, '/v1/me/export').expect(200);
     expect(exp.body.mobilityExtra.rentalBookings).toMatchObject([{ vehicleTitle: 'Toyota RAV4 2019', totalMinor: 10000, status: 'requested' }]);
+  });
+});
+
+describe('stale requests', () => {
+  it('refuses to confirm a request whose first day has passed, and maintenance closes it', async () => {
+    const owner = await user();
+    const org = await createOrg(owner);
+    const v = await makeVehicle(owner, org);
+    const renter = await user();
+    const stale = (await rent(renter, v.id, 1, 2).expect(201)).body;
+    const fresh = (await rent(renter, v.id, 10, 11).expect(201)).body;
+    await ctx.sql.query(`UPDATE rental_bookings SET starts_on = current_date - 2, ends_on = current_date - 1 WHERE id = $1`, [stale.id]);
+    await post(owner, `/v1/orgs/${org}/rental-bookings/${stale.id}/confirm`).expect(409);
+    await ctx.app.get(MaintenanceService).runOnce();
+    const status = async (id: string) => (await ctx.sql.query(`SELECT status FROM rental_bookings WHERE id = $1`, [id])).rows[0].status;
+    expect(await status(stale.id)).toBe('cancelled');
+    expect(await status(fresh.id)).toBe('requested');
   });
 });

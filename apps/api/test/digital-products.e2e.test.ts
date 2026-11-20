@@ -82,8 +82,18 @@ describe('digital products', () => {
     await read(await user(), url).expect(404);
   });
 
+  it('a file already delivered to a buyer is kept when the seller replaces it', async () => {
+    const s = await setup('delivered');
+    const [a, b] = [await upload(s.owner, 'digital_file'), await upload(s.owner, 'digital_file')];
+    await putFiles(s.owner, s.org.id, s.product.id, [a]).expect(200);
+    await putFiles(s.owner, s.org.id, s.product.id, [b]).expect(200);
+    expect((await ctx.sql.query(`SELECT count(*)::int AS n FROM media_assets WHERE id = $1`, [a])).rows[0].n).toBe(1);
+    const files = (await ctx.http.get('/v1/me/downloads').set(bearer(s.buyer.token)).expect(200)).body.items;
+    expect(JSON.stringify(files)).toContain(a);
+  });
+
   it('replaces and removes files (dropped ones are deleted) and refuses bad input', async () => {
-    const s = await setup();
+    const s = await setup('pending'); // no delivered order: nobody bought the files yet
     const [a, b] = [await upload(s.owner, 'digital_file'), await upload(s.owner, 'digital_file')];
     await putFiles(s.owner, s.org.id, s.product.id, [a]).expect(200);
     const second = await putFiles(s.owner, s.org.id, s.product.id, [b]).expect(200);

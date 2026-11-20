@@ -20,6 +20,7 @@ import { DB, type Db } from '../db/db.module.js';
 import { FlagsService } from '../flags/flags.service.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { CommissionService } from '../platform-ops/commission.service.js';
 import { SanctionsService } from '../platform-ops/sanctions.service.js';
 import { SettingsService } from '../platform-ops/settings.service.js';
 import { GovernanceService } from './governance.service.js';
@@ -102,6 +103,7 @@ export class AdminApprovalsService implements OnModuleInit {
     private readonly wallet: WalletService,
     private readonly sanctions: SanctionsService,
     private readonly settings: SettingsService,
+    private readonly commissions: CommissionService,
   ) {}
 
   onModuleInit(): void {
@@ -160,16 +162,17 @@ export class AdminApprovalsService implements OnModuleInit {
         await tx.execute(sql`UPDATE admin_approvals SET status = 'expired' WHERE id = ${id}::uuid`);
         return { expired: true as const };
       }
-      await this.execute(tx, a, meta);
+      const sanctionId = await this.execute(tx, a, meta);
       await tx.execute(sql`
         UPDATE admin_approvals SET status = 'executed', decided_by = ${adminId}::uuid, decided_at = now(), executed_at = now() WHERE id = ${id}::uuid`);
       const base = { approvalId: id, kind: a.kind, subjectId: a.subject_id };
       await this.audit.record({ action: 'admin.approval_decided', actorUserId: adminId, meta, metadata: { ...base, decision: 'approved' } }, tx);
       await this.audit.record({ action: 'admin.approval_executed', actorUserId: adminId, meta, metadata: base }, tx);
-      return { expired: false as const, a, view: await this.get(tx, id) };
+      return { expired: false as const, a, sanctionId, view: await this.get(tx, id) };
     });
     if (out.expired) throw AppError.conflict('This request has expired', { reason: 'expired' });
     await this.notifyRequester(out.a.requested_by, id, out.a.kind, 'approved');
+    if (out.sanctionId) await this.sanctions.notifyIssued(out.a.subject_id ?? '', out.sanctionId);
     return out.view;
   }
 
@@ -217,14 +220,15 @@ export class AdminApprovalsService implements OnModuleInit {
   private async lock(tx: Pick<Db, 'execute'>, id: string, adminId: string): Promise<Row> {
     const a = await this.find(tx, id);
     if (a.requested_by === adminId) throw AppError.forbidden('You cannot decide your own request');
+    if (a.subject_id === adminId) throw AppError.forbidden('You cannot decide a request about yourself');
     if (a.status !== 'pending') throw AppError.conflict('This request is no longer pending', { reason: 'not_pending', status: a.status });
     const still = await tx.execute(sql`SELECT 1 FROM users WHERE id = ${a.requested_by}::uuid AND status = 'active' AND 'admin' = ANY(roles)`);
     if (still.rows.length === 0) throw AppError.conflict('The requester is no longer an active administrator', { reason: 'requester_not_admin' });
     return a;
   }
 
-  /** Runs the sensitive operation inside the decision's transaction, attributed to the requester. */
-  private async execute(tx: Pick<Db, 'transaction'>, a: Row, meta: RequestMeta): Promise<void> {
+  /** Runs the sensitive operation inside the decision's transaction, attributed to the requester; returns the sanction id it issued, if any (notified after the commit). */
+  private async execute(tx: Pick<Db, 'transaction'>, a: Row, meta: RequestMeta): Promise<string | void> {
     const p = a.payload;
     switch (a.kind) {
       case 'flag.regulated.change': {
@@ -248,10 +252,13 @@ export class AdminApprovalsService implements OnModuleInit {
       case 'sanction.issue': {
         const body = issueSanctionRequestSchema.parse({ kind: p.kind, durationDays: p.durationDays, reportId: p.reportId, reason: a.reason });
         // The requester was checked as an active administrator when the decision locked the request.
-        await this.sanctions.issueTx({ userId: a.requested_by, roles: ['admin'] }, a.subject_id ?? '', body, meta, tx, true);
-        return;
+        return this.sanctions.issueTx({ userId: a.requested_by, roles: ['admin'] }, a.subject_id ?? '', body, meta, tx, true);
       }
       case 'setting.sensitive': {
+        if (p.key === 'org.commissionBps') {
+          await this.commissions.setOrgBps(a.requested_by, String(p.orgId), { bps: p.bps as number | null, reason: a.reason ?? '' }, meta, tx);
+          return;
+        }
         await this.settings.put(a.requested_by, putSettingRequestSchema.parse({ key: p.key, scope: p.scope, value: p.value, reason: a.reason }), meta, tx);
         return;
       }

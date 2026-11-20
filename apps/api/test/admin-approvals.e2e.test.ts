@@ -196,6 +196,26 @@ describe('mode active', () => {
     expect(audits.rows).toHaveLength(1);
   });
 
+  it('an organisation commission goes through the double validation; the targeted admin cannot decide a request about themself', async () => {
+    on();
+    const [a, b, staff] = [await admin(), await admin(), await admin()];
+    const owner = await user();
+    const org = await ctx.http.post('/v1/orgs').set(bearer(owner.token)).send({ slug: `appr-${Date.now().toString(36)}`, name: 'Boutique test', kind: 'shop' }).expect(201);
+    const orgId = org.body.id as string;
+    const r = await put(a, `/admin/orgs/${orgId}/commission`, { bps: 500, reason: 'accord commercial' });
+    expect(r.status).toBe(202);
+    const bps = async () => (await ctx.sql.query('SELECT commission_bps FROM organizations WHERE id = $1', [orgId])).rows[0].commission_bps;
+    expect(await bps()).toBeNull();
+    await decide(b, r.body.approvalId, 'approve').expect(200);
+    expect(await bps()).toBe(500);
+
+    const s = await post(a, `/admin/users/${staff.id}/platform-roles`, { role: 'support', reason: 'renfort equipe' });
+    expect(s.status).toBe(202);
+    expect((await decide(staff, s.body.approvalId, 'approve')).status).toBe(403);
+    expect((await decide(staff, s.body.approvalId, 'reject')).status).toBe(403);
+    await decide(b, s.body.approvalId, 'approve').expect(200);
+  });
+
   it('a request expires after 24 hours', async () => {
     on();
     const [a, b] = [await admin(), await admin()];

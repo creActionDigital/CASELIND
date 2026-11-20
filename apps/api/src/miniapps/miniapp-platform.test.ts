@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { manifestNeedsReconsent, readManifest, splitRevenue, undeclaredLinks, validateManifest } from '@caselind/contracts';
 import { monthStartOf, previousMonthStart } from './miniapp-revenue.service.js';
-import { appSubject } from './miniapps.shared.js';
+import { Reflector } from '@nestjs/core';
+import { AdminMiniAppVersionsController } from './miniapp-dev.controller.js';
+import { appSubject, assertIndependentReviewer } from './miniapps.shared.js';
 
 const manifest = (over: Record<string, unknown> = {}) => ({
   dataAccessed: [{ scope: 'profile.basic', purpose: 'Afficher votre nom', retention: '30 jours' }],
@@ -73,5 +75,26 @@ describe('app-scoped subject', () => {
     expect(s).not.toBe(appSubject(env, 'app-1', 'user-2'));
     expect(s).not.toContain('user-1');
     expect(appSubject({ ...(env as object), MINIAPP_SUBJECT_KEY: 'k'.repeat(20) } as never, 'app-1', 'user-1')).not.toBe(s);
+  });
+});
+
+describe('liens génériques', () => {
+  it('rejette tout motif hôte.tld non déclaré', () => {
+    expect(undeclaredLinks('allez sur evil.ru/login ou x.tk', ['a.example.test'])).toEqual(['evil.ru', 'x.tk']);
+    expect(undeclaredLinks('voir a.example.test/x', ['a.example.test'])).toEqual([]);
+  });
+});
+
+describe('relecture indépendante', () => {
+  const tx = (rows: unknown[]) => ({ execute: async () => ({ rows }) });
+  it('refuse un membre ou créateur', async () => {
+    await expect(assertIndependentReviewer(tx([{}]), 'a', 'o', 'u')).rejects.toMatchObject({ status: 403 });
+    await expect(assertIndependentReviewer(tx([]), 'a', 'o', 'u')).resolves.toBeUndefined();
+  });
+  it('revenue-share, certify et quota sont réservés à admin', () => {
+    const r = new Reflector();
+    for (const m of ['certify', 'revenueShare', 'setQuota'] as const) {
+      expect(r.get('caselind:roles', AdminMiniAppVersionsController.prototype[m])).toEqual(['admin']);
+    }
   });
 });

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ENV, type Env } from '../src/config/env.js';
 import { MaintenanceService } from '../src/maintenance/maintenance.service.js';
-import { bearer, createTestContext, signUp, type TestContext } from './helpers.js';
+import { bearer, createTestContext, PASSWORD, signUp, type TestContext } from './helpers.js';
 
 /** Sanctions graduées, effets côté serveur, recours, limites d'action, anti-spam (CDC §26). */
 let ctx: TestContext;
@@ -77,7 +77,8 @@ describe('suspension temporaire, bannissement', () => {
     const victim = await user();
     const s = await sanction(a, victim.id, { kind: 'suspension_temp', durationDays: 2 }).expect(201);
     expect(await status(victim.id)).toBe('suspended');
-    await ctx.http.get('/v1/me').set(bearer(victim.token)).expect(401);
+    const blocked = await ctx.http.get('/v1/me').set(bearer(victim.token)).expect(403); // session restreinte : sanctions seulement
+    expect(blocked.body.error.code).toBe('account_suspended');
 
     await ctx.app.get(MaintenanceService).runOnce();
     expect(await status(victim.id)).toBe('suspended'); // pas encore échue
@@ -116,6 +117,7 @@ describe('recours', () => {
     const a = await admin();
     const victim = await user();
     const stranger = await user();
+    const m2 = await mod();
     const s1 = await sanction(m, victim.id, { kind: 'mute_posting', durationDays: 7 }).expect(201);
     const s2 = await sanction(m, victim.id, { kind: 'warning' }).expect(201);
 
@@ -139,7 +141,9 @@ describe('recours', () => {
     expect(list.body.items[0].message).toBeDefined();
 
     await ctx.http.post(`/v1/admin/appeals/${appealId}/decide`).set(bearer(victim.token)).send({ decision: 'accepted' }).expect(403);
-    const rej = await ctx.http.post(`/v1/admin/appeals/${appealId}/decide`).set(bearer(m.token)).send({ decision: 'rejected', note: 'maintenue' }).expect(200);
+    const own = await ctx.http.post(`/v1/admin/appeals/${appealId}/decide`).set(bearer(m.token)).send({ decision: 'rejected' }).expect(409); // l'émetteur ne tranche pas
+    expect(own.body.error.details.reason).toBe('issuer');
+    const rej = await ctx.http.post(`/v1/admin/appeals/${appealId}/decide`).set(bearer(m2.token)).send({ decision: 'rejected', note: 'maintenue' }).expect(200);
     expect(rej.body).toMatchObject({ status: 'rejected', sanctionStatus: 'active' });
     await ctx.http.post(`/v1/admin/appeals/${appealId}/decide`).set(bearer(a.token)).send({ decision: 'accepted' }).expect(409);
 
@@ -165,9 +169,37 @@ describe('recours', () => {
     await ctx.sql.query(`UPDATE user_sanctions SET status = 'appealed' WHERE id = $1`, [ban.body.id]);
     const id = (await ctx.http.get('/v1/admin/appeals').query({ status: 'pending' }).set(bearer(a.token)).expect(200)).body.items.find((x: { sanctionId: string }) => x.sanctionId === ban.body.id).id;
     const m = await mod();
+    const a2 = await admin();
     await ctx.http.post(`/v1/admin/appeals/${id}/decide`).set(bearer(m.token)).send({ decision: 'accepted' }).expect(403); // suspension : administrateur seulement
-    await ctx.http.post(`/v1/admin/appeals/${id}/decide`).set(bearer(a.token)).send({ decision: 'accepted' }).expect(200);
+    await ctx.http.post(`/v1/admin/appeals/${id}/decide`).set(bearer(a2.token)).send({ decision: 'accepted' }).expect(200);
     expect(await status(victim.id)).toBe('active');
+  });
+});
+
+describe('compte suspendu : session restreinte', () => {
+  it('un suspendu se connecte, lit ses sanctions et fait appel ; tout le reste reste refusé', async () => {
+    const a = await admin();
+    const { identifier, tokens } = await signUp(ctx);
+    const me = await ctx.http.get('/v1/me').set(bearer(tokens.accessToken)).expect(200);
+    const ban = await sanction(a, me.body.id, { kind: 'ban' }).expect(201);
+    expect(await status(me.body.id)).toBe('suspended');
+
+    const login = await ctx.http.post('/v1/auth/login').send({ identifier, password: PASSWORD }).expect(200);
+    const t = bearer(login.body.accessToken);
+    expect((await ctx.http.get('/v1/me/sanctions').set(t).expect(200)).body.items[0].id).toBe(ban.body.id);
+    await ctx.http.get('/v1/me').set(t).expect(403);
+    await ctx.http.get('/v1/wallet/alerts').set(t).expect(403);
+    await ctx.http.post('/v1/posts').set(t).send({ clientId: randomUUID(), body: 'Bonjour', visibility: 'public' }).expect(403);
+    const ap = await ctx.http.post(`/v1/me/sanctions/${ban.body.id}/appeal`).set(t).send({ message: 'Je conteste ce bannissement.' }).expect(200);
+    expect(ap.body.appeal.status).toBe('pending');
+    await ctx.http.post('/v1/auth/refresh').send({ refreshToken: login.body.refreshToken }).expect(200);
+    await ctx.http.post('/v1/auth/logout').set(t).expect(204);
+    await ctx.http.get('/v1/me/sanctions').set(t).expect(401);
+  });
+
+  it('GET admin/users/:id/sanctions refuse un identifiant invalide (400)', async () => {
+    const a = await admin();
+    await ctx.http.get('/v1/admin/users/pas-un-uuid/sanctions').set(bearer(a.token)).expect(400);
   });
 });
 
@@ -234,6 +266,9 @@ describe('limites d\'action et droits', () => {
     expect(await status(staff.id)).toBe('suspended');
     const mineB = (await ctx.http.get('/v1/me/sanctions').set(bearer(b.token)).expect(200)).body.items;
     expect(mineB).toHaveLength(1);
+    // La cible est prévenue une fois la double validation exécutée (rien n'était notifié tant que c'était en attente).
+    const notes = (await ctx.sql.query(`SELECT data FROM notifications WHERE user_id = $1`, [b.id])).rows;
+    expect(notes.filter((n: { data: { sanctionId?: string } }) => n.data?.sanctionId === mineB[0].id)).toHaveLength(1);
     // b ne lève pas sa propre sanction ; c (un autre administrateur) le peut.
     expect((await ctx.http.post(`/v1/admin/sanctions/${mineB[0].id}/lift`).set(bearer(b.token)).send({}).expect(409)).body.error.details.reason).toBe('self');
     await ctx.http.post(`/v1/admin/sanctions/${mineB[0].id}/lift`).set(bearer(c.token)).send({}).expect(200);

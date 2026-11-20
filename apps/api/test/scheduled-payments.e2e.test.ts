@@ -214,6 +214,7 @@ describe('scheduled payments', () => {
     await svc.runDue();
     expect((await row(id)).runs_done).toBe(0); // a paused payment never runs
     expect((await k.post(a, `/v1/wallet/scheduled-payments/${id}/resume`).expect(200)).body.status).toBe('active');
+    await makeDue(id); // resume realigns next_run_at on the schedule; make the run due again
     await svc.runDue();
     expect((await row(id)).runs_done).toBe(1);
     expect((await k.post(a, `/v1/wallet/scheduled-payments/${id}/cancel`).expect(200)).body.status).toBe('cancelled');
@@ -222,5 +223,44 @@ describe('scheduled payments', () => {
     expect((await svc.runDue()).ok).toBe(0);
     const list = await k.get(a, '/v1/wallet/scheduled-payments').expect(200);
     expect(list.body.items.map((p: { id: string }) => p.id)).toContain(id);
+  });
+});
+
+describe('missed occurrences and blocks', () => {
+  it('skips past occurrences: one debit per pass, never a catch-up burst, also after a resume', async () => {
+    k.limits();
+    k.pinOk();
+    const a = await k.user();
+    const b = await k.user();
+    await k.topup(a, 10_000);
+    const id = (await schedule(a, b).expect(201)).body.id;
+    // Three weeks of outage: first run was 22 days ago.
+    await ctx.sql.query(`UPDATE scheduled_payments SET first_run_at = now() - interval '22 days', next_run_at = now() - interval '22 days' WHERE id = $1`, [id]);
+    expect(await svc.runDue()).toEqual({ ok: 1, failed: 0 });
+    expect(await svc.runDue()).toEqual({ ok: 0, failed: 0 });
+    const r = await row(id);
+    expect(new Date(r.next_run_at).getTime()).toBeGreaterThan(Date.now());
+    expect(r.runs_done).toBe(4); // occurrences 0..3 passed, the next one (index 4) is in the future
+    expect(await k.balance(a)).toBe(9500);
+    // Paused for weeks then resumed: nothing due any more.
+    await k.post(a, `/v1/wallet/scheduled-payments/${id}/pause`).expect(200);
+    await ctx.sql.query(`UPDATE scheduled_payments SET next_run_at = now() - interval '15 days' WHERE id = $1`, [id]);
+    await k.post(a, `/v1/wallet/scheduled-payments/${id}/resume`).expect(200);
+    expect(new Date((await row(id)).next_run_at).getTime()).toBeGreaterThan(Date.now());
+    expect(await svc.runDue()).toEqual({ ok: 0, failed: 0 });
+  });
+
+  it('fails a due run without any debit when a block appeared since', async () => {
+    k.limits();
+    k.pinOk();
+    const a = await k.user();
+    const b = await k.user();
+    await k.topup(a, 5000);
+    const id = (await schedule(a, b).expect(201)).body.id;
+    await ctx.sql.query(`INSERT INTO user_blocks (blocker_id, blocked_id) VALUES ($1, $2)`, [b.id, a.id]);
+    await makeDue(id);
+    expect(await svc.runDue()).toEqual({ ok: 0, failed: 1 });
+    expect(await k.balance(a)).toBe(5000);
+    expect((await row(id)).last_error).toBe('invalid_counterparty');
   });
 });

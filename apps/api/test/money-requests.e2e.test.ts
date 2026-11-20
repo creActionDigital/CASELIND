@@ -235,3 +235,16 @@ describe('account export and purge of wallet finance data', () => {
   });
 });
 
+describe('concurrent creation', () => {
+  it('replays the same clientId instead of failing', async () => {
+    k.limits();
+    const a = await k.user();
+    const b = await k.user();
+    const clientId = randomUUID();
+    const send = () => k.post(a, '/v1/wallet/requests', { clientId, payerHandle: b.handle, amountMinor: 500, currency: 'USD' });
+    const res = await Promise.all([send(), send(), send()]);
+    for (const r of res) expect([200, 201]).toContain(r.status);
+    expect(new Set(res.map((r) => r.body.id)).size).toBe(1);
+    expect((await ctx.sql.query(`SELECT 1 FROM money_requests WHERE requester_id = $1`, [a.id])).rows).toHaveLength(1);
+  });
+});

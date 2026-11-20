@@ -125,7 +125,7 @@ export class SavingsService {
       amountMinor: body.amountMinor,
       currency: goal.currency,
       kind: 'adjustment',
-      idempotencyKey: `sav:${body.clientId}`,
+      idempotencyKey: `sav:${id}:${body.clientId}`,
       initiatedBy: auth.userId,
       metadata: { ref: 'savings', note: `Tirelire : ${goal.title}` },
     };
@@ -168,9 +168,14 @@ export class SavingsService {
 
   /** Archiving hides the goal; it needs an empty goal so no fund is left in a hidden place. */
   async archive(auth: AuthUser, id: string, meta: RequestMeta): Promise<SavingsGoal> {
-    const goal = await this.view(auth.userId, id);
-    if (goal.savedMinor > 0) throw AppError.conflict('Withdraw the savings first', { reason: 'withdraw_first' });
+    await this.view(auth.userId, id);
     await this.db.transaction(async (tx) => {
+      // Locked like deposits/withdrawals, balance read in the same transaction: no deposit can slip in between.
+      const g = await tx.execute(sql`SELECT 1 FROM savings_goals WHERE id = ${id}::uuid AND user_id = ${auth.userId}::uuid FOR UPDATE`);
+      if (g.rows.length === 0) throw AppError.notFound('Savings goal not found');
+      const s = await tx.execute<{ saved: string }>(sql`
+        SELECT COALESCE(SUM(CASE kind WHEN 'deposit' THEN amount_minor ELSE -amount_minor END), 0)::text AS saved FROM savings_movements WHERE goal_id = ${id}::uuid`);
+      if (Number(s.rows[0]?.saved ?? 0) > 0) throw AppError.conflict('Withdraw the savings first', { reason: 'withdraw_first' });
       await tx.execute(sql`UPDATE savings_goals SET archived = true WHERE id = ${id}::uuid AND user_id = ${auth.userId}::uuid`);
       await this.audit.record({ action: 'wallet.savings_archived', actorUserId: auth.userId, sessionId: auth.sessionId, meta, metadata: { goalId: id } }, tx);
     });

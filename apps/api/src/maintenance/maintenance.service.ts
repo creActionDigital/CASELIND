@@ -238,7 +238,9 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       WHERE status = 'accepted' AND trip_id IN (SELECT id FROM carpool_trips WHERE status = 'departed' AND departs_at + interval '24 hours' <= ${at}::timestamptz)`);
     const completed = await this.db.execute(sql`UPDATE carpool_trips SET status = 'completed' WHERE status = 'departed' AND departs_at + interval '24 hours' <= ${at}::timestamptz`);
     const roadside = await this.db.execute(sql`UPDATE roadside_requests SET status = 'expired' WHERE status = 'requested' AND expires_at <= ${at}::timestamptz`);
-    const n = (cancelled.rowCount ?? 0) + (completed.rowCount ?? 0) + (roadside.rowCount ?? 0);
+    // Rental requests nobody answered before the start day are closed ('cancelled': the status check has no 'expired').
+    const rentals = await this.db.execute(sql`UPDATE rental_bookings SET status = 'cancelled', updated_at = now() WHERE status = 'requested' AND starts_on < ${at.slice(0, 10)}::date`);
+    const n = (cancelled.rowCount ?? 0) + (completed.rowCount ?? 0) + (roadside.rowCount ?? 0) + (rentals.rowCount ?? 0);
     if (n > 0) this.logger.log(`maintenance: ${n} carpool trips / roadside requests closed`);
     return n;
   }

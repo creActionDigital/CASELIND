@@ -141,8 +141,12 @@ export class MoneyRequestsService {
       INSERT INTO money_requests (requester_id, payer_id, client_id, amount_minor, currency, note, expires_at, bill_id)
       VALUES (${requesterId}::uuid, ${payerId}::uuid, ${p.clientId}::uuid, ${p.amountMinor}, ${p.currency}, ${p.note ?? null},
               now() + make_interval(days => ${MONEY_REQUEST_TTL_DAYS}), ${billId}::uuid)
+      ON CONFLICT (requester_id, client_id) DO NOTHING
       RETURNING id`);
-    return ins.rows[0]!.id;
+    if (ins.rows[0]) return ins.rows[0].id;
+    // Same clientId created concurrently: replay the existing request.
+    const prior = await tx.execute<{ id: string }>(sql`SELECT id FROM money_requests WHERE requester_id = ${requesterId}::uuid AND client_id = ${p.clientId}::uuid`);
+    return prior.rows[0]!.id;
   }
 
   async list(me: string, q: MoneyRequestListQuery): Promise<MoneyRequestList> {

@@ -24,6 +24,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { bestEffort } from '../messaging/messaging.shared.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import type { AuthUser } from '../security/auth.guard.js';
+import { blockedBetween } from '../mobility-extra/extra.shared.js';
 import { KycPort } from '../wallet/kyc.port.js';
 import type { TransferInput } from '../wallet/ledger.port.js';
 import { PinVerifier, pinRefusal } from '../wallet/pin.port.js';
@@ -63,6 +64,17 @@ const SELECT = sql`
     p.ends_on::text AS ends_on, p.max_runs, p.runs_done, p.consecutive_failures, p.status, p.last_error, p.created_at, p.created_at::text AS created_text,
     u.display_name AS rp_name, u.handle::text AS rp_handle
   FROM scheduled_payments p JOIN users u ON u.id = p.recipient_id`;
+
+/**
+ * Index of the first occurrence after `now`, from `fromIdx`: past occurrences (pause, outage) are skipped, never replayed in a burst.
+ * shortcut: a one-off payment is never skipped, and the search stops after 5000 steps.
+ */
+export function nextFutureIndex(first: Date, frequency: 'once' | 'weekly' | 'monthly', fromIdx: number, now: Date): number {
+  if (frequency === 'once') return fromIdx;
+  let i = fromIdx;
+  while (i < fromIdx + 5000 && scheduledRunAt(first, frequency, i).getTime() <= now.getTime()) i++;
+  return i;
+}
 
 const toPayment = (r: PaymentRow): ScheduledPayment => ({
   mode: 'sandbox',
@@ -196,11 +208,22 @@ export class ScheduledPaymentsService {
   ): Promise<ScheduledPayment> {
     if (!UUID_RE.test(id)) throw AppError.notFound('Scheduled payment not found');
     await this.db.transaction(async (tx) => {
-      const cur = await tx.execute<{ status: string }>(sql`SELECT status FROM scheduled_payments WHERE id = ${id}::uuid AND owner_id = ${auth.userId}::uuid FOR UPDATE`);
-      if (!cur.rows[0]) throw AppError.notFound('Scheduled payment not found');
-      if (!from.includes(cur.rows[0].status)) throw AppError.conflict('This scheduled payment cannot be changed that way', { reason: 'scheduled_state', status: cur.rows[0].status });
-      // Resuming never replays a backlog of missed runs at once: a due run simply waits for the next pass.
-      await tx.execute(sql`UPDATE scheduled_payments SET status = ${status}, consecutive_failures = 0 WHERE id = ${id}::uuid`);
+      const cur = await tx.execute<{ status: string; frequency: 'once' | 'weekly' | 'monthly'; first_run_at: Date; next_run_at: Date; runs_done: number; max_runs: number | null; ends_on: string | null }>(sql`
+        SELECT status, frequency, first_run_at, next_run_at, runs_done, max_runs, ends_on::text AS ends_on FROM scheduled_payments
+        WHERE id = ${id}::uuid AND owner_id = ${auth.userId}::uuid FOR UPDATE`);
+      const c = cur.rows[0];
+      if (!c) throw AppError.notFound('Scheduled payment not found');
+      if (!from.includes(c.status)) throw AppError.conflict('This scheduled payment cannot be changed that way', { reason: 'scheduled_state', status: c.status });
+      let final: string = status;
+      let nextAt = new Date(c.next_run_at);
+      let done = c.runs_done;
+      // Resuming skips the occurrences missed while paused: never a burst of back payments.
+      if (status === 'active' && c.frequency !== 'once' && nextAt.getTime() <= Date.now()) {
+        done = nextFutureIndex(new Date(c.first_run_at), c.frequency, c.runs_done, new Date());
+        nextAt = scheduledRunAt(new Date(c.first_run_at), c.frequency, done);
+        if ((c.max_runs !== null && done >= c.max_runs) || (c.ends_on !== null && nextAt.toISOString().slice(0, 10) > c.ends_on)) final = 'completed';
+      }
+      await tx.execute(sql`UPDATE scheduled_payments SET status = ${final}, consecutive_failures = 0, runs_done = ${done}, next_run_at = ${nextAt.toISOString()}::timestamptz WHERE id = ${id}::uuid`);
       await this.audit.record({ action, actorUserId: auth.userId, sessionId: auth.sessionId, meta, metadata: { paymentId: id } }, tx);
     });
     return this.view(auth.userId, id);
@@ -260,16 +283,19 @@ export class ScheduledPaymentsService {
         WHERE id = ${id}::uuid AND status = 'active' AND next_run_at <= ${now.toISOString()}::timestamptz FOR UPDATE SKIP LOCKED`);
       const row = l.rows[0];
       if (!row || row.runs_done + 1 !== runNumber) return null;
-      const r = await this.ledger.transferWith(input, limits, tx);
+      // The block may have appeared since the payment was authorised: a failed run, no debit.
+      const r = (await blockedBetween(tx, p.owner_id, p.recipient_id)) ? ({ ok: false, reason: 'invalid_counterparty' } as const) : await this.ledger.transferWith(input, limits, tx);
       if (r.ok) {
         await tx.execute(sql`
           INSERT INTO scheduled_payment_runs (payment_id, run_number, status, transfer_id) VALUES (${id}::uuid, ${runNumber}, 'ok', ${r.transferId}::uuid)
           ON CONFLICT (payment_id, run_number) WHERE status = 'ok' DO NOTHING`);
-        const nextAt = scheduledRunAt(new Date(row.first_run_at), row.frequency, runNumber);
+        // Missed occurrences are skipped (at most one debit per pass, never a catch-up burst).
+        const idx = nextFutureIndex(new Date(row.first_run_at), row.frequency, runNumber, now);
+        const nextAt = scheduledRunAt(new Date(row.first_run_at), row.frequency, idx);
         const done =
-          row.frequency === 'once' || (row.max_runs !== null && runNumber >= row.max_runs) || (row.ends_on !== null && nextAt.toISOString().slice(0, 10) > row.ends_on);
+          row.frequency === 'once' || (row.max_runs !== null && idx >= row.max_runs) || (row.ends_on !== null && nextAt.toISOString().slice(0, 10) > row.ends_on);
         await tx.execute(sql`
-          UPDATE scheduled_payments SET runs_done = ${runNumber}, consecutive_failures = 0, last_error = NULL,
+          UPDATE scheduled_payments SET runs_done = ${idx}, consecutive_failures = 0, last_error = NULL,
             status = ${done ? 'completed' : 'active'}, next_run_at = ${(done ? new Date(row.first_run_at) : nextAt).toISOString()}::timestamptz
           WHERE id = ${id}::uuid`);
         await this.audit.record(

@@ -133,6 +133,9 @@ describe('full cycle', () => {
     await post(d, `/v1/carpool/trips/${trip.id}/cancel`).expect(409);
     await post(p, `/v1/carpool/trips/${trip.id}/ratings`, { userId: d.id, rating: 5 }).expect(409);
 
+    // Completing right after the departure is refused; later it is accepted.
+    await post(d, `/v1/carpool/trips/${trip.id}/complete`).expect(409);
+    await ctx.sql.query(`UPDATE carpool_trips SET departed_at = now() - interval '11 minutes' WHERE id = $1`, [trip.id]);
     const done = (await post(d, `/v1/carpool/trips/${trip.id}/complete`).expect(200)).body;
     expect(done.status).toBe('completed');
     expect(done.bookings[0].status).toBe('completed');
@@ -345,5 +348,16 @@ describe('expiry and reports', () => {
     expect(JSON.stringify(exp.body.mobilityExtra)).not.toMatch(/lat|lng/i);
     const exp2 = await get(p, '/v1/me/export').expect(200);
     expect(exp2.body.mobilityExtra.carpoolBookings).toHaveLength(1);
+  });
+});
+
+describe('cursor validation', () => {
+  it('answers 400, not 500, for a cursor whose date is not a valid timestamp', async () => {
+    const u = await user();
+    const bad = Buffer.from(JSON.stringify({ t: '2026', i: '00000000-0000-4000-8000-000000000000' }), 'utf8').toString('base64url');
+    const huge = Buffer.from(JSON.stringify({ t: 'Jan 1 99999', i: '00000000-0000-4000-8000-000000000000' }), 'utf8').toString('base64url');
+    const page = (c: string) => get(u, `/v1/carpool/trips?originLat=-1.66&originLng=29.22&radiusKm=20&cursor=${c}`);
+    expect((await page(bad)).status).toBe(200); // lenient date normalised to ISO
+    expect((await page(huge)).status).toBe(400);
   });
 });

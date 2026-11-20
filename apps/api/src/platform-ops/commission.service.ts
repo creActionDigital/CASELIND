@@ -109,9 +109,16 @@ export class CommissionService {
   }
 
   /** Override of one organisation's rate (`null` = back to the platform rate). Applies to the next deliveries only. */
-  async setOrgBps(adminId: string, orgId: string, b: SetOrgCommissionRequest, meta: RequestMeta): Promise<{ orgId: string; bps: number | null }> {
+  async assertOrg(orgId: string): Promise<void> {
     if (!UUID_RE.test(orgId)) throw AppError.notFound('Organization not found');
-    await this.db.transaction(async (tx) => {
+    const r = await this.db.execute(sql`SELECT 1 FROM organizations WHERE id = ${orgId}::uuid`);
+    if (r.rows.length === 0) throw AppError.notFound('Organization not found');
+  }
+
+  /** `exec`: the caller's transaction when the change runs after a second approval. */
+  async setOrgBps(adminId: string, orgId: string, b: SetOrgCommissionRequest, meta: RequestMeta, exec: Pick<Db, 'transaction'> = this.db): Promise<{ orgId: string; bps: number | null }> {
+    if (!UUID_RE.test(orgId)) throw AppError.notFound('Organization not found');
+    await exec.transaction(async (tx) => {
       const r = await tx.execute<{ commission_bps: number | null }>(sql`SELECT commission_bps FROM organizations WHERE id = ${orgId}::uuid FOR UPDATE`);
       if (!r.rows[0]) throw AppError.notFound('Organization not found');
       await tx.execute(sql`UPDATE organizations SET commission_bps = ${b.bps} WHERE id = ${orgId}::uuid`);

@@ -63,10 +63,20 @@ export async function replaceFiles(tx: Exec, link: FileLink, userId: string, pur
     const used = await tx.execute(sql`SELECT 1 FROM ${t} WHERE media_id = ANY(${uuids(ids)}) AND ${c} <> ${key}::uuid LIMIT 1`);
     if (used.rows.length > 0) throw invalidAsset('assetIds', 'file already attached elsewhere');
   }
-  const gone = await tx.execute<{ storage_key: string }>(sql`
+  // A digital file of a product already delivered to a buyer stays (kept linked, after the new ones): the buyer's access goes through this link.
+  const sold =
+    link.table === 'product_files'
+      ? (await tx.execute(sql`SELECT 1 FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = ${key}::uuid AND o.status = 'delivered' LIMIT 1`)).rows.length > 0
+      : false;
+  const retained = sold
+    ? (await tx.execute<{ media_id: string }>(sql`SELECT media_id FROM ${t} WHERE ${c} = ${key}::uuid ${ids.length > 0 ? sql`AND media_id <> ALL(${uuids(ids)})` : sql``} ORDER BY position`)).rows.map((r) => r.media_id)
+    : [];
+  const gone = sold
+    ? { rows: [] as { storage_key: string }[] }
+    : await tx.execute<{ storage_key: string }>(sql`
     DELETE FROM media_assets WHERE id IN (SELECT media_id FROM ${t} WHERE ${c} = ${key}::uuid ${ids.length > 0 ? sql`AND media_id <> ALL(${uuids(ids)})` : sql``}) RETURNING storage_key`);
   await tx.execute(sql`DELETE FROM ${t} WHERE ${c} = ${key}::uuid`);
-  for (const [position, id] of ids.entries()) await tx.execute(sql`INSERT INTO ${t} (${c}, media_id, position) VALUES (${key}::uuid, ${id}::uuid, ${position})`);
+  for (const [position, id] of [...ids, ...retained].entries()) await tx.execute(sql`INSERT INTO ${t} (${c}, media_id, position) VALUES (${key}::uuid, ${id}::uuid, ${position})`);
   return gone.rows.map((r) => r.storage_key);
 }
 
