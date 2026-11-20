@@ -76,6 +76,8 @@ const envSchema = z
       .default('false')
       .transform((v) => v === 'true'),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+    /** Bearer token of GET /metrics (outside /v1). Unset = the route answers 404. */
+    METRICS_TOKEN: z.string().min(16, 'METRICS_TOKEN must be at least 16 characters').optional(),
     /** Days between a deletion request and the anonymisation of the account (login cancels it meanwhile). */
     ACCOUNT_DELETION_GRACE_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     /** false = the hourly cleanup job is not scheduled on this instance. */
@@ -130,6 +132,8 @@ const envSchema = z
     WALLET_SANDBOX_TOPUP_MAX_MINOR: z.coerce.number().int().min(1).default(100_00),
     /** Lot 6A: sandbox top-up is always allowed outside production; in production only when this is `true`. */
     WALLET_SANDBOX_TOPUP_ENABLED: z.enum(['true', 'false']).optional(),
+    /** Double validation des operations admin sensibles (CDC §17/§26) : defaut `true` en production, `false` sinon. */
+    ADMIN_DUAL_APPROVAL: z.enum(['true', 'false']).optional(),
     /** How long after sending the author may recall a message for everyone (409 afterwards). */
     MESSAGE_RECALL_WINDOW_SECONDS: z.coerce.number().int().min(0).max(86400).default(120),
     /** Lot 3b: false = the minute job that sends scheduled messages is not started on this instance. */
@@ -180,6 +184,13 @@ const envSchema = z
     QR_POLL_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(90),
     /** Lot 10: POST /oauth/token (per IP), on top of the default budget. */
     OAUTH_TOKEN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(30),
+    /** Plateforme développeurs : appels par jeton mini-app, par application (client OAuth), par minute et par jour (surcharge par minute : colonne miniapps.rate_limit_per_minute). Compteur en mémoire, par instance. */
+    MINIAPP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(300),
+    MINIAPP_RATE_LIMIT_PER_DAY: z.coerce.number().int().min(1).default(50_000),
+    /** Notifications envoyees par une application (scope notify) : plafond global par application et par jour (5 par utilisateur et par jour en plus). */
+    MINIAPP_NOTIFY_APP_PER_DAY: z.coerce.number().int().min(1).default(2000),
+    /** Cle serveur des identifiants d'utilisateur propres a chaque mini-app (hmac(cle, appId + userId)). Absente : derivee d'une autre cle serveur ; ne pas la changer une fois des apps en service. */
+    MINIAPP_SUBJECT_KEY: z.string().min(16).optional(),
     /** Lot 6B: signs merchant payment QR payloads (HMAC-SHA256). Required in production; derived elsewhere when absent. */
     PAYMENT_QR_SECRET: z.string().min(32, 'PAYMENT_QR_SECRET must be at least 32 characters').optional(),
     /** Lot 6B: per-currency, per-KYC-tier limits as JSON, e.g. {"USD":{"1":{"maxBalanceMinor":1,"maxSingleTransferMinor":1,"maxDailyOutgoingMinor":1}}}; unlisted entries use the defaults. */
@@ -243,6 +254,16 @@ const envSchema = z
     /** Lot 12: provider call timeout (no automatic retry). */
     AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
     AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(16).max(8192).default(1024),
+    /** Assistant actions emergency stop: "false" = off everywhere; "true" = on; unset = on outside production, the `ai_actions` flag in production. */
+    AI_ACTIONS_ENABLED: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === 'true')),
+    /** Per-client budget for message translation (each uncached call is a provider request). */
+    AI_TRANSLATE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(20),
+    /** Anti-spam: publications per hour and per account (posts, comments). */
+    ANTISPAM_POSTS_PER_HOUR: z.coerce.number().int().min(1).default(30),
+    ANTISPAM_COMMENTS_PER_HOUR: z.coerce.number().int().min(1).default(60),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production') {

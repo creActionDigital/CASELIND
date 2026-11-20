@@ -7,6 +7,7 @@ import {
   type DeliveryListQuery,
   type DeliveryStatus,
   type DeliveryView,
+  DELIVERY_SCHEDULE_VISIBLE_MINUTES,
   ErrorCodes,
   type MyDeliveryList,
   type MyDeliveryListQuery,
@@ -27,6 +28,7 @@ import { type Tx } from '../orgs/orgs.service.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 import {
   ACTIVE_COURIER_STATUSES,
+  byUrgency,
   COURIER_TRANSITIONS,
   decodeCursor,
   DeliveryCodes,
@@ -218,8 +220,15 @@ export class DeliveryService {
     const filters = [eq(deliveries.courierId, courierId)];
     if (q.scope === 'active') filters.push(inArray(deliveries.status, [...ACTIVE_COURIER_STATUSES]));
     if (q.scope === 'done') filters.push(inArray(deliveries.status, [...FINAL_STATUSES]));
+    // A scheduled delivery only shows 60 minutes before its slot (once under way it always shows).
+    if (q.scope !== 'done') {
+      filters.push(
+        sql`(${deliveries.scheduledFor} IS NULL OR ${deliveries.status} <> 'assigned' OR ${deliveries.scheduledFor} <= now() + make_interval(mins => ${DELIVERY_SCHEDULE_VISIBLE_MINUTES}))` as ReturnType<typeof eq>,
+      );
+    }
     const { rows, nextCursor } = await this.page(filters, q.limit, q.cursor);
-    return { items: await hydrateCourierDeliveries(this.db, rows), nextCursor };
+    // shortcut: express first inside a page only (cursor order stays newest first), fine for a courier's short list.
+    return { items: byUrgency(await hydrateCourierDeliveries(this.db, rows)), nextCursor };
   }
 
   async getMine(courierId: string, deliveryId: string): Promise<CourierDelivery> {

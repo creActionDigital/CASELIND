@@ -3,6 +3,7 @@ import {
   type AdminListQuery,
   type AdminOrgList,
   type AdminUserList,
+  type GrantPlatformRoleRequest,
   type SetOrgStatusRequest,
   type SetOrgVerificationRequest,
   type SetUserStatusRequest,
@@ -35,10 +36,10 @@ export class GovernanceService {
   }
 
   /** Active <-> suspended only. Another administrator or yourself cannot be suspended here (no admin wars, no lock-out). */
-  async setUserStatus(adminId: string, userId: string, body: SetUserStatusRequest, meta: RequestMeta): Promise<void> {
+  async setUserStatus(adminId: string, userId: string, body: SetUserStatusRequest, meta: RequestMeta, exec: Pick<Db, 'transaction'> = this.db): Promise<void> {
     if (!UUID_RE.test(userId)) throw AppError.notFound('User not found');
     if (userId === adminId) throw AppError.conflict('You cannot change your own status', { reason: 'self' });
-    await this.db.transaction(async (tx) => {
+    await exec.transaction(async (tx) => {
       const r = await tx.execute<{ status: string; roles: string[] }>(sql`SELECT status::text AS status, roles FROM users WHERE id = ${userId}::uuid FOR UPDATE`);
       const u = r.rows[0];
       if (!u) throw AppError.notFound('User not found');
@@ -47,6 +48,37 @@ export class GovernanceService {
       if (u.status === body.status) throw AppError.conflict('The account already has this status', { reason: 'unchanged' });
       await tx.execute(sql`UPDATE users SET status = ${body.status}::user_status WHERE id = ${userId}::uuid`);
       await this.audit.record({ action: 'admin.user_status', actorUserId: adminId, subjectUserId: userId, meta, metadata: { from: u.status, to: body.status, reason: body.reason } }, tx);
+    });
+  }
+
+  /** Double validation: suspending an account that holds a moderation or support role (an administrator is refused by `setUserStatus`). */
+  async isStaffSuspension(userId: string, body: SetUserStatusRequest): Promise<boolean> {
+    if (body.status !== 'suspended' || !UUID_RE.test(userId)) return false;
+    const r = await this.db.execute<{ roles: string[] }>(sql`SELECT roles FROM users WHERE id = ${userId}::uuid`);
+    const roles = r.rows[0]?.roles ?? [];
+    return !roles.includes('admin') && roles.some((x) => x === 'moderator' || x === 'support');
+  }
+
+  /** Cheap checks before a role request is queued, so a request that can never run is not created. */
+  async precheckGrant(adminId: string, userId: string): Promise<void> {
+    if (!UUID_RE.test(userId)) throw AppError.notFound('User not found');
+    if (userId === adminId) throw AppError.conflict('You cannot change your own roles', { reason: 'self' });
+    const r = await this.db.execute(sql`SELECT 1 FROM users WHERE id = ${userId}::uuid`);
+    if (!r.rows[0]) throw AppError.notFound('User not found');
+  }
+
+  /** Gives a platform role. Yourself: 409 (no self-promotion); already held: 409. Audited with the reason. */
+  async grantPlatformRole(adminId: string, userId: string, body: GrantPlatformRoleRequest, meta: RequestMeta, exec: Pick<Db, 'transaction'> = this.db): Promise<void> {
+    if (!UUID_RE.test(userId)) throw AppError.notFound('User not found');
+    if (userId === adminId) throw AppError.conflict('You cannot change your own roles', { reason: 'self' });
+    await exec.transaction(async (tx) => {
+      const r = await tx.execute<{ status: string; roles: string[] }>(sql`SELECT status::text AS status, roles FROM users WHERE id = ${userId}::uuid FOR UPDATE`);
+      const u = r.rows[0];
+      if (!u) throw AppError.notFound('User not found');
+      if (u.status !== 'active') throw AppError.conflict('Only an active account can receive a role', { reason: 'bad_status', status: u.status });
+      if (u.roles.includes(body.role)) throw AppError.conflict('The account already has this role', { reason: 'unchanged' });
+      await tx.execute(sql`UPDATE users SET roles = array_append(roles, ${body.role}) WHERE id = ${userId}::uuid`);
+      await this.audit.record({ action: 'admin.platform_role_granted', actorUserId: adminId, subjectUserId: userId, meta, metadata: { role: body.role, reason: body.reason } }, tx);
     });
   }
 

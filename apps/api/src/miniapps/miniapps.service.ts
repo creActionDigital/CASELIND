@@ -11,17 +11,21 @@ import {
   type PageQuery,
   type ReviewMiniAppRequest,
   type UpdateMiniAppRequest,
+  validateManifest,
 } from '@caselind/contracts';
 import { sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { decodeCursor, encodeCursor, validationError } from '../social/social.shared.js';
 import {
   APP_COLUMNS,
   type AppRow,
   appNotFound,
+  jsonbOf,
+  manifestError,
   newClientId,
   type PublicAppRow,
   randomToken,
@@ -36,7 +40,7 @@ type Executor = Pick<Db, 'execute'>;
 
 const PUBLIC_SELECT = sql.raw(
   `a.id, a.org_id, a.name, a.description, a.icon_media_id, a.launch_url, a.redirect_uris, a.scopes, a.confidential, a.client_id,
-   a.client_secret_hash, a.status, a.review_note, a.reviewed_at, a.published_at, a.created_at, a.updated_at,
+   a.client_secret_hash, a.status, a.review_note, a.reviewed_at, a.published_at, a.current_version, a.rate_limit_per_minute, a.manifest, a.certified_at, a.certification_note, a.revenue_share_bps, a.created_at, a.updated_at,
    o.name AS org_name, o.verification_status AS org_verification`,
 );
 
@@ -46,7 +50,14 @@ export class MiniAppsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /** Tell the owners of an organisation about a decision on one of its applications (generic text, no review note). */
+  private async notifyOwners(orgId: string, title: string, body: string, appId: string): Promise<void> {
+    const owners = await this.db.execute<{ user_id: string }>(sql`SELECT user_id FROM org_members WHERE org_id = ${orgId}::uuid AND role = 'owner' AND status = 'active'`);
+    await this.notifications.notifyMany(owners.rows.map((o) => ({ userId: o.user_id, category: 'system' as const, title, body, data: { kind: 'miniapp_status', appId } })));
+  }
 
   // ---- developer side (permission org.admins.manage, checked by OrgGuard) -------------------------
 
@@ -59,12 +70,16 @@ export class MiniAppsService {
 
   async create(orgId: string, userId: string, body: CreateMiniAppRequest, meta: RequestMeta): Promise<MiniAppWithSecret> {
     await this.checkIcon(this.db, userId, body.iconMediaId);
+    if (body.manifest !== undefined) {
+      const v = validateManifest(body.manifest, body.scopes);
+      if (!v.ok) throw manifestError(v.problems);
+    }
     const secret = body.confidential ? randomToken(SECRET_PREFIX) : null;
     const row = await this.db.transaction(async (tx) => {
       const res = await tx.execute<AppRow>(sql`
-        INSERT INTO miniapps (org_id, created_by, name, description, icon_media_id, launch_url, redirect_uris, scopes, confidential, client_id, client_secret_hash)
+        INSERT INTO miniapps (org_id, created_by, name, description, icon_media_id, launch_url, redirect_uris, scopes, confidential, client_id, client_secret_hash, manifest)
         VALUES (${orgId}::uuid, ${userId}::uuid, ${body.name}, ${body.description ?? null}, ${body.iconMediaId ?? null}::uuid, ${body.launchUrl},
-                ${textArray(body.redirectUris)}, ${textArray(body.scopes)}, ${body.confidential}, ${newClientId()}, ${secret ? sha256(secret) : null})
+                ${textArray(body.redirectUris)}, ${textArray(body.scopes)}, ${body.confidential}, ${newClientId()}, ${secret ? sha256(secret) : null}, ${jsonbOf(body.manifest)})
         RETURNING ${sql.raw(APP_COLUMNS)}`);
       const r = res.rows[0]!;
       await this.audit.record({ action: 'miniapp.created', actorUserId: userId, meta, metadata: { orgId, appId: r.id } }, tx);
@@ -109,6 +124,10 @@ export class MiniAppsService {
       if (cur.status !== 'draft' && cur.status !== 'rejected') {
         throw AppError.conflict('Application cannot be edited in its current status', { reason: 'app_locked', status: cur.status });
       }
+      if (patch.manifest !== undefined) {
+        const v = validateManifest(patch.manifest, patch.scopes ?? cur.scopes);
+        if (!v.ok) throw manifestError(v.problems);
+      }
       const res = await tx.execute<AppRow>(sql`
         UPDATE miniapps SET
           name = ${patch.name ?? cur.name},
@@ -117,6 +136,7 @@ export class MiniAppsService {
           launch_url = ${patch.launchUrl ?? cur.launch_url},
           redirect_uris = ${textArray(patch.redirectUris ?? cur.redirect_uris)},
           scopes = ${textArray(patch.scopes ?? cur.scopes)},
+          manifest = ${patch.manifest === undefined ? sql`manifest` : jsonbOf(patch.manifest)},
           status = 'draft'
         WHERE id = ${appId}::uuid RETURNING ${sql.raw(APP_COLUMNS)}`);
       await this.audit.record({ action: 'miniapp.updated', actorUserId: userId, meta, metadata: { orgId, appId, fields: Object.keys(patch) } }, tx);
@@ -131,6 +151,9 @@ export class MiniAppsService {
       if (cur.status !== 'draft' && cur.status !== 'rejected') {
         throw AppError.conflict('Only a draft or rejected application can be submitted', { reason: 'invalid_transition', status: cur.status });
       }
+      // §23: no review without a complete declarative manifest (data, endpoints, events, costs, terms).
+      const v = validateManifest(cur.manifest, cur.scopes);
+      if (!v.ok) throw manifestError(v.problems);
       const res = await tx.execute<AppRow>(sql`
         UPDATE miniapps SET status = 'in_review', review_note = NULL WHERE id = ${appId}::uuid RETURNING ${sql.raw(APP_COLUMNS)}`);
       await this.audit.record({ action: 'miniapp.submitted', actorUserId: userId, meta, metadata: { orgId, appId } }, tx);
@@ -195,6 +218,14 @@ export class MiniAppsService {
       );
       return upd.rows[0]!;
     });
+    const texts: Partial<Record<ReviewMiniAppRequest['decision'], [string, string]>> = {
+      suspend: ['Application suspendue', `${row.name} a été suspendue par la modération : tous ses accès sont coupés.`],
+      reinstate: ['Application rétablie', `${row.name} a été rétablie par la modération.`],
+      approve: ['Application publiée', `${row.name} a été approuvée et publiée.`],
+      reject: ['Application refusée', `${row.name} a été refusée : consultez la note de revue.`],
+    };
+    const text = texts[body.decision];
+    if (text) await this.notifyOwners(row.org_id, text[0], text[1], appId).catch(() => undefined);
     return toApp(row);
   }
 
@@ -218,6 +249,6 @@ export class MiniAppsService {
       WHERE a.id = ${appId}::uuid AND a.status = 'published' AND o.status = 'active'`);
     const row = res.rows[0];
     if (!row) throw appNotFound();
-    return toPublicApp(row);
+    return { ...toPublicApp(row), manifest: row.manifest ?? null };
   }
 }

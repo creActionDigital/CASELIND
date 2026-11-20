@@ -1,5 +1,8 @@
 import { z } from 'zod';
+import { exportedSanctionSchema } from './admin-ops2.js'; import { exportedHrSchema } from './hr.js';
 import { exportedKycSchema } from './kyc.js';
+import { exportedAiActionLogSchema } from './ai-actions.js';
+import { consentJournalEntrySchema, userConsentSchema } from './consents.js';
 import { exportedGuardianSchema, exportedSchoolFeeSchema } from './school-guardians.js';
 import { myFreelanceProfileSchema } from './freelance.js';
 import { exportedHealthSchema } from './health.js';
@@ -13,13 +16,20 @@ import { exportedPollSchema, exportedPollVoteSchema } from './messaging-polls.js
 import { exportedCommentSchema, exportedFollowSchema, exportedPostSchema } from './social.js';
 import { exportedReportSchema, exportedStorySchema } from './stories.js';
 import { exportedDeliverySchema } from './delivery.js';
+import { exportedCourierRequestSchema } from './courier.js';
 import { exportedCartItemSchema, exportedOrderSchema, exportedReviewSchema } from './orders.js';
+import { exportedReturnSchema } from './order-returns.js';
+import { exportedWishlistItemSchema } from './wishlist.js';
+import { exportedCreatorSchema } from './creator.js';
+import { exportedWalletFinanceSchema } from './wallet-finance.js';
 import { exportedOrgFeedbackSchema } from './org-feedback.js';
 import { exportedAiConversationSchema } from './ai.js';
 import { exportedMiniAppGrantSchema } from './miniapps.js';
+import { exportedMiniAppAccessSchema } from './miniapps-dev.js';
 import { exportedSearchHistorySchema } from './search.js';
 import { exportedServicesSchema } from './services.js';
 import { exportedMobilitySchema } from './mobility.js';
+import { exportedMobilityExtraSchema } from './mobility-extra.js';
 import { meSchema } from './users.js';
 import { exportedWalletSchema } from './wallet.js';
 
@@ -98,12 +108,24 @@ export const accountExportSchema = z.object({
   /** Lot 5B: the user's orders (with their own address) and reviews. */
   orders: z.array(exportedOrderSchema),
   reviews: z.array(exportedReviewSchema),
+  /** Returns and disputes the user filed on their orders. */
+  orderReturns: z.array(exportedReturnSchema),
   /** Lot 5B: the lines of the cart (no stock is reserved by it). */
   cart: z.array(exportedCartItemSchema),
+  /** Wishlist: product ids and dates. */
+  wishlist: z.array(exportedWishlistItemSchema),
+  /** Creator tools: boosts of the user and tips sent/received (fictitious test funds; no counterparty identity). */
+  creator: exportedCreatorSchema,
+  /** Wallet finance (test funds): money requests, split bills, scheduled payments, savings goals and anomaly alerts. */
+  walletFinance: exportedWalletFinanceSchema,
   /** Lot 6B: KYC level and request statuses/dates (no document number, no file). */
   kyc: exportedKycSchema,
   /** Lot 8: deliveries of the user's orders and deliveries the user carried (no location, no code). */
   deliveries: z.array(exportedDeliverySchema),
+  /** On-demand courier requests, as requester and as courier (no code, no position, no coordinates). */
+  courierRequests: z.array(exportedCourierRequestSchema),
+  /** Gestion d'entreprise : fiches, conges, plannings et lignes de salaire DE L'UTILISATEUR (jamais la note RH). */
+  hr: exportedHrSchema, /** Sanctions reçues et recours déposés par le compte (CDC §26). */ sanctions: z.array(exportedSanctionSchema),
   /** Lot 7: the search history (own queries only; empty when disabled or cleared). */
   searchHistory: z.array(exportedSearchHistorySchema),
   /** Lot 6A: sandbox wallet balances and transactions (no real money). */
@@ -111,10 +133,20 @@ export const accountExportSchema = z.object({
   /** Lot 9: own provider profile and offers, own bookings as a client, own service reviews. */
   services: exportedServicesSchema,
   mobility: exportedMobilitySchema,
+  /** Covoiturage, locations de vehicules et depannages du compte (libelles et statuts, jamais de coordonnees). */
+  mobilityExtra: exportedMobilityExtraSchema,
   /** Lot 10: mini-app authorizations (never a token). */
   miniappGrants: z.array(exportedMiniAppGrantSchema),
+  /** Lectures de données par les mini-applications (90 jours) : application, scope et date, jamais le contenu. */
+  miniappAccess: z.array(exportedMiniAppAccessSchema),
   /** Lot 12: own AI assistant conversations (private to the user). */
   aiConversations: z.array(exportedAiConversationSchema),
+  /** Assistant actions journal: tool, status and date, never the arguments. */
+  aiActionLog: z.array(exportedAiActionLogSchema),
+  /** Actions proposed by the assistant with their arguments (text the user typed): right of access. */
+  aiActions: z.array(z.object({ id: z.uuid(), tool: z.string(), label: z.string(), status: z.string(), args: z.record(z.string(), z.unknown()), createdAt: z.string() })),
+  /** Own bookmarked posts (saved for later): post id and date. */
+  postBookmarks: z.array(z.object({ postId: z.uuid(), createdAt: z.string() })),
   /** Avis et questions posés par le compte sur des organisations (texte public ou propre au compte seulement). */
   orgFeedback: exportedOrgFeedbackSchema,
   /** Lot 15: own classified ads (text, place and status; never the photos' bytes). */
@@ -137,6 +169,8 @@ export const accountExportSchema = z.object({
   /** Lot 15c: visit appointments, as visitor or as ad owner. */
   listingVisits: z.array(z.object({ id: z.uuid(), listingId: z.uuid(), role: z.string(), status: z.string(), scheduledAt: z.string(), message: z.string(), place: z.string().nullable(), createdAt: z.string() })),
   /** Lot 16h: marketing consent and loyalty point balances per shop (no monetary value). */
+  /** Privacy consent journal (every change of answer, most recent first; no content). */
+  consentJournal: z.array(consentJournalEntrySchema),
   loyalty: z.object({ marketingConsent: z.boolean(), balances: z.array(z.object({ orgName: z.string(), points: z.number().int() })) }),
   /** Lot 15d: price negotiations, as buyer or as ad owner. */
   listingOffers: z.array(z.object({ id: z.uuid(), listingId: z.uuid(), role: z.string(), status: z.string(), offerMinor: z.number().int(), counterMinor: z.number().int().nullable(), currency: z.string(), message: z.string(), createdAt: z.string() })),
@@ -213,5 +247,7 @@ export const accountConsentsSchema = z.object({
   health: z.object({ version: z.string(), grantedAt: z.iso.datetime() }).nullable(),
   marketing: z.boolean(),
   miniapps: z.array(z.object({ appId: z.uuid(), appName: z.string(), scopes: z.array(z.string()), grantedAt: z.iso.datetime() })),
+  /** Unified view: one line per consent kind of the whitelist (legacy fields above stay for compatibility). */
+  items: z.array(userConsentSchema),
 });
 export type AccountConsents = z.infer<typeof accountConsentsSchema>;

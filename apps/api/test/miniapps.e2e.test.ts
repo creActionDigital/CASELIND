@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { LedgerPort } from '../src/wallet/ledger.port.js';
 import { bearer, createTestContext, PASSWORD, signUp, type TestContext } from './helpers.js';
+import { manifestFor } from './miniapps-kit.js';
 
 let ctx: TestContext;
 
@@ -61,7 +62,7 @@ async function draftApp(scopes = ALL_SCOPES, extra: Record<string, unknown> = {}
   const res = await ctx.http
     .post(`/v1/orgs/${orgId}/miniapps`)
     .set(bearer(owner.token))
-    .send({ name: 'Mon App', description: 'Une app', launchUrl: 'https://app.example.test/', redirectUris: [REDIRECT], scopes, ...extra })
+    .send({ name: 'Mon App', description: 'Une app', launchUrl: 'https://app.example.test/', redirectUris: [REDIRECT], scopes, manifest: manifestFor(scopes), ...extra })
     .expect(201);
   return { owner, orgId, appId: res.body.id, clientId: res.body.clientId, secret: res.body.clientSecret };
 }
@@ -297,7 +298,8 @@ describe('what an app token can reach', () => {
     const u = await user();
     const c = await connect(u, dev, ['profile.basic', 'profile.email']);
     const me = await ctx.http.get('/v1/miniapp-api/me').set(bearer(c.access)).expect(200);
-    expect(me.body).toMatchObject({ id: u.id });
+    expect(me.body.id).toMatch(/^sub_/);
+    expect(me.body.id).not.toBe(u.id);
     expect(me.body).toHaveProperty('email');
     expect(me.body).not.toHaveProperty('phone');
 

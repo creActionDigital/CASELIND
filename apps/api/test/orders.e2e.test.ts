@@ -435,7 +435,7 @@ describe('order lifecycle', () => {
     expect(cancelled.body.status).toBe('cancelled');
     expect(cancelled.body.events.at(-1)).toMatchObject({ actorKind: 'buyer', note: 'changed my mind' });
     expect(fake.variants.get(t.a)!.stock).toBe(50);
-    expect(fake.released.at(-1)).toEqual([{ variantId: t.a, quantity: 2 }]);
+    expect(fake.released.at(-1)).toEqual([expect.objectContaining({ variantId: t.a, quantity: 2 })]);
 
     const t2 = await pendingOrder();
     await setStatus(t2.orgId, t2.owner, t2.order.id, 'confirmed').expect(200);

@@ -1,0 +1,28 @@
+{
+  "name": "@caselind/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Client SDK for CASELIND mini-apps: OAuth 2.0 PKCE, scoped resources, PIN payments, notifications, verified webhooks, manifest validation",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@caselind/contracts": "*"
+  }
+}

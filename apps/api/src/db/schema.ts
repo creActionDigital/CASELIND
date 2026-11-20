@@ -202,7 +202,7 @@ export const mediaAssets = pgTable('media_assets', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerUserId: uuid('owner_user_id').notNull(),
   purpose: text('purpose')
-    .$type<'avatar' | 'post' | 'message' | 'story' | 'org_logo' | 'org_banner' | 'product' | 'document' | 'kyc_document' | 'listing' | 'cv' | 'delivery' | 'lesson' | 'org_gallery' | 'delivery_proof' | 'health_result'>()
+    .$type<'avatar' | 'post' | 'message' | 'story' | 'org_logo' | 'org_banner' | 'product' | 'document' | 'kyc_document' | 'listing' | 'cv' | 'delivery' | 'lesson' | 'org_gallery' | 'digital_file' | 'delivery_proof' | 'health_result'>()
     .notNull(),
   declaredMime: text('declared_mime').notNull(),
   mime: text('mime'),

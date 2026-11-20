@@ -34,6 +34,8 @@ import {
 
 /** The generic push body: message content is never sent to a third party (CDC §6). */
 export const PUSH_BODY = 'Nouveau message';
+/** Generic body for someone who was @mentioned (no content either). */
+export const MENTION_PUSH_BODY = 'Vous avez été mentionné(e)';
 
 /** Sending, reading, reacting to and recalling messages. Message content never reaches logs or audit. */
 @Injectable()
@@ -97,7 +99,7 @@ export class MessagesService {
       const mentioned = new Set(row.mentions);
       const inputs = recipients.rows
         .filter((r) => !r.muted || mentioned.has(r.user_id))
-        .map((r) => ({ userId: r.user_id, urgent: mentioned.has(r.user_id) }));
+        .map((r) => ({ userId: r.user_id, mention: mentioned.has(r.user_id) }));
       if (inputs.length === 0) return;
       let title = conversation.title ?? '';
       if (conversation.kind === 'direct') {
@@ -110,10 +112,11 @@ export class MessagesService {
             userId: i.userId,
             category: 'message' as const,
             title,
-            body: PUSH_BODY,
+            // A mention reaches a muted conversation too, but never bypasses quiet mode; it carries no message content.
+            body: i.mention ? MENTION_PUSH_BODY : PUSH_BODY,
             data: { conversationId: conversation.id, messageId: row.id },
             persist: false,
-            ...(i.urgent && { urgent: true }),
+            ...(i.mention && { genericBody: true }),
           })),
         ),
       ).catch((err: unknown) => this.logger.warn(`message push failed: ${(err as Error).name}`));
@@ -282,6 +285,7 @@ export class MessagesService {
         .returning();
       if (!row) return undefined;
       await tx.delete(messageReactions).where(eq(messageReactions.messageId, m.id));
+      await tx.execute(sql`DELETE FROM message_translations WHERE message_id = ${m.id}::uuid`); // cached machine translations of the text
       await tx.delete(messagePolls).where(eq(messagePolls.messageId, m.id)); // options and votes cascade
       await this.audit.record(
         { action: 'message.recalled', actorUserId: userId, meta, metadata: { conversationId: m.conversationId, messageId: m.id } },

@@ -29,6 +29,8 @@ export interface NotifyInput {
   persist?: boolean;
   /** Bypasses the user's quiet mode (e.g. an @mention or a security alert). Category opt-outs still apply. */
   urgent?: boolean;
+  /** A message-category body that holds no message content (e.g. "you were mentioned"): kept even when previews are off. */
+  genericBody?: boolean;
 }
 
 const MAX_TOKENS_PER_USER = 10;
@@ -163,7 +165,7 @@ export class NotificationsService {
       const urgent = i.urgent === true;
       if (i.category !== 'security' && pref?.pushDisabledCategories.includes(i.category)) continue;
       if (pref?.quietUntil && pref.quietUntil > now && !urgent) continue;
-      const hideBody = i.category === 'message' && !(pref?.messagePreviews ?? false);
+      const hideBody = i.category === 'message' && !(pref?.messagePreviews ?? false) && !i.genericBody;
       for (const to of tokens) {
         messages.push({
           to,

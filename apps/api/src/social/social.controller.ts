@@ -19,6 +19,7 @@ import {
 } from '@caselind/contracts';
 import type { Response } from 'express';
 import { ZodPipe } from '../common/zod.pipe.js';
+import { BoostsService } from '../creator/boosts.service.js';
 import { RequireFlag } from '../flags/flag.guard.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
 import { CommentsService } from './comments.service.js';
@@ -35,6 +36,7 @@ export class SocialController {
     private readonly follows: FollowsService,
     private readonly posts: PostsService,
     private readonly comments: CommentsService,
+    private readonly boosts: BoostsService,
   ) {}
 
   // ---- follows ----
@@ -72,8 +74,9 @@ export class SocialController {
 
   // ---- feed ----
   @Get('feed')
-  feed(@CurrentUser() user: AuthUser, @Query(pageQuery) q: SocialPageQuery): Promise<PostList> {
-    return this.posts.feed(user.userId, user.roles, q);
+  /** The feed, with at most one labelled sponsored post (`sponsored: true`) per 10 posts. */
+  async feed(@CurrentUser() user: AuthUser, @Query(pageQuery) q: SocialPageQuery): Promise<PostList> {
+    return this.boosts.injectSponsored(user, await this.posts.feed(user.userId, user.roles, q));
   }
 
   @Get('feed/videos')

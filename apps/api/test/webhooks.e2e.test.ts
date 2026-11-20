@@ -99,6 +99,12 @@ describe('management', () => {
     await ctx.http.get(`/v1/orgs/${s.orgId}/webhooks`).expect(401);
   });
 
+  it('can subscribe to every event of the contract (the database constraint must list them all)', async () => {
+    const s = await seller();
+    const res = await subscribe(s, { events: ['order.created', 'order.status_changed', 'pos.sale_created', 'pos.sale_voided', 'org.question_asked', 'order.return_requested'] }).expect(201);
+    expect(res.body.events).toContain('order.return_requested');
+  });
+
   it('refuses unsafe URLs (SSRF) with 400, http in production included', async () => {
     const s = await seller();
     const bad = ['https://127.0.0.1/h', 'https://10.0.0.5/h', 'https://192.168.1.1/h', 'https://169.254.169.254/latest', 'https://localhost/h', 'https://2130706433/h', 'https://[::1]/h', 'https://[::ffff:127.0.0.1]/h', 'https://db.internal/h', 'https://user:pw@example.com/h', 'https://example.com:8080/h', 'http://example.com/h', 'http://localhost:4000/h', 'ftp://example.com/h', 'not a url'];

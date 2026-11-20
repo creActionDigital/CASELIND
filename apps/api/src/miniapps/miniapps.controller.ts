@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, Param, Patch, Post, Put, Query, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import {
   type AdminMiniAppListQuery,
   adminMiniAppListQuerySchema,
@@ -20,6 +20,11 @@ import {
   type MiniAppGrantList,
   type MiniAppList,
   type MiniAppMe,
+  type MiniAppNotifyRequest,
+  type MiniAppNotifyResponse,
+  miniappNotifyRequestSchema,
+  type SetMiniAppMuteRequest,
+  setMiniAppMuteRequestSchema,
   type MiniAppOrderList,
   type MiniAppPageQuery,
   miniappPageQuerySchema,
@@ -47,6 +52,7 @@ import { CurrentMembership, type OrgMembership, OrgPermission, UUID_RE } from '.
 import { type AuthUser, CurrentUser, Public, Roles } from '../security/auth.guard.js';
 import { CurrentMiniApp, type MiniAppPrincipal, MiniAppTokenGuard, RequireMiniAppScope } from './miniapp-token.guard.js';
 import { MiniAppApiService } from './miniapp-api.service.js';
+import { MiniAppUsageInterceptor } from './miniapp-usage.interceptor.js';
 import { MiniAppsService } from './miniapps.service.js';
 import { OAuthService } from './oauth.service.js';
 
@@ -217,6 +223,18 @@ export class MyMiniAppsController {
     await this.oauth.revokeGrant(user.userId, uuid(appId, 'Authorization'), meta);
   }
 
+  /** Silence (or re-enable) the notifications of one app without withdrawing its access. */
+  @Put('miniapp-grants/:appId/notifications')
+  @HttpCode(204)
+  async mute(
+    @CurrentUser() user: AuthUser,
+    @Param('appId') appId: string,
+    @Body(new ZodPipe(setMiniAppMuteRequestSchema)) body: SetMiniAppMuteRequest,
+    @ReqMeta() meta: RequestMeta,
+  ): Promise<void> {
+    await this.oauth.setMuted(user.userId, uuid(appId, 'Authorization'), body.muted, meta);
+  }
+
   @Get('miniapp-payment-requests')
   pending(@CurrentUser() user: AuthUser): Promise<MiniAppPaymentRequestList> {
     return this.api.listPendingForUser(user.userId);
@@ -247,24 +265,25 @@ export class MyMiniAppsController {
 @Controller('miniapp-api')
 @Public()
 @UseGuards(MiniAppTokenGuard)
+@UseInterceptors(MiniAppUsageInterceptor)
 @RequireFlag('miniapps')
 export class MiniAppApiController {
   constructor(private readonly api: MiniAppApiService) {}
 
   @Get('me')
-  @RequireMiniAppScope('profile.basic')
+  @RequireMiniAppScope('profile.basic', 'GET', '/v1/miniapp-api/me')
   me(@CurrentMiniApp() p: MiniAppPrincipal): Promise<MiniAppMe> {
     return this.api.me(p);
   }
 
   @Get('orders')
-  @RequireMiniAppScope('orders.read')
+  @RequireMiniAppScope('orders.read', 'GET', '/v1/miniapp-api/orders')
   orders(@CurrentMiniApp() p: MiniAppPrincipal, @Query(new ZodPipe(miniappPageQuerySchema)) q: MiniAppPageQuery): Promise<MiniAppOrderList> {
     return this.api.orders(p, q);
   }
 
   @Post('payment-requests')
-  @RequireMiniAppScope('wallet.pay')
+  @RequireMiniAppScope('wallet.pay', 'POST', '/v1/miniapp-api/payment-requests')
   async createPayment(
     @CurrentMiniApp() p: MiniAppPrincipal,
     @Body(new ZodPipe(createMiniAppPaymentRequestSchema)) body: CreateMiniAppPaymentRequest,
@@ -276,8 +295,29 @@ export class MiniAppApiController {
   }
 
   @Get('payment-requests/:id')
-  @RequireMiniAppScope('wallet.pay')
+  @RequireMiniAppScope('wallet.pay', 'GET', '/v1/miniapp-api/payment-requests/{id}')
   getPayment(@CurrentMiniApp() p: MiniAppPrincipal, @Param('id') id: string): Promise<MiniAppPaymentRequest> {
     return this.api.getPaymentRequestForApp(p, uuid(id, 'Payment request'));
+  }
+
+  /** Scope notify: a notification to the user of the token only (5 a day per user, app quota, declared links only). */
+  @Post('notify')
+  @HttpCode(200)
+  @RequireMiniAppScope('notify', 'POST', '/v1/miniapp-api/notify')
+  async notify(
+    @CurrentMiniApp() p: MiniAppPrincipal,
+    @Body(new ZodPipe(miniappNotifyRequestSchema)) body: MiniAppNotifyRequest,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<MiniAppNotifyResponse> {
+    try {
+      return await this.api.notify(p, body);
+    } catch (err) {
+      if (err instanceof AppError && err.status === 429) {
+        const next = new Date();
+        next.setUTCHours(24, 0, 0, 0);
+        res.setHeader('Retry-After', String(Math.max(1, Math.ceil((next.getTime() - Date.now()) / 1000))));
+      }
+      throw err;
+    }
   }
 }

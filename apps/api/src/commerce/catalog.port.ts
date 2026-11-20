@@ -17,10 +17,16 @@ export interface PricedLine {
   title: string;
   variantLabel: string | null;
   sku: string | null;
+  /** Effective price: the promotion in force is applied here (the only place a price is fixed). */
   unitPriceMinor: number;
+  /** Base price when a promotion lowers `unitPriceMinor` (crossed out), else null/absent. */
+  compareAtPriceMinor?: number | null;
   currency: string;
   quantity: number;
   imageAssetId: string | null;
+  /** Promotion whose units `reserve` counted for this line (null/absent: base price); kept on the order item to give them back. */
+  promotionId?: string | null;
+  promoUnits?: number;
 }
 
 /** `orgId`: only variants of that org count (others read as unavailable); `reason`: label of the stock movement. */
@@ -30,7 +36,9 @@ export interface ReserveOptions {
 
 /** `reason`: label of the stock movement (default `order_released`). */
 export interface ReleaseOptions {
-  reason?: 'order_released' | 'pos_void';
+  reason?: 'order_released' | 'pos_void' | 'return_restocked';
+  /** Promotional units to give back (sold_count - units, never below 0), read from the order items. */
+  promos?: { promotionId: string; units: number }[];
 }
 
 export type ReserveResult =

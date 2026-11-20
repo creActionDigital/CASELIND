@@ -15,9 +15,11 @@ import { AppError } from '../common/app-error.js';
 import { DB, type Db } from '../db/db.module.js';
 import { mediaAssets, postComments, postMedia, postReactions, type PostRow, posts, users } from '../db/schema.js';
 import { bestEffort } from '../messaging/messaging.shared.js';
+import { replacePostHashtags } from '../creator/hashtags.js';
 import { contentUrlOf } from '../media/media.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { alreadyNotified, FollowsService } from './follows.service.js';
+import { PublishGuard } from '../platform-ops/publish.guard.js';
 import { isPrivileged, postVisibleSql } from './post-visibility.js';
 import { decodeCursor, encodeCursor, postNotFound, SOCIAL_CATEGORY, UUID_RE, validationError } from './social.shared.js';
 
@@ -43,6 +45,7 @@ export class PostsService {
     @Inject(DB) private readonly db: Db,
     private readonly follows: FollowsService,
     private readonly notifications: NotificationsService,
+    private readonly publishGuard: PublishGuard,
   ) {}
 
   /** The visibility matrix, as SQL over `posts` joined with the author (`users`): see postVisibleSql. */
@@ -97,7 +100,7 @@ export class PostsService {
   async hydrate(viewerId: string, items: PostWithAuthor[]): Promise<Post[]> {
     if (items.length === 0) return [];
     const ids = items.map((i) => i.row.id);
-    const [mediaRows, reactionRows, mine, commentRows] = await Promise.all([
+    const [mediaRows, reactionRows, mine, commentRows, savedRows] = await Promise.all([
       this.db
         .select({ postId: postMedia.postId, id: mediaAssets.id, mime: mediaAssets.mime, position: postMedia.position })
         .from(postMedia)
@@ -118,7 +121,11 @@ export class PostsService {
         .from(postComments)
         .where(and(inArray(postComments.postId, ids), sql`${postComments.deletedAt} IS NULL AND NOT ${postComments.hidden}`))
         .groupBy(postComments.postId),
+      this.db.execute<{ post_id: string }>(
+        sql`SELECT post_id FROM post_bookmarks WHERE user_id = ${viewerId}::uuid AND post_id = ANY(${sql`ARRAY[${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)}]`})`,
+      ),
     ]);
+    const saved = new Set(savedRows.rows.map((r) => r.post_id));
     const media = new Map<string, Post['media']>();
     for (const m of mediaRows) {
       media.set(m.postId, [...(media.get(m.postId) ?? []), { id: m.id, mime: m.mime, contentUrl: contentUrlOf(m.id) }]);
@@ -141,6 +148,8 @@ export class PostsService {
       reactions: counts.get(row.id) ?? EMPTY_COUNTS(),
       myReaction: myReaction.get(row.id) ?? null,
       commentsCount: comments.get(row.id) ?? 0,
+      bookmarked: saved.has(row.id),
+      sponsored: false,
       moderation: row.hidden ? 'hidden' : 'visible',
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -158,6 +167,7 @@ export class PostsService {
   async create(userId: string, roles: readonly PlatformRole[], req: CreatePostRequest): Promise<{ post: Post; created: boolean }> {
     const existing = await this.findByClientId(userId, req.clientId);
     if (existing) return { post: await this.hydrateOne(userId, existing), created: false };
+    await this.publishGuard.assertMayPublish(userId, 'post');
 
     let kind: PostKind = 'text';
     if (req.mediaIds.length > 0) {
@@ -188,6 +198,7 @@ export class PostsService {
         if (req.mediaIds.length > 0) {
           await tx.insert(postMedia).values(req.mediaIds.map((mediaId, position) => ({ postId: p!.id, mediaId, position })));
         }
+        await replacePostHashtags(tx, p!.id, req.body);
         return p!.id;
       });
     } catch (err) {
@@ -228,7 +239,10 @@ export class PostsService {
       }
       set.body = patch.body;
     }
-    await this.db.update(posts).set(set).where(and(eq(posts.id, postId), sql`${posts.deletedAt} IS NULL`));
+    await this.db.transaction(async (tx) => {
+      await tx.update(posts).set(set).where(and(eq(posts.id, postId), sql`${posts.deletedAt} IS NULL`));
+      if (patch.body !== undefined) await replacePostHashtags(tx, postId, patch.body);
+    });
     return this.hydrateOne(userId, await this.requireVisible(userId, roles, postId));
   }
 
@@ -241,7 +255,7 @@ export class PostsService {
 
   // ---- lists --------------------------------------------------------------------------------
 
-  private async page(viewerId: string, roles: readonly PlatformRole[], q: SocialPageQuery, extra: SQL): Promise<PostList> {
+  async page(viewerId: string, roles: readonly PlatformRole[], q: SocialPageQuery, extra: SQL): Promise<PostList> {
     const filters: SQL[] = [this.visibleTo(viewerId, roles), extra];
     if (q.cursor) {
       const c = decodeCursor(q.cursor);
@@ -277,6 +291,15 @@ export class PostsService {
   async userPosts(viewerId: string, roles: readonly PlatformRole[], targetId: string, q: SocialPageQuery): Promise<PostList> {
     const target = await this.follows.resolveTarget(viewerId, targetId);
     return this.page(viewerId, roles, q, sql`${posts.authorId} = ${target.id}::uuid`);
+  }
+
+  /** The given posts that the viewer may see, hydrated, in the order of `ids` (the others are omitted). */
+  async hydrateByIds(viewerId: string, roles: readonly PlatformRole[], ids: string[]): Promise<Post[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.baseSelect().where(and(inArray(posts.id, ids), this.visibleTo(viewerId, roles)));
+    const byId = new Map(rows.map((r) => [r.row.id, this.toWithAuthor(r)]));
+    const ordered = ids.map((id) => byId.get(id)).filter((x): x is PostWithAuthor => x !== undefined);
+    return this.hydrate(viewerId, ordered);
   }
 
   // ---- reactions ----------------------------------------------------------------------------

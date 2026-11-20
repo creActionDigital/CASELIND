@@ -22,6 +22,7 @@ import type { RequestMeta } from '../common/request-meta.js';
 import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { appendConsent } from '../consents/consents.shared.js';
 import { HealthCrypto } from './health-crypto.js';
 import { HealthProService } from './health-pro.service.js';
 import { HealthResultsService } from './health-results.service.js';
@@ -101,7 +102,10 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
     if (version !== HEALTH_CONSENT_VERSION) throw AppError.conflict('The consent text changed: read it again', { reason: 'consent_version', current: HEALTH_CONSENT_VERSION });
     await this.db.transaction(async (tx) => {
       const ins = await tx.execute(sql`INSERT INTO health_consents (user_id, version) VALUES (${userId}::uuid, ${version}) ON CONFLICT (user_id) DO NOTHING`);
-      if ((ins.rowCount ?? 0) > 0) await this.audit.record({ action: 'health.consent_granted', actorUserId: userId, meta, metadata: { version } }, tx);
+      if ((ins.rowCount ?? 0) > 0) {
+        await appendConsent(tx, userId, 'health', true, version);
+        await this.audit.record({ action: 'health.consent_granted', actorUserId: userId, meta, metadata: { version } }, tx);
+      }
     });
     return this.consent(userId);
   }
@@ -110,7 +114,10 @@ export class HealthService implements OnApplicationBootstrap, OnApplicationShutd
   async revoke(userId: string, meta: RequestMeta): Promise<HealthConsent> {
     await this.db.transaction(async (tx) => {
       const del = await tx.execute(sql`DELETE FROM health_consents WHERE user_id = ${userId}::uuid`);
-      if ((del.rowCount ?? 0) > 0) await this.audit.record({ action: 'health.consent_revoked', actorUserId: userId, meta, metadata: {} }, tx);
+      if ((del.rowCount ?? 0) > 0) {
+        await appendConsent(tx, userId, 'health', false, HEALTH_CONSENT_VERSION);
+        await this.audit.record({ action: 'health.consent_revoked', actorUserId: userId, meta, metadata: {} }, tx);
+      }
     });
     return this.consent(userId);
   }

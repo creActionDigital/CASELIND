@@ -7,6 +7,7 @@ import { type PostCommentRow, postComments, users } from '../db/schema.js';
 import { bestEffort } from '../messaging/messaging.shared.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrivacyService } from '../privacy/privacy.service.js';
+import { PublishGuard } from '../platform-ops/publish.guard.js';
 import { alreadyNotified } from './follows.service.js';
 import { isPrivileged, PostsService } from './posts.service.js';
 import { commentNotFound, decodeCursor, encodeCursor, SOCIAL_CATEGORY, UUID_RE, validationError } from './social.shared.js';
@@ -26,6 +27,7 @@ export class CommentsService {
     private readonly posts: PostsService,
     private readonly privacy: PrivacyService,
     private readonly notifications: NotificationsService,
+    private readonly publishGuard: PublishGuard,
   ) {}
 
   /** Not deleted, author active, not blocked either way with the viewer; hidden ones only for their author and moderators. */
@@ -96,6 +98,7 @@ export class CommentsService {
     req: CreateCommentRequest,
   ): Promise<Comment> {
     const post = await this.posts.requireVisible(userId, roles, postId);
+    await this.publishGuard.assertMayPublish(userId, 'comment');
     let parent: CommentWithAuthor | null = null;
     if (req.replyToId) {
       const [p] = await this.select()

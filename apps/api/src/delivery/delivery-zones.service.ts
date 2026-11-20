@@ -26,6 +26,7 @@ function toZone(r: DeliveryZoneRow): DeliveryZone {
     name: r.name,
     areas: r.areas,
     fees: r.fees,
+    expressFees: r.expressFees ?? null,
     etaMinutes: r.etaMinutes,
     active: r.active,
     createdAt: r.createdAt.toISOString(),
@@ -41,9 +42,13 @@ function refused(reason: string, message: string, orgId: string): AppError {
 
 export interface ResolvedZone {
   zoneId: string;
+  /** Zone fee, plus the express supplement when express was asked. */
   feeMinor: number;
   etaMinutes: number;
 }
+
+const expressUnavailable = (orgId: string) =>
+  AppError.conflict('Express delivery is not offered for this zone', { reason: 'express_unavailable', orgId });
 
 @Injectable()
 export class DeliveryZonesService {
@@ -65,7 +70,7 @@ export class DeliveryZonesService {
       if (n >= DELIVERY_ZONES_PER_ORG_MAX) throw AppError.conflict('Too many delivery zones', { reason: 'zone_limit', max: DELIVERY_ZONES_PER_ORG_MAX });
       const [row] = await tx
         .insert(deliveryZones)
-        .values({ orgId, name: body.name, areas, fees: body.fees, etaMinutes: body.etaMinutes, active: body.active })
+        .values({ orgId, name: body.name, areas, fees: body.fees, expressFees: body.expressFees ?? null, etaMinutes: body.etaMinutes, active: body.active })
         .returning();
       await this.audit.record(
         { action: 'delivery.zone_saved', actorUserId: userId, meta, metadata: { orgId, zoneId: row!.id, created: true } },
@@ -84,6 +89,7 @@ export class DeliveryZonesService {
       if (patch.areas.length === 0) throw new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path: 'areas', message: 'no usable area' }]);
     }
     if (body.fees !== undefined) patch.fees = body.fees;
+    if (body.expressFees !== undefined) patch.expressFees = body.expressFees;
     if (body.etaMinutes !== undefined) patch.etaMinutes = body.etaMinutes;
     if (body.active !== undefined) patch.active = body.active;
     return this.db.transaction(async (tx) => {
@@ -139,6 +145,7 @@ export class DeliveryZonesService {
     currency: string,
     zoneId: string | undefined,
     address: OrderAddress,
+    speed: 'standard' | 'express' = 'standard',
   ): Promise<ResolvedZone | null> {
     const zones = await tx
       .select()
@@ -147,6 +154,8 @@ export class DeliveryZonesService {
       .orderBy(asc(deliveryZones.id));
     if (zones.length === 0) {
       if (zoneId) throw refused('zone_not_found', 'unknown delivery zone', orgId);
+      // No zone, no supplement to charge: express cannot be offered.
+      if (speed === 'express') throw expressUnavailable(orgId);
       return null;
     }
     if (!zoneId) throw refused('zone_required', 'this seller delivers by zone: choose one', orgId);
@@ -156,6 +165,9 @@ export class DeliveryZonesService {
     if (!zone.areas.some((a) => parts.includes(a))) throw refused('zone_not_covered', 'the address is outside the zone', orgId);
     const fee = zone.fees[currency];
     if (fee === undefined) throw refused('zone_currency_unsupported', 'the zone has no fee in the order currency', orgId);
-    return { zoneId: zone.id, feeMinor: fee, etaMinutes: zone.etaMinutes };
+    // The supplement comes from the zone only, never from the client.
+    const supplement = speed === 'express' ? zone.expressFees?.[currency] : 0;
+    if (supplement === undefined) throw expressUnavailable(orgId);
+    return { zoneId: zone.id, feeMinor: fee + supplement, etaMinutes: zone.etaMinutes };
   }
 }

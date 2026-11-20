@@ -79,17 +79,27 @@ export class FlagsService {
     return rows.map(toFeatureFlag);
   }
 
+  /** Double validation applies when a regulated flag is switched on or off, or its country/role scope changes (a no-op switch needs no approval). */
+  async isRegulatedToggle(key: string, patch: UpdateFeatureFlagRequest): Promise<boolean> {
+    const scopeChange = patch.allowedCountries !== undefined || patch.allowedRoles !== undefined;
+    if (patch.enabled === undefined && !scopeChange) return false;
+    const [f] = await this.db.select({ regulated: featureFlags.regulated, enabled: featureFlags.enabled }).from(featureFlags).where(eq(featureFlags.key, key)).limit(1);
+    return !!f?.regulated && (scopeChange || f.enabled !== patch.enabled);
+  }
+
   async update(
     key: string,
     patch: UpdateFeatureFlagRequest,
     actorUserId: string,
     meta: RequestMeta,
+    /** An outer transaction (double validation): the change then commits with the decision. */
+    exec: Pick<Db, 'transaction'> = this.db,
   ): Promise<FeatureFlag> {
     // Read, decision, write and audit in one transaction with the row locked: a concurrent
     // admin change waits here and then re-evaluates against the committed state, so a regulated
     // flag can never end up ON with a new reach that nobody confirmed, and the audit's from/to
     // always describe the state actually replaced.
-    return this.db.transaction(async (tx) => {
+    return exec.transaction(async (tx) => {
       const [current] = await tx
         .select()
         .from(featureFlags)

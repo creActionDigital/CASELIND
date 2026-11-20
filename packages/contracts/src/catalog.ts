@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { type Page, pageQuerySchema } from './pagination.js';
+import { promotionBadgeSchema } from './promotions.js';
 
 /**
  * Catalogue (lot 5A): categories, products with variants, stock and the buyer-facing storefront.
@@ -111,7 +112,7 @@ export const orgProductListQuerySchema = pageQuerySchema.extend({
 export type OrgProductListQuery = z.infer<typeof orgProductListQuerySchema>;
 
 export const stockReasonSchema = z.enum(['restock', 'adjustment', 'damage']);
-export const stockMovementReasonSchema = z.enum(['initial', 'restock', 'adjustment', 'damage', 'order_reserved', 'order_released', 'pos_sale', 'pos_void']);
+export const stockMovementReasonSchema = z.enum(['initial', 'restock', 'adjustment', 'damage', 'order_reserved', 'order_released', 'pos_sale', 'pos_void', 'return_restocked']);
 export const adjustStockRequestSchema = z.object({
   delta: z
     .number()
@@ -135,7 +136,11 @@ export type StorefrontOrg = z.infer<typeof storefrontOrgSchema>;
 export const storefrontVariantSchema = z.object({
   id: z.string().uuid(),
   options: z.record(z.string(), z.string()),
+  /** Effective price (promotion applied when one is running). */
   priceMinor: z.number().int(),
+  /** Crossed-out base price, only when a promotion lowers `priceMinor`. */
+  compareAtPriceMinor: z.number().int().nullish(),
+  promotion: promotionBadgeSchema.nullish(),
   currency: z.string(),
   inStock: z.boolean(),
 });
@@ -147,7 +152,11 @@ export const storefrontProductSchema = z.object({
   title: z.string(),
   categoryId: z.string().uuid().nullable(),
   coverUrl: z.string().nullable(),
+  /** Lowest effective price (promotions applied). */
   minPriceMinor: z.number().int(),
+  /** Base price of that variant when a promotion lowers it (crossed out). */
+  compareAtPriceMinor: z.number().int().nullish(),
+  promotion: promotionBadgeSchema.nullish(),
   currency: z.string(),
   inStock: z.boolean(),
   org: storefrontOrgSchema,
@@ -158,6 +167,8 @@ export const storefrontProductListSchema = z.object({ items: z.array(storefrontP
 export type StorefrontProductList = Page<StorefrontProduct>;
 
 export const storefrontProductDetailSchema = storefrontProductSchema.extend({
+  /** Whether the caller wishes this product. */
+  wished: z.boolean().optional(),
   description: z.string().nullable(),
   media: z.array(productMediaSchema),
   variants: z.array(storefrontVariantSchema),

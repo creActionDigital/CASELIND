@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
+import { countMaintenanceRun } from '../observability/metrics.js';
 import { inArray, lt, or, sql } from 'drizzle-orm';
 import type pg from 'pg';
 import { ENV, type Env } from '../config/env.js';
@@ -8,8 +9,16 @@ import { auditEvents, orgMembers, otpChallenges, refreshTokens, sessions, userBl
 import { contentUrlOf, MediaService } from '../media/media.service.js';
 import { MediaStorage } from '../media/storage.js';
 import { reconcile } from '../ledger/ledger.queries.js';
+import { BatchesService } from '../inventory-ops/batches.service.js';
+import { MoneyRequestsService } from '../wallet-finance/money-requests.service.js';
+import { SavingsService } from '../wallet-finance/savings.service.js';
+import { ScheduledPaymentsService } from '../wallet-finance/scheduled-payments.service.js';
 import { FeesService } from '../school/fees.service.js';
 import { WebhookService } from '../webhooks/webhooks.service.js';
+import { MiniAppRevenueService } from '../miniapps/miniapp-revenue.service.js';
+import { MiniAppWebhookService } from '../miniapps/miniapp-webhook.service.js';
+import { AnnouncementsService } from '../platform-ops/announcements.service.js';
+import { SanctionsService } from '../platform-ops/sanctions.service.js';
 
 /** Media of deleted accounts removed per maintenance run (files first, then rows); the rest waits for the next run. */
 const DELETED_USER_MEDIA_BATCH = 500;
@@ -66,6 +75,14 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     private readonly storage: MediaStorage,
     private readonly schoolFees: FeesService,
     private readonly webhooks: WebhookService,
+    private readonly batches: BatchesService,
+    private readonly moneyRequests: MoneyRequestsService,
+    private readonly scheduledPayments: ScheduledPaymentsService,
+    private readonly savings: SavingsService,
+    private readonly miniappHooks: MiniAppWebhookService,
+    private readonly miniappRevenue: MiniAppRevenueService,
+    private readonly sanctions: SanctionsService,
+    private readonly announcements: AnnouncementsService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -86,7 +103,9 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
   async scheduledRun(): Promise<void> {
     try {
       await this.runOnce();
+      countMaintenanceRun('success');
     } catch (err) {
+      countMaintenanceRun('failure');
       this.logger.error('maintenance run failed', err instanceof Error ? err.stack : String(err));
     }
   }
@@ -119,15 +138,38 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         };
         // Lot 4B: not part of the result shape; logged only.
         await this.purgeOldStoryViews(now);
+        // Retention: assistant action log (12 months), daily active-user counter (400 days), administrator requests past their deadline marked expired.
+        await this.purgeRetention().catch((err: unknown) => this.logger.error(`retention purge failed: ${(err as Error).name}`));
+        // Creator tools: impression de-duplication rows (8 days), old daily counters, boosts past their end.
+        await this.tidyCreatorData(now).catch((err: unknown) => this.logger.error(`creator data cleanup failed: ${(err as Error).name}`));
+        // Mini-app platform: access log (90 days) and daily usage counters (400 days).
+        await this.purgeMiniAppData(now).catch((err: unknown) => this.logger.error(`mini-app data purge failed: ${(err as Error).name}`));
+        // On-demand courier: open requests past their deadline become expired (they already read as expired before this runs).
+        await this.expireCourierRequests(now).catch((err: unknown) => this.logger.error(`courier request expiry failed: ${(err as Error).name}`));
+        // Carpooling and roadside assistance: past trips are closed, open roadside requests past their deadline expire.
+        await this.expireMobilityExtra(now).catch((err: unknown) => this.logger.error(`carpool/roadside expiry failed: ${(err as Error).name}`));
         // Lot 3b: disappearing messages past their expiry lose body and media, like a recall.
         await this.wipeExpiredMessages(now);
         // Lot 6A: hourly ledger reconciliation; any divergence is logged as an error.
         await this.reconcileLedger();
         // Lot 17b: school fees due within 3 days (once per fee, generic notification); never fails the run.
         await this.schoolFees.remindDue(now).catch((err: unknown) => this.logger.error(`school fee reminders failed: ${(err as Error).name}`));
+        // Lots: expiry alerts (within 7 days, then expired), once per batch and threshold; never fails the run.
+        await this.batches.notifyExpiring(now).catch((err: unknown) => this.logger.error(`batch expiry alerts failed: ${(err as Error).name}`));
+        // Wallet finance (test funds): expired money requests, due scheduled payments (resilient, idempotent per run), savings deadline reminders; never fail the run.
+        await this.moneyRequests.expireDue().catch((err: unknown) => this.logger.error(`money request expiry failed: ${(err as Error).name}`));
+        await this.scheduledPayments.runDue(now).catch((err: unknown) => this.logger.error(`scheduled payments failed: ${(err as Error).name}`));
+        await this.savings.remindDeadlines().catch((err: unknown) => this.logger.error(`savings reminders failed: ${(err as Error).name}`));
         // Webhooks: retries that are due, then the journal bound (100 per subscription); never fails the run.
         await this.webhooks.processDue().catch((err: unknown) => this.logger.error(`webhook retries failed: ${(err as Error).name}`));
         await this.webhooks.purge().catch((err: unknown) => this.logger.error(`webhook journal purge failed: ${(err as Error).name}`));
+        // Mini-app events: retries and journal bound; indicative revenue statements (previous month closed, current month open).
+        await this.miniappHooks.processDue().catch((err: unknown) => this.logger.error(`mini-app webhook retries failed: ${(err as Error).name}`));
+        await this.miniappHooks.purge().catch((err: unknown) => this.logger.error(`mini-app webhook journal purge failed: ${(err as Error).name}`));
+        await this.miniappRevenue.runMaintenance(now).catch((err: unknown) => this.logger.error(`mini-app revenue statements failed: ${(err as Error).name}`));
+        // Sanctions past their end expire (a suspension lifts itself); announcements end / are notified when their period begins.
+        await this.sanctions.expireDue().catch((err: unknown) => this.logger.error(`sanction expiry failed: ${(err as Error).name}`));
+        await this.announcements.runMaintenance().catch((err: unknown) => this.logger.error(`announcements maintenance failed: ${(err as Error).name}`));
         this.logger.log(
           `maintenance done: otpChallenges=${result.otpChallenges} refreshTokens=${result.refreshTokens} sessions=${result.sessions} deletedAccounts=${result.deletedAccounts} staleUploads=${result.staleUploads} deletedUserMedia=${result.deletedUserMedia}`,
         );
@@ -171,6 +213,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         sql`, `,
       )}]::uuid[]`;
       await this.db.execute(sql`DELETE FROM message_reactions WHERE message_id = ANY(${arr})`);
+      await this.db.execute(sql`DELETE FROM message_translations WHERE message_id = ANY(${arr})`);
       await this.db.execute(sql`DELETE FROM message_favorites WHERE message_id = ANY(${arr})`);
       await this.db.execute(sql`DELETE FROM message_polls WHERE message_id = ANY(${arr})`);
       this.logger.log(`maintenance: ${ids.length} expired messages erased`);
@@ -178,7 +221,59 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
     return ids.length;
   }
 
+  /** Courier requests nobody accepted before `expires_at` (30 minutes, or 30 minutes after the slot). */
+  /**
+   * Carpooling: a trip nobody marked as departed, 3 hours after its time, is cancelled (its live bookings with it);
+   * a departed trip nobody completed, 24 hours after, is completed. Roadside: open requests past `expires_at` expire.
+   */
+  private async expireMobilityExtra(now: Date): Promise<number> {
+    const at = now.toISOString();
+    await this.db.execute(sql`
+      UPDATE carpool_bookings SET status = CASE WHEN status = 'requested' THEN 'declined' ELSE 'cancelled' END, updated_at = now()
+      WHERE status IN ('requested', 'accepted')
+        AND trip_id IN (SELECT id FROM carpool_trips WHERE status IN ('open', 'full') AND departs_at + interval '3 hours' <= ${at}::timestamptz)`);
+    const cancelled = await this.db.execute(sql`UPDATE carpool_trips SET status = 'cancelled' WHERE status IN ('open', 'full') AND departs_at + interval '3 hours' <= ${at}::timestamptz`);
+    await this.db.execute(sql`
+      UPDATE carpool_bookings SET status = 'completed', updated_at = now()
+      WHERE status = 'accepted' AND trip_id IN (SELECT id FROM carpool_trips WHERE status = 'departed' AND departs_at + interval '24 hours' <= ${at}::timestamptz)`);
+    const completed = await this.db.execute(sql`UPDATE carpool_trips SET status = 'completed' WHERE status = 'departed' AND departs_at + interval '24 hours' <= ${at}::timestamptz`);
+    const roadside = await this.db.execute(sql`UPDATE roadside_requests SET status = 'expired' WHERE status = 'requested' AND expires_at <= ${at}::timestamptz`);
+    const n = (cancelled.rowCount ?? 0) + (completed.rowCount ?? 0) + (roadside.rowCount ?? 0);
+    if (n > 0) this.logger.log(`maintenance: ${n} carpool trips / roadside requests closed`);
+    return n;
+  }
+
+  private async expireCourierRequests(now: Date): Promise<number> {
+    const res = await this.db.execute(sql`
+      UPDATE courier_requests SET status = 'expired' WHERE status = 'requested' AND expires_at <= ${now.toISOString()}::timestamptz`);
+    const n = res.rowCount ?? 0;
+    if (n > 0) this.logger.log(`maintenance: ${n} courier requests expired`);
+    return n;
+  }
+
+  /** Reads of user data by mini-apps older than 90 days; per-app daily counters (no user data) older than 400 days. */
+  private async purgeMiniAppData(now: Date): Promise<void> {
+    const iso = (days: number): string => new Date(now.getTime() - days * DAY_MS).toISOString();
+    await this.db.execute(sql`DELETE FROM miniapp_access_log WHERE at < ${iso(90)}::timestamptz`);
+    await this.db.execute(sql`DELETE FROM miniapp_usage_daily WHERE day < ${iso(400)}::date`);
+    await this.db.execute(sql`DELETE FROM miniapp_notify_daily WHERE day < ${iso(3)}::date`);
+  }
+
+  /** Impression de-duplication hashes older than 8 days, daily counters older than 120 days, boosts whose end passed become `ended`. */
+  private async tidyCreatorData(now: Date): Promise<void> {
+    const iso = (days: number): string => new Date(now.getTime() - days * DAY_MS).toISOString();
+    await this.db.execute(sql`DELETE FROM post_impression_viewers WHERE day < ${iso(8)}::date`);
+    await this.db.execute(sql`DELETE FROM post_impressions WHERE day < ${iso(120)}::date`);
+    await this.db.execute(sql`UPDATE post_boosts SET status = 'ended' WHERE status = 'active' AND ends_at <= ${now.toISOString()}::timestamptz`);
+  }
+
   /** Views of stories that expired more than 30 days ago (the stories stay in their author's archive). */
+  private async purgeRetention(): Promise<void> {
+    await this.db.execute(sql`DELETE FROM ai_action_log WHERE created_at < now() - interval '12 months'`);
+    await this.db.execute(sql`DELETE FROM user_active_days WHERE day < current_date - 400`);
+    await this.db.execute(sql`UPDATE admin_approvals SET status = 'expired' WHERE status = 'pending' AND expires_at <= now()`);
+  }
+
   private async purgeOldStoryViews(now: Date): Promise<number> {
     const cutoff = new Date(now.getTime() - 30 * DAY_MS);
     const res = await this.db.execute(sql`
@@ -240,6 +335,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
   private async purgeDueDeletions(now: Date): Promise<number> {
     const cutoff = new Date(now.getTime() - this.env.ACCOUNT_DELETION_GRACE_DAYS * DAY_MS);
     return this.db.transaction(async (tx) => {
+      // The consent journal refuses DELETE/TRUNCATE (trigger of 0100) unless this transaction is the account purge.
+      await tx.execute(sql`SET LOCAL caselind.purge = 'on'`);
       const candidates = await tx.execute<{ id: string }>(sql`
         SELECT id FROM users
         WHERE deletion_requested_at < ${cutoff.toISOString()}::timestamptz AND status <> 'deleted'`);
@@ -300,6 +397,16 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           )
         ORDER BY m.org_id, m.user_id`);
       await tx.delete(orgMembers).where(inArray(orgMembers.userId, ids));
+      // HR: the account's profile, leaves, shifts and salary lines are erased (salary with the account); references to it elsewhere are cleared.
+      // Sanctions received and appeals filed (personal data of the account) go with it.
+      await tx.execute(sql`DELETE FROM user_sanctions WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM salary_register WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM work_shifts WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM leave_requests WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM employee_profiles WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE employee_profiles SET manager_user_id = NULL WHERE manager_user_id = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE leave_requests SET decided_by = NULL WHERE decided_by = ANY(${idArray})`);
+      await tx.execute(sql`UPDATE salary_register SET recorded_by = NULL WHERE recorded_by = ANY(${idArray})`);
 
       // Messaging (lot 3A): memberships become "left", message bodies and attachments are erased
       // (the rows stay so conversations keep their numbering), reactions are dropped. A group left
@@ -307,6 +414,7 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       await tx.execute(sql`
         UPDATE conversation_members SET status = 'left', left_at = now(), role = 'member'
         WHERE user_id = ANY(${idArray}) AND status = 'active'`);
+      await tx.execute(sql`DELETE FROM message_translations WHERE message_id IN (SELECT id FROM messages WHERE sender_id = ANY(${idArray}))`);
       await tx.execute(sql`UPDATE messages SET body = NULL, media_id = NULL WHERE sender_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM message_reactions WHERE user_id = ANY(${idArray})`);
       // Lot 3b: favourites, drafts and scheduled messages of the account.
@@ -355,6 +463,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       await tx.execute(sql`DELETE FROM post_reactions WHERE user_id = ANY(${idArray})`);
       // Commerce (lot 5B): the cart and the reviews go; orders stay for the seller accounting with the address erased.
       await tx.execute(sql`DELETE FROM cart_items WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM wishlist_items WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM post_bookmarks WHERE user_id = ANY(${idArray})`); // their posts, boosts, tags and counters go with the posts
       await tx.execute(sql`DELETE FROM reviews WHERE user_id = ANY(${idArray})`);
       // Services (lot 9): reviews, booking notes and the provider profile go; live bookings are cancelled by the system and
       // the offers of an individual provider are archived (bookings and offers of organisations are not personal data of the user).
@@ -371,6 +481,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
       await tx.execute(sql`DELETE FROM miniapp_tokens WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM miniapp_auth_codes WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM miniapp_grants WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM miniapp_access_log WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM miniapp_notify_daily WHERE user_id = ANY(${idArray})`);
       // Mobility (lot 11): favourite places, trusted contacts (both directions), quick messages, ratings' text and the driver
       // profile go; live rides are cancelled by the system; addresses of past rides are erased (distance and fare are kept).
       await tx.execute(sql`DELETE FROM mobility_favorite_places WHERE user_id = ANY(${idArray})`);
@@ -386,13 +498,35 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           stop_lat = NULL, stop_lng = NULL, stop_label = NULL, track_lat = NULL, track_lng = NULL, share_hash = NULL
         WHERE rider_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM mobility_drivers WHERE user_id = ANY(${idArray})`);
+      // Roadside assistance: a provider who leaves hands the request back to the open list (position and consent erased).
+      await tx.execute(sql`
+        UPDATE roadside_requests SET status = 'requested', provider_id = NULL, eta_minutes = NULL, accepted_at = NULL, location_consent = false, last_lat = NULL, last_lng = NULL, last_location_at = NULL
+        WHERE provider_id = ANY(${idArray}) AND status IN ('accepted', 'on_the_way')`);
+      // On-demand courier: a courier who leaves hands an accepted request back to the open list (under way: cancelled) and loses
+      // their position; a requester who leaves cancels the live requests, and addresses, coordinates and notes are erased.
+      await tx.execute(sql`
+        UPDATE courier_requests SET status = CASE WHEN status = 'accepted' THEN 'requested' ELSE 'cancelled' END,
+          cancelled_at = CASE WHEN status = 'accepted' THEN NULL ELSE now() END,
+          expires_at = CASE WHEN status = 'accepted' THEN now() + interval '30 minutes' ELSE expires_at END,
+          accepted_at = NULL, courier_id = NULL, location_consent = false, last_lat = NULL, last_lng = NULL, last_location_at = NULL
+        WHERE courier_id = ANY(${idArray}) AND status IN ('accepted', 'picked_up')`);
+      await tx.execute(sql`
+        UPDATE courier_requests SET status = 'cancelled', cancelled_at = now(), location_consent = false, last_lat = NULL, last_lng = NULL, last_location_at = NULL
+        WHERE requester_id = ANY(${idArray}) AND status IN ('requested', 'accepted', 'picked_up')`);
+      await tx.execute(sql`
+        UPDATE courier_requests SET pickup_lat = 0, pickup_lng = 0, pickup_label = '', dropoff_lat = 0, dropoff_lng = 0, dropoff_label = '', note = NULL
+        WHERE requester_id = ANY(${idArray})`);
       // AI assistant (lot 12): private conversations (messages cascade), settings and usage counters go.
-      await tx.execute(sql`DELETE FROM ai_conversations WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM ai_conversations WHERE user_id = ANY(${idArray})`); // proposed actions cascade
+      await tx.execute(sql`DELETE FROM ai_actions WHERE user_id = ANY(${idArray})`);
+      await tx.execute(sql`DELETE FROM ai_action_log WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM ai_user_settings WHERE user_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM ai_usage_daily WHERE user_id = ANY(${idArray})`);
       // Ledger (lot 6A): postings are append-only and kept (retention); the user's accounts are frozen, never deleted.
       // A non-zero sandbox balance left on them is reported by the reconciliation/back-office, not erased.
       await tx.execute(sql`UPDATE ledger_accounts SET status = 'frozen' WHERE user_id = ANY(${idArray})`);
+      // Savings pools (system accounts 'savings:<userId>') are frozen the same way.
+      await tx.execute(sql`UPDATE ledger_accounts SET status = 'frozen' WHERE system_code = ANY(SELECT 'savings:' || x::text FROM unnest(${idArray}) AS x)`);
       // Delivery (lot 8): a courier who leaves loses their open deliveries (not picked up: back to the seller queue;
       // under way: failed), their position goes; as a buyer the position, the rating text and the failure text are erased.
       // Events are append-only and keep no personal text beyond the actor id of the (anonymised) account.
@@ -413,6 +547,8 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
           rating_comment = CASE WHEN buyer_id = ANY(${idArray}) THEN NULL ELSE rating_comment END
         WHERE buyer_id = ANY(${idArray}) OR courier_id = ANY(${idArray})`);
       await tx.execute(sql`UPDATE orders SET address = NULL, address_anonymized_at = now() WHERE buyer_id = ANY(${idArray}) AND address IS NOT NULL`);
+      // Returns stay for the seller accounting (statuses, amounts); the free text the user wrote is erased.
+      await tx.execute(sql`UPDATE order_returns SET details = NULL, dispute_reason = NULL WHERE requested_by = ANY(${idArray})`);
       // Posts and comments are erased for good (bodies included; reactions, media links and replies cascade).
       await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ANY(${idArray})`);
       await tx.execute(sql`DELETE FROM posts WHERE author_id = ANY(${idArray})`);
@@ -475,6 +611,22 @@ export class MaintenanceService implements OnApplicationBootstrap, OnApplication
         ['school_guardians', ['student_user_id', 'guardian_user_id']],
         ['loyalty_movements', ['user_id']],
         ['marketing_consents', ['user_id']],
+        ['user_consents', ['user_id']],
+        ['user_active_days', ['user_id']],
+        // Wallet finance (test funds): children (shares, runs, movements) go by ON DELETE CASCADE.
+        ['money_requests', ['requester_id', 'payer_id']],
+        ['split_bill_shares', ['user_id']],
+        ['split_bills', ['creator_id']],
+        ['scheduled_payments', ['owner_id', 'recipient_id']],
+        ['savings_goals', ['user_id']],
+        ['wallet_alerts', ['user_id']],
+        // Carpooling (ratings and bookings of others on a deleted driver's trips go with the trip by ON DELETE CASCADE),
+        // vehicle rentals as a renter, roadside requests as a requester.
+        ['carpool_ratings', ['rater_id', 'ratee_id']],
+        ['carpool_bookings', ['passenger_id']],
+        ['carpool_trips', ['driver_id']],
+        ['rental_bookings', ['renter_id']],
+        ['roadside_requests', ['requester_id']],
       ] as const) {
         const cond = sql.join(
           cols.map((c) => sql`${sql.identifier(c)} = ANY(${idArray})`),

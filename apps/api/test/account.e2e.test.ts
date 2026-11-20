@@ -112,7 +112,7 @@ describe('data export', () => {
     const res = await ctx.http.get('/v1/me/export').set(bearer(a.token)).expect(200);
     const body = res.body;
     expect(Object.keys(body).sort()).toEqual(
-      ['aiConversations', 'blocks', 'budgets', 'calls', 'cart', 'comments', 'conversations', 'deliveries', 'education', 'exportedAt', 'favoriteMessages', 'following', 'freelance', 'games', 'health', 'jobAlerts', 'jobApplications', 'jobInterviews', 'jobProfile', 'kyc', 'listingAlerts', 'listingOffers', 'listingVisits', 'listings', 'livesHosted', 'loyalty', 'media', 'messaging', 'messagesSent', 'messagesSentTruncated', 'miniappGrants', 'mobility', 'orders', 'orgFeedback', 'orgMemberships', 'posts', 'privacy', 'profile', 'reportsFiled', 'reviews', 'school', 'schoolFees', 'schoolGuardians', 'searchHistory', 'securityEvents', 'services', 'sessions', 'stories', 'twoFactorEnabled', 'twoFactorEnabledAt', 'wallet'].sort(),
+      ['aiActionLog', 'aiActions', 'postBookmarks', 'aiConversations', 'blocks', 'budgets', 'calls', 'cart', 'comments', 'consentJournal', 'conversations', 'courierRequests', 'creator', 'deliveries', 'education', 'exportedAt', 'favoriteMessages', 'following', 'freelance', 'games', 'health', 'hr', 'jobAlerts', 'jobApplications', 'jobInterviews', 'jobProfile', 'kyc', 'listingAlerts', 'listingOffers', 'listingVisits', 'listings', 'livesHosted', 'loyalty', 'media', 'messaging', 'messagesSent', 'messagesSentTruncated', 'miniappAccess', 'miniappGrants', 'mobility', 'mobilityExtra', 'orders', 'orgFeedback', 'orderReturns', 'orgMemberships', 'posts', 'privacy', 'profile', 'reportsFiled', 'reviews', 'sanctions', 'school', 'schoolFees', 'schoolGuardians', 'searchHistory', 'securityEvents', 'services', 'sessions', 'stories', 'twoFactorEnabled', 'twoFactorEnabledAt', 'wallet', 'walletFinance', 'wishlist'].sort(),
     );
     expect(body.profile).toMatchObject({ id: a.id, handle: a.handle, email: a.identifier, status: 'active' });
     expect(body.privacy.readReceipts).toBe(false);
@@ -184,7 +184,8 @@ describe('consents overview', () => {
     const a = await user();
     await ctx.http.get('/v1/me/consents').expect(401);
     const none = (await ctx.http.get('/v1/me/consents').set(bearer(a.token)).expect(200)).body;
-    expect(none).toEqual({ health: null, marketing: false, miniapps: [] });
+    expect(none).toMatchObject({ health: null, marketing: false, miniapps: [] });
+    expect(none.items).toHaveLength(6);
     await ctx.http.put('/v1/me/marketing-consent').set(bearer(a.token)).send({ optIn: true }).expect(200);
     expect((await ctx.http.get('/v1/me/consents').set(bearer(a.token)).expect(200)).body.marketing).toBe(true);
   });

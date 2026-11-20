@@ -422,6 +422,8 @@ export class AuthService {
   private async issueTokens(user: UserRow, sessionId: string, meta: RequestMeta): Promise<TokenPair> {
     const refresh = this.tokens.newRefreshToken();
     await this.db.insert(refreshTokens).values({ sessionId, tokenHash: refresh.hash, expiresAt: refresh.expiresAt });
+    // Daily active-user counter (one row per user and day, kept beyond the 7 days of refresh tokens) for the admin analytics.
+    await this.db.execute(sql`INSERT INTO user_active_days (user_id, day) VALUES (${user.id}::uuid, (now() AT TIME ZONE 'UTC')::date) ON CONFLICT DO NOTHING`);
     // Sliding expiry: an active session stays alive, an idle one ends after the refresh TTL.
     await this.db
       .update(sessions)

@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
+import { countWebhookDelivery } from '../observability/metrics.js';
 import {
   type CreateWebhookRequest,
   ErrorCodes,
@@ -102,7 +103,7 @@ export class WebhookService {
   /* ---------------------------------------------------------------- secrets */
 
   /** AES-256-GCM bound to the subscription id (AAD): `v2:<kid>:<iv>:<tag>:<ciphertext>` (v1, without kid, is still read). */
-  private seal(id: string, plain: string): string {
+  seal(id: string, plain: string): string {
     const { kid, key } = this.keys[0]!;
     const iv = randomBytes(12);
     const c = createCipheriv('aes-256-gcm', key, iv);
@@ -111,7 +112,7 @@ export class WebhookService {
     return ['v2', kid, iv.toString('base64url'), c.getAuthTag().toString('base64url'), ct.toString('base64url')].join(':');
   }
 
-  private open(id: string, stored: string): string {
+  open(id: string, stored: string): string {
     const parts = stored.split(':');
     const [v, kid] = parts;
     const [iv, tag, ct] = v === 'v2' ? parts.slice(2) : parts.slice(1);
@@ -337,6 +338,7 @@ export class WebhookService {
     const code = ok ? null : out.errorCode;
     const final = ok || !opts.retry || d.attempt >= WEBHOOK_MAX_ATTEMPTS;
     const wait = BACKOFF_MINUTES[d.attempt - 1] ?? BACKOFF_MINUTES[BACKOFF_MINUTES.length - 1]!;
+    countWebhookDelivery(ok ? 'delivered' : final ? 'failed' : 'retry');
     await this.db.execute(sql`
       UPDATE org_webhook_deliveries SET status = ${ok ? 'delivered' : final ? 'failed' : 'pending'}, http_status = ${out.httpStatus}, error_code = ${code},
         next_attempt_at = ${final ? sql`NULL` : sql`now() + make_interval(mins => ${wait})`}

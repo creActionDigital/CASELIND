@@ -12,7 +12,7 @@ export interface PrefetchedLimits {
 export type LedgerOwner =
   | { kind: 'user'; userId: string }
   | { kind: 'org'; orgId: string }
-  | { kind: 'system'; code: 'sandbox_funding' | 'fees' };
+  | { kind: 'system'; code: 'sandbox_funding' | 'fees' | `savings:${string}` };
 
 export type TransferKind = 'p2p' | 'merchant_payment' | 'sandbox_topup' | 'refund' | 'adjustment';
 

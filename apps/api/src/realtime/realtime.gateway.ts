@@ -9,6 +9,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import { z } from 'zod';
 import { ENV, type Env } from '../config/env.js';
+import { trackSocket } from '../observability/metrics.js';
 import type { AuthUser } from '../security/auth.guard.js';
 import { SessionVerifier } from '../security/session-verifier.js';
 import { PresenceService } from '../messaging/presence.service.js';
@@ -60,8 +61,12 @@ export class RealtimeGateway implements OnGatewayInit, OnApplicationShutdown {
     server.on('connection', (socket) => {
       const userId = (socket.data as SocketData).auth?.userId;
       if (!userId) return;
+      trackSocket(1);
       void this.presence.touch(userId);
-      socket.on('disconnect', () => void this.presence.touch(userId));
+      socket.on('disconnect', () => {
+        trackSocket(-1);
+        void this.presence.touch(userId);
+      });
     });
     const every = this.env.REALTIME_SESSION_RECHECK_SECONDS;
     if (every > 0) {

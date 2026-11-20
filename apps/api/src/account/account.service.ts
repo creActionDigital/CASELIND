@@ -10,6 +10,7 @@ import {
   type ReportReason,
 } from '@caselind/contracts';
 import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { exportWalletFinance } from '../wallet-finance/wallet-finance.export.js';
 import { AuditService } from '../audit/audit.service.js';
 import { MessageExtrasService } from '../messaging/message-extras.service.js';
 import { AppError } from '../common/app-error.js';
@@ -25,6 +26,7 @@ import {
   messages,
   cartItems,
   orderItems,
+  orderReturns,
   orders,
   reviews,
   organizations,
@@ -43,16 +45,20 @@ import {
 import { contentUrlOf } from '../media/media.service.js';
 import type { Tx } from '../orgs/orgs.service.js';
 import { PrivacyService } from '../privacy/privacy.service.js';
+import { ConsentsService } from '../consents/consents.service.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 import type { AuthUser } from '../security/auth.guard.js';
 import { PasswordService } from '../security/password.service.js';
 import { UsersService } from '../users/users.service.js';
+import { HrService } from '../hr/hr.service.js';
+import { MiniAppWebhookService } from '../miniapps/miniapp-webhook.service.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { HealthService } from '../health/health.service.js';
 import { GamesService } from '../games/games.service.js';
 import { SchoolService } from '../school/school.service.js';
 import { FeesService } from '../school/fees.service.js';
 import { GuardiansService } from '../school/guardians.service.js';
+import { SanctionsService } from '../platform-ops/sanctions.service.js';
 import { TwoFactorService } from '../auth/identity/two-factor.service.js';
 
 const DAY_MS = 86_400_000;
@@ -78,6 +84,10 @@ export class AccountService {
     private readonly school: SchoolService,
     private readonly schoolFees: FeesService,
     private readonly guardians: GuardiansService,
+    private readonly consentsSvc: ConsentsService,
+    private readonly hr: HrService,
+    private readonly miniappHooks: MiniAppWebhookService,
+    private readonly sanctionsSvc: SanctionsService,
   ) {}
 
   /** G7: one read-only view of the consents stored by the health, loyalty and mini-app modules. */
@@ -92,6 +102,7 @@ export class AccountService {
       health: h ? { version: h.version, grantedAt: new Date(h.granted_at).toISOString() } : null,
       marketing: marketing.rows[0]?.opted_in ?? false,
       miniapps: grants.rows.map((g) => ({ appId: g.app_id, appName: g.name, scopes: g.scopes, grantedAt: new Date(g.created_at).toISOString() })),
+      items: await this.consentsSvc.items(userId),
     };
   }
 
@@ -232,11 +243,33 @@ export class AccountService {
       .from(cartItems)
       .where(eq(cartItems.userId, auth.userId))
       .orderBy(asc(cartItems.createdAt), asc(cartItems.variantId));
+    const wishlistRows = await this.db.execute<{ product_id: string; created_at: Date }>(
+      sql`SELECT product_id, created_at FROM wishlist_items WHERE user_id = ${auth.userId}::uuid ORDER BY created_at, product_id`,
+    );
+    const walletFinance = await exportWalletFinance(this.db, auth.userId);
+    // Creator tools: own boosts and tips sent/received (test funds; no counterparty identity).
+    const boostRows = await this.db.execute<{ id: string; post_id: string; status: 'active' | 'ended' | 'cancelled' | 'rejected'; budget_minor: string; currency: string; starts_at: Date; ends_at: Date }>(
+      sql`SELECT id, post_id, status, budget_minor::text, currency::text AS currency, starts_at, ends_at FROM post_boosts WHERE user_id = ${auth.userId}::uuid ORDER BY created_at, id`,
+    );
+    const tipRows = await this.db.execute<{ id: string; sent: boolean; post_id: string | null; amount_minor: string; currency: string; created_at: Date }>(
+      sql`SELECT id, (initiated_by = ${auth.userId}::uuid) AS sent, metadata->>'postId' AS post_id, amount_minor::text, currency::text AS currency, created_at
+          FROM journal_entries
+          WHERE kind = 'p2p' AND metadata->>'ref' = 'tip' AND (initiated_by = ${auth.userId}::uuid OR metadata->>'creatorId' = ${auth.userId})
+          ORDER BY created_at, id`,
+    );
     const reviewRows = await this.db
       .select({ id: reviews.id, productId: reviews.productId, rating: reviews.rating, body: reviews.body, createdAt: reviews.createdAt })
       .from(reviews)
       .where(eq(reviews.userId, auth.userId))
       .orderBy(asc(reviews.createdAt), asc(reviews.id));
+
+    // Returns and disputes the user filed (their own free text; no data about other people).
+    const returnRows = await this.db
+      .select({ r: orderReturns, number: orders.number })
+      .from(orderReturns)
+      .innerJoin(orders, eq(orders.id, orderReturns.orderId))
+      .where(eq(orderReturns.requestedBy, auth.userId))
+      .orderBy(asc(orderReturns.createdAt), asc(orderReturns.id));
 
     // Lot 8: deliveries of the user's orders and the ones the user carried; never the proof code nor a position.
     const deliveryRows = await this.db
@@ -253,7 +286,16 @@ export class AccountService {
     const wallet =await this.wallets.exportFor(auth.userId);
     const services = await this.exportServices(auth.userId);
     const mobility = await this.exportMobility(auth.userId);
+    const mobilityExtra = await this.exportMobilityExtra(auth.userId);
+    const courierRequests = await this.exportCourierRequests(auth.userId);
     const aiConversations = await this.exportAiConversations(auth.userId);
+    // Assistant actions journal: tool, status and date only (never the arguments).
+    const aiActionLog = (await this.db.execute<{ tool: string; status: string; created_at: Date }>(sql`
+      SELECT tool, status, created_at FROM ai_action_log WHERE user_id = ${auth.userId}::uuid ORDER BY created_at, id`)).rows.map((r) => ({ tool: r.tool, status: r.status, createdAt: new Date(r.created_at).toISOString() }));
+    const aiActions = (await this.db.execute<{ id: string; tool: string; label: string; status: string; args: Record<string, unknown>; created_at: Date }>(sql`
+      SELECT id, tool, label, status, args, created_at FROM ai_actions WHERE user_id = ${auth.userId}::uuid ORDER BY created_at, id`)).rows.map((r) => ({ id: r.id, tool: r.tool, label: r.label, status: r.status, args: r.args, createdAt: new Date(r.created_at).toISOString() }));
+    const postBookmarks = (await this.db.execute<{ post_id: string; created_at: Date }>(sql`
+      SELECT post_id, created_at FROM post_bookmarks WHERE user_id = ${auth.userId}::uuid ORDER BY created_at, post_id`)).rows.map((r) => ({ postId: r.post_id, createdAt: new Date(r.created_at).toISOString() }));
     const orgFeedback = await this.exportOrgFeedback(auth.userId);
     const listingRows = await this.db.execute<{ id: string; kind: string; title: string; description: string; price_minor: string | null; currency: string | null; city: string; status: string; created_at: Date }>(sql`
       SELECT id, kind, title, description, price_minor, currency, city, status, created_at FROM listings WHERE owner_id = ${auth.userId}::uuid ORDER BY created_at, id`);
@@ -311,6 +353,11 @@ export class AccountService {
     const notificationRows = await this.db.execute<{ id: string; category: string; title: string; body: string; read_at: Date | null; created_at: Date }>(sql`SELECT id, category, title, body, read_at, created_at FROM notifications WHERE user_id = ${auth.userId}::uuid ORDER BY created_at DESC LIMIT 200`);
     // Lot 10: mini-app authorizations (history included); never a token.
     const miniappGrants = await this.exportMiniAppGrants(auth.userId);
+    // Reads of the user's data by mini-apps (90 days kept): app, scope, date; never the content.
+    const miniappAccessRows = await this.db.execute<{ app_id: string; name: string; scope: string; at: Date }>(sql`
+      SELECT l.miniapp_id AS app_id, a.name, l.scope, l.at FROM miniapp_access_log l JOIN miniapps a ON a.id = l.miniapp_id
+      WHERE l.user_id = ${auth.userId}::uuid ORDER BY l.at DESC, l.id DESC LIMIT 5000`);
+    const miniappAccess = miniappAccessRows.rows.map((r) => ({ appId: r.app_id, appName: r.name, scope: r.scope, at: new Date(r.at).toISOString() }));
     // Lot 6B: KYC level and request statuses/dates; never the document number nor the files.
     const [kycProfile] = await this.db.select({ level: kycProfiles.level }).from(kycProfiles).where(eq(kycProfiles.userId, auth.userId)).limit(1);
     const kycRows = await this.db
@@ -403,6 +450,16 @@ export class AccountService {
           .filter((i) => i.orderId === o.id)
           .map((i) => ({ title: i.title, variantLabel: i.variantLabel, quantity: i.quantity, unitPriceMinor: i.unitPriceMinor })),
       })),
+      orderReturns: returnRows.map(({ r, number }) => ({
+        orderNumber: number,
+        reason: r.reason,
+        details: r.details,
+        status: r.status,
+        refundMinor: r.refundMinor,
+        currency: r.currency.trim(),
+        disputeReason: r.disputeReason,
+        createdAt: r.createdAt.toISOString(),
+      })),
       deliveries: deliveryRows.map(({ d, number }) => ({
         orderNumber: number,
         role: (d.buyerId === auth.userId ? 'buyer' : 'courier') as 'buyer' | 'courier',
@@ -415,6 +472,27 @@ export class AccountService {
         proofs: proofRows.filter((p) => p.delivery_id === d.id).map((p) => ({ kind: p.kind, sizeBytes: Number(p.size_bytes), takenAt: new Date(p.taken_at).toISOString() })),
       })),
       cart: cartRows.map((c) => ({ variantId: c.variantId, quantity: c.quantity, addedAt: c.createdAt.toISOString() })),
+      wishlist: wishlistRows.rows.map((w) => ({ productId: w.product_id, addedAt: new Date(w.created_at).toISOString() })),
+      creator: {
+        boosts: boostRows.rows.map((b) => ({
+          id: b.id,
+          postId: b.post_id,
+          status: b.status,
+          budgetMinor: Number(b.budget_minor),
+          currency: b.currency.trim(),
+          startsAt: new Date(b.starts_at).toISOString(),
+          endsAt: new Date(b.ends_at).toISOString(),
+        })),
+        tips: tipRows.rows.map((t) => ({
+          transferId: t.id,
+          direction: (t.sent ? 'sent' : 'received') as 'sent' | 'received',
+          postId: t.post_id,
+          amountMinor: Number(t.amount_minor),
+          currency: t.currency.trim(),
+          createdAt: new Date(t.created_at).toISOString(),
+        })),
+      },
+      walletFinance,
       kyc: {
         level: (kycProfile?.level ?? 0) as 0 | 1 | 2,
         hasPaymentPin: pinRow !== undefined,
@@ -436,8 +514,14 @@ export class AccountService {
       wallet,
       services,
       mobility,
+      mobilityExtra,
+      courierRequests,
       miniappGrants,
+      miniappAccess,
       aiConversations,
+      aiActionLog,
+      aiActions,
+      postBookmarks,
       orgFeedback,
       listings: listingRows.rows.map((l) => ({
         id: l.id,
@@ -453,6 +537,7 @@ export class AccountService {
       jobProfile: cvRows.rows[0] ?? null,
       listingAlerts: listingAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, kind: a.kind, createdAt: new Date(a.created_at).toISOString() })),
       listingVisits: visitRows.rows.map((v) => ({ id: v.id, listingId: v.listing_id, role: v.role, status: v.status, scheduledAt: new Date(v.scheduled_at).toISOString(), message: v.message, place: v.place, createdAt: new Date(v.created_at).toISOString() })),
+      consentJournal: await this.consentsSvc.journal(auth.userId, true),
       loyalty: { marketingConsent: consentRows.rows[0]?.opted_in ?? false, balances: loyaltyRows.rows.map((l) => ({ orgName: l.org_name, points: Number(l.points) })) },
       listingOffers: offerRows.rows.map((o) => ({ id: o.id, listingId: o.listing_id, role: o.role, status: o.status, offerMinor: Number(o.offer_minor), counterMinor: o.counter_minor === null ? null : Number(o.counter_minor), currency: o.currency, message: o.message, createdAt: new Date(o.created_at).toISOString() })),
       jobAlerts: jobAlertRows.rows.map((a) => ({ id: a.id, q: a.q, city: a.city, contractType: a.contract_type, createdAt: new Date(a.created_at).toISOString() })),
@@ -471,6 +556,8 @@ export class AccountService {
       school: await this.school.exportFor(auth.userId),
       schoolFees: await this.schoolFees.exportFor(auth.userId),
       schoolGuardians: await this.guardians.exportFor(auth.userId),
+      hr: await this.hr.exportFor(auth.userId),
+      sanctions: await this.sanctionsSvc.exportFor(auth.userId),
       education: {
         authored: eduAuthored.rows.map((c) => ({ id: c.id, title: c.title, status: c.status, createdAt: new Date(c.created_at).toISOString() })),
         enrollments: eduEnrollments,
@@ -562,7 +649,66 @@ export class AccountService {
     }));
   }
 
+  /** On-demand courier requests of both roles: labels and fee, the note only for the requester; never a code, a position or a coordinate. */
+  private async exportCourierRequests(userId: string): Promise<AccountExport['courierRequests']> {
+    const rows = await this.db.execute(sql`
+      SELECT id, requester_id, kind, status, pickup_label, dropoff_label, note, fee_estimate_minor, currency, requester_rating, courier_rating, created_at, delivered_at
+      FROM courier_requests WHERE requester_id = ${userId}::uuid OR courier_id = ${userId}::uuid ORDER BY created_at, id`);
+    type R = { id: string; requester_id: string; kind: 'parcel' | 'document'; status: AccountExport['courierRequests'][number]['status']; pickup_label: string; dropoff_label: string; note: string | null; fee_estimate_minor: string | number; currency: string; requester_rating: number | null; courier_rating: number | null; created_at: string | Date; delivered_at: string | Date | null };
+    return (rows.rows as unknown as R[]).map((r) => {
+      const asRequester = r.requester_id === userId;
+      return {
+        id: r.id,
+        role: asRequester ? ('requester' as const) : ('courier' as const),
+        kind: r.kind,
+        status: r.status,
+        pickupLabel: r.pickup_label,
+        dropoffLabel: r.dropoff_label,
+        note: asRequester ? r.note : null,
+        feeMinor: Number(r.fee_estimate_minor),
+        currency: r.currency.trim(),
+        ratingGiven: asRequester ? r.requester_rating : r.courier_rating,
+        ratingReceived: asRequester ? r.courier_rating : r.requester_rating,
+        createdAt: new Date(r.created_at).toISOString(),
+        deliveredAt: r.delivered_at ? new Date(r.delivered_at).toISOString() : null,
+      };
+    });
+  }
+
   /** Lot 11: own driver profile, rides (both roles), favourite places and trusted contacts. */
+  /** Carpooling, vehicle rentals and roadside requests of the user: labels, statuses and amounts; never a coordinate. */
+  private async exportMobilityExtra(userId: string): Promise<AccountExport['mobilityExtra']> {
+    const iso = (v: string | Date): string => new Date(v).toISOString();
+    const [trips, books, rentals, roadside] = await Promise.all([
+      this.db.execute(sql`
+        SELECT id, status, origin_label, dest_label, departs_at, seats_total, price_per_seat_minor, currency, note, vehicle_label, created_at
+        FROM carpool_trips WHERE driver_id = ${userId}::uuid ORDER BY created_at, id`),
+      this.db.execute(sql`SELECT id, trip_id, seats, status, created_at FROM carpool_bookings WHERE passenger_id = ${userId}::uuid ORDER BY created_at, id`),
+      this.db.execute(sql`
+        SELECT b.id, v.title, b.starts_on::text AS starts_on, b.ends_on::text AS ends_on, b.total_minor, b.currency, b.status, b.note, b.created_at
+        FROM rental_bookings b JOIN rental_vehicles v ON v.id = b.vehicle_id WHERE b.renter_id = ${userId}::uuid ORDER BY b.created_at, b.id`),
+      this.db.execute(sql`
+        SELECT id, requester_id, kind, status, label, vehicle_label, note, created_at
+        FROM roadside_requests WHERE requester_id = ${userId}::uuid OR provider_id = ${userId}::uuid ORDER BY created_at, id`),
+    ]);
+    type D = string | Date;
+    return {
+      carpoolTrips: (trips.rows as { id: string; status: string; origin_label: string; dest_label: string; departs_at: D; seats_total: number; price_per_seat_minor: string | number; currency: string; note: string | null; vehicle_label: string | null; created_at: D }[]).map((t) => ({
+        id: t.id, status: t.status, originLabel: t.origin_label, destinationLabel: t.dest_label, departsAt: iso(t.departs_at), seatsTotal: t.seats_total,
+        pricePerSeatMinor: Number(t.price_per_seat_minor), currency: t.currency.trim(), note: t.note, vehicleLabel: t.vehicle_label, createdAt: iso(t.created_at),
+      })),
+      carpoolBookings: (books.rows as { id: string; trip_id: string; seats: number; status: string; created_at: D }[]).map((b) => ({
+        id: b.id, tripId: b.trip_id, seats: b.seats, status: b.status, createdAt: iso(b.created_at),
+      })),
+      rentalBookings: (rentals.rows as { id: string; title: string; starts_on: string; ends_on: string; total_minor: string | number; currency: string; status: string; note: string | null; created_at: D }[]).map((b) => ({
+        id: b.id, vehicleTitle: b.title, startsOn: b.starts_on, endsOn: b.ends_on, totalMinor: Number(b.total_minor), currency: b.currency.trim(), status: b.status, note: b.note, createdAt: iso(b.created_at),
+      })),
+      roadsideRequests: (roadside.rows as { id: string; requester_id: string; kind: string; status: string; label: string; vehicle_label: string | null; note: string | null; created_at: D }[]).map((r) => ({
+        id: r.id, role: (r.requester_id === userId ? 'requester' : 'provider') as 'requester' | 'provider', kind: r.kind, status: r.status, label: r.label, vehicleLabel: r.vehicle_label, note: r.note, createdAt: iso(r.created_at),
+      })),
+    };
+  }
+
   private async exportMobility(userId: string): Promise<AccountExport['mobility']> {
     const iso = (v: string | Date): string => new Date(v).toISOString();
     const [driver, rides, favs, trusted] = await Promise.all([
@@ -669,9 +815,14 @@ export class AccountService {
         .update(sessions)
         .set({ revokedAt: requestedAt, revokeReason: 'account_deletion_requested' })
         .where(and(eq(sessions.userId, auth.userId), isNull(sessions.revokedAt)));
+      // Mini-apps lose access at once: their tokens are cut.
+      await tx.execute(sql`UPDATE miniapp_tokens SET revoked_at = now() WHERE user_id = ${auth.userId}::uuid AND revoked_at IS NULL`);
     });
     this.realtime.disconnectUser(auth.userId);
     const deletionScheduledFor = new Date(requestedAt.getTime() + this.env.ACCOUNT_DELETION_GRACE_DAYS * DAY_MS);
+    // Each mini-app the user had authorized is told (opaque app-scoped subject only) to erase what it holds.
+    const apps = await this.db.execute<{ app_id: string }>(sql`SELECT app_id FROM miniapp_grants WHERE user_id = ${auth.userId}::uuid AND revoked_at IS NULL`);
+    for (const a of apps.rows) this.miniappHooks.emit(a.app_id, auth.userId, 'user.data_deletion_requested', { deletionScheduledFor: deletionScheduledFor.toISOString() });
     await this.audit.record({
       action: 'user.deletion_requested',
       actorUserId: auth.userId,

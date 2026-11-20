@@ -62,6 +62,7 @@ export class CartService {
         sku: p.sku,
         imageAssetId: p.imageAssetId,
         unitPriceMinor: p.unitPriceMinor,
+        compareAtPriceMinor: p.compareAtPriceMinor ?? null,
         quantity: r.quantity,
         lineTotalMinor,
       });

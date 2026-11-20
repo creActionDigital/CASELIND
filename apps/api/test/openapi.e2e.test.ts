@@ -19,6 +19,8 @@ function mountedRoutes(ctx: TestContext): Set<string> {
       // Nest's global 404 handler is mounted as a catch-all (`/v1{/*splat}`, every method). No
       // controller declares a wildcard route, so wildcards are never API operations.
       if (rawPath.includes('*')) continue;
+      // /metrics is an infrastructure scrape target outside the versioned API (see bootstrap).
+      if (rawPath === '/metrics') continue;
       const path = rawPath.replace(/:(\w+)/g, '{$1}');
       for (const [method, enabled] of Object.entries(layer.route.methods)) {
         if (!enabled) continue;

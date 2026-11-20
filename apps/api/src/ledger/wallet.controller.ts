@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query, Res } from '@nestjs/common';
 import {
   type AdminLedgerAccount,
+  type ApprovalPending,
   type LedgerReconciliation,
   type OrgWallet,
   type SandboxTopupRequest,
@@ -14,6 +15,7 @@ import {
   walletTransferRequestSchema,
 } from '@caselind/contracts';
 import type { Response } from 'express';
+import { AdminApprovalsService } from '../admin/approvals.service.js';
 import { ReqMeta, type RequestMeta } from '../common/request-meta.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { RequireFlag } from '../flags/flag.guard.js';
@@ -91,7 +93,10 @@ export class OrgWalletController {
 @Controller('admin/ledger')
 @Roles('admin')
 export class AdminLedgerController {
-  constructor(private readonly wallet: WalletService) {}
+  constructor(
+    private readonly wallet: WalletService,
+    private readonly approvals: AdminApprovalsService,
+  ) {}
 
   // Declared before `accounts/:id` routes: static path first.
   @Get('reconcile')
@@ -104,15 +109,32 @@ export class AdminLedgerController {
     return this.wallet.adminAccount(id);
   }
 
+  /** Freezing or unfreezing: 200, or 202 `{approvalId, status}` when the double validation is active. */
   @Post('accounts/:id/freeze')
   @HttpCode(200)
-  freeze(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<AdminLedgerAccount> {
-    return this.wallet.setFrozen(id, true, user.userId, user.sessionId, meta);
+  freeze(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response): Promise<AdminLedgerAccount | ApprovalPending> {
+    return this.setFrozen(user, id, true, meta, res);
   }
 
   @Post('accounts/:id/unfreeze')
   @HttpCode(200)
-  unfreeze(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta): Promise<AdminLedgerAccount> {
-    return this.wallet.setFrozen(id, false, user.userId, user.sessionId, meta);
+  unfreeze(@CurrentUser() user: AuthUser, @Param('id') id: string, @ReqMeta() meta: RequestMeta, @Res({ passthrough: true }) res: Response): Promise<AdminLedgerAccount | ApprovalPending> {
+    return this.setFrozen(user, id, false, meta, res);
+  }
+
+  private async setFrozen(user: AuthUser, id: string, frozen: boolean, meta: RequestMeta, res: Response): Promise<AdminLedgerAccount | ApprovalPending> {
+    const pending = await this.approvals.guard({
+      kind: 'ledger.account.freeze',
+      subjectId: id,
+      payload: { frozen },
+      actorId: user.userId,
+      meta,
+      precheck: async () => void (await this.wallet.adminAccount(id)),
+    });
+    if (pending) {
+      res.status(202);
+      return pending;
+    }
+    return this.wallet.setFrozen(id, frozen, user.userId, user.sessionId, meta);
   }
 }

@@ -20,10 +20,11 @@ import { CatalogPort, type PricedLine } from '../commerce/catalog.port.js';
 import { DB, type Db } from '../db/db.module.js';
 import { cartItems, deliveries, deliveryEvents, orderEvents, orderItems, orgMembers, orders, type OrderRow } from '../db/schema.js';
 import { DeliveryZonesService } from '../delivery/delivery-zones.service.js';
-import { DeliveryCodes, hydrateDeliveries } from '../delivery/delivery.shared.js';
+import { checkedSchedule, DeliveryCodes, hydrateDeliveries } from '../delivery/delivery.shared.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { ORG_ROLE_PERMISSIONS } from '../orgs/org-permissions.js';
 import { LoyaltyService } from '../loyalty/loyalty.service.js';
+import { CommissionService } from '../platform-ops/commission.service.js';
 import { WebhookService } from '../webhooks/webhooks.service.js';
 import { resolveContactUserId } from '../orgs/org-contact.js';
 import { pgErrorOf, type Tx } from '../orgs/orgs.service.js';
@@ -71,6 +72,7 @@ export class OrdersService {
     private readonly codes: DeliveryCodes,
     private readonly loyalty: LoyaltyService,
     private readonly webhooks: WebhookService,
+    private readonly commissions: CommissionService,
   ) {}
 
   /* ------------------------------------------------------------------ checkout */
@@ -89,10 +91,11 @@ export class OrdersService {
     const replay = await this.findByClientId(this.db, buyerId, req.clientId);
     if (replay.length > 0) return { orders: await hydrateOrders(this.db, replay), created: false };
     if (req.fulfillment === 'delivery' && !req.address) throw validationError('address', 'a delivery needs an address');
+    const scheduledFor = checkedSchedule(req.scheduledFor);
 
     let outcome: { rows: OrderRow[]; created: boolean };
     try {
-      outcome = await this.db.transaction((tx) => this.checkoutTx(tx, buyerId, req));
+      outcome = await this.db.transaction((tx) => this.checkoutTx(tx, buyerId, req, scheduledFor));
     } catch (err) {
       // Lost a race against the same clientId (the cart lock normally serialises it): replay.
       if (pgErrorOf(err).constraint !== 'orders_checkout_unique') throw err;
@@ -118,7 +121,7 @@ export class OrdersService {
       .orderBy(orders.orgId, orders.currency);
   }
 
-  private async checkoutTx(tx: Tx, buyerId: string, req: CheckoutRequest): Promise<{ rows: OrderRow[]; created: boolean }> {
+  private async checkoutTx(tx: Tx, buyerId: string, req: CheckoutRequest, scheduledFor: Date | null): Promise<{ rows: OrderRow[]; created: boolean }> {
     // The cart rows are the per-user lock: two concurrent checkouts of one user run one after the other.
     const cart = await tx
       .select({ variantId: cartItems.variantId, quantity: cartItems.quantity })
@@ -159,7 +162,7 @@ export class OrdersService {
       // Lot 8: a delivery is priced by the seller's zone (free without zones); a pick-up is free.
       const zone =
         req.fulfillment === 'delivery' && req.address
-          ? await this.zones.resolveForCheckout(tx, g.orgId, g.currency, req.zones?.find((z) => z.orgId === g.orgId)?.zoneId, req.address)
+          ? await this.zones.resolveForCheckout(tx, g.orgId, g.currency, req.zones?.find((z) => z.orgId === g.orgId)?.zoneId, req.address, req.speed)
           : null;
       const deliveryFeeMinor = zone?.feeMinor ?? 0;
       const [order] = await tx
@@ -194,6 +197,8 @@ export class OrdersService {
           quantity: l.quantity,
           lineTotalMinor: l.unitPriceMinor * l.quantity,
           imageAssetId: l.imageAssetId,
+          promotionId: l.promotionId ?? null,
+          promoUnits: l.promoUnits ?? 0,
         })),
       );
       await tx.insert(orderEvents).values({ orderId: order!.id, fromStatus: null, status: 'pending', actorKind: 'buyer', actorUserId: buyerId });
@@ -210,6 +215,8 @@ export class OrdersService {
           proofNonce: proof.nonce,
           proofHash: proof.hash,
           estimatedMinutes: zone?.etaMinutes ?? null,
+          speed: req.speed,
+          scheduledFor,
         });
         await tx.insert(deliveryEvents).values({ deliveryId, kind: 'status', fromStatus: null, status: 'pending', actorKind: 'buyer', actorUserId: buyerId });
       }
@@ -361,12 +368,14 @@ export class OrdersService {
       });
       if (to === 'cancelled') {
         const lines = await tx
-          .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
+          .select({ variantId: orderItems.variantId, quantity: orderItems.quantity, promotionId: orderItems.promotionId, promoUnits: orderItems.promoUnits })
           .from(orderItems)
           .where(eq(orderItems.orderId, orderId));
-        await this.catalog.release(tx, lines);
+        await this.catalog.release(tx, lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })), { promos: lines.flatMap((l) => (l.promotionId ? [{ promotionId: l.promotionId, units: l.promoUnits }] : [])) });
         await this.coupons.release(tx, orderId);
       }
+      // Indicative commission line, in the same transaction; best effort in a savepoint: the transition never fails because of it.
+      if (to === 'delivered') await tx.transaction((t) => this.commissions.recordForOrder(orderId, t)).catch(() => undefined);
       let orphaned: string[] = [];
       if (to === 'cancelled') {
         // Lot 8: a delivery not picked up yet ends with the order.
@@ -453,6 +462,7 @@ export class OrdersService {
     });
     // Lot 16h: best effort in a savepoint (a failure must not abort the delivery transaction).
     if (to === 'delivered') await tx.transaction((t) => this.loyalty.awardForOrder(orderId, t)).catch(() => undefined);
+    if (to === 'delivered') await tx.transaction((t) => this.commissions.recordForOrder(orderId, t)).catch(() => undefined);
     return true;
   }
 

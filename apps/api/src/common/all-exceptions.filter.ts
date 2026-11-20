@@ -48,6 +48,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof AppError) {
       status = exception.status;
       body = { code: exception.code, message: exception.message, details: exception.details };
+      const wait = (exception.details as { retryAfterSeconds?: unknown } | undefined)?.retryAfterSeconds;
+      if (status === 429 && typeof wait === 'number') res.setHeader('Retry-After', String(wait));
     } else if (exception instanceof ThrottlerException) {
       status = 429;
       body = { code: ErrorCodes.rateLimited, message: 'Too many requests, please retry later' };

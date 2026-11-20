@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { deliveryStatusSchema } from './delivery.js';
+import { deliverySpeedSchema, deliveryStatusSchema } from './delivery.js';
 import { orderAddressSchema } from './orders.js';
 
 const currencySchema = z.string().regex(/^[A-Z]{3}$/);
@@ -12,6 +12,10 @@ export const courierDeliverySchema = z.object({
   orgId: z.uuid(),
   orgName: z.string(),
   status: deliveryStatusSchema,
+  /** Express deliveries come first in the list. */
+  speed: deliverySpeedSchema,
+  /** Slot asked by the buyer: a scheduled delivery only shows in the list 60 minutes before. */
+  scheduledFor: z.iso.datetime().nullable(),
   address: orderAddressSchema.nullable(),
   currency: currencySchema,
   /** Cash on delivery: amount to collect, delivery fee included. */

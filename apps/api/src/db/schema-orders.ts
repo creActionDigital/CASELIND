@@ -82,6 +82,8 @@ export const orderItems = pgTable('order_items', {
   quantity: integer('quantity').notNull(),
   lineTotalMinor: minor('line_total_minor').notNull(),
   imageAssetId: uuid('image_asset_id'),
+  promotionId: uuid('promotion_id'),
+  promoUnits: integer('promo_units').notNull().default(0),
 });
 export type OrderItemRow = typeof orderItems.$inferSelect;
 
@@ -120,3 +122,46 @@ export const reviews = pgTable('reviews', {
   updatedAt: tstz('updated_at').notNull().defaultNow(),
 });
 export type ReviewRow = typeof reviews.$inferSelect;
+
+export type ReturnStatusValue = 'requested' | 'approved' | 'rejected' | 'received' | 'refunded' | 'disputed' | 'resolved' | 'cancelled';
+export interface ReturnItemJson {
+  orderItemId: string;
+  variantId: string;
+  title: string;
+  unitPriceMinor: number;
+  quantity: number;
+}
+
+/** Returns and disputes of an order (0071_order_returns.sql). */
+export const orderReturns = pgTable('order_returns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').notNull(),
+  orgId: uuid('org_id').notNull(),
+  requestedBy: uuid('requested_by').notNull(),
+  reason: text('reason').$type<'defective' | 'wrong_item' | 'not_as_described' | 'changed_mind' | 'other'>().notNull(),
+  details: text('details'),
+  status: text('status').$type<ReturnStatusValue>().notNull().default('requested'),
+  items: jsonb('items').$type<ReturnItemJson[]>().notNull(),
+  refundMinor: minor('refund_minor').notNull(),
+  refundedMinor: minor('refunded_minor'),
+  currency: text('currency').notNull(),
+  sellerNote: text('seller_note'),
+  resolution: text('resolution').$type<'refund_buyer' | 'refund_partial' | 'reject'>(),
+  disputeReason: text('dispute_reason'),
+  adminNote: text('admin_note'),
+  resolvedBy: uuid('resolved_by'),
+  restock: boolean('restock').notNull().default(false),
+  createdAt: tstz('created_at').notNull().defaultNow(),
+  updatedAt: tstz('updated_at').notNull().defaultNow(),
+});
+export type OrderReturnRow = typeof orderReturns.$inferSelect;
+
+export const orderReturnEvents = pgTable('order_return_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  returnId: uuid('return_id').notNull(),
+  fromStatus: text('from_status').$type<ReturnStatusValue>(),
+  status: text('status').$type<ReturnStatusValue>().notNull(),
+  actorKind: text('actor_kind').$type<'buyer' | 'org' | 'admin'>().notNull(),
+  actorUserId: uuid('actor_user_id'),
+  createdAt: tstz('created_at').notNull().defaultNow(),
+});

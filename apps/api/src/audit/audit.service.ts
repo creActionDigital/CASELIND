@@ -36,6 +36,12 @@ export type AuditAction =
   | 'admin.user_status'
   | 'admin.org_status'
   | 'admin.org_verification'
+  /** Double validation : metadata {approvalId, kind[, subjectId, decision]}. Never the payload content. */
+  | 'admin.approval_requested'
+  | 'admin.approval_decided'
+  | 'admin.approval_executed'
+  | 'admin.approval_cancelled'
+  | 'admin.platform_role_granted'
   | 'media.uploaded'
   | 'media.rejected'
   | 'media.deleted'
@@ -43,6 +49,7 @@ export type AuditAction =
   | 'org.created'
   | 'org.updated'
   | 'org.gallery_set'
+  | 'catalog.product_files_set'
   /** Webhooks sortants : id, evenements et hote seulement, jamais l'URL complete ni le secret. */
   | 'org.webhook_created'
   | 'org.webhook_updated'
@@ -186,6 +193,8 @@ export type AuditAction =
   | 'conversation.member_removed'
   | 'conversation.member_role_changed'
   | 'message.recalled'
+  /** Machine translation of a message: ids, target language, provider and whether it came from the cache; never a text. */
+  | 'message.translated'
   /** Polls: ids only (conversation, message), never the question or the options. */
   | 'message.poll_created'
   | 'message.poll_closed'
@@ -197,12 +206,21 @@ export type AuditAction =
   | 'commerce.document_created'
   | 'commerce.document_status'
   | 'commerce.coupon_deactivated'
+  /** Promotions on products: metadata {orgId, promotionId, productId, kind?, value?, fields?}. Never the label. */
+  | 'commerce.promotion_created'
+  | 'commerce.promotion_changed'
+  | 'commerce.promotion_stopped'
+  | 'commerce.promotion_deleted'
+  /** Returns and disputes of an order: metadata {orderId, returnId, from, to, refundMinor?, resolution?}. Never the reason text. */
+  | 'commerce.return_requested'
+  | 'commerce.return_status_changed'
   /** Loyalty and campaigns (lot 16h): ids, flags and counts only, never the campaign text. */
   | 'commerce.loyalty_updated'
   | 'commerce.campaign_sent'
   | 'commerce.pos_sale'
   | 'commerce.pos_void'
   | 'user.marketing_consent_updated'
+  | 'user.consent_updated'
   /** Services (lot 9): metadata {offerId, orgId?, fields?}. Never a booking note. */
   | 'service.created'
   | 'service.updated'
@@ -212,6 +230,36 @@ export type AuditAction =
   | 'product.published'
   | 'product.archived'
   | 'stock.adjusted'
+  /** Gestion d'entreprise (achats, dépenses) : metadata {orgId, supplierId|poId|expenseId[, status, category, amountMinor, currency, totalMinor]}. Jamais de texte libre ni de contact. */
+  | 'business.supplier_created'
+  | 'business.supplier_changed'
+  | 'business.supplier_deleted'
+  | 'business.po_created'
+  | 'business.po_changed'
+  | 'business.po_ordered'
+  | 'business.po_received'
+  | 'business.po_cancelled'
+  | 'business.expense_created'
+  | 'business.expense_changed'
+  | 'business.expense_deleted'
+  | 'business.export'
+  /** RH : metadata {orgId, employeeId|leaveId|shiftId|salaryId[, status, kind, days, period]}. Jamais un montant, un motif ou une note. */
+  | 'hr.profile_saved'
+  | 'hr.leave_requested'
+  | 'hr.leave_cancelled'
+  | 'hr.leave_decided'
+  | 'hr.shift_created'
+  | 'hr.shift_deleted'
+  | 'hr.salary_saved'
+  | 'hr.salary_deleted'
+  /** Lots et inventaire physique : metadata {orgId, variantId|countId, batchId, quantity, lines, discrepancies, movements}. Jamais de nom ni de note. */
+  | 'stock.batch_created'
+  | 'stock.batch_changed'
+  | 'stock.batch_consumed'
+  | 'inventory.count_opened'
+  | 'inventory.count_lines_saved'
+  | 'inventory.count_closed'
+  | 'inventory.count_cancelled'
   /** Sandbox wallet (lot 6A): metadata {transferId, amountMinor, currency, counterpartyId}. Never the note. */
   | 'wallet.transfer'
   | 'wallet.sandbox_topup'
@@ -230,6 +278,24 @@ export type AuditAction =
   /** Merchant QR (lot 6B): metadata {orgId, qrId[, currency, amountMinor]}. */
   | 'wallet.qr_created'
   | 'wallet.qr_revoked'
+  /** Wallet finance (test funds): metadata ids, amounts, currency and frequency only. Never a note, a title or a PIN. */
+  | 'wallet.request_created'
+  | 'wallet.request_declined'
+  | 'wallet.request_cancelled'
+  | 'wallet.split_created'
+  | 'wallet.split_cancelled'
+  | 'wallet.scheduled_created'
+  | 'wallet.scheduled_paused'
+  | 'wallet.scheduled_resumed'
+  | 'wallet.scheduled_cancelled'
+  | 'wallet.scheduled_run'
+  | 'wallet.savings_created'
+  | 'wallet.savings_deposit'
+  | 'wallet.savings_withdraw'
+  | 'wallet.savings_archived'
+  | 'wallet.alert_confirmed'
+  | 'wallet.alert_reported'
+  | 'wallet.alert_reviewed'
   /** Delivery (lot 8): metadata {orgId, deliveryId, orderId[, courierUserId, from, to, zoneId]}. Never a code, a position or an address. */
   | 'delivery.zone_saved'
   | 'delivery.zone_deleted'
@@ -238,8 +304,28 @@ export type AuditAction =
   | 'delivery.proof_reset'
   /** Photo / signature proof: ids and kinds only, never the file. */
   | 'delivery.proof_set'
+  /** On-demand courier: metadata {requestId[, from, to, currency, feeMinor, kind, courierUserId]}. Never an address, a note, a code or a position. */
+  | 'courier_request.created'
+  | 'courier_request.status_changed'
   /** Mobility (lot 11): driver decisions. metadata {driverUserId, decision}. */
   | 'mobility.driver_decided'
+  /** Covoiturage, location de vehicules, depannage : metadata {ids, statuts, devise, montant}. Jamais une note, un libelle ou une position. */
+  | 'courier_request.proof_reset'
+  | 'admin.announcement_changed'
+  | 'admin.sanction_issued'
+  | 'admin.sanction_lifted'
+  | 'admin.sanction_expired'
+  | 'user.sanction_appealed'
+  | 'admin.appeal_decided'
+  | 'admin.setting_changed'
+  | 'carpool.trip_created'
+  | 'carpool.trip_status_changed'
+  | 'carpool.booking_status_changed'
+  | 'rental.vehicle_saved'
+  | 'rental.booking_created'
+  | 'rental.booking_status_changed'
+  | 'roadside.created'
+  | 'roadside.status_changed'
   /** Mini-apps (lot 10): metadata {orgId?, appId[, scopes, decision, from, to, kind, requestId, transferId]}. Never a secret, a code or a token. */
   | 'miniapp.created'
   | 'miniapp.updated'
@@ -250,8 +336,26 @@ export type AuditAction =
   | 'miniapp.grant_revoked'
   | 'miniapp.token_replay'
   | 'miniapp.payment_confirmed'
+  /** Versions et quota (plateforme développeurs): metadata {appId, versionId, version[, scopes, decision, addedScopes, rateLimitPerMinute]}. Jamais le journal de modifications. */
+  | 'miniapp.version_created'
+  | 'miniapp.version_submitted'
+  | 'miniapp.version_reviewed'
+  | 'miniapp.quota_set'
+  /** Plateforme developpeurs phase 2 : jamais de contenu (ni texte de notification, ni secret, ni URL complete). */
+  | 'miniapp.certified'
+  | 'miniapp.decertified'
+  | 'miniapp.revenue_share_set'
+  | 'miniapp.webhook_created'
+  | 'miniapp.webhook_deleted'
+  | 'miniapp.webhook_secret_rotated'
+  | 'miniapp.webhook_disabled'
+  | 'miniapp.notified'
+  | 'miniapp.notifications_muted'
   /** AI (lot 12): admin enables/disables a catalogue model. metadata {modelId, from, to}. Never a prompt, a reply or a key. */
-  | 'ai.model_toggled';
+  | 'ai.model_toggled'
+  /** Creator tools: metadata {boostId, postId[, days, budgetMinor, currency, refunded]}. Test funds only; never a post text. */
+  | 'creator.boost_created'
+  | 'creator.boost_rejected';
 
 export interface AuditInput {
   action: AuditAction;

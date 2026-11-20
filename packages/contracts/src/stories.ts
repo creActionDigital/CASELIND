@@ -73,7 +73,7 @@ export type StoryViewerList = z.infer<typeof storyViewerListSchema>;
 
 /* ------------------------------------------------------------------ reports */
 
-export const reportTargetTypeSchema = z.enum(['user', 'post', 'comment', 'story', 'message', 'product', 'review', 'service', 'service_review', 'ride', 'listing', 'job', 'mission', 'course', 'course_review', 'scholarship', 'org_update', 'org_review', 'org_question']);
+export const reportTargetTypeSchema = z.enum(['user', 'post', 'comment', 'story', 'message', 'product', 'review', 'service', 'service_review', 'ride', 'listing', 'job', 'mission', 'course', 'course_review', 'scholarship', 'org_update', 'org_review', 'org_question', 'carpool_trip']);
 export type ReportTargetType = z.infer<typeof reportTargetTypeSchema>;
 
 export const reportReasonSchema = z.enum(['spam', 'harassment', 'hate', 'violence', 'nudity', 'scam', 'illegal', 'other']);

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /* Lot 10: mini-app platform. OAuth 2.0 authorization code + PKCE (S256). See docs/architecture/API_CONTRACTS.md and ADR-021. */
 
-export const MINIAPP_SCOPES = ['profile.basic', 'profile.phone', 'profile.email', 'orders.read', 'wallet.pay'] as const;
+export const MINIAPP_SCOPES = ['profile.basic', 'profile.phone', 'profile.email', 'orders.read', 'wallet.pay', 'notify'] as const;
 export const miniappScopeSchema = z.enum(MINIAPP_SCOPES);
 export type MiniAppScope = z.infer<typeof miniappScopeSchema>;
 
@@ -12,6 +12,7 @@ export const SCOPE_DESCRIPTIONS: Record<MiniAppScope, string> = {
   'profile.email': 'Votre adresse e-mail vérifiée',
   'orders.read': 'Vos commandes passées chez l’organisation qui édite cette application',
   'wallet.pay': 'Demander un paiement (sandbox), que vous confirmez toujours avec votre PIN',
+  notify: 'Vous envoyer des notifications (5 par jour au plus, que vous pouvez couper)',
 };
 
 const scopeListSchema = z
@@ -54,6 +55,8 @@ export const createMiniAppRequestSchema = z.object({
   scopes: z.array(miniappScopeSchema).max(MINIAPP_SCOPES.length).default([]),
   /** Confidential apps (default) get a client secret; public ones (pure client-side) rely on PKCE alone. */
   confidential: z.boolean().default(true),
+  /** Manifeste declaratif (valide par le serveur avec `miniappManifestSchema` ; obligatoire a la soumission). */
+  manifest: z.unknown().optional(),
 });
 export type CreateMiniAppRequest = z.infer<typeof createMiniAppRequestSchema>;
 
@@ -79,6 +82,17 @@ export const miniappSchema = z.object({
   reviewNote: z.string().nullable(),
   reviewedAt: z.iso.datetime().nullable(),
   publishedAt: z.iso.datetime().nullable(),
+  /** Version approuvee en cours (null tant qu'aucune version n'a ete approuvee). */
+  currentVersion: z.string().nullable().optional(),
+  /** Surcharge admin du quota par minute ; null = valeur par defaut de la plateforme. */
+  rateLimitPerMinute: z.number().int().nullable().optional(),
+  /** Manifeste declaratif de la version approuvee (ou en preparation avant la premiere approbation). */
+  manifest: z.unknown().nullable().optional(),
+  certification: z.enum(['unreviewed', 'reviewed', 'certified']).optional(),
+  certifiedAt: z.iso.datetime().nullable().optional(),
+  certificationNote: z.string().nullable().optional(),
+  /** Part de la plateforme en points de base (0-3000), fixee par l'administrateur. */
+  revenueShareBps: z.number().int().optional(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -116,6 +130,13 @@ export const miniappPublicSchema = z.object({
   launchUrl: z.string(),
   clientId: z.string(),
   scopes: z.array(miniappScopeSchema),
+  /** Version courante affichee dans l'annuaire. */
+  version: z.string().nullable().optional(),
+  certification: z.enum(['unreviewed', 'reviewed', 'certified']).optional(),
+  /** Modele de cout declare (free, per_use, subscription, other). */
+  costModel: z.string().nullable().optional(),
+  /** Manifeste approuve (detail d'une application seulement ; a valider avec `miniappManifestSchema`). */
+  manifest: z.unknown().nullable().optional(),
   organization: z.object({ id: z.uuid(), name: z.string(), verified: z.boolean() }),
 });
 export type MiniAppPublic = z.infer<typeof miniappPublicSchema>;
@@ -147,6 +168,11 @@ export type AuthorizePreviewQuery = z.infer<typeof authorizePreviewQuerySchema>;
 export const authorizePreviewSchema = z.object({
   app: miniappPublicSchema.omit({ clientId: true, scopes: true }),
   scopes: z.array(z.object({ scope: miniappScopeSchema, description: z.string(), alreadyGranted: z.boolean() })),
+  certification: z.enum(['unreviewed', 'reviewed', 'certified']).optional(),
+  /** Manifeste approuve : donnees consultees, couts, conditions (a valider avec `miniappManifestSchema`). */
+  manifest: z.unknown().nullable().optional(),
+  /** Vrai quand l'utilisateur a deja une autorisation que la version courante oblige a renouveler. */
+  reconsentRequired: z.boolean().optional(),
 });
 export type AuthorizePreview = z.infer<typeof authorizePreviewSchema>;
 
@@ -205,6 +231,10 @@ export const miniappGrantSchema = z.object({
   organizationName: z.string(),
   scopes: z.array(miniappScopeSchema),
   grantedAt: z.iso.datetime(),
+  /** Une version approuvee a ajoute des scopes : l'utilisateur doit consentir de nouveau pour qu'ils soient couverts. */
+  reconsentRequired: z.boolean().optional(),
+  /** Vrai quand l'utilisateur a coupe les notifications de cette application. */
+  notificationsMuted: z.boolean().optional(),
 });
 export type MiniAppGrant = z.infer<typeof miniappGrantSchema>;
 export const miniappGrantListSchema = z.object({ items: z.array(miniappGrantSchema) });
@@ -223,7 +253,8 @@ export type ExportedMiniAppGrant = z.infer<typeof exportedMiniAppGrantSchema>;
 /* ------------------------------------------------------------------ resources reachable with an app token */
 
 export const miniappMeSchema = z.object({
-  id: z.uuid(),
+  /** Identifiant propre a cette application (different pour chaque application, stable) : jamais l'identifiant global. */
+  id: z.string(),
   displayName: z.string(),
   handle: z.string(),
   avatarUrl: z.string().nullable(),

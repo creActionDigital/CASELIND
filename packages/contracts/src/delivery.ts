@@ -14,6 +14,14 @@ const currencySchema = z.string().regex(/^[A-Z]{3}$/);
 export const fulfillmentSchema = z.enum(['delivery', 'pickup']);
 export type Fulfillment = z.infer<typeof fulfillmentSchema>;
 
+/** Express (priced by the zone supplement, courier sees it first) or standard; a slot may be asked 2 hours to 7 days ahead. */
+export const deliverySpeedSchema = z.enum(['standard', 'express']);
+export type DeliverySpeed = z.infer<typeof deliverySpeedSchema>;
+export const DELIVERY_SCHEDULE_MIN_HOURS = 2;
+export const DELIVERY_SCHEDULE_MAX_DAYS = 7;
+/** A scheduled delivery shows in the courier task list this long before its slot. */
+export const DELIVERY_SCHEDULE_VISIBLE_MINUTES = 60;
+
 export const deliveryStatusSchema = z.enum(['pending', 'assigned', 'picked_up', 'in_transit', 'delivered', 'failed', 'returned']);
 export type DeliveryStatus = z.infer<typeof deliveryStatusSchema>;
 
@@ -29,6 +37,8 @@ export const createDeliveryZoneRequestSchema = z.object({
   areas: z.array(z.string().trim().min(1).max(80)).min(1).max(50),
   /** Fee per currency, in minor units. A zone cannot be used for an order whose currency has no fee. */
   fees: deliveryZoneFeesSchema,
+  /** Express supplement per currency, added to the fee; null or absent = express not offered in this zone. */
+  expressFees: deliveryZoneFeesSchema.nullable().optional(),
   etaMinutes: z.number().int().min(5).max(20160),
   active: z.boolean().default(true),
 });
@@ -39,6 +49,7 @@ export const updateDeliveryZoneRequestSchema = z
     name: z.string().trim().min(1).max(80),
     areas: z.array(z.string().trim().min(1).max(80)).min(1).max(50),
     fees: deliveryZoneFeesSchema,
+    expressFees: deliveryZoneFeesSchema.nullable(),
     etaMinutes: z.number().int().min(5).max(20160),
     active: z.boolean(),
   })
@@ -52,6 +63,7 @@ export const deliveryZoneSchema = z.object({
   name: z.string(),
   areas: z.array(z.string()),
   fees: z.record(z.string(), z.number().int()),
+  expressFees: z.record(z.string(), z.number().int()).nullable(),
   etaMinutes: z.number().int(),
   active: z.boolean(),
   createdAt: z.iso.datetime(),
@@ -83,6 +95,9 @@ export const deliveryViewSchema = z.object({
   orderNumber: z.string(),
   orgId: z.uuid(),
   status: deliveryStatusSchema,
+  speed: deliverySpeedSchema,
+  /** Slot asked by the buyer, or null. */
+  scheduledFor: z.iso.datetime().nullable(),
   courier: deliveryCourierSchema.nullable(),
   estimatedMinutes: z.number().int().nullable(),
   /** Buyer only: the 6-digit code to give to the courier on arrival. */

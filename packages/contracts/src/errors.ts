@@ -40,6 +40,8 @@ export const ErrorCodes = {
   aiUnavailable: 'ai_unavailable',
   /** 502: the AI provider failed; details.reason is a short kind, never provider content. */
   aiProviderError: 'ai_provider_error',
+  /** 409: a consent (details.kind: ai_processing, translation) must be granted before the content leaves for a provider. */
+  consentRequired: 'consent_required',
   internal: 'internal_error',
 } as const;
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

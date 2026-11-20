@@ -20,6 +20,8 @@ export const mediaPurposeSchema = z.enum([
   'lesson',
   /** Storefront gallery (CDC §5): photos and videos, readable by any signed-in user like product images. */
   'org_gallery',
+  /** Digital product files (CDC §7): readable by the seller's catalogue managers and by buyers of a delivered order. */
+  'digital_file',
   /** Proof of delivery (lot 8): photo or signature PNG, readable by the courier, the buyer and the seller's order viewers only. */
   'delivery_proof',
   /** Exam result report (lot 18d): PDF or photo, readable by the patient and by a professional with an active share covering `results`. */
@@ -75,6 +77,7 @@ export const MEDIA_ALLOWED_MIMES: Readonly<Record<MediaPurpose, readonly MediaMi
   delivery: [...IMAGES, 'application/pdf'],
   lesson: [...IMAGES, ...VIDEOS, 'application/pdf'],
   org_gallery: [...IMAGES, ...VIDEOS],
+  digital_file: [...IMAGES, ...VIDEOS, ...AUDIO, 'application/pdf'],
   delivery_proof: ['image/jpeg', 'image/png', 'image/webp'],
   health_result: [...IMAGES, 'application/pdf'],
 };

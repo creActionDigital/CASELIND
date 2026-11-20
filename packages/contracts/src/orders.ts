@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { checkoutZoneChoiceSchema, deliveryViewSchema, fulfillmentSchema } from './delivery.js';
+import { checkoutZoneChoiceSchema, deliverySpeedSchema, deliveryViewSchema, fulfillmentSchema } from './delivery.js';
 
 /* Lot 5B: cart, split orders, coupons, verified reviews. See docs/architecture/API_CONTRACTS.md.
  * Amounts are integers in minor units of the line's currency; no amount ever transits through CASELIND. */
@@ -31,7 +31,10 @@ export const cartLineSchema = z.object({
   variantLabel: z.string().nullable(),
   sku: z.string().nullable(),
   imageAssetId: z.uuid().nullable(),
+  /** Effective unit price, computed by the server (promotion applied). */
   unitPriceMinor: z.number().int(),
+  /** Crossed-out base price, only when a promotion lowers `unitPriceMinor`. */
+  compareAtPriceMinor: z.number().int().nullish(),
   quantity: z.number().int(),
   lineTotalMinor: z.number().int(),
 });
@@ -84,8 +87,15 @@ export const checkoutRequestSchema = z
     fulfillment: fulfillmentSchema.default('delivery'),
     /** Lot 8: delivery zone per organisation. Required for an organisation that defines zones. */
     zones: z.array(checkoutZoneChoiceSchema).max(20).optional(),
+    /** `express` adds the zone supplement (computed by the server; 409 express_unavailable if the zone has none). Delivery only. */
+    speed: deliverySpeedSchema.default('standard'),
+    /** Slot asked for a delivery: 2 hours to 7 days ahead (400 schedule_out_of_range). Delivery only. */
+    scheduledFor: z.iso.datetime().optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.fulfillment === 'pickup' && (v.speed === 'express' || v.scheduledFor)) {
+      ctx.addIssue({ code: 'custom', path: ['speed'], message: 'express and scheduled apply to a delivery only' });
+    }
     if (v.fulfillment === 'delivery' && !v.address) ctx.addIssue({ code: 'custom', path: ['address'], message: 'a delivery needs an address' });
   });
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;

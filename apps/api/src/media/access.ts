@@ -36,6 +36,8 @@ export function canRead(viewerId: string, asset: Readable): boolean {
     case 'cv':
     case 'delivery':
     case 'lesson':
+    // Digital product files: owner here; buyers of a delivered order and catalogue managers in canReadAsync.
+    case 'digital_file':
     // Lot 8: the courier (owner) here; the buyer and the seller's order viewers in canReadAsync.
     case 'delivery_proof':
     // Lot 18d: the patient (owner) here; a professional with an active share covering results in canReadAsync.
@@ -73,6 +75,18 @@ export async function canReadAsync(
       JOIN org_members om ON om.org_id = j.org_id AND om.user_id = ${viewerId}::uuid AND om.status = 'active'
       WHERE a.cv_media_id = ${asset.id}::uuid`);
     return res.rows.some((r) => roleHasPermission(r.role as OrgRole, 'hr.manage'));
+  }
+  // Digital product files: buyers of a delivered order containing the product, and the seller's catalogue managers.
+  if (asset.purpose === 'digital_file') {
+    const buyer = await db.execute(sql`
+      SELECT 1 FROM product_files pf JOIN order_items oi ON oi.product_id = pf.product_id JOIN orders o ON o.id = oi.order_id
+      WHERE pf.media_id = ${asset.id}::uuid AND o.buyer_id = ${viewerId}::uuid AND o.status = 'delivered' LIMIT 1`);
+    if (buyer.rows.length > 0) return true;
+    const staff = await db.execute<{ role: string }>(sql`
+      SELECT DISTINCT om.role FROM product_files pf JOIN products p ON p.id = pf.product_id
+      JOIN org_members om ON om.org_id = p.org_id AND om.user_id = ${viewerId}::uuid AND om.status = 'active'
+      WHERE pf.media_id = ${asset.id}::uuid`);
+    return staff.rows.some((r) => roleHasPermission(r.role as OrgRole, 'catalog.manage'));
   }
   // Delivery files: the two parties of the contract.
   if (asset.purpose === 'delivery') {

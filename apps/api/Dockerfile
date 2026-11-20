@@ -8,6 +8,7 @@ COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/api/package.json apps/api/
 COPY apps/mobile/package.json apps/mobile/
+COPY apps/web/package.json apps/web/
 RUN npm ci -w @caselind/contracts -w @caselind/api
 COPY packages/contracts packages/contracts
 COPY apps/api apps/api
@@ -20,6 +21,7 @@ COPY package.json package-lock.json ./
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/api/package.json apps/api/
 COPY apps/mobile/package.json apps/mobile/
+COPY apps/web/package.json apps/web/
 RUN npm ci --omit=dev -w @caselind/contracts -w @caselind/api
 
 FROM node:22-slim AS runtime

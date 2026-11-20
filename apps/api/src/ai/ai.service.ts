@@ -1,9 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   type AiConversation,
   type AiMessage,
   type AiModelList,
   type AiSettings,
+  type ConsentKind,
   ErrorCodes,
   type ProductDescriptionRequest,
   type ProductDescriptionResult,
@@ -14,7 +15,11 @@ import { sql } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
 import { ENV, type Env } from '../config/env.js';
 import { DB, type Db } from '../db/db.module.js';
+import { hasConsent } from '../consents/consents.shared.js';
+import { AiActionStore } from './ai-action-store.js';
+import { ACTIONS_PROMPT, parseModelReply } from './ai-actions.logic.js';
 import { type AvailableModel, AiModelsService, toCard } from './ai-models.service.js';
+import { bestEffort } from '../messaging/messaging.shared.js';
 import { type LlmMessage, LlmProviderError } from './llm-provider.js';
 
 /**
@@ -49,10 +54,13 @@ interface Row {
 
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger(AiService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(ENV) private readonly env: Env,
     private readonly models: AiModelsService,
+    private readonly actions: AiActionStore,
   ) {}
 
   // ---- models and settings ------------------------------------------------------------------------
@@ -136,22 +144,30 @@ export class AiService {
     const hist = await this.db.execute(sql`
       SELECT role, content FROM (SELECT role, content, created_at, id FROM ai_messages WHERE conversation_id = ${id}::uuid ORDER BY created_at DESC, id DESC LIMIT ${HISTORY_WINDOW}) h
       ORDER BY created_at, id`);
+    const actionsOn = await this.actions.enabled(userId);
     const messages: LlmMessage[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: actionsOn ? [SYSTEM_PROMPT, ACTIONS_PROMPT].join('\n') : SYSTEM_PROMPT },
       ...(hist.rows as { role: 'user' | 'assistant'; content: string }[]).map((m) => ({ role: m.role, content: m.content })),
       { role: 'user', content },
     ];
     const out = await this.generate(userId, messages);
+    // The actions block is always removed from the text; proposals are kept only when actions are on.
+    const parsed = parseModelReply(out.text);
+    const replyText = parsed.text || (parsed.proposals.length > 0 ? 'Voici ce que je peux faire :' : out.text);
     const saved = await this.db.transaction(async (tx) => {
       const u = await tx.execute(sql`INSERT INTO ai_messages (conversation_id, role, content) VALUES (${id}::uuid, 'user', ${content}) RETURNING id, role, content, model_id, created_at`);
-      const a = await tx.execute(sql`INSERT INTO ai_messages (conversation_id, role, content, model_id) VALUES (${id}::uuid, 'assistant', ${out.text}, ${out.model.entry.id}) RETURNING id, role, content, model_id, created_at`);
+      const a = await tx.execute(sql`INSERT INTO ai_messages (conversation_id, role, content, model_id) VALUES (${id}::uuid, 'assistant', ${replyText}, ${out.model.entry.id}) RETURNING id, role, content, model_id, created_at`);
       await tx.execute(sql`
         UPDATE ai_conversations SET updated_at = now(),
           title = CASE WHEN title = 'Nouvelle conversation' THEN ${content.replace(/\s+/g, ' ').slice(0, 60)} ELSE title END
         WHERE id = ${id}::uuid`);
       return { user: toMessage(u.rows[0] as Row), reply: toMessage(a.rows[0] as Row) };
     });
-    return { userMessage: saved.user, reply: saved.reply, modelId: out.model.entry.id, fallbackUsed: out.fallbackUsed, aiGenerated: true };
+    // After the commit: a failure of the actions journal never turns an answered message into a 500.
+    let proposals: Awaited<ReturnType<typeof this.actions.record>> = [];
+    if (actionsOn) await bestEffort(this.logger, 'ai actions record', async () => { proposals = await this.actions.record(userId, id, parsed, content); });
+    else await bestEffort(this.logger, 'ai actions log', async () => { for (const t of [...parsed.ignoredTools, ...parsed.proposals.map((p) => p.tool)]) await this.actions.log(userId, t, 'ignored'); });
+    return { userMessage: saved.user, reply: saved.reply, modelId: out.model.entry.id, fallbackUsed: out.fallbackUsed, aiGenerated: true, actions: proposals };
   }
 
   // ---- seller help --------------------------------------------------------------------------------
@@ -168,6 +184,12 @@ export class AiService {
 
   // ---- generation ---------------------------------------------------------------------------------
 
+  /** One generation for another module (translation, natural search, summary): same consent, quota, model choice and notice rules. */
+  async complete(userId: string, messages: LlmMessage[], consent: ConsentKind = 'ai_processing'): Promise<{ text: string; modelId: string }> {
+    const out = await this.generate(userId, messages, consent);
+    return { text: out.text, modelId: out.model.entry.id };
+  }
+
   private async reserveQuota(userId: string): Promise<void> {
     const res = await this.db.execute(sql`
       INSERT INTO ai_usage_daily (user_id, day, count) VALUES (${userId}::uuid, (now() AT TIME ZONE 'UTC')::date, 1)
@@ -183,7 +205,9 @@ export class AiService {
   }
 
   /** Picks the candidates (requested model first, others only with allowFallback), reserves quota and calls them in order. */
-  private async generate(userId: string, messages: LlmMessage[]): Promise<{ text: string; model: AvailableModel; fallbackUsed: boolean }> {
+  private async generate(userId: string, messages: LlmMessage[], consent: ConsentKind = 'ai_processing'): Promise<{ text: string; model: AvailableModel; fallbackUsed: boolean }> {
+    // Nothing leaves for a provider without the user's current, explicit consent.
+    if (!(await hasConsent(this.db, userId, consent))) throw consentRequired(consent);
     const settings = await this.getSettings(userId);
     const available = await this.models.available();
     const primary = settings.modelId ? available.find((m) => m.entry.id === settings.modelId) : this.models.defaultOf(available);
@@ -211,6 +235,11 @@ export class AiService {
     await this.refundQuota(userId);
     throw new AppError(502, ErrorCodes.aiProviderError, 'The AI provider could not answer, try again later', { reason: last?.kind ?? 'server' });
   }
+}
+
+/** 409: the consent for this use must be granted first (details.kind). */
+export function consentRequired(kind: ConsentKind): AppError {
+  return new AppError(409, ErrorCodes.consentRequired, `Consent required: grant "${kind}" before this content is sent to an AI provider`, { kind });
 }
 
 function dataNotice(modelId: string): AppError {

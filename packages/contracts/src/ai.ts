@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { aiActionSchema } from './ai-actions.js';
 
 /** Lot 12 : multi-provider AI assistant (CDC §22, decision Q9, ADR-022). */
 
@@ -98,6 +99,8 @@ export const sendAiMessageResultSchema = z.object({
   /** true when another model than the requested one answered (only if allowFallback). */
   fallbackUsed: z.boolean(),
   aiGenerated: z.literal(true),
+  /** Actions the assistant proposes (never run before the user confirms); empty when none or when actions are off. */
+  actions: z.array(aiActionSchema),
 });
 export type SendAiMessageResult = z.infer<typeof sendAiMessageResultSchema>;
 

@@ -17,7 +17,11 @@ export const ORG_PERMISSIONS = [
   'orders.manage',
   'inventory.manage',
   'finance.view',
+  /** Écriture des dépenses (gestion d'entreprise) : droit séparé de la lecture des chiffres. */
+  'finance.manage',
   'hr.manage',
+  /** Registre de salaire (etat saisi a la main) : finance et RH uniquement. */
+  'payroll.manage',
   'support.inbox',
   'delivery.tasks',
 ] as const;
@@ -50,10 +54,10 @@ export const ORG_ROLE_PERMISSIONS: Readonly<Record<OrgRole, ReadonlySet<OrgPermi
     'support.inbox',
     'delivery.tasks',
   ]),
-  finance: new Set(['org.view', 'finance.view', 'orders.view']),
+  finance: new Set(['org.view', 'finance.view', 'finance.manage', 'payroll.manage', 'orders.view']),
   stock: new Set(['org.view', 'inventory.manage']),
   sales: new Set(['org.view', 'catalog.manage', 'orders.view', 'orders.manage']),
-  hr: new Set(['org.view', 'org.members.view', 'hr.manage']),
+  hr: new Set(['org.view', 'org.members.view', 'hr.manage', 'payroll.manage']),
   support: new Set(['org.view', 'support.inbox', 'orders.view']),
   delivery: new Set(['org.view', 'delivery.tasks']),
   employee: new Set(['org.view']),

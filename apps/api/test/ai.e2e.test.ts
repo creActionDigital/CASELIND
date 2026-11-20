@@ -57,6 +57,8 @@ async function user(roles?: string[]): Promise<TU> {
   const s = await signUp(ctx);
   const me = await ctx.http.get('/v1/me').set(bearer(s.tokens.accessToken)).expect(200);
   if (roles) await ctx.sql.query(`UPDATE users SET roles = $1::text[] WHERE id = $2`, [roles, me.body.id]);
+  // Nothing goes to a provider without the ai_processing consent.
+  await ctx.http.put('/v1/me/consents/ai_processing').set(bearer(s.tokens.accessToken)).send({ granted: true }).expect(200);
   return { token: s.tokens.accessToken, id: me.body.id, handle: me.body.handle };
 }
 

@@ -18,6 +18,8 @@ import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
+import { MiniAppUsageService } from './miniapp-usage.service.js';
+import { MiniAppWebhookService } from './miniapp-webhook.service.js';
 import {
   ACCESS_PREFIX,
   ACCESS_TOKEN_TTL_SECONDS,
@@ -25,6 +27,7 @@ import {
   type AppRow,
   appNotFound,
   AUTH_CODE_TTL_SECONDS,
+  certificationOf,
   invalidClient,
   iconUrlOf,
   iso,
@@ -48,6 +51,8 @@ export class OAuthService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
+    private readonly usage: MiniAppUsageService,
+    private readonly hooks: MiniAppWebhookService,
   ) {}
 
   /** A published app of an active organisation by `client_id`; anything else is invisible (404). */
@@ -81,8 +86,8 @@ export class OAuthService {
     this.checkRedirect(app, q.redirectUri);
     const requested = q.scopes?.trim() ? q.scopes.trim().split(/\s+/) : app.scopes;
     const scopes = this.checkScopes(app, requested);
-    const grant = await this.db.execute<{ scopes: string[] }>(sql`
-      SELECT scopes FROM miniapp_grants WHERE user_id = ${userId}::uuid AND app_id = ${app.id}::uuid AND revoked_at IS NULL`);
+    const grant = await this.db.execute<{ scopes: string[]; reconsent_required: boolean }>(sql`
+      SELECT scopes, reconsent_required FROM miniapp_grants WHERE user_id = ${userId}::uuid AND app_id = ${app.id}::uuid AND revoked_at IS NULL`);
     const granted = new Set(grant.rows[0]?.scopes ?? []);
     return {
       app: {
@@ -94,6 +99,9 @@ export class OAuthService {
         organization: { id: app.org_id, name: app.org_name, verified: app.org_verification === 'verified' },
       },
       scopes: scopes.map((scope) => ({ scope, description: SCOPE_DESCRIPTIONS[scope], alreadyGranted: granted.has(scope) })),
+      certification: certificationOf(app),
+      manifest: app.manifest ?? null,
+      reconsentRequired: grant.rows[0]?.reconsent_required ?? false,
     };
   }
 
@@ -116,8 +124,12 @@ export class OAuthService {
         INSERT INTO miniapp_auth_codes (code_hash, app_id, user_id, redirect_uri, scopes, code_challenge, expires_at)
         VALUES (${sha256(code)}, ${app.id}::uuid, ${userId}::uuid, ${body.redirectUri}, ${textArray(scopes)}, ${body.codeChallenge},
                 now() + make_interval(secs => ${AUTH_CODE_TTL_SECONDS}))`);
+      // A consent that now covers every scope the app declares ends a pending re-consent request.
+      await tx.execute(sql`UPDATE miniapp_grants SET reconsent_required = NOT (${textArray(app.scopes)} <@ scopes) WHERE user_id = ${userId}::uuid AND app_id = ${app.id}::uuid`);
+      await this.usage.bump(app.id, 'authorizations', tx);
       await this.audit.record({ action: 'miniapp.authorized', actorUserId: userId, meta, metadata: { appId: app.id, scopes } }, tx);
     });
+    this.hooks.emit(app.id, userId, 'authorization.granted', { scopes });
     const target = new URL(body.redirectUri);
     target.searchParams.set('code', code);
     target.searchParams.set('state', body.state);
@@ -223,8 +235,8 @@ export class OAuthService {
   // ---- the user's authorizations ------------------------------------------------------------------
 
   async listGrants(userId: string): Promise<MiniAppGrantList> {
-    const res = await this.db.execute<{ app_id: string; name: string; icon_media_id: string | null; org_name: string; scopes: string[]; created_at: string | Date }>(sql`
-      SELECT g.app_id, a.name, a.icon_media_id, o.name AS org_name, g.scopes, g.created_at
+    const res = await this.db.execute<{ app_id: string; name: string; icon_media_id: string | null; org_name: string; scopes: string[]; created_at: string | Date; reconsent_required: boolean; notifications_muted: boolean }>(sql`
+      SELECT g.app_id, a.name, a.icon_media_id, o.name AS org_name, g.scopes, g.created_at, g.reconsent_required, g.notifications_muted
       FROM miniapp_grants g JOIN miniapps a ON a.id = g.app_id JOIN organizations o ON o.id = a.org_id
       WHERE g.user_id = ${userId}::uuid AND g.revoked_at IS NULL ORDER BY g.updated_at DESC, g.app_id`);
     return {
@@ -235,12 +247,15 @@ export class OAuthService {
         organizationName: r.org_name,
         scopes: r.scopes as MiniAppScope[],
         grantedAt: iso(r.created_at),
+        reconsentRequired: r.reconsent_required,
+        notificationsMuted: r.notifications_muted,
       })),
     };
   }
 
   /** Cuts every token of the app for this user at once. Idempotent; an app the user never authorized is a 404. */
   async revokeGrant(userId: string, appId: string, meta: RequestMeta): Promise<void> {
+    let revoked = false;
     await this.db.transaction(async (tx) => {
       const grant = await tx.execute<{ revoked_at: string | Date | null }>(sql`
         SELECT revoked_at FROM miniapp_grants WHERE user_id = ${userId}::uuid AND app_id = ${appId}::uuid FOR UPDATE`);
@@ -252,7 +267,17 @@ export class OAuthService {
         UPDATE miniapp_payment_requests SET status = 'cancelled', decided_at = now()
         WHERE user_id = ${userId}::uuid AND app_id = ${appId}::uuid AND status = 'pending'`);
       await this.audit.record({ action: 'miniapp.grant_revoked', actorUserId: userId, meta, metadata: { appId } }, tx);
+      revoked = true;
     });
+    // The app must purge what it holds about this user: tell it (opaque subject only).
+    if (revoked) this.hooks.emit(appId, userId, 'authorization.revoked', { reason: 'user_revoked' });
+  }
+
+  /** The user silences (or re-enables) the notifications of one app without withdrawing its access. */
+  async setMuted(userId: string, appId: string, muted: boolean, meta: RequestMeta): Promise<void> {
+    const res = await this.db.execute(sql`UPDATE miniapp_grants SET notifications_muted = ${muted} WHERE user_id = ${userId}::uuid AND app_id = ${appId}::uuid AND revoked_at IS NULL RETURNING app_id`);
+    if (res.rows.length === 0) throw AppError.notFound('Authorization not found');
+    await this.audit.record({ action: 'miniapp.notifications_muted', actorUserId: userId, meta, metadata: { appId, muted } });
   }
 
   // ---- export and purge ---------------------------------------------------------------------------

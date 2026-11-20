@@ -143,7 +143,8 @@ describe('GET /v1/places', () => {
        WHERE table_schema = 'public' AND column_name IN ('lat', 'lng', 'latitude', 'longitude')
        ORDER BY table_name`,
     );
-    expect(cols.rows.map((r) => r.table_name)).toEqual(['listings', 'mobility_favorite_places', 'organizations', 'service_offers']);
+    // roadside_requests: the position the user sends with a breakdown request, shared with the consent given at that moment (lot 11 bis).
+    expect(cols.rows.map((r) => r.table_name)).toEqual(['listings', 'mobility_favorite_places', 'organizations', 'roadside_requests', 'service_offers']);
   });
 });
 

@@ -519,14 +519,15 @@ describe('push notifications', () => {
       expect(i).toMatchObject({
         category: 'message',
         title: 'Les amis',
-        body: 'Nouveau message',
         persist: false,
         data: { conversationId: g, messageId: msg.body.id },
       });
+      expect(i.body).toBe(i.userId === r3.id ? 'Vous avez été mentionné(e)' : 'Nouveau message');
       expect(JSON.stringify(i)).not.toContain('privé');
     }
-    expect(inputs.find((i) => i.userId === r3.id)?.urgent).toBe(true);
-    expect(inputs.find((i) => i.userId === r1.id)?.urgent).toBeUndefined();
+    // A mention reaches a muted conversation but does not bypass quiet mode.
+    expect(inputs.find((i) => i.userId === r3.id)?.genericBody).toBe(true);
+    expect(inputs.every((i) => i.urgent === undefined)).toBe(true);
     spy.mockClear();
     const dm = await direct(r1, s);
     await send(r1, dm).expect(201);

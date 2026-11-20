@@ -19,6 +19,7 @@ import { ModerationRegistry } from '../moderation/moderation-registry.js';
 import { PrivacyService } from '../privacy/privacy.service.js';
 import { RelationsService } from '../social/relations.service.js';
 import { decodeCursor, encodeCursor, UUID_RE, validationError } from './cursor.js';
+import { PublishGuard } from '../platform-ops/publish.guard.js';
 import { StoryAccessService } from './story-access.js';
 
 const storyNotFound = () => AppError.notFound('Story not found');
@@ -37,6 +38,7 @@ export class StoriesService implements OnModuleInit {
     private readonly relations: RelationsService,
     private readonly privacy: PrivacyService,
     private readonly moderation: ModerationRegistry,
+    private readonly publishGuard: PublishGuard,
   ) {}
 
   onModuleInit(): void {
@@ -63,6 +65,7 @@ export class StoriesService implements OnModuleInit {
   async create(userId: string, req: CreateStoryRequest): Promise<{ story: Story; created: boolean }> {
     const existing = await this.findByClientId(userId, req.clientId);
     if (existing) return { story: (await this.toStories([existing], userId))[0]!, created: false };
+    await this.publishGuard.assertMayPublish(userId, 'story');
 
     const [asset] = await this.db
       .select({ ownerUserId: mediaAssets.ownerUserId, purpose: mediaAssets.purpose, status: mediaAssets.status })

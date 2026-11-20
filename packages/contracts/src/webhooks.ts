@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Webhooks sortants d'une organisation : liste blanche d'evenements, 5 abonnements au plus par organisation. */
-export const WEBHOOK_EVENTS = ['order.created', 'order.status_changed', 'pos.sale_created', 'pos.sale_voided', 'org.question_asked'] as const;
+export const WEBHOOK_EVENTS = ['order.created', 'order.status_changed', 'pos.sale_created', 'pos.sale_voided', 'org.question_asked', 'order.return_requested'] as const;
 export const webhookEventSchema = z.enum(WEBHOOK_EVENTS);
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;
 export const WEBHOOKS_PER_ORG = 5;

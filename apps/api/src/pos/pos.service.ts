@@ -18,6 +18,7 @@ import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { CatalogPort } from '../commerce/catalog.port.js';
 import { DB, type Db } from '../db/db.module.js';
+import { countPosOperation } from '../observability/metrics.js';
 import { WebhookService } from '../webhooks/webhooks.service.js';
 
 /** `lines` also carries `variantId` (internal: needed to give the stock back on void); the API never shows it. */
@@ -96,6 +97,7 @@ export class PosService {
       return fresh;
     });
     // After the commit, and only for a new sale (a retry returns the first one). Amounts and ids only: no cashier, no item titles.
+    if (fresh) countPosOperation('sale');
     if (fresh) this.webhooks.emit(orgId, 'pos.sale_created', { saleId: sale.id, totalMinor: sale.totalMinor, currency: sale.currency, paymentMethod: sale.paymentMethod, lineCount: sale.lines.length });
     return sale;
   }
@@ -121,6 +123,7 @@ export class PosService {
       voided = true;
       return toSale(upd.rows[0]!);
     });
+    if (voided) countPosOperation('void');
     if (voided) this.webhooks.emit(orgId, 'pos.sale_voided', { saleId: sale.id, totalMinor: sale.totalMinor, currency: sale.currency });
     return sale;
   }
@@ -163,6 +166,7 @@ export class PosService {
       ON CONFLICT (org_id) WHERE closed_at IS NULL DO NOTHING
       RETURNING ${SHIFT_COLS}`);
     if (!rows[0]) throw AppError.conflict('A session is already open', { reason: 'shift_open' });
+    countPosOperation('shift_open');
     return toShift(rows[0]);
   }
 

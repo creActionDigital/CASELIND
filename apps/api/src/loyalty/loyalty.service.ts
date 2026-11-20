@@ -7,11 +7,13 @@ import type {
   MyLoyalty,
   UpdateLoyaltyProgramRequest,
 } from '@caselind/contracts';
+import { CONSENT_VERSIONS } from '@caselind/contracts';
 import { sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { DB, type Db } from '../db/db.module.js';
+import { appendConsent } from '../consents/consents.shared.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import type { Tx } from '../orgs/orgs.service.js';
 
@@ -93,6 +95,7 @@ export class LoyaltyService {
       await tx.execute(sql`
         INSERT INTO marketing_consents (user_id, opted_in) VALUES (${userId}::uuid, ${optIn})
         ON CONFLICT (user_id) DO UPDATE SET opted_in = EXCLUDED.opted_in, updated_at = now()`);
+      await appendConsent(tx, userId, 'marketing', optIn, CONSENT_VERSIONS.marketing);
       await this.audit.record({ action: 'user.marketing_consent_updated', actorUserId: userId, meta, metadata: { optIn } }, tx);
     });
     return { marketingConsent: optIn };

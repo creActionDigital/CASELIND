@@ -105,6 +105,10 @@ export const postSchema = z.object({
   reactions: reactionCountsSchema,
   myReaction: reactionTypeSchema.nullable(),
   commentsCount: z.number().int().min(0),
+  /** The caller saved this post (always sent by the API; optional here for older fixtures). */
+  bookmarked: z.boolean().optional(),
+  /** True only on a boosted post inserted in the feed: the client MUST label it "Sponsorisé". */
+  sponsored: z.boolean().optional(),
   /** `hidden` when moderation hid it: only the author and moderators can still see it. */
   moderation: z.enum(['visible', 'hidden']),
   createdAt: z.iso.datetime(),

@@ -7,6 +7,8 @@ import {
   type DeliveryView,
   ErrorCodes,
   type OrderAddress,
+  DELIVERY_SCHEDULE_MAX_DAYS,
+  DELIVERY_SCHEDULE_MIN_HOURS,
   PROOF_CODE_LENGTH,
 } from '@caselind/contracts';
 import { asc, eq, inArray } from 'drizzle-orm';
@@ -64,6 +66,28 @@ export function normalizeArea(v: string): string {
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+
+/** The slot asked at checkout, 2 hours to 7 days ahead (400 schedule_out_of_range), or null when none was asked. */
+export function checkedSchedule(scheduledFor: string | undefined, now: Date = new Date()): Date | null {
+  if (!scheduledFor) return null;
+  const t = new Date(scheduledFor).getTime();
+  if (t < now.getTime() + DELIVERY_SCHEDULE_MIN_HOURS * 3_600_000 || t > now.getTime() + DELIVERY_SCHEDULE_MAX_DAYS * 86_400_000) {
+    throw new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [
+      { path: 'scheduledFor', message: `must be between ${DELIVERY_SCHEDULE_MIN_HOURS} hours and ${DELIVERY_SCHEDULE_MAX_DAYS} days ahead`, reason: 'schedule_out_of_range' },
+    ]);
+  }
+  return new Date(t);
+}
+
+/** Courier task order: express first, then the earliest slot, then the newest. Stable inside a page. */
+export function byUrgency<T extends { speed: 'standard' | 'express'; scheduledFor: string | null }>(items: T[]): T[] {
+  const rank = (d: T): number => (d.speed === 'express' ? 0 : 1);
+  return items
+    .map((d, i) => ({ d, i }))
+    .sort((a, b) => rank(a.d) - rank(b.d) || (a.d.scheduledFor ?? '9').localeCompare(b.d.scheduledFor ?? '9') || a.i - b.i)
+    .map((x) => x.d);
 }
 
 /**
@@ -134,6 +158,8 @@ export async function hydrateDeliveries(
       orderNumber: numbers.get(r.orderId) ?? '',
       orgId: r.orgId,
       status: r.status,
+      speed: r.speed,
+      scheduledFor: r.scheduledFor?.toISOString() ?? null,
       courier: courier ? { userId: courier.id, handle: courier.handle, displayName: courier.displayName } : null,
       estimatedMinutes: r.estimatedMinutes,
       proofCode: viewer === 'buyer' && active ? codes.codeFor(r.id, r.proofNonce) : null,
@@ -180,6 +206,8 @@ export async function hydrateCourierDeliveries(db: DbExecutor, rows: DeliveryRow
       orgId: r.orgId,
       orgName: orgNames.get(r.orgId) ?? '',
       status: r.status,
+      speed: r.speed,
+      scheduledFor: r.scheduledFor?.toISOString() ?? null,
       address: (o?.address as OrderAddress | null | undefined) ?? null,
       currency: (o?.currency ?? 'XXX').trim(),
       totalMinor: o?.totalMinor ?? 0,

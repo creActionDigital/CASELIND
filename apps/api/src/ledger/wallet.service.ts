@@ -14,14 +14,16 @@ import {
 } from '@caselind/contracts';
 import { sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
+import { AnomalyService } from '../wallet-finance/anomaly.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
 import { ENV, type Env } from '../config/env.js';
+import type { DbExecutor } from '../commerce/catalog.port.js';
 import { DB, type Db } from '../db/db.module.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import type { AuthUser } from '../security/auth.guard.js';
 import { KycPort } from '../wallet/kyc.port.js';
-import type { TransferInput, TransferResult } from '../wallet/ledger.port.js';
+import type { LedgerOwner, TransferInput, TransferResult } from '../wallet/ledger.port.js';
 import { PinVerifier, pinRefusal } from '../wallet/pin.port.js';
 import { LedgerService } from './ledger.service.js';
 import { balancesOf, reconcile, transactionsOf, type WalletScope } from './ledger.queries.js';
@@ -59,6 +61,7 @@ export class WalletService {
     private readonly pins: PinVerifier,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly anomaly: AnomalyService,
   ) {}
 
   async wallet(userId: string): Promise<Wallet> {
@@ -114,6 +117,36 @@ export class WalletService {
     return { response, created: !response.replayed };
   }
 
+  /**
+   * Transfer of the caller's sandbox funds to another user or to a system account, for features built on the wallet
+   * (creator tips, boosted posts). Same PIN check, KYC limits, freeze check, idempotency (`clientId`) and audit as `transfer`;
+   * `inTx` runs in the SAME transaction when the movement is new (never on a replay), so a side effect and its payment commit together.
+   */
+  async payInternal(
+    auth: AuthUser,
+    p: { to: LedgerOwner; amountMinor: number; currency: string; clientId: string; pin: string; metadata: Record<string, string> },
+    meta: RequestMeta,
+    inTx?: (tx: DbExecutor, transferId: string) => Promise<void>,
+  ): Promise<WalletTransferResponse> {
+    this.assertCurrency(p.currency);
+    const pin = await this.pins.verify(auth.userId, p.pin);
+    const refusal = pinRefusal(pin);
+    if (refusal) throw refusal;
+    const input: TransferInput = {
+      from: { kind: 'user', userId: auth.userId },
+      to: p.to,
+      amountMinor: p.amountMinor,
+      currency: p.currency,
+      kind: 'p2p',
+      idempotencyKey: p.clientId,
+      initiatedBy: auth.userId,
+      metadata: p.metadata,
+    };
+    const counterparty = p.to.kind === 'user' ? p.to.userId : null;
+    const result = await this.run(input, auth.userId, 'wallet.transfer', counterparty, meta, auth.sessionId, inTx);
+    return this.respond(result, input, auth.userId, counterparty);
+  }
+
   /** Credits the caller from the sandbox funding account (fictitious funds). */
   async topup(auth: AuthUser, body: SandboxTopupRequest, meta: RequestMeta): Promise<{ response: WalletTransferResponse; created: boolean }> {
     if (!sandboxTopupEnabled(this.env)) throw AppError.featureDisabled('Sandbox top-up is disabled on this instance');
@@ -153,11 +186,13 @@ export class WalletService {
     counterpartyId: string | null,
     meta: RequestMeta,
     sessionId: string,
+    inTx?: (tx: DbExecutor, transferId: string) => Promise<void>,
   ): Promise<TransferResult> {
     const limits = await this.ledger.prefetchLimits(input);
-    return this.db.transaction(async (tx) => {
+    const outcome = await this.db.transaction(async (tx) => {
       const r = await this.ledger.transferWith(input, limits, tx);
       if (r.ok && !r.replayed) {
+        if (inTx) await inTx(tx, r.transferId);
         // Amount, currency and counterparty id only: never the note.
         await this.audit.record(
           {
@@ -172,9 +207,12 @@ export class WalletService {
       }
       return r;
     });
+    // Anomaly alerts (information only, never blocks nor throws): after a new user-initiated send.
+    if (outcome.ok && !outcome.replayed && action === 'wallet.transfer') await this.anomaly.afterTransfer(actorId, outcome.transferId, input.currency);
+    return outcome;
   }
 
-  private async respond(result: TransferResult, input: TransferInput, userId: string, toUserId: string): Promise<WalletTransferResponse> {
+  private async respond(result: TransferResult, input: TransferInput, userId: string, toUserId: string | null): Promise<WalletTransferResponse> {
     if (!result.ok) {
       if (result.reason === 'insufficient_funds') throw AppError.conflict('Insufficient funds', { reason: 'insufficient_funds' });
       if (result.reason === 'limit_exceeded') throw AppError.conflict('Transfer limit exceeded', { reason: 'limit_exceeded' });
@@ -238,8 +276,14 @@ export class WalletService {
   }
 
   async setFrozen(id: string, frozen: boolean, actorId: string, sessionId: string, meta: RequestMeta): Promise<AdminLedgerAccount> {
+    await this.applyFrozen(id, frozen, actorId, sessionId, meta);
+    return this.adminAccount(id);
+  }
+
+  /** `exec`: an outer transaction (double validation), so the change commits with the decision. */
+  async applyFrozen(id: string, frozen: boolean, actorId: string, sessionId: string | null, meta: RequestMeta, exec: Pick<Db, 'transaction'> = this.db): Promise<void> {
     if (!UUID_RE.test(id)) throw AppError.notFound('Account not found');
-    await this.db.transaction(async (tx) => {
+    await exec.transaction(async (tx) => {
       const res = await tx.execute<{ user_id: string | null; org_id: string | null; owner_kind: string; currency: string; status: string }>(sql`
         UPDATE ledger_accounts SET status = ${frozen ? 'frozen' : 'active'} WHERE id = ${id}::uuid
         RETURNING user_id, org_id, owner_kind, currency::text AS currency, status`);
@@ -257,7 +301,6 @@ export class WalletService {
         tx,
       );
     });
-    return this.adminAccount(id);
   }
 
   reconcile(): Promise<LedgerReconciliation> {
