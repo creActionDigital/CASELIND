@@ -1,0 +1,30 @@
+# Prompt de reprise CASELIND (2026-11-20) : à coller dans une nouvelle conversation
+
+Tu reprends le projet CASELIND (E:\CASELIND), pilote Goma (RDC), USD/CDF, couleur de marque #4F46E5, pas de dégradés, police Poppins. Réponds en français. Le propriétaire veut finir "de A à Z", avec le plus de sous-agents possible (ordinateur puissant), sans erreur, en économisant les tokens sans rien sacrifier à la qualité ni à la vitesse. Ne reste jamais inactif : quand des agents travaillent, prends toi-même une tâche qui ne touche pas leurs fichiers.
+
+## Lis d'abord (dans cet ordre)
+1. docs/RAPPORTS_AGENTS.md (état et constats ouverts), docs/BACKLOG.md (section "État réel"), docs/PROGRESS.md, docs/MODULES.md, docs/architecture/DECISIONS.md.
+2. Le cahier des charges maître : E:\CASELIND\CASELIND_CAHIER_DES_CHARGES_DEFINITIF.md (ne redemande jamais quel lot : lis-le).
+3. Mémoire : C:\Users\HP\.claude\projects\E--CASELIND\memory\MEMORY.md.
+
+## État au moment de l'arrêt
+- Branche master, HEAD 07b3d32, trois commits locaux d'avance sur origin/main (7f71ae7) : 68a360d (serveur, migrations 0071-0100), b7cc48e (mobile), 07b3d32 (docs, CI, déploiement). NON POUSSÉS.
+- Tests observés verts avant commit : API 1221 (un test 2FA intermittent dans la suite complète, vert seul), mobile 487 ; tsc propre api + mobile + contracts. Kiswahili 4676/4676 (script apps/mobile/scripts/i18n-coverage.mjs).
+- Fichiers non suivis à ne pas commiter : .expo/, .playwright-mcp/, tsconfig.json (racine).
+
+## À faire maintenant, dans cet ordre
+1. **Relecture de sécurité et de correction des lots 0088-0100** (mini-apps phase 2, sanctions et recours, annonces/réglages/commissions, mobilité 2 : covoiturage/location/dépannage, produits numériques, finance du wallet) : 2 agents sonnet en lecture seule, rapports de 30 lignes, puis corriger les défauts réels avec un test chacun.
+2. **TESTER TOUT, écran par écran (exigence explicite du propriétaire : "on doit tout tester")** : pour CHAQUE écran sous apps/mobile/src/app (liste : `find apps/mobile/src/app -name "*.tsx"`), l'ouvrir, vérifier chargement/erreur/vide, faire les actions principales de bout en bout avec de vraies données de démonstration, en clair et en sombre, en largeur téléphone (375) et bureau, en fr/en/sw, et noter dans docs/QA_ECRANS.md un tableau écran → résultat → défaut corrigé. Parcours complets à jouer : inscription/connexion, boutique → panier → commande → retour/remboursement, caisse, livraison/coursier, wallet, mobilité (course, covoiturage, location, dépannage), mini-apps (consentement, paiement), administration (double validation à 2 administrateurs, sanctions, recours). Lancer aussi les tests de charge/fumée (scripts/smoke, scripts/load) et un `docker compose config` si Docker est disponible. Utiliser des sous-agents sonnet pour répartir les écrans (3 au plus en parallèle), chacun rapporte en ≤ 20 lignes avec captures décrites.
+   Détail de la vérification dans le navigateur :
+   **Vérifier les écrans dans le navigateur** (outil Browser, serveur Expo web : voir .claude/launch.json ; données : scripts/seed-demo.mjs) : admin (hub, sanctions, annonces, réglages, approbations), mes sanctions, annonces, covoiturage, location, dépannage, retours, promotions, achats, RH, créateur, téléchargements, comparateur, wallet (requests/split/scheduled/savings/alerts), mini-apps (consentement, développeur). Corriger ce qui casse.
+3. **Restes connus** : les ventes de caisse ne rendent pas leurs unités promotionnelles à l'annulation ; écran mobile du reset du code de remise du coursier (POST /v1/courier-requests/:id/reset-proof) ; limits.maxOrderMinor non appliqué au paiement ; notification à l'utilisateur après sanction par double validation ; notificationsMuted absent de l'export de compte ; lien profond de consentement mini-app après connexion non testé ; tuile vendeur vers seller/[orgId]/product-files?productId= ; chemins à vérifier : /commissions vendeur.
+4. **Push** : demande l'accord explicite du propriétaire avant `git push origin master:main` (compte GitHub creActionDigital, flux appareil ; voir mémoire github-push.md). Ne pousse jamais sans ce oui.
+
+## Règles du propriétaire (à respecter strictement)
+- Commits avec un titre clair en français, un commit par lot cohérent, tests complets verts avant chaque commit (API : `npm test -w @caselind/api` ~10 min, UN seul processus lourd à la fois ; mobile : `npx vitest run` dans apps/mobile). Fin de message de commit : "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>" (ou celle du dernier rappel système).
+- Ne dis "fait" que sur résultat observé ; termine toujours par ce qui n'est pas fait ou pas vérifié.
+- Exclus (ne pas faire) : application web (7), e-mails transactionnels (11), trading, paris, lot 19 services publics, CSL Coins, abonnements payants. Bloqués par un tiers (ne pas contourner) : FlexPay/paiement en ligne, Brevo/WhatsApp OTP, compte Expo/push, appels TURN, hébergement/domaine, S3/CDN, fournisseur de tuiles de production, connexion sociale, biométrie, messages vocaux, envoi de PDF depuis le mobile (l'installation de expo-document-picker a été refusée : demande au propriétaire).
+- Monolithe modulaire (cahier §28) : pas de microservices prématurés. Paiements : wallet bac à sable, COD seulement, remboursements "à régler hors plateforme". Santé et modules réglementés coupés par défaut côté serveur.
+- Sous-agents : modèle sonnet, ≤ 3-4 en parallèle, un vitest à la fois par agent (erreur Windows 1455 = mémoire : relancer seul), rapports de ≤ 20 lignes, migrations réservées à partir de 0101, fichiers partagés par Edit uniquement.
+- Pièges Windows : pas de `sed -i` (casse les CRLF), écrire les scripts de modification avec l'outil Write puis `node fichier` ; Alert.alert à boutons ne marche pas sur le web : utiliser alertConfirm (apps/mobile/src/lib/confirm.ts) ; après un changement de contrats : `npm run build -w @caselind/contracts`.
+- Le kiswahili a été écrit par des agents : relecture par un locuteur natif obligatoire avant la production ; le cahier demande fr/en/sw (le lingala n'existe pas).
