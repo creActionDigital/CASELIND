@@ -17,7 +17,8 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:18
+        # Same major version as deploy/docker-compose.yml (postgres:17).
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ci-postgres-only
@@ -60,12 +61,46 @@ jobs:
       - run: npx expo export --platform web
         working-directory: apps/mobile
 
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @caselind/contracts
+      - run: npm run typecheck -w @caselind/web
+      - run: npm test -w @caselind/web
+      - run: npx vite build
+        working-directory: apps/web
+
+  docker:
+    # Builds the API image exactly as deploy/docker-compose.yml does (no push), with a GitHub Actions layer cache.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: false
+          tags: caselind-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # No lint job yet: ESLint is not a dependency of the repository (apps/mobile "lint" is `expo lint`, which needs it).
+  # Add one together with the ESLint dependency and its config, not before.
+
   audit:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Non-blocking at first: dependency advisories are reviewed, not yet a merge gate.
-    # Remove continue-on-error once the baseline is clean.
-    continue-on-error: true
+    # Blocking: fails on high or critical advisories of production dependencies only
+    # (--omit=dev: build tooling and test dependencies do not ship). Moderate and below are reviewed, not gated.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

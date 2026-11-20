@@ -1,6 +1,6 @@
 # Contrats d'API CASELIND — v1
 
-Dernière mise à jour : 2026-11-01. Source de vérité : schémas Zod de [`packages/contracts/src`](../../packages/contracts/src). Ce document en est la lecture humaine.
+Dernière mise à jour : 2026-11-20 (conventions transverses, temps réel, webhooks, métriques ajoutés en fin de document ; les routes des lots 13 et suivants ne sont pas détaillées ici : source de vérité = `GET /v1/openapi.json` et `apps/api/src/openapi/registry.ts`). Source de vérité : schémas Zod de [`packages/contracts/src`](../../packages/contracts/src). Ce document en est la lecture humaine.
 
 **Source lisible par machine : `GET /v1/openapi.json`** (public, sans limitation de débit). Document OpenAPI 3.1.0 généré (à la première requête, puis mis en cache) depuis ces mêmes schémas Zod (`z.toJSONSchema`, entrées en `io: 'input'`, réponses en `io: 'output'`) à partir du registre [`apps/api/src/openapi/registry.ts`](../../apps/api/src/openapi/registry.ts). Le test `apps/api/test/openapi.e2e.test.ts` échoue si une route montée manque au registre ou inversement : toute nouvelle route doit y être déclarée. Les clients mobile et web peuvent générer leurs types depuis ce document.
 
@@ -397,3 +397,85 @@ Flag `ai` (actif, non réglementé). Les routes admin n'en dépendent pas. Aucun
 - **Confidentialité** : prompt système en code (français, se déclare IA, n'invente rien sur l'application) ; ni prompt ni réponse dans les logs ni l'audit (`log-scrub` masque aussi les query strings de `/ai` et `/me/ai-settings`).
 - **Compte** : l'export ajoute `aiConversations` ; la purge supprime conversations, messages, réglages et compteurs.
 - **Limites connues** : pas de streaming ; pas de réessai ni de disjoncteur ; noms de modèles et politiques du catalogue par défaut à revérifier au moment de créer les clés ; quota par jour UTC et non par fenêtre glissante.
+
+---
+
+# Conventions transverses (relevé du 2026-11-20)
+
+Cette partie complète les conventions du début du document. Source : `apps/api/src/common`, `app.module.ts`, `bootstrap.ts`, `observability`, `realtime`, `webhooks`, `miniapps` et `packages/contracts/src`. Les routes des lots 13 et suivants (commerce avancé, livraison et coursiers, mobilité, santé, éducation, RH, mini-apps phase 2, administration…) ne sont pas détaillées dans ce fichier : voir `GET /v1/openapi.json`.
+
+## En-têtes
+
+| En-tête | Sens | Détail |
+|---|---|---|
+| `Authorization: Bearer <accessToken>` | requête | Jeton de session. Les routes `/v1/miniapp-api/*` acceptent à la place un jeton d'application opaque (`cla_…`), jamais un jeton de session (ADR-021). |
+| `X-Request-Id` | requête et réponse | Accepté seulement s'il correspond à `^[A-Za-z0-9._-]{8,64}$`, sinon un UUID est généré. Toujours renvoyé dans l'en-tête de réponse, repris dans `error.requestId` et dans les journaux pino. |
+| `Retry-After` | réponse (secondes) | Posé par la garde des jetons d'application et par le calcul de quota des mini-apps (429). Pour le limiteur NestJS global (429 `rate_limited` sans `details`), la présence de l'en-tête est à vérifier. |
+| `Content-Type: application/json` | requête | Corps JSON limité à 100 ko. Les téléversements de médias suivent leurs propres limites `MEDIA_MAX_*`. |
+
+## Enveloppe d'erreur et `details.reason`
+
+Enveloppe unique `{ "error": { code, message, details?, requestId } }`. `code` est stable, `message` ne l'est pas. Pour les erreurs de validation (400 `validation_failed`), `details` est un tableau `[{path, message}]` ; pour les erreurs métier, `details` est un objet, le plus souvent `{ reason }` : un identifiant court et stable qui permet au client de choisir son message (par exemple `idempotency_mismatch`, `insufficient_funds`, `limit_exceeded`, `slot_taken`, `invalid_transition`, `last_owner`, `consent_required`, `pin_not_set`, `pin_locked`). Les URL de webhook refusées répondent 400 avec `details: [{path: 'url', message: 'url_<raison>'}]`.
+
+Codes (`packages/contracts/src/errors.ts`) : `validation_failed`, `unauthenticated`, `invalid_credentials`, `forbidden`, `not_found`, `conflict`, `rate_limited`, `account_locked`, `account_not_verified`, `account_suspended`, `otp_invalid`, `otp_expired`, `otp_resend_too_soon`, `refresh_token_invalid`, `feature_disabled`, `payload_too_large`, `unsupported_media_type`, `data_notice_required`, `ai_unavailable`, `ai_provider_error`, `consent_required`, `internal_error`. La table HTTP du début du document reste valable ; ajouts : 409 `data_notice_required` et `consent_required` (`details.kind`), 502 `ai_provider_error`, 503 `ai_unavailable`.
+
+Règles : un objet d'un autre utilisateur ou d'une autre organisation répond 404 (pas 403) quand son existence ne doit pas fuiter ; une fonction coupée par un flag répond 403 `feature_disabled` ; `internal_error` ne contient jamais de détail interne. Les valeurs de `details.reason` ne sont pas figées dans un schéma partagé (environ 200 valeurs dans les services) : se référer à la ligne de la route dans `registry.ts` avant de s'appuyer sur l'une d'elles.
+
+## Pagination par curseur
+
+Les listes paginées acceptent `limit` (défaut et maximum selon la route, par exemple 50 et 100 pour certaines listes de messagerie) et `cursor`, et répondent `{ items, nextCursor }`. Le curseur est **opaque** pour le client : un keyset (horodatage, id) encodé en base64url (`stories/cursor.ts`), ou une clé propre au module (par exemple `(distance, id)` pour `/places`). Un curseur invalide donne 400 `validation_failed` (`path: cursor`). Quelques routes anciennes utilisent `before` (par exemple l'audit) : se référer à leur schéma.
+
+## Idempotence
+
+- Toute création susceptible d'être rejouée par un client mobile hors ligne porte un **`clientId`** (UUID généré par le client) : message, publication, story, sondage, commande, virement, demande d'argent, partage de frais, dépôt d'épargne, paiement QR, boost, pourboire. `clientRef` joue le même rôle pour les demandes de paiement des mini-apps.
+- Même `clientId` et mêmes valeurs : **200** avec la ressource déjà créée (la première création renvoie 201), sans second effet.
+- Même `clientId` avec des valeurs différentes : **409** `conflict` avec `details.reason: idempotency_mismatch` (virements, boosts) ou `client_id_reused` / `client_ref_reused` selon le module.
+- L'unicité est portée par la base (par exemple `UNIQUE (sender_id, conversation_id, client_id)` pour les messages), donc valable entre instances.
+- Il n'existe pas d'en-tête `Idempotency-Key` générique (non trouvé dans le code).
+
+## Événements temps réel (Socket.IO)
+
+Connexion : `io(url, { path: '/v1/socket.io', auth: { token } })`, jeton lu uniquement dans `handshake.auth.token`, vérifié par le `SessionVerifier` (même règle que l'API HTTP). Refus : `connect_error` « unauthenticated ». À la connexion, la socket rejoint `user:<id>`, `session:<id>` et les `conversation:<id>` de l'utilisateur ; `order:<id>` sert au suivi de livraison d'une commande. Tampon entrant limité à 16 ko ; seul `typing` est accepté du client. CORS repris de `CORS_ORIGINS` (fermé si vide). Les effets temps réel partent **après le commit** et ne bloquent jamais la requête : les clients doivent se resynchroniser par HTTP à la reconnexion.
+
+Événements serveur vers client (type `RealtimeEvent`, `realtime/realtime.service.ts`) :
+
+| Événement | Room / destinataire | Émis par | Charge utile |
+|---|---|---|---|
+| `message.new`, `message.updated`, `message.reaction`, `message.poll` | `conversation:` | messaging, moderation | message complet (`updated` : rappel, modération) ; agrégats pour `reaction` et `poll` |
+| `receipt.updated` | `conversation:` | messaging | reçu de lecture |
+| `conversation.updated`, `conversation.member_added`, `conversation.member_removed` | `conversation:` | messaging, communautés | infos de conversation ou `{conversationId, userId}` |
+| `draft.updated` | `user:` | messaging | `{conversationId, body}` (`body: null` après envoi) |
+| `presence.updated` | `user:` des pairs autorisés | messaging (présence) | `presenceSchema` ; respecte `show_presence` |
+| `typing` | `conversation:` (autres membres) | client, relayé par le serveur | `{conversationId, userId}` ; 1 par 2 s et par conversation |
+| `notification.new` | `user:` | notifications | `Notification` |
+| `delivery.updated` | `user:` acheteur et coursier | delivery, courier | `{orderId, deliveryId, status}` ou `{courierRequestId, status}` |
+| `delivery.location` | `order:` ou `user:` du demandeur | delivery, courier | `{lat, lng, updatedAt}` (+ `courierRequestId` pour les courses) |
+| `ride.updated`, `ride.location`, `ride.message` | `user:` passager et chauffeur | mobility | `{rideId, status}` ; `{rideId, lat, lng, updatedAt}` ; `{rideId, code, text, fromRole}` (messages rapides prédéfinis) |
+| `call.ringing`, `call.updated`, `call.signal` | `user:` des deux parties | calls | appel ; `{callId, from, type, payload}` (signalisation relayée, jamais stockée) |
+| `live.viewers`, `live.ended`, `live.message`, `live.signal` | `user:` hôte et spectateurs | calls (lives) | `{liveId, …}` |
+
+**en cours** : la mobilité (`ride.*`, `delivery.location` des courses) évolue encore ; les formes ci-dessus sont celles du code au 2026-11-20.
+
+## Webhooks sortants d'organisation
+
+Routes (permission `org.admins.manage`, donc propriétaires) : `GET|POST /v1/orgs/:orgId/webhooks`, `PATCH|DELETE …/webhooks/:id`, `POST …/webhooks/:id/rotate-secret`, `GET …/webhooks/:id/deliveries`, `POST …/webhooks/:id/test`. 5 abonnements au plus par organisation (`WEBHOOKS_PER_ORG`).
+
+Événements (`WEBHOOK_EVENTS`, `packages/contracts/src/webhooks.ts`) : `order.created`, `order.status_changed`, `order.return_requested`, `pos.sale_created`, `pos.sale_voided`, `org.question_asked`.
+
+Livraison : `POST` JSON `{ id, event, createdAt, orgId, data }`. En-têtes : `X-Caselind-Event`, `X-Caselind-Delivery` (id de livraison), `X-Caselind-Timestamp`, `X-Caselind-Signature` = HMAC-SHA256 hex de `"<timestamp>.<corps brut>"` avec le secret de l'abonnement (affiché une seule fois à la création et à la rotation ; stocké chiffré). `User-Agent: Caselind-Webhooks/1`. Le récepteur doit vérifier la signature et refuser un horodatage trop ancien (le SDK `packages/sdk/src/webhook.ts` le fait, tolérance de 300 s par défaut). Succès = réponse 2xx.
+
+Fiabilité : délai de 5 s ; 3 tentatives (reprises à 1 min puis 10 min, relevées chaque minute) ; abonnement désactivé après 10 échecs consécutifs ; journal conservé : 100 livraisons par abonnement (le corps n'est pas renvoyé par l'API) ; plafond de 120 événements par minute et par organisation (par instance ; au-delà, abandon avec avertissement). URL : https seulement, ports 443 ou 8443, pas d'identifiants dans l'URL, pas d'adresse privée ni locale, DNS résolu et vérifié, requête envoyée vers l'adresse vérifiée (anti-SSRF, voir ADR du 2026-11-20).
+
+## Webhooks et notifications des mini-apps
+
+Événements (`MINIAPP_EVENTS`, `packages/contracts/src/miniapps-platform.ts`) : `authorization.granted`, `authorization.revoked`, `payment.confirmed`, `payment.declined`, `user.data_deletion_requested` (plus `ping` depuis le portail développeur). Le champ `data.sub` est l'identifiant de l'utilisateur **propre à l'application**, jamais l'id global. Mêmes en-têtes `X-Caselind-*`, même signature, mêmes tentatives et même garde anti-SSRF que les webhooks d'organisation ; un abonnement par application (`miniapp_webhooks`), géré depuis le portail développeur. Types côté SDK : `packages/sdk/src/webhook.ts` (`CaselindWebhookError.reason` : `missing_header`, `stale_timestamp`, `bad_signature`, `bad_body`).
+
+`POST /v1/miniapp-api/notify` : notification envoyée à l'utilisateur par l'application ; quotas par utilisateur et par jour (`details.reason: notify_quota`) et par application (`MINIAPP_NOTIFY_APP_PER_DAY`, 2000 par défaut). Détail des routes : `registry.ts`, bloc « Developer platform phase 2 » (**en cours**).
+
+## Quotas et limites de débit (429)
+
+Limiteur global `RATE_LIMIT_PER_MINUTE` (120) ; `AUTH_RATE_LIMIT_PER_MINUTE` (10) sur `/auth` ; limites dédiées : médias, messagerie, signalements, recherche, sondage de QR, jetons OAuth, IA et traduction. Mini-apps : fenêtre fixe par application (`MINIAPP_RATE_LIMIT_PER_MINUTE` 300, `MINIAPP_RATE_LIMIT_PER_DAY` 50 000, surcharge par application via `PATCH /v1/admin/miniapps/:appId/quota`), réponse 429 avec `Retry-After`. Tous ces compteurs sont **en mémoire de l'instance** (voir `CASELIND_ARCHITECTURE.md`, limites connues).
+
+## `/metrics` et sondes
+
+`GET /metrics` (hors `/v1`) avec `Authorization: Bearer <METRICS_TOKEN>` ; 404 si `METRICS_TOKEN` n'est pas défini, 401 si le jeton est faux (comparaison en temps constant). Format texte Prometheus 0.0.4, `Cache-Control: no-store`, sans limitation de débit. Séries : `http_requests_total{method,route,status_class}` et `http_request_duration_seconds` (histogramme ; `route` = gabarit de route Nest, jamais l'URL brute), `caselind_maintenance_runs_total{result}`, `caselind_webhook_deliveries_total{status}`, `caselind_pos_operations_total{type}`, `process_resident_memory_bytes`, `process_heap_used_bytes`, `process_cpu_seconds_total`, `process_uptime_seconds`, `nodejs_eventloop_lag_mean_seconds`, `nodejs_eventloop_lag_max_seconds`, `pg_pool_connections_total`, `pg_pool_connections_idle`, `pg_pool_waiting_requests`, `socketio_connections_active`. Aucun identifiant ne peut entrer dans une étiquette. Sondes publiques : `GET /v1/health`, `/v1/health/live`, `/v1/health/ready`.

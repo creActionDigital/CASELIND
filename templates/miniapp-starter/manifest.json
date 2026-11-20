@@ -1,0 +1,24 @@
+{
+  "dataAccessed": [
+    { "scope": "profile.basic", "purpose": "Afficher votre nom et votre avatar dans l'application", "retention": "Jusqu'au retrait de l'accès" },
+    { "scope": "wallet.pay", "purpose": "Demander un paiement que vous confirmez avec votre PIN", "retention": "10 ans (obligation comptable)" },
+    { "scope": "notify", "purpose": "Vous prévenir quand votre commande avance", "retention": "Aucune (non conservée)" }
+  ],
+  "endpoints": [
+    { "method": "GET", "path": "/v1/miniapp-api/me" },
+    { "method": "POST", "path": "/v1/miniapp-api/payment-requests" },
+    { "method": "GET", "path": "/v1/miniapp-api/payment-requests/{id}" },
+    { "method": "POST", "path": "/v1/miniapp-api/notify" }
+  ],
+  "events": ["authorization.revoked", "payment.confirmed", "payment.declined", "user.data_deletion_requested"],
+  "costs": {
+    "model": "per_use",
+    "description": "Des paiements ponctuels que vous confirmez toujours vous-même ; aucun prélèvement automatique.",
+    "maxAmountMinor": 50000,
+    "currency": "USD"
+  },
+  "termsUrl": "https://example.com/conditions",
+  "privacyUrl": "https://example.com/confidentialite",
+  "supportEmail": "support@example.com",
+  "dataLocation": "Union européenne"
+}
