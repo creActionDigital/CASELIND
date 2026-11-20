@@ -3,7 +3,7 @@ import { memo, type ComponentRef, useEffect, useMemo, useRef, useState } from 'r
 import { Image, PanResponder, Platform, Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
 import { useI18n } from '../i18n';
-import { spacing } from '../theme/tokens';
+import { brandColor, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Text } from '../ui';
 import type { LatLng } from './geo';
@@ -138,7 +138,7 @@ export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, line, 
       ))}
       {size.w > 0 && line && line.length >= 2 ? (
         <Svg pointerEvents="none" width={size.w} height={size.h} style={StyleSheet.absoluteFill}>
-          <Polyline points={linePoints(line, view.center, view.zoom, size.w, size.h)} fill="none" stroke="#4F46E5" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+          <Polyline points={linePoints(line, view.center, view.zoom, size.w, size.h)} fill="none" stroke={brandColor} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       ) : null}
       {size.w > 0 ? markers.map((m) => <Pin key={m.id} marker={m} {...at(m)} onSelect={onSelect} color={colors.primary} />) : null}

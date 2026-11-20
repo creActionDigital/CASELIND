@@ -37,7 +37,7 @@ function Gate() {
   if (status === 'loading' || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: colors.background }}>
-        <Wordmark size={28} />
+        <Wordmark size={28} vertical />
         <ActivityIndicator color={colors.primary} />
       </View>
     );

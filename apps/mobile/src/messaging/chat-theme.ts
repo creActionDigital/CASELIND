@@ -35,6 +35,6 @@ export function chatColors(colors: Palette, isDark: boolean): ChatColors {
         theirBubble: colors.surface,
         onTheirs: colors.text,
         accent: brandColor,
-        tick: '#C7D2FE',
+        tick: '#BFE0F7', // bleu clair lisible sur la bulle bleue
       };
 }

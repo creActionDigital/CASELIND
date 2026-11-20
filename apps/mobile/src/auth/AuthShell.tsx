@@ -10,8 +10,8 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
   return (
     <Screen>
       <View style={{ maxWidth: 480, width: '100%', alignSelf: 'center', paddingTop: spacing.xl }}>
-        <Wordmark size={26} />
-        <Text variant="small" muted style={{ marginTop: spacing.xs, marginBottom: spacing.xxl }}>
+        <Wordmark size={24} vertical />
+        <Text variant="small" muted style={{ marginTop: spacing.xs, marginBottom: spacing.xxl, textAlign: 'center' }}>
           {t('auth.tagline')}
         </Text>
         <Text variant="title" accessibilityRole="header" style={{ marginBottom: spacing.xs }}>

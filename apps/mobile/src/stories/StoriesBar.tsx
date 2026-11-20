@@ -15,7 +15,7 @@ import { fetchStoryFeed } from './api';
 import { storyKeys } from './keys';
 import { orderStoryGroups } from './order';
 
-/** Barre des statuts de l'Accueil : « Mon statut » puis un avatar par auteur (anneau indigo = non vus, rouge + badge LIVE = en direct). */
+/** Barre des statuts de l'Accueil : « Mon statut » puis un avatar par auteur (anneau bleu = non vus, rouge + badge LIVE = en direct). */
 export function StoriesBar() {
   const { colors } = useTheme();
   const { t } = useI18n();

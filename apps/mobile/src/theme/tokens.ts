@@ -1,6 +1,6 @@
 /**
- * Identité visuelle CASELIND : langage inspiré des principes Apple (HIG) — base neutre, une seule couleur
- * d'accent (l'indigo CASELIND), typographie système à l'échelle iOS, surfaces calmes et séparateurs fins.
+ * Identité visuelle CASELIND : langage inspiré des principes Apple (HIG) — base neutre, couleurs du logo officiel
+ * (bleu #0F70B7 principal, orange #ED6B1B secondaire), typographie Poppins, surfaces calmes et séparateurs fins.
  * Le rouge est réservé aux pastilles et aux alertes. Contrastes vérifiés AA (texte ≥ 4.5:1, interface ≥ 3:1).
  */
 export interface Palette {
@@ -30,9 +30,9 @@ export const light: Palette = {
   border: '#D1D1D6',
   text: '#1D1D1F', // 15.6:1 sur background
   textMuted: '#636366', // 5.4:1 sur background, 5.9:1 sur surface
-  primary: '#4F46E5', // 6.3:1 avec blanc, 5.6:1 sur background
+  primary: '#0F70B7', // bleu du logo : 5.2:1 avec blanc, 4.7:1 sur background
   onPrimary: '#FFFFFF',
-  primarySoft: '#E8E7FC',
+  primarySoft: '#E3EFF8',
   accent: '#D70015', // pastilles de notification : 5.9:1 avec blanc
   onAccent: '#FFFFFF',
   danger: '#D70015',
@@ -50,9 +50,9 @@ export const dark: Palette = {
   border: '#38383A',
   text: '#F5F5F7', // 19:1
   textMuted: '#A1A1A6', // 8:1 sur background, 6.6:1 sur surface
-  primary: '#8E8AFF', // 7.3:1 sur background
-  onPrimary: '#0B0A2E', // 7.5:1 sur primary
-  primarySoft: '#25233F',
+  primary: '#4DA3E8', // bleu du logo éclairci : 7.7:1 sur background
+  onPrimary: '#04121F', // 7.4:1 sur primary
+  primarySoft: '#0E2A40',
   accent: '#FF453A',
   onAccent: '#1A0000', // 6.0:1
   danger: '#FF6961', // 7.4:1 sur background
@@ -69,10 +69,12 @@ export const radius = { sm: 10, md: 14, lg: 22, xl: 28, xxl: 32, pill: 999 } as 
 /**
  * Couleur de marque UNIE (logo, bouton central, actions principales) : le propriétaire ne veut pas de
  * dégradés. Gardé sous forme de paire pour les composants `LinearGradient` existants, qui rendent ainsi
- * un aplat. Texte blanc dessus : 6,3:1 (AA). Ne pas réintroduire de dégradé décoratif.
+ * un aplat. Texte blanc dessus : 5,2:1 (AA). Ne pas réintroduire de dégradé décoratif.
  */
-export const brandColor = '#4F46E5';
+export const brandColor = '#0F70B7';
 export const brandGradient = [brandColor, brandColor] as const;
+/** Orange du logo, couleur secondaire de marque (assistant IA, mises en avant) : icônes ou gros texte seulement (3,1:1 avec blanc). */
+export const brandAccent = '#ED6B1B';
 
 /** Surfaces sombres « vitrées » posées sur une photo ou une vidéo (live, visionneuses). */
 export const glass = { dark: 'rgba(17,17,24,0.55)', light: 'rgba(255,255,255,0.18)', border: 'rgba(255,255,255,0.22)' } as const;

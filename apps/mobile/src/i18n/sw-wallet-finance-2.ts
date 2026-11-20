@@ -2,7 +2,6 @@ import type { MessageKey } from './fr';
 
 /** Kiswahili : finances du portefeuille (demandes, partage, paiements planifiés, épargne, alertes). */
 export const swWalletFinance2: Partial<Record<MessageKey, string>> = {
-  'wf.test': 'Hali ya majaribio: pesa za kubuni, hakuna uhusiano na opereta yeyote wa Mobile Money.',
   'wf.menu.title': 'Fedha za pochi',
   'wf.menu.requests': 'Maombi',
   'wf.menu.split': 'Gawanya',

@@ -1,6 +1,5 @@
 /** Textes de la finance du portefeuille (mode test) : demandes d'argent, paiements partagés et programmés, tirelires, alertes. Fusionnés dans `fr` et `en`. */
 export const walletFinanceFr = {
-  'wf.test': 'Mode test : argent fictif, aucun lien avec un opérateur de Mobile Money.',
   'wf.menu.title': 'Finance du portefeuille',
   'wf.menu.requests': 'Demandes',
   'wf.menu.split': 'Partager',
@@ -128,7 +127,6 @@ export const walletFinanceFr = {
 } as const;
 
 export const walletFinanceEn = {
-  'wf.test': 'Test mode: fictitious money, no link with any Mobile Money operator.',
   'wf.menu.title': 'Wallet finance',
   'wf.menu.requests': 'Requests',
   'wf.menu.split': 'Split',

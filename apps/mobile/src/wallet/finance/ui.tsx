@@ -10,17 +10,9 @@ import { PIN_LENGTH } from '../pin';
 import { PinPad, SandboxBanner } from '../ui';
 import { financeErrorMessage } from './errors';
 
-/** En-tête commun : bandeau « mode test » du portefeuille + rappel que rien n'est relié à Mobile Money. */
+/** En-tête commun : bandeau « mode test » du portefeuille (il dit déjà que rien n'est relié à Mobile Money). */
 export function FinanceHeader() {
-  const { t } = useI18n();
-  return (
-    <View style={{ gap: spacing.xs }}>
-      <SandboxBanner />
-      <Text variant="caption" muted>
-        {t('wf.test')}
-      </Text>
-    </View>
-  );
+  return <SandboxBanner />;
 }
 
 /** Carte simple sur fond de surface. */

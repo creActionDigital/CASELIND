@@ -33,7 +33,7 @@ export function Chip({ label, selected, disabled, onPress }: { label: string; se
   );
 }
 
-/** Pastille de catégorie (boutique) : pleine en indigo quand elle est active, contour discret sinon. */
+/** Pastille de catégorie (boutique) : pleine en bleu de marque quand elle est active, contour discret sinon. */
 export function CategoryPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   const { colors } = useTheme();
   return (
@@ -109,7 +109,7 @@ export function Stepper({
   );
 }
 
-/** Statut de commande : teinte neutre, indigo pour la livraison en cours, vert pour livrée (le rouge reste aux alertes). */
+/** Statut de commande : teinte neutre, bleu de marque pour la livraison en cours, vert pour livrée (le rouge reste aux alertes). */
 export function StatusPill({ status }: { status: OrderStatus }) {
   const { colors } = useTheme();
   const { t } = useI18n();
