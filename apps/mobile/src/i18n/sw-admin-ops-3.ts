@@ -95,7 +95,7 @@ export const swAdminOps3: Partial<Record<MessageKey, string>> = {
   'ops2.settings.hint.currencies.enabled': 'Sarafu zikitenganishwa kwa koma: USD, CDF',
   'ops2.settings.hint.cities.pilot': 'Miji ya majaribio ikitenganishwa kwa koma',
   'ops2.settings.hint.commission.defaultBps': 'Pointi za msingi, 0 hadi 3000 (250 = 2.5%). Uthibitisho maradufu.',
-  'ops2.settings.hint.limits.maxOrderMinor': 'Kikomo cha oda kwa vipimo vidogo. Uthibitisho maradufu.',
+  'ops2.settings.hint.limits.maxOrderMinor': 'Kikomo cha oda kwa kila sarafu, kwa vipimo vidogo: "USD 5000000, CDF 900000000". Uthibitisho maradufu.',
   'ops2.settings.reason': 'Sababu (herufi 3 hadi 300)',
   'ops2.settings.save': 'Hifadhi',
   'ops2.settings.saved': 'Mpangilio umehifadhiwa.',

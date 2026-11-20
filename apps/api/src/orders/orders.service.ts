@@ -25,6 +25,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { ORG_ROLE_PERMISSIONS } from '../orgs/org-permissions.js';
 import { LoyaltyService } from '../loyalty/loyalty.service.js';
 import { CommissionService } from '../platform-ops/commission.service.js';
+import { SettingsService } from '../platform-ops/settings.service.js';
 import { WebhookService } from '../webhooks/webhooks.service.js';
 import { resolveContactUserId } from '../orgs/org-contact.js';
 import { pgErrorOf, type Tx } from '../orgs/orgs.service.js';
@@ -73,6 +74,7 @@ export class OrdersService {
     private readonly loyalty: LoyaltyService,
     private readonly webhooks: WebhookService,
     private readonly commissions: CommissionService,
+    private readonly settings: SettingsService,
   ) {}
 
   /* ------------------------------------------------------------------ checkout */
@@ -165,6 +167,10 @@ export class OrdersService {
           ? await this.zones.resolveForCheckout(tx, g.orgId, g.currency, req.zones?.find((z) => z.orgId === g.orgId)?.zoneId, req.address, req.speed)
           : null;
       const deliveryFeeMinor = zone?.feeMinor ?? 0;
+      const max = await this.settings.maxOrderMinor(g.orgId, g.currency, tx);
+      if (max !== undefined && g.subtotalMinor - discountMinor + deliveryFeeMinor > max) {
+        throw AppError.conflict('The order is above the platform ceiling', { reason: 'order_limit_exceeded', currency: g.currency, maxMinor: max });
+      }
       const [order] = await tx
         .insert(orders)
         .values({

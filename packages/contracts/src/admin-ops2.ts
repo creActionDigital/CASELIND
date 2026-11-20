@@ -199,7 +199,11 @@ export const settingValueSchemas = {
   'currencies.enabled': z.array(z.enum(['USD', 'CDF'])).min(1).max(2),
   'cities.pilot': z.array(z.string().trim().min(1).max(60)).max(50),
   'commission.defaultBps': z.number().int().min(0).max(COMMISSION_MAX_BPS),
-  'limits.maxOrderMinor': z.number().int().min(1).max(1_000_000_000_000),
+  /** Plafond d'une commande par devise (unité mineure) ; une devise absente n'est pas plafonnée. */
+  'limits.maxOrderMinor': z
+    .object({ USD: z.number().int().min(1).max(1_000_000_000_000).optional(), CDF: z.number().int().min(1).max(1_000_000_000_000).optional() })
+    .strict()
+    .refine((v) => v.USD !== undefined || v.CDF !== undefined, 'USD or CDF required'),
 } as const satisfies Record<SettingKey, z.ZodType>;
 
 /** Portées admises par clé (la ville ne sert qu'aux coordonnées d'assistance). */

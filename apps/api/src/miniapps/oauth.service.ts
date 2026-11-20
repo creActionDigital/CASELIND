@@ -284,8 +284,8 @@ export class OAuthService {
 
   /** Grants including revoked ones; never a token. */
   async exportGrants(userId: string): Promise<ExportedMiniAppGrant[]> {
-    const res = await this.db.execute<{ app_id: string; name: string; scopes: string[]; created_at: string | Date; revoked_at: string | Date | null }>(sql`
-      SELECT g.app_id, a.name, g.scopes, g.created_at, g.revoked_at FROM miniapp_grants g JOIN miniapps a ON a.id = g.app_id
+    const res = await this.db.execute<{ app_id: string; name: string; scopes: string[]; created_at: string | Date; revoked_at: string | Date | null; notifications_muted: boolean }>(sql`
+      SELECT g.app_id, a.name, g.scopes, g.created_at, g.revoked_at, g.notifications_muted FROM miniapp_grants g JOIN miniapps a ON a.id = g.app_id
       WHERE g.user_id = ${userId}::uuid ORDER BY g.created_at, g.app_id`);
     return res.rows.map((r) => ({
       appId: r.app_id,
@@ -293,6 +293,7 @@ export class OAuthService {
       scopes: r.scopes,
       grantedAt: iso(r.created_at),
       revokedAt: r.revoked_at ? iso(r.revoked_at) : null,
+      notificationsMuted: r.notifications_muted,
     }));
   }
 }

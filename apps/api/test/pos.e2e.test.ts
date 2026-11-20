@@ -158,6 +158,16 @@ describe('caisse (counter sales)', () => {
     expect(JSON.stringify(audit.rows)).not.toContain('Article');
   });
 
+  it('void: gives back the promotional units the sale counted', async () => {
+    const s = await seller('USD');
+    const promotionId = randomUUID();
+    const promo = fake.add({ orgId: s.orgId, currency: 'USD', price: 8_000, stock: 10, promotionId });
+    const made = await sale(s, { lines: [{ variantId: promo, quantity: 3 }, { variantId: s.variant, quantity: 1 }] }).expect(201);
+    await ctx.http.post(`/v1/orgs/${s.orgId}/pos/sales/${made.body.id}/void`).set(bearer(s.owner.token)).send({}).expect(200);
+    expect(fake.releasedPromos.at(-1)).toEqual([{ promotionId, units: 3 }]);
+    expect(JSON.stringify(made.body)).not.toContain(promotionId);
+  });
+
   it('void: a variant with untracked stock is left alone', async () => {
     const s = await seller('USD');
     const free = fake.add({ orgId: s.orgId, currency: 'USD', price: 700, stock: 0, trackStock: false });

@@ -27,6 +27,17 @@ function setup(handler: (url: string, init: RequestInit) => Response | Promise<R
 }
 
 describe('api client', () => {
+  it('403 account_suspended : signale la restriction sans rafraîchir ni déconnecter', async () => {
+    const { fetchImpl, hooks } = setup(() => json(403, { error: { code: 'account_suspended', message: 'no' } }));
+    const onSuspended = vi.fn();
+    const c = createApiClient({ baseUrl: 'http://api.test/v1', hooks: { ...hooks, onSuspended }, fetchImpl: fetchImpl as unknown as typeof fetch });
+    c.setAccessToken('access-0');
+    await expect(c.request('/me')).rejects.toMatchObject({ status: 403, code: 'account_suspended' });
+    expect(onSuspended).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(hooks.onSignedOut).not.toHaveBeenCalled();
+  });
+
   it('10 concurrent 401 requests trigger a single /auth/refresh', async () => {
     const { client, fetchImpl, hooks } = setup(async (url, init) => {
       if (url.endsWith('/auth/refresh')) {

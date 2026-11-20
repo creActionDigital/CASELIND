@@ -30,6 +30,8 @@ export interface SessionHooks {
   onTokens(pair: TokenPair): Promise<void> | void;
   /** Refresh impossible (jeton invalide/expiré) : déconnexion locale. */
   onSignedOut(): Promise<void> | void;
+  /** Compte sanctionné : session restreinte (403 `account_suspended`) ; la session n'est ni rafraîchie ni vidée. */
+  onSuspended?(): void;
 }
 
 export interface ApiClientOptions {
@@ -134,7 +136,11 @@ export function createApiClient(options: ApiClientOptions) {
       res = await send(path, opts, fresh);
     }
 
-    if (!res.ok) throw await toError(res);
+    if (!res.ok) {
+      const err = await toError(res);
+      if (res.status === 403 && err.code === 'account_suspended') options.hooks.onSuspended?.();
+      throw err;
+    }
     if (opts.text) return (await res.text()) as T;
     if (res.status === 204 || !opts.schema) return undefined as T;
     let json: unknown;

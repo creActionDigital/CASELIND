@@ -50,6 +50,14 @@ export class SettingsService {
     return undefined;
   }
 
+  /** Ceiling of one order in `currency` for the shop's country (then global); `undefined` when none is set. */
+  async maxOrderMinor(orgId: string, currency: string, exec: Reader = this.db): Promise<number | undefined> {
+    const r = await exec.execute<{ country: string | null }>(sql`SELECT country::text AS country FROM organizations WHERE id = ${orgId}::uuid`);
+    const country = r.rows[0]?.country;
+    const v = await this.resolve('limits.maxOrderMinor', [...(country ? [`country:${country}`] : []), 'global'], exec);
+    return v?.[currency as 'USD' | 'CDF'];
+  }
+
   /** Non-sensitive keys only, resolved for the requested country and city. */
   async publicConfig(country?: string, city?: string): Promise<PublicConfig> {
     const scopes = [...(country && city ? [`city:${country}:${city}`] : []), ...(country ? [`country:${country}`] : []), 'global'];

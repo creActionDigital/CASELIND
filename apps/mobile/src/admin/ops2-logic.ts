@@ -71,8 +71,17 @@ export function parseSettingValue(key: SettingKeyName, text: string): unknown {
   const t = text.trim();
   switch (key) {
     case 'commission.defaultBps':
-    case 'limits.maxOrderMinor':
       return /^\d{1,13}$/.test(t) ? Number(t) : undefined;
+    case 'limits.maxOrderMinor': {
+      // « USD 5000000, CDF 900000000 » : une valeur par devise.
+      const v: Record<string, number> = {};
+      for (const part of t.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)) {
+        const m = /^(USD|CDF)\s*[:=]?\s*(\d{1,13})$/i.exec(part);
+        if (!m || Number(m[2]) < 1) return undefined;
+        v[m[1]!.toUpperCase()] = Number(m[2]);
+      }
+      return Object.keys(v).length > 0 ? v : undefined;
+    }
     case 'currencies.enabled': {
       const v = t.split(/[\s,;]+/).filter(Boolean).map((s) => s.toUpperCase());
       return v.length > 0 && v.every((c) => c === 'USD' || c === 'CDF') ? [...new Set(v)] : undefined;

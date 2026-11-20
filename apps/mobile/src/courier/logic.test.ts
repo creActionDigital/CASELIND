@@ -64,7 +64,7 @@ describe('express', () => {
 describe('coursier à la demande', () => {
   it('actions par statut et rôle', () => {
     expect(courierActions('requested', 'requester', false)).toEqual(['cancel']);
-    expect(courierActions('picked_up', 'requester', false)).toEqual([]);
+    expect(courierActions('picked_up', 'requester', false)).toEqual(['resetCode']);
     expect(courierActions('delivered', 'requester', false)).toEqual(['rate']);
     expect(courierActions('delivered', 'requester', true)).toEqual([]);
     expect(courierActions('accepted', 'courier', false)).toEqual(['pickedUp', 'shareLocation']);

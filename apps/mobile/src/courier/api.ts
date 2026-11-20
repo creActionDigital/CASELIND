@@ -28,6 +28,7 @@ export const fetchMyCourierRequests = (scope: 'active' | 'done' | 'all') =>
   api.request('/courier-requests', { query: { scope, limit: 50 }, schema: courierRequestListSchema });
 export const fetchCourierRequest = (id: string) => api.request(`/courier-requests/${id}`, { schema: courierRequestSchema });
 export const cancelCourierRequest = (id: string) => api.request(`/courier-requests/${id}/cancel`, { method: 'POST', body: {}, schema: courierRequestSchema });
+export const resetCourierProof = (id: string) => api.request(`/courier-requests/${id}/reset-proof`, { method: 'POST', body: {}, schema: courierRequestSchema });
 export const rateCourierRequest = (id: string, rating: number) =>
   api.request(`/courier-requests/${id}/rating`, { method: 'POST', body: { rating }, schema: courierRequestSchema });
 

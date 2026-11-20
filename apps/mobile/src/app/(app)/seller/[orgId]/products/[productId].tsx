@@ -263,6 +263,15 @@ function Editor({ orgId, product }: { orgId: string; product?: Product }) {
         style={{ marginBottom: spacing.md }}
       />
 
+      {product && canEdit ? (
+        <Button
+          variant="secondary"
+          label={t('dig.files.title')}
+          onPress={() => router.push({ pathname: '/seller/[orgId]/product-files', params: { orgId, productId: product.id } })}
+          style={{ marginBottom: spacing.md }}
+        />
+      ) : null}
+
       <SectionTitle>{t('seller.variants.title')}</SectionTitle>
       {variantsError ? (
         <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite" style={{ marginBottom: spacing.sm }}>

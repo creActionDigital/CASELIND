@@ -19,7 +19,7 @@ import { classifyLogin } from '../security/login-response';
 
 export type SignInResult = { twoFactorRequired: true; challengeId: string } | null;
 
-export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
+export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'restricted';
 
 interface AuthValue {
   status: AuthStatus;
@@ -51,6 +51,7 @@ const device = {
 
 /** Client API unique de l'application ; ses hooks sont branchés par AuthProvider. */
 let signedOutListener: (() => void) | null = null;
+let suspendedListener: (() => void) | null = null;
 export const api = createApiClient({
   baseUrl: API_URL,
   hooks: {
@@ -60,6 +61,7 @@ export const api = createApiClient({
       await clearRefreshToken();
       signedOutListener?.();
     },
+    onSuspended: () => suspendedListener?.(),
   },
 });
 
@@ -81,13 +83,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     signedOutListener = localSignOut;
+    suspendedListener = () => {
+      setMeState(null);
+      setStatus('restricted');
+    };
     return () => {
       signedOutListener = null;
+      suspendedListener = null;
     };
   }, [localSignOut]);
 
   const loadMe = useCallback(async () => {
-    const profile = await api.request('/me', { schema: meSchema });
+    let profile: Me;
+    try {
+      profile = await api.request('/me', { schema: meSchema });
+    } catch (err) {
+      // Session restreinte : l'écouteur a déjà basculé en mode restreint, la connexion est réussie.
+      if (err instanceof ApiRequestError && err.code === 'account_suspended') return;
+      throw err;
+    }
     setMeState(profile);
     if (isLocale(profile.locale)) applyLocale.current(profile.locale);
     setStatus('signedIn');
@@ -191,8 +205,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async signOut() {
         // Le jeton push est retiré tant que le jeton d'accès est valide, avant la révocation de la session.
-        const { unregisterPush } = await import('../notifications/push');
-        await unregisterPush();
+        if (status === 'signedIn') {
+          const { unregisterPush } = await import('../notifications/push');
+          await unregisterPush();
+        }
         try {
           await api.request('/auth/logout', { method: 'POST' });
         } catch {

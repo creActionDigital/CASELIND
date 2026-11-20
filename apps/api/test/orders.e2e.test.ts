@@ -779,3 +779,24 @@ describe('seller contact', () => {
     await get(stranger).expect(404);
   });
 });
+
+describe('plafond de commande (limits.maxOrderMinor)', () => {
+  it('refuses an order above the ceiling of its currency; other currencies and smaller orders pass', async () => {
+    await ctx.sql.query(`INSERT INTO platform_settings (key, scope, value) VALUES ('limits.maxOrderMinor', 'global', '{"CDF": 15000}'::jsonb)
+      ON CONFLICT (key, scope) DO UPDATE SET value = EXCLUDED.value`);
+    try {
+      const s = await seller('CDF');
+      const usd = await seller('USD');
+      const buyer = await user();
+      await setItem(buyer, s.a, 2).expect(200);
+      const ko = await checkout(buyer).expect(409);
+      expect(ko.body.error.details).toMatchObject({ reason: 'order_limit_exceeded', currency: 'CDF', maxMinor: 15000 });
+      expect((await ctx.sql.query(`SELECT 1 FROM orders WHERE buyer_id = $1`, [buyer.id])).rows).toHaveLength(0);
+      await setItem(buyer, s.a, 1).expect(200);
+      await setItem(buyer, usd.a, 5).expect(200);
+      await checkout(buyer).expect(201);
+    } finally {
+      await ctx.sql.query(`DELETE FROM platform_settings WHERE key = 'limits.maxOrderMinor'`);
+    }
+  });
+});

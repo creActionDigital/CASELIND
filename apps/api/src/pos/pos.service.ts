@@ -21,8 +21,8 @@ import { DB, type Db } from '../db/db.module.js';
 import { countPosOperation } from '../observability/metrics.js';
 import { WebhookService } from '../webhooks/webhooks.service.js';
 
-/** `lines` also carries `variantId` (internal: needed to give the stock back on void); the API never shows it. */
-type StoredLine = PosSale['lines'][number] & { variantId?: string };
+/** `lines` also carries `variantId` and the promotion units counted (internal: given back on void); the API never shows them. */
+type StoredLine = PosSale['lines'][number] & { variantId?: string; promotionId?: string | null; promoUnits?: number };
 type Row = { request_hash?: string | null; id: string; currency: string; total_minor: string; payment_method: PosSale['paymentMethod']; lines: StoredLine[]; created_at: Date | string; voided_at: Date | string | null };
 const COLS = sql`id, currency, total_minor, payment_method, lines, created_at, voided_at`;
 const iso = (d: Date | string): string => new Date(d).toISOString();
@@ -85,7 +85,7 @@ export class PosService {
       if (currencies.size !== 1) throw AppError.conflict('All items of a sale must use the same currency');
       const currency = [...currencies][0]!;
       const total = reserved.lines.reduce((s, l) => s + l.unitPriceMinor * l.quantity, 0);
-      const lines: StoredLine[] = reserved.lines.map((l) => ({ variantId: l.variantId, title: l.title, variantLabel: l.variantLabel, quantity: l.quantity, unitPriceMinor: l.unitPriceMinor }));
+      const lines: StoredLine[] = reserved.lines.map((l) => ({ variantId: l.variantId, title: l.title, variantLabel: l.variantLabel, quantity: l.quantity, unitPriceMinor: l.unitPriceMinor, promotionId: l.promotionId ?? null, promoUnits: l.promoUnits ?? 0 }));
       // FOR SHARE: a concurrent close (FOR UPDATE) finishes first, then the closed session no longer matches.
       const open = await tx.execute<{ id: string }>(sql`SELECT id FROM pos_shifts WHERE org_id = ${orgId}::uuid AND closed_at IS NULL FOR SHARE`);
       const ins = await tx.execute<Row>(sql`
@@ -115,7 +115,7 @@ export class PosService {
       if (closed.rows.length > 0) throw AppError.conflict('The session of this sale is closed', { reason: 'shift_closed' });
       // Sales recorded before 0063 did not keep the variant: their stock cannot be given back reliably.
       if (row.lines.some((l) => !l.variantId)) throw AppError.conflict('This sale predates stock tracking and cannot be voided', { reason: 'legacy_sale' });
-      await this.catalog.release(tx, row.lines.map((l) => ({ variantId: l.variantId!, quantity: l.quantity })), { reason: 'pos_void' });
+      await this.catalog.release(tx, row.lines.map((l) => ({ variantId: l.variantId!, quantity: l.quantity })), { reason: 'pos_void', promos: row.lines.flatMap((l) => (l.promotionId && l.promoUnits ? [{ promotionId: l.promotionId, units: l.promoUnits }] : [])) });
       const upd = await tx.execute<Row>(sql`
         UPDATE pos_sales SET voided_at = now(), voided_by = ${actorId}::uuid, void_reason = ${reason?.length ? reason : null}
         WHERE id = ${id}::uuid RETURNING ${COLS}`);

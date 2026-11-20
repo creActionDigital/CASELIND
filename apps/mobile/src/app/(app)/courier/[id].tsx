@@ -10,6 +10,7 @@ import {
   pickedUpCourierRequest,
   postCourierLocation,
   rateCourierRequest,
+  resetCourierProof,
   setCourierLocationConsent,
 } from '../../../courier/api';
 import { courierErrorMessage } from '../../../courier/errors';
@@ -59,6 +60,7 @@ export default function CourierRequestDetail() {
     },
     onError: fail,
   });
+  const resetCode = useMutation({ mutationFn: () => resetCourierProof(id), onSuccess: done, onError: fail });
   const rate = useMutation({ mutationFn: (n: number) => rateCourierRequest(id, n), onSuccess: done, onError: fail });
   const consent = useMutation({ mutationFn: (granted: boolean) => setCourierLocationConsent(id, granted), onSuccess: done, onError: fail });
 
@@ -175,6 +177,19 @@ export default function CourierRequestDetail() {
           label={t(r.locationSharing ? 'courier.location.stop' : 'courier.location.start')}
           loading={consent.isPending}
           onPress={() => consent.mutate(!r.locationSharing)}
+        />
+      ) : null}
+      {actions.includes('resetCode') ? (
+        <Button
+          variant="secondary"
+          label={t('courier.action.resetCode')}
+          loading={resetCode.isPending}
+          onPress={() =>
+            alertConfirm(t('courier.resetCode.title'), t('courier.resetCode.body'), [
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('courier.action.resetCode'), style: 'destructive', onPress: () => resetCode.mutate() },
+            ])
+          }
         />
       ) : null}
       {actions.includes('rate') ? (

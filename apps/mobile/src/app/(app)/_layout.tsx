@@ -1,4 +1,6 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { takePendingLink } from '../../auth/pending-link';
 import { useI18n } from '../../i18n';
 import { IncomingCall } from '../../calllive/IncomingCall';
 import { PushRouting } from '../../notifications/PushRouting';
@@ -8,6 +10,12 @@ import { useTheme } from '../../theme/use-theme';
 export default function AppLayout() {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const router = useRouter();
+  // Lien de consentement ouvert avant la connexion : on y revient avec ses paramètres.
+  useEffect(() => {
+    const link = takePendingLink();
+    if (link) router.replace(link as never);
+  }, [router]);
   return (
     <>
     <PushRouting />

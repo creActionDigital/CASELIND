@@ -3,7 +3,7 @@ import type { CourierRequest, CourierRequestStatus } from '@caselind/contracts';
 /* Coursier à la demande : logique pure (le serveur reste la référence). */
 
 export type CourierRole = 'requester' | 'courier';
-export type CourierAction = 'cancel' | 'pickedUp' | 'delivered' | 'rate' | 'shareLocation';
+export type CourierAction = 'cancel' | 'pickedUp' | 'delivered' | 'rate' | 'shareLocation' | 'resetCode';
 
 const LIVE: readonly CourierRequestStatus[] = ['requested', 'accepted', 'picked_up'];
 export const isLiveCourier = (s: CourierRequestStatus): boolean => LIVE.includes(s);
@@ -12,6 +12,7 @@ export const isLiveCourier = (s: CourierRequestStatus): boolean => LIVE.includes
 export function courierActions(status: CourierRequestStatus, role: CourierRole, rated: boolean): CourierAction[] {
   if (role === 'requester') {
     if (status === 'requested' || status === 'accepted') return ['cancel'];
+    if (status === 'picked_up') return ['resetCode'];
     return status === 'delivered' && !rated ? ['rate'] : [];
   }
   if (status === 'accepted') return ['pickedUp', 'shareLocation'];

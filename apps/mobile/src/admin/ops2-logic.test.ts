@@ -86,6 +86,9 @@ describe('paramètres et commissions', () => {
     expect(parseSettingValue('support.contact', 'aide@caselind.test')).toEqual({ email: 'aide@caselind.test' });
     expect(parseSettingValue('support.contact', '{"phone":"+243810000000"}')).toEqual({ phone: '+243810000000' });
     expect(parseSettingValue('support.contact', 'n\'importe quoi')).toBeUndefined();
+    expect(parseSettingValue('limits.maxOrderMinor', 'usd 5000000, CDF: 900000000')).toEqual({ USD: 5000000, CDF: 900000000 });
+    expect(parseSettingValue('limits.maxOrderMinor', '5000000')).toBeUndefined();
+    expect(parseSettingValue('limits.maxOrderMinor', 'USD 0')).toBeUndefined();
   });
   it('portée', () => {
     expect(scopeOf('')).toBe('global');

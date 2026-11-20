@@ -621,14 +621,15 @@ export class AccountService {
 
   private async exportMiniAppGrants(userId: string): Promise<AccountExport['miniappGrants']> {
     const res = await this.db.execute(sql`
-      SELECT g.app_id, a.name, g.scopes, g.created_at, g.revoked_at FROM miniapp_grants g JOIN miniapps a ON a.id = g.app_id
+      SELECT g.app_id, a.name, g.scopes, g.created_at, g.revoked_at, g.notifications_muted FROM miniapp_grants g JOIN miniapps a ON a.id = g.app_id
       WHERE g.user_id = ${userId}::uuid ORDER BY g.created_at, g.app_id`);
-    return (res.rows as { app_id: string; name: string; scopes: string[]; created_at: string | Date; revoked_at: string | Date | null }[]).map((r) => ({
+    return (res.rows as { app_id: string; name: string; scopes: string[]; created_at: string | Date; revoked_at: string | Date | null; notifications_muted: boolean }[]).map((r) => ({
       appId: r.app_id,
       appName: r.name,
       scopes: r.scopes,
       grantedAt: new Date(r.created_at).toISOString(),
       revokedAt: r.revoked_at ? new Date(r.revoked_at).toISOString() : null,
+      notificationsMuted: r.notifications_muted,
     }));
   }
 

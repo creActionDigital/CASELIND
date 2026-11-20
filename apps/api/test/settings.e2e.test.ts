@@ -48,7 +48,9 @@ describe('liste blanche et validation', () => {
     await put(a, { key: 'currencies.enabled', value: [] }).expect(400);
     await put(a, { key: 'cities.pilot', scope: 'city:CD:Goma', value: ['Goma'] }).expect(400); // portée non admise pour cette clé
     await put(a, { key: 'support.contact', scope: 'pays:CD', value: { email: 'a@b.test' } }).expect(400);
-    await put(a, { key: 'limits.maxOrderMinor', value: 0 }).expect(400);
+    await put(a, { key: 'limits.maxOrderMinor', value: { USD: 0 } }).expect(400);
+    await put(a, { key: 'limits.maxOrderMinor', value: 5_000_000 }).expect(400); // un nombre seul : devise inconnue
+    await put(a, { key: 'limits.maxOrderMinor', value: {} }).expect(400);
     await put(a, { key: 'support.contact', value: { email: 'a@b.test' }, reason: 'x' }).expect(400);
     expect(await stored('commission.defaultBps')).toBeUndefined();
   });
@@ -83,7 +85,7 @@ describe('lecture publique', () => {
     await put(a, { key: 'support.contact', scope: 'country:CD', value: { whatsapp: '+243820000000' } }).expect(200);
     await put(a, { key: 'support.contact', scope: 'city:CD:Goma', value: { phone: '+243830000000' } }).expect(200);
     await put(a, { key: 'cities.pilot', value: ['Kinshasa'] }).expect(200);
-    await put(a, { key: 'limits.maxOrderMinor', value: 5_000_000 }).expect(200);
+    await put(a, { key: 'limits.maxOrderMinor', value: { USD: 5_000_000 } }).expect(200);
     await put(a, { key: 'commission.defaultBps', value: 250 }).expect(200);
 
     const g = (await ctx.http.get('/v1/config/public').expect(200)).body;
@@ -107,7 +109,7 @@ describe('double validation', () => {
     expect(await stored('support.contact')).toEqual({ email: 'direct@caselind.test' });
 
     const p1 = (await put(a, { key: 'commission.defaultBps', value: 400 }).expect(202)).body;
-    const p2 = (await put(a, { key: 'limits.maxOrderMinor', scope: 'country:CD', value: 9_000_000 }).expect(202)).body;
+    const p2 = (await put(a, { key: 'limits.maxOrderMinor', scope: 'country:CD', value: { CDF: 9_000_000 } }).expect(202)).body;
     expect(p1.status).toBe('pending');
     expect(await stored('commission.defaultBps')).toBe(250); // valeur d'avant : rien n'est appliqué
     expect(await stored('limits.maxOrderMinor', 'country:CD')).toBeUndefined();

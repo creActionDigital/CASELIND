@@ -247,6 +247,7 @@ export const exportedMiniAppGrantSchema = z.object({
   scopes: z.array(z.string()),
   grantedAt: z.iso.datetime(),
   revokedAt: z.iso.datetime().nullable(),
+  notificationsMuted: z.boolean(),
 });
 export type ExportedMiniAppGrant = z.infer<typeof exportedMiniAppGrantSchema>;
 

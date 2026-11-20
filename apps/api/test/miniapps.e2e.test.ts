@@ -366,6 +366,7 @@ describe('grants and revocation', () => {
     const exported = await ctx.http.get('/v1/me/export').set(bearer(u.token));
     if (exported.status === 200) {
       expect(exported.body.miniappGrants).toHaveLength(1);
+      expect(exported.body.miniappGrants[0].notificationsMuted).toBe(false);
       expect(JSON.stringify(exported.body)).not.toContain(again.access);
     }
   });
