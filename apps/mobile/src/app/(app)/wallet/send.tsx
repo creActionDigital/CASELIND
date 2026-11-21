@@ -21,10 +21,10 @@ import { useKyc, useTransactions, useWalletEnabled, walletKeys } from '../../../
 import { inPeriod, type Period } from '../../../wallet/history';
 import { counterpartyName } from '../../../wallet/ui';
 import { PIN_LENGTH } from '../../../wallet/pin';
+import { cleanHandle, HANDLE_RE } from '../../../wallet/finance/logic';
 import { useWalletPrefs } from '../../../wallet/prefs';
 import { PinPad, SandboxBanner } from '../../../wallet/ui';
 
-const HANDLE_RE = /^[a-zA-Z0-9_.]{3,30}$/;
 const PERIODS: Period[] = ['week', 'month', 'year'];
 type Step = 'form' | 'review' | 'pin' | 'done';
 
@@ -68,7 +68,7 @@ export default function WalletSend() {
     return () => clearTimeout(h);
   }, [handle]);
 
-  const clean = handle.trim().replace(/^@/, '').toLowerCase();
+  const clean = cleanHandle(handle);
   const cleanDebounced = debounced.trim().replace(/^@/, '').toLowerCase();
   const handleOk = HANDLE_RE.test(clean);
   const isSelf = !!me && clean === me.handle.toLowerCase();
@@ -175,6 +175,7 @@ export default function WalletSend() {
           <PinPad value={pin} onChange={onPin} disabled={send.isPending} error={pinError} />
           {send.isPending ? <Text muted>{t('wallet.send.sending')}</Text> : null}
           {needPin ? <Button label={t('wallet.send.createPin')} onPress={() => router.push('/wallet/pin')} /> : null}
+          <Button variant="ghost" label={t('wf.pin.forgot')} onPress={() => router.push('/wallet/pin')} disabled={send.isPending} />
           <Button variant="ghost" label={t('common.cancel')} onPress={() => { setPin(''); setPinError(null); setStep('review'); }} disabled={send.isPending} />
         </ScrollView>
       </>

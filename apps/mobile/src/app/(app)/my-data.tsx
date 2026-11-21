@@ -1,9 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Share, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useAuth } from '../../auth/auth-context';
 import { useI18n } from '../../i18n';
+import { shareMessage } from '../../lib/share';
 import { alertConfirm } from '../../lib/confirm';
 import { ApiRequestError } from '../../lib/api';
 import { fetchExport, requestDeletion } from '../../privacy/api';
@@ -36,16 +37,7 @@ export default function MyData() {
   });
 
   const share = async (json: string) => {
-    try {
-      await Share.share({ message: json });
-    } catch {
-      // Web sans partage natif : copie dans le presse-papiers.
-      try {
-        await globalThis.navigator?.clipboard?.writeText(json);
-      } catch {
-        setShareError(true);
-      }
-    }
+    await shareMessage({ message: json }, t('share.copied'));
   };
 
   const confirmDelete = () =>

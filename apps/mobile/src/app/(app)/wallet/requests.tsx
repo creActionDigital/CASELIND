@@ -16,10 +16,9 @@ import { parseWalletAmount, WALLET_CURRENCIES } from '../../../wallet/amount';
 import { walletKeys } from '../../../wallet/hooks';
 import { cancelRequest, createRequest, declineRequest, fetchRequests, payRequest, walletFinanceKeys } from '../../../wallet/finance/api';
 import { financeErrorMessage } from '../../../wallet/finance/errors';
-import { daysLeft, requestActions } from '../../../wallet/finance/logic';
+import { cleanHandle, daysLeft, HANDLE_RE, requestActions } from '../../../wallet/finance/logic';
 import { Card, FinanceHeader, PinPrompt } from '../../../wallet/finance/ui';
 
-const HANDLE_RE = /^[a-zA-Z0-9_.]{3,30}$/;
 type Side = 'received' | 'sent';
 
 /** Demandes d'argent (mode test) : demander à un contact, puis voir, payer (avec PIN), refuser ou annuler. */
@@ -53,7 +52,7 @@ export default function WalletRequests() {
 
   const parsed = parseWalletAmount(amount, currency);
   const minor = 'minor' in parsed ? parsed.minor : null;
-  const clean = handle.trim().replace(/^@/, '').toLowerCase();
+  const clean = cleanHandle(handle);
 
   const create = useMutation({
     mutationFn: () => {

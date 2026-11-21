@@ -24,7 +24,7 @@ export default function MyLoyalty() {
         <View style={{ gap: spacing.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
             <Text style={{ flex: 1 }}>{t('loyalty.consent')}</Text>
-            <Switch
+            <Switch accessibilityRole="switch" accessibilityState={{ checked: q.data.marketingConsent }}
               accessibilityLabel={t('loyalty.consent')}
               value={q.data.marketingConsent}
               disabled={consent.isPending}

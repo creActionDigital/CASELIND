@@ -35,6 +35,8 @@ export const swCommunity: Partial<Record<MessageKey, string>> = {
   'miniapps.title': 'Programu ndogo',
   'miniapps.search': 'Tafuta programu',
   'miniapps.empty': 'Hakuna programu kwa sasa.',
+  'miniapps.discover': 'Vinjari orodha ya programu',
+  'miniapps.dev.createOrg': 'Unda shirika',
   'miniapps.more': 'Onyesha zaidi',
   'miniapps.mine': 'Programu nilizoruhusu',
   'miniapps.payments': 'Maombi ya malipo',

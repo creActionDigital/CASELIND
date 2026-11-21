@@ -2,10 +2,11 @@ import { QUICK_MESSAGES, type CancelReason, type QuickMessageCode, type RideView
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Share, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, View } from 'react-native';
 import { SheetModal } from '../../../components/SheetModal';
 import { distanceKm } from '../../../delivery/logic';
 import { useI18n, type MessageKey } from '../../../i18n';
+import { shareMessage } from '../../../lib/share';
 import { absoluteUrl } from '../../../lib/config';
 import { ApiRequestError } from '../../../lib/api';
 import {
@@ -127,7 +128,7 @@ function RideBody({ ride, refetch }: { ride: RideView; refetch: () => void }) {
     mutationFn: () => shareRide(id),
     onMutate: () => setError(null),
     onSuccess: (s) => {
-      void Share.share({ message: t('mobility.share.message', { link: absoluteUrl(s.path) }) }).catch(() => undefined);
+      void shareMessage({ message: t('mobility.share.message', { link: absoluteUrl(s.path) }) }, t('share.copied'));
       void qc.invalidateQueries({ queryKey: rideKeys.ride(id) });
     },
     onError: fail,

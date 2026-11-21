@@ -35,6 +35,7 @@ export const swMobilityExtra2: Partial<Record<MessageKey, string>> = {
   'carpool.intro': 'Shiriki safari na dereva. Hakuna malipo ya mtandaoni: bei ya kiti inalipwa kwa pesa taslimu.',
   'carpool.origin': 'Mahali pa kuanzia',
   'carpool.destination': 'Mahali pa kufikia (si lazima)',
+  'carpool.new.destination': 'Mahali pa kufikia',
   'carpool.date': 'Siku (YYYY-MM-DD, si lazima)',
   'carpool.time': 'Saa (HH:MM)',
   'carpool.search.go': 'Tafuta',

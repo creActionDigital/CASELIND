@@ -63,6 +63,10 @@ export function PinPrompt({ hint, onSubmit, onCancel }: { hint: string; onSubmit
       <PinPad value={pin} onChange={(v) => void change(v)} disabled={busy} error={error} />
       {busy ? <Text muted>{t('wf.pin.working')}</Text> : null}
       {needPin ? <Button label={t('wallet.send.createPin')} onPress={() => router.push('/wallet/pin')} /> : null}
+      <Text variant="small" muted style={{ textAlign: 'center' }}>
+        {t('wf.pin.forgotHelp')}
+      </Text>
+      <Button variant="ghost" label={t('wf.pin.forgot')} onPress={() => router.push('/wallet/pin')} disabled={busy} />
       <Button variant="ghost" label={t('common.cancel')} onPress={onCancel} disabled={busy} />
     </ScrollView>
   );

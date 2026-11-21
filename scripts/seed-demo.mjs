@@ -20,11 +20,12 @@
  *   emma@caselind.test   professionnelle de santé (médecin) validée
  *   frank@caselind.test  directeur d'école « ecole-demo » (classe + annonce)
  *   gina@caselind.test   élève / patiente
- *   hugo@caselind.test   conducteur de mobilité + lecteur du fil
+ *   hugo@caselind.test   conducteur de mobilité APPROUVÉ (KYC niveau 1 + validation admin) + covoiturage + lecteur du fil
+ * Aussi : véhicule de location (org « demo-location », alice), mini-app approuvée « Démo Mini-App » (annuaire + consentement de bob).
  */
 import fs from 'node:fs';
 import zlib from 'node:zlib';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import pg from 'pg';
 
 const API = process.env.API_URL ?? 'http://localhost:3000/v1';
@@ -129,13 +130,16 @@ const tomorrowAt = (h, plusDays = 1) => { const d = new Date(); d.setUTCDate(d.g
 
 // ================= MAIN =================
 await sql(`UPDATE feature_flags SET enabled=true WHERE key = ANY($1)`, [FLAGS]);
-await sql(`UPDATE users SET roles = ARRAY['user','admin'] WHERE email = 'alice@caselind.test'`);
+// Deux administrateurs (alice, hugo) : la double validation et la revue indépendante des mini-apps en exigent deux.
+await sql(`UPDATE users SET roles = ARRAY['user','admin'] WHERE email IN ('alice@caselind.test','hugo@caselind.test')`);
 
 for (const [n, d] of [['alice', 'Alice Mbala'], ['bob', 'Bob Kasongo'], ['carla', 'Carla Ndaye'], ['david', 'David Tshimanga'], ['emma', 'Dr Emma Lukusa'], ['frank', 'Frank Mutombo'], ['gina', 'Gina Kabila'], ['hugo', 'Hugo Banza']]) {
   await step(`compte ${n}`, () => account(n, d));
 }
-// l'accès admin d'alice a été donné après son éventuelle connexion : se reconnecter pour que le rôle soit dans le jeton
-await step('reconnexion alice (rôle admin)', async () => { tokens.alice = (await http('POST', '/auth/login', null, { identifier: 'alice@caselind.test', password: PWD, device })).accessToken; });
+// l'accès admin d'alice et hugo a été donné après son éventuelle connexion : se reconnecter pour que le rôle soit dans le jeton
+await step('reconnexion alice et hugo (rôle admin)', async () => {
+  for (const n of ['alice', 'hugo']) tokens[n] = (await http('POST', '/auth/login', null, { identifier: `${n}@caselind.test`, password: PWD, device })).accessToken;
+});
 const id = {};
 for (const n of Object.keys(tokens)) id[n] = await me(n);
 await step('handles lisibles', async () => {
@@ -369,6 +373,43 @@ await step('conducteur de mobilité + lieux favoris', async () => {
 });
 await step('IA : conversation', async () => { if (state.ai) return; await http('POST', '/ai/conversations', T('bob'), { title: 'Test IA' }); state.ai = 1; save(); });
 await step('communautés : groupe publié', async () => { if (state.comm || !state.convs) return; await http('PUT', `/conversations/${state.convs.group}/community`, T('alice'), { description: 'Voisins du quartier', tags: ['quartier'] }).catch((e) => console.error('comm', e.message)); state.comm = 1; save(); });
+
+// ---------- parcours bloqués : chauffeur approuvé, location, mini-app, covoiturage ----------
+await step('hugo : KYC niveau 1 + chauffeur approuvé', async () => {
+  if (state.driverOk) return;
+  await sql(`INSERT INTO kyc_profiles (user_id, level) VALUES ($1, 1) ON CONFLICT (user_id) DO UPDATE SET level = GREATEST(kyc_profiles.level, 1)`, [id.hugo]);
+  await http('POST', `/admin/mobility/drivers/${id.hugo}/decision`, T('alice'), { decision: 'approve' }).catch((e) => { if (!String(e.message).includes('already_decided')) throw e; });
+  state.driverOk = 1; save();
+});
+await step('covoiturage : trajet publié par hugo', async () => {
+  if (state.trip || !state.driverOk) return;
+  const trip = await http('POST', '/carpool/trips', T('hugo'), { origin: { lat: -1.65849, lng: 29.2205, label: 'Gare routière de Goma' }, destination: { lat: -1.5833, lng: 29.0333, label: 'Centre de Sake' }, departsAt: tomorrowAt(9, 2), seatsTotal: 3, pricePerSeatMinor: 500, note: 'Trajet de démonstration' });
+  state.trip = trip.id; save();
+});
+await step('location : organisation + véhicule publié', async () => {
+  if (state.rental) return;
+  const org = await http('POST', '/orgs', T('alice'), { slug: 'demo-location', name: 'Goma Location', kind: 'other', country: 'CD', city: 'Goma', visibility: 'public' }).catch(async () => http('GET', '/public/orgs/demo-location', T('alice')));
+  const v = await http('POST', `/orgs/${org.id}/rentals`, T('alice'), { title: 'Toyota RAV4 2019', kind: 'car', make: 'Toyota', model: 'RAV4', year: 2019, seats: 5, transmission: 'auto', fuel: 'petrol', dailyRateMinor: 5000, depositMinor: 20000, city: 'Goma', description: 'Climatisée, kilométrage illimité en ville.' });
+  state.rental = { orgId: org.id, vehicleId: v.id }; save();
+});
+await step('mini-app approuvée + consentement de bob', async () => {
+  if (state.miniapp) return;
+  const org = await http('POST', '/orgs', T('alice'), { slug: 'demo-apps', name: 'Atelier Apps', kind: 'other', country: 'CD', city: 'Kinshasa' }).catch(async () => http('GET', '/public/orgs/demo-apps', T('alice')));
+  const redirect = 'https://app.example.test/callback';
+  const manifest = {
+    dataAccessed: [{ scope: 'profile.basic', purpose: 'Afficher votre nom dans la mini-application', retention: '30 jours' }],
+    endpoints: [{ method: 'GET', path: '/v1/miniapp-api/me' }],
+    events: ['authorization.granted', 'authorization.revoked', 'user.data_deletion_requested'],
+    costs: { model: 'free', description: 'Gratuit', maxAmountMinor: null, currency: null },
+    termsUrl: 'https://app.example.test/terms', privacyUrl: 'https://app.example.test/privacy', supportEmail: 'support@app.example.test', dataLocation: 'Union européenne',
+  };
+  const app = await http('POST', `/orgs/${org.id}/miniapps`, T('alice'), { name: 'Démo Mini-App', description: 'Mini-application de démonstration', launchUrl: 'https://app.example.test/', redirectUris: [redirect], scopes: ['profile.basic'], manifest });
+  await http('POST', `/orgs/${org.id}/miniapps/${app.id}/submit`, T('alice'));
+  await http('POST', `/admin/miniapps/${app.id}/review`, T('hugo'), { decision: 'approve' }); // pas alice : l'app est de son organisation
+  const challenge = createHash('sha256').update(randomBytes(48).toString('base64url')).digest('base64url');
+  await http('POST', '/oauth/authorize', T('bob'), { clientId: app.clientId, redirectUri: redirect, scopes: ['profile.basic'], state: 'state-' + randomUUID().slice(0, 12), codeChallenge: challenge });
+  state.miniapp = { orgId: org.id, appId: app.id, clientId: app.clientId }; save();
+});
 
 // ---------- bilan ----------
 console.log('\n=== BILAN ===');

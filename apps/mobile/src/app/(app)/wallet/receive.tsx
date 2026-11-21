@@ -1,7 +1,8 @@
 import { Stack } from 'expo-router';
-import { ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useAuth } from '../../../auth/auth-context';
 import { useI18n } from '../../../i18n';
+import { shareMessage } from '../../../lib/share';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Avatar, Button, Text } from '../../../ui';
@@ -32,7 +33,7 @@ export default function WalletReceive() {
         </View>
         <Button
           label={t('wallet.receive.share')}
-          onPress={() => void Share.share({ message: t('wallet.receive.shareMessage', { handle }) }).catch(() => undefined)}
+          onPress={() => void shareMessage({ message: t('wallet.receive.shareMessage', { handle }) }, t('share.copied'))}
         />
       </ScrollView>
     </>

@@ -3,9 +3,10 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n';
+import { shareMessage } from '../lib/share';
 import { getAuthMediaUri } from '../media/auth-media';
 import { api } from '../auth/auth-context';
 import { useReact } from '../social/hooks';
@@ -73,7 +74,7 @@ function Page({ post, active, height }: { post: CachedPost; active: boolean; hei
         <Action
           icon="arrow-redo-outline"
           label={t('hub.share')}
-          onPress={() => void Share.share({ message: post.body ?? `${post.author.displayName} (@${post.author.handle})` }).catch(() => {})}
+          onPress={() => void shareMessage({ message: post.body ?? `${post.author.displayName} (@${post.author.handle})` }, t('share.copied'))}
         />
       </View>
       <View style={[styles.info, { paddingBottom: TAB_BAR_SPACE - 8 + 0 * insets.bottom }]}>

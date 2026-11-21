@@ -122,7 +122,7 @@ export default function Availability() {
             <TextField label={t('services.pro.avail.date')} value={x.date} onChangeText={(v) => patchEx(x.key, { date: v })} maxLength={10} keyboardType="numbers-and-punctuation" />
             <View style={styles.switchRow}>
               <Text style={{ flex: 1 }}>{t('services.pro.avail.closed')}</Text>
-              <Switch value={x.closed} onValueChange={(v) => patchEx(x.key, { closed: v })} accessibilityLabel={t('services.pro.avail.closed')} />
+              <Switch accessibilityRole="switch" accessibilityState={{ checked: x.closed }} value={x.closed} onValueChange={(v) => patchEx(x.key, { closed: v })} accessibilityLabel={t('services.pro.avail.closed')} />
             </View>
             {!x.closed ? (
               <View style={styles.row}>

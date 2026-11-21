@@ -2,8 +2,9 @@ import type { CreatedPaymentQr, CreatePaymentQrRequest, PaymentQr } from '@casel
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../../i18n';
+import { shareMessage } from '../../../../lib/share';
 import { errorMessage } from '../../../../lib/errors';
 import { createPaymentQr, fetchPaymentQrPayload, fetchPaymentQrs, revokePaymentQr } from '../../../../scan/api';
 import { QR_EXPIRIES, buildCreateQr, type QrMode } from '../../../../scan/qr-forms';
@@ -117,7 +118,7 @@ export default function SellerQr() {
               : t('sellerQr.expiresAt', { time: shown.expiresAt ? new Date(shown.expiresAt).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' }) : '' }) +
                 (shown.singleUse ? ` · ${t('sellerQr.singleUse')}` : '')}
           </Text>
-          <Button label={t('sellerQr.share')} onPress={() => void Share.share({ message: shown.payload }).catch(() => undefined)} />
+          <Button label={t('sellerQr.share')} onPress={() => void shareMessage({ message: shown.payload }, t('share.copied'))} />
           <Button variant="secondary" label={t('sellerQr.revoke')} loading={revoke.isPending} onPress={() => revoke.mutate(shown.qrId)} />
           <Button variant="ghost" label={t('sellerQr.back')} onPress={() => setShown(null)} />
         </ScrollView>

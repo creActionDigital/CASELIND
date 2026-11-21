@@ -82,7 +82,12 @@ export default function NewMiniApp() {
     <Screen>
       <Stack.Screen options={{ title: t('miniapps.dev.new') }} />
       <View style={{ gap: spacing.md }}>
-        {owned.length === 0 ? <Text muted>{t('miniapps.dev.noOrg')}</Text> : null}
+        {owned.length === 0 ? (
+          <>
+            <Text muted>{t('miniapps.dev.noOrg')}</Text>
+            <Button label={t('miniapps.dev.createOrg')} onPress={() => router.push('/seller/new' as never)} />
+          </>
+        ) : null}
         {owned.length > 1 ? (
           <>
             <SectionTitle>{t('miniapps.dev.org')}</SectionTitle>

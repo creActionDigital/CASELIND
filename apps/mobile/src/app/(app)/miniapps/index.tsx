@@ -36,7 +36,7 @@ export default function MiniApps() {
         ]}
       />
       <View style={{ gap: spacing.md, marginTop: spacing.md }}>
-        {tab === 'directory' ? <Directory /> : tab === 'mine' ? <Mine /> : <Payments />}
+        {tab === 'directory' ? <Directory /> : tab === 'mine' ? <Mine onDiscover={() => setTab('directory')} /> : <Payments onDiscover={() => setTab('directory')} />}
       </View>
     </Screen>
   );
@@ -96,7 +96,7 @@ function Details({ id }: { id: string }) {
   );
 }
 
-function Mine() {
+function Mine({ onDiscover }: { onDiscover: () => void }) {
   const { t, locale } = useI18n();
   const router = useRouter();
   const qc = useQueryClient();
@@ -116,7 +116,7 @@ function Mine() {
   });
   if (q.isPending) return <Loading />;
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
-  if (q.data.items.length === 0) return <Text muted>{t('miniapps.mine.empty')}</Text>;
+  if (q.data.items.length === 0) return <><Text muted>{t('miniapps.mine.empty')}</Text><Button variant="secondary" label={t('miniapps.discover')} onPress={onDiscover} /></>;
   return (
     <>
       {q.data.items.map((g) => (
@@ -153,7 +153,7 @@ function Mine() {
   );
 }
 
-function Payments() {
+function Payments({ onDiscover }: { onDiscover: () => void }) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
   const qc = useQueryClient();
@@ -180,7 +180,7 @@ function Payments() {
   if (q.isPending) return <Loading />;
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const pending = q.data.items.filter((r) => r.status === 'pending');
-  if (pending.length === 0) return <Text muted>{t('miniapps.pay.empty')}</Text>;
+  if (pending.length === 0) return <><Text muted>{t('miniapps.pay.empty')}</Text><Button variant="secondary" label={t('miniapps.discover')} onPress={onDiscover} /></>;
   return (
     <>
       {pending.map((r) => (

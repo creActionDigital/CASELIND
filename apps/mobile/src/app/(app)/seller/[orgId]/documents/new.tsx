@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { safeBack } from '../../../../../lib/back-target';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { createDocument, dk } from '../../../../../seller/api';
@@ -24,7 +25,7 @@ export default function NewDocument() {
     mutationFn: (body: NonNullable<ReturnType<typeof toDocumentRequest>>) => createDocument(orgId, body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: dk.all(orgId) });
-      router.back();
+      safeBack(router, `/seller/${orgId}/documents`);
     },
     onError: (e) => setError(sellerErrorMessage(e, t, locale)),
   });

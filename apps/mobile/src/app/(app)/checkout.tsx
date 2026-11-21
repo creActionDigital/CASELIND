@@ -17,7 +17,7 @@ import { canCheckout } from '../../shop/cart-logic';
 import { couponErrorCode, couponErrorKey, stockConflict, type StockConflict } from '../../shop/errors';
 import { formatMoney } from '../../shop/format';
 import { shopKeys, useCart } from '../../shop/hooks';
-import { normalizePhone } from '../../shop/order-logic';
+import { feeKind, normalizePhone } from '../../shop/order-logic';
 import { radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, EmptyState, ErrorState, Text, TextField } from '../../ui';
@@ -353,7 +353,11 @@ export default function Checkout() {
               <Text variant="small" muted style={styles.flex}>
                 {t('delivery.fee')}
               </Text>
-              <Text variant="small">{feeFor(plans[g.orgId], g.currency) > 0 ? formatMoney(feeFor(plans[g.orgId], g.currency), g.currency, locale) : t('delivery.free')}</Text>
+              {(() => {
+                const fee = feeFor(plans[g.orgId], g.currency);
+                const kind = feeKind({ delivery: mode === 'delivery', zoneCount: zonesByOrg[g.orgId]?.length ?? 0, zoneChosen: !!zoneSel[g.orgId], feeMinor: fee });
+                return <Text variant="small">{kind === 'pending' ? t('delivery.feePending') : kind === 'amount' ? formatMoney(fee, g.currency, locale) : t('delivery.free')}</Text>;
+              })()}
             </View>
             <TextField
               label={t('checkout.couponFor', { shop: g.orgName })}

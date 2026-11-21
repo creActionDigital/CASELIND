@@ -3,11 +3,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
+import { shareMessage } from '../../../lib/share';
 import { useToggleWish } from '../../../promotions/hooks';
 import { PromoBadge, PromoCountdown, PromoPrice } from '../../../promotions/parts';
 import { openReport } from '../../../report/open-report';
@@ -22,6 +23,7 @@ import { AxisPicker } from '../../../shop/VariantPickers';
 import { brandColor, onMedia, radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { AuthImage, Avatar, EmptyState, ErrorState, Text, Button } from '../../../ui';
+import { safeBack } from '../../../lib/back-target';
 
 const MAX = 99;
 
@@ -142,7 +144,7 @@ export default function ProductScreen() {
             <AuthImage contentUrl={p.coverUrl} label={p.title} style={{ width, height: heroH, borderRadius: 0 }} />
           )}
           <View style={[styles.topBar, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
-            <RoundButton icon="chevron-back" label={t('product.back')} onPress={() => router.back()} />
+            <RoundButton icon="chevron-back" label={t('product.back')} onPress={() => safeBack(router, '/shop')} />
             <View style={styles.topRight}>
               <RoundButton
                 icon={p.wished ? 'heart' : 'heart-outline'}
@@ -164,7 +166,7 @@ export default function ProductScreen() {
                   else if (next.includes(p.id)) setNotice({ text: t('cmp.added'), ok: true });
                 }}
               />
-              <RoundButton icon="share-outline" label={t('product.share')} onPress={() => void Share.share({ message: p.title }).catch(() => undefined)} />
+              <RoundButton icon="share-outline" label={t('product.share')} onPress={() => void shareMessage({ message: p.title }, t('share.copied'))} />
             </View>
           </View>
           {p.media.length > 1 ? (

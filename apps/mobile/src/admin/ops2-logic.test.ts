@@ -7,7 +7,9 @@ import {
   canAppeal,
   canDecide,
   canLift,
+  audienceLabel,
   dayToIso,
+  endOfDayIso,
   kindsFor,
   parseDuration,
   parseSettingValue,
@@ -70,9 +72,21 @@ describe('annonces', () => {
     expect(dayToIso('2026-12-01')).toBe('2026-12-01T00:00:00.000Z');
     expect(dayToIso('2026-02-30')).toBeNull();
     expect(dayToIso('01/12/2026')).toBeNull();
+    const d = new Date(endOfDayIso('2026-12-31')!);
+    expect([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()]).toEqual([2026, 11, 31, 23]);
+    expect(endOfDayIso('2026-02-30')).toBeNull();
     expect(announcementReady('Titre', 'Texte', '2026-12-01')).toBe(true);
     expect(announcementReady('', 'Texte', '2026-12-01')).toBe(false);
     expect(announcementReady('T', 'x'.repeat(501), '2026-12-01')).toBe(false);
+  });
+});
+
+describe('libellé d’audience', () => {
+  const t = (k: string) => k.split('.').pop()!;
+  it('traduit all, role et country', () => {
+    expect(audienceLabel('all', t)).toBe('all');
+    expect(audienceLabel('role:admin', t)).toBe('role : admin');
+    expect(audienceLabel('country:CD', t)).toBe('country : CD');
   });
 });
 

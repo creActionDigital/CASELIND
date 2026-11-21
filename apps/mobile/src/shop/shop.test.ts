@@ -150,3 +150,14 @@ describe('commandes', () => {
     expect(commerceTarget(null)).toBeNull();
   });
 });
+
+import { feeKind } from './order-logic';
+describe('feeKind', () => {
+  it('attend le choix de la zone, puis calcule', () => {
+    expect(feeKind({ delivery: true, zoneCount: 2, zoneChosen: false, feeMinor: 0 })).toBe('pending');
+    expect(feeKind({ delivery: true, zoneCount: 2, zoneChosen: true, feeMinor: 0 })).toBe('free');
+    expect(feeKind({ delivery: true, zoneCount: 2, zoneChosen: true, feeMinor: 500 })).toBe('amount');
+    expect(feeKind({ delivery: true, zoneCount: 0, zoneChosen: false, feeMinor: 0 })).toBe('free');
+    expect(feeKind({ delivery: false, zoneCount: 2, zoneChosen: false, feeMinor: 0 })).toBe('free');
+  });
+});

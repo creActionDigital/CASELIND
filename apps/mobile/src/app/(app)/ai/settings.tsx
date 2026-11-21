@@ -107,7 +107,7 @@ export default function AiSettingsScreen() {
 
       <View style={[styles.switchRow, { backgroundColor: colors.surface }]}>
         <Text style={{ flex: 1 }}>{t('ai.fallback')}</Text>
-        <Switch
+        <Switch accessibilityRole="switch" accessibilityState={{ checked: settings.data.allowFallback }}
           accessibilityLabel={t('ai.fallback')}
           value={settings.data.allowFallback}
           onValueChange={(v) => save.mutate({ allowFallback: v })}

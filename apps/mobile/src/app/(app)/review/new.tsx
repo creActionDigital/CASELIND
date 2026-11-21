@@ -4,6 +4,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
+import { ApiRequestError } from '../../../lib/api';
+import { safeBack } from '../../../lib/back-target';
 import { errorMessage } from '../../../lib/errors';
 import { createReview, fetchProduct } from '../../../shop/api';
 import { shopKeys } from '../../../shop/hooks';
@@ -21,15 +23,23 @@ export default function NewReview() {
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<'sent' | 'already' | null>(null);
 
   const product = useQuery({ queryKey: shopKeys.product(id), queryFn: () => fetchProduct(id) });
   const send = useMutation({
     mutationFn: () => createReview(id, { rating, ...(body.trim() ? { body: body.trim() } : {}) }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: shopKeys.reviews(id) });
-      router.back();
+      qc.setQueryData(shopKeys.reviewed(id), true);
+      setDone('sent');
     },
-    onError: (e) => setError(errorMessage(e, t, locale)),
+    onError: (e) => {
+      if (e instanceof ApiRequestError && e.status === 409) {
+        qc.setQueryData(shopKeys.reviewed(id), true);
+        return setDone('already');
+      }
+      setError(errorMessage(e, t, locale));
+    },
   });
 
   if (product.isPending) {
@@ -47,6 +57,15 @@ export default function NewReview() {
       <Text variant="heading" accessibilityRole="header" style={{ marginBottom: spacing.md }}>
         {product.data.title}
       </Text>
+      {done ? (
+        <View style={{ gap: spacing.md }}>
+          <Text accessibilityLiveRegion="polite" color={done === 'sent' ? colors.success : undefined} variant="bodyStrong">
+            {t(done === 'sent' ? 'review.done' : 'review.alreadyDone')}
+          </Text>
+          <Button label={t('common.close')} onPress={() => safeBack(router, `/product/${id}`)} />
+        </View>
+      ) : (
+        <>
       <Text variant="bodyStrong">{t('review.rating')}</Text>
       <View style={styles.stars}>
         {[1, 2, 3, 4, 5].map((n) => (
@@ -77,6 +96,8 @@ export default function NewReview() {
           send.mutate();
         }}
       />
+        </>
+      )}
     </Screen>
   );
 }

@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Platform, Share, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useI18n } from '../../../../../i18n';
+import { shareMessage } from '../../../../../lib/share';
 import { fetchRevenue, pKeys } from '../../../../../miniapps/platform-api';
 import { Card, Loading } from '../../../../../seller/ui';
 import { formatMoney } from '../../../../../shop/format';
@@ -17,7 +18,7 @@ export default function DeveloperRevenue() {
   if (q.isError) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const csv = () => {
     const lines = ['period,currency,gross_minor,platform_minor,developer_minor,share_bps,payments_count,status', ...q.data.items.map((i) => [i.period, i.currency, i.grossMinor, i.platformMinor, i.developerMinor, i.shareBps, i.paymentsCount, i.status].join(','))];
-    void Share.share({ message: [...lines, `# ${q.data.disclaimer}`].join('\n') });
+    void shareMessage({ message: [...lines, `# ${q.data.disclaimer}`].join('\n') }, t('share.copied'));
   };
   return (
     <Screen>

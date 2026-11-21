@@ -211,7 +211,7 @@ function History({ onPick }: { onPick: (e: { query: string; scope: SearchScope }
                 {t('search.history.toggleHint')}
               </Text>
             </View>
-            <Switch
+            <Switch accessibilityRole="switch" accessibilityState={{ checked: enabled }}
               accessibilityLabel={t('search.history.toggle')}
               value={enabled}
               disabled={!data || toggle.isPending}

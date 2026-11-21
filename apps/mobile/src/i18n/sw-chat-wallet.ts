@@ -94,6 +94,7 @@ export const swChatWallet: Partial<Record<MessageKey, string>> = {
   'chat.status.delivered': 'imewasilishwa',
   'chat.status.read': 'imesomwa',
   'chat.system.group_created': '{name} ameunda kikundi',
+  'chat.system.group_created_you': 'Umeunda kikundi',
   'chat.system.member_added': '{actor} amemwongeza {name}',
   'chat.system.member_removed': '{actor} amemwondoa {name}',
   'chat.system.member_joined': '{name} amejiunga na kikundi',

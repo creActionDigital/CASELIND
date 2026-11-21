@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
-import { cancelOrder, fetchOrder } from '../../../shop/api';
+import { cancelOrder, fetchCart, fetchOrder, setCartItem } from '../../../shop/api';
+import { quantityOf } from '../../../shop/cart-logic';
 import { formatMoney } from '../../../shop/format';
 import { shopKeys } from '../../../shop/hooks';
 import { canCancel, canReview, mediaContentUrl } from '../../../shop/order-logic';
@@ -24,6 +25,26 @@ export default function OrderDetail() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const id = String(orderId);
   const [confirming, setConfirming] = useState(false);
+  const [reorderErrors, setReorderErrors] = useState<string[]>([]);
+  const [reordering, setReordering] = useState(false);
+
+  async function reorder(items: { variantId: string; quantity: number; title: string }[]) {
+    setReordering(true);
+    setReorderErrors([]);
+    const errors: string[] = [];
+    // Séquentiel : chaque PUT renvoie le panier à jour, donc la quantité déjà présente s'additionne.
+    for (const i of items) {
+      try {
+        const cart = await fetchCart();
+        qc.setQueryData(shopKeys.cart, await setCartItem(i.variantId, quantityOf(cart, i.variantId) + i.quantity));
+      } catch (e) {
+        errors.push(t('orders.reorderFail', { title: i.title, error: errorMessage(e, t, locale) }));
+      }
+    }
+    setReordering(false);
+    setReorderErrors(errors);
+    if (errors.length < items.length) router.push('/cart');
+  }
 
   const order = useQuery({ queryKey: shopKeys.order(id), queryFn: () => fetchOrder(id) });
   const cancel = useMutation({
@@ -89,18 +110,7 @@ export default function OrderDetail() {
                 <Text variant="small" muted>
                   {i.quantity} × {money(i.unitPriceMinor)}
                 </Text>
-                {canReview(o.status) ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t('orders.review')} : ${i.title}`}
-                    onPress={() => router.push({ pathname: '/review/new', params: { productId: i.productId } })}
-                    style={styles.link}
-                  >
-                    <Text color={colors.primary} style={{ fontWeight: '600' }}>
-                      {t('orders.review')}
-                    </Text>
-                  </Pressable>
-                ) : null}
+                {canReview(o.status) ? <ReviewLink productId={i.productId} title={i.title} /> : null}
               </View>
               <Text variant="small">{money(i.lineTotalMinor)}</Text>
             </View>
@@ -112,12 +122,12 @@ export default function OrderDetail() {
           <Line label={t('orders.total')} value={money(o.totalMinor)} strong />
         </View>
 
-        {o.delivery ? (
+        {o.delivery && !(o.status === 'delivered' && ['pending', 'assigned'].includes(o.delivery.status)) ? (
           <>
             <Text variant="heading" accessibilityRole="header">
               {t('delivery.title')}
             </Text>
-            <BuyerDelivery orderId={o.id} delivery={o.delivery} />
+            <BuyerDelivery orderId={o.id} delivery={o.delivery} done={o.status === 'delivered'} />
           </>
         ) : null}
 
@@ -172,6 +182,16 @@ export default function OrderDetail() {
             {errorMessage(cancel.error, t, locale)}
           </Text>
         ) : null}
+        {o.status === 'delivered' ? (
+          <>
+            {reorderErrors.map((m) => (
+              <Text key={m} color={colors.danger} accessibilityLiveRegion="polite">
+                {m}
+              </Text>
+            ))}
+            <Button label={t('orders.reorder')} loading={reordering} onPress={() => void reorder(o.items)} />
+          </>
+        ) : null}
         {canCancel(o.status) ? (
           confirming ? (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -185,6 +205,33 @@ export default function OrderDetail() {
         ) : null}
       </ScrollView>
     </View>
+  );
+}
+
+function ReviewLink({ productId, title }: { productId: string; title: string }) {
+  const { colors } = useTheme();
+  const { t } = useI18n();
+  const router = useRouter();
+  // Observateur seul (jamais de requête) : se met à jour quand l'écran d'avis écrit `reviewed`.
+  const reviewed = useQuery({ queryKey: shopKeys.reviewed(productId), queryFn: () => true, enabled: false });
+  if (reviewed.data) {
+    return (
+      <Text variant="small" muted style={styles.link}>
+        {t('orders.reviewed')}
+      </Text>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${t('orders.review')} : ${title}`}
+      onPress={() => router.push({ pathname: '/review/new', params: { productId } })}
+      style={styles.link}
+    >
+      <Text color={colors.primary} style={{ fontWeight: '600' }}>
+        {t('orders.review')}
+      </Text>
+    </Pressable>
   );
 }
 

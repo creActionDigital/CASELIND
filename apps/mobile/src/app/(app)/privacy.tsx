@@ -54,7 +54,7 @@ export default function Privacy() {
         {toggles.map((row) => (
           <View key={row.key} style={styles.row}>
             <Text style={{ flex: 1 }}>{t(row.label)}</Text>
-            <Switch
+            <Switch accessibilityRole="switch" accessibilityState={{ checked: !!(s[row.key]) }}
               accessibilityLabel={t(row.label)}
               value={s[row.key]}
               onValueChange={(v) => patch.mutate({ [row.key]: v })}

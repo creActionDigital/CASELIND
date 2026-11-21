@@ -41,9 +41,9 @@ export default function MiniAppConsent() {
     },
   });
 
-  if (!p) return <Screen><Text>{t('mp.consent.invalid')}</Text></Screen>;
-  if (preview.isPending) return <Loading />;
-  if (preview.isError) return <Screen><Text>{t('mp.consent.invalid')}</Text><ErrorState error={preview.error} onRetry={() => preview.refetch()} /></Screen>;
+  if (!p) return <Screen><Stack.Screen options={{ title: t('mp.consent.title') }} /><Text>{t('mp.consent.invalid')}</Text></Screen>;
+  if (preview.isPending) return <><Stack.Screen options={{ title: t('mp.consent.title') }} /><Loading /></>;
+  if (preview.isError) return <Screen><Stack.Screen options={{ title: t('mp.consent.title') }} /><Text>{t('mp.consent.invalid')}</Text><ErrorState error={preview.error} onRetry={() => preview.refetch()} /></Screen>;
 
   const { app, scopes, certification, manifest, reconsentRequired } = preview.data;
   const hasManifest = manifestOf(manifest) !== null;

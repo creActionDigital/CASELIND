@@ -1,4 +1,5 @@
 import type { ContractType } from '@caselind/contracts';
+import { safeBack } from '../../../../../lib/back-target';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -71,7 +72,7 @@ export default function NewJob() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: jobKeys.all });
-      router.back();
+      safeBack(router, `/seller/${orgId}/jobs`);
     },
     onError: (e) => {
       if ((e instanceof Error && e.message === 'invalid_amount') || (e instanceof ApiRequestError && e.status === 400)) return setError(t('jobs.err.invalid'));

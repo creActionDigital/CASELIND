@@ -206,6 +206,8 @@ export class AuthService {
     if (cancelDeletion) {
       await this.audit.record({ action: 'auth.deletion_cancelled', subjectUserId: user.id, meta });
     }
+    // Seen = an earlier session of this account with the same platform and device name (user agent when unnamed).
+    const seen = await this.db.execute(sql`SELECT 1 FROM sessions WHERE user_id = ${user.id}::uuid AND platform = ${device.platform} AND device_name IS NOT DISTINCT FROM ${device.name ?? null} AND (${device.name ?? null}::text IS NOT NULL OR user_agent IS NOT DISTINCT FROM ${meta.userAgent ?? null}) LIMIT 1`);
     const pair = await this.createSession(user, device, meta);
     await this.audit.record({
       action: 'auth.login',
@@ -214,16 +216,19 @@ export class AuthService {
       meta,
       ...(twoFactor ? { metadata: { twoFactor: true } } : {}),
     });
-    // Security alert for the user's other devices; fire-and-forget, never fails the login.
-    void this.notifications
-      .notify({
-        userId: user.id,
-        category: 'security',
-        title: 'Nouvelle connexion',
-        body: device.name ?? device.platform,
-        urgent: true,
-      })
-      .catch(() => undefined);
+    // Security alert only for a device never seen on this account; fire-and-forget, never fails the login.
+    if (seen.rows.length === 0) {
+      const kind = { ios: 'un iPhone', android: 'un téléphone Android', web: 'un navigateur web', other: 'un nouvel appareil' }[device.platform];
+      void this.notifications
+        .notify({
+          userId: user.id,
+          category: 'security',
+          title: 'Nouvelle connexion',
+          body: `Connexion depuis ${kind}${device.name ? ` (${device.name})` : ''}. Si ce n'est pas vous, changez votre mot de passe.`,
+          urgent: true,
+        })
+        .catch(() => undefined);
+    }
     return pair;
   }
 

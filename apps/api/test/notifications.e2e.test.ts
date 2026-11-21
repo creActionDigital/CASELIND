@@ -293,15 +293,20 @@ describe('push delivery and preferences', () => {
 });
 
 describe('security notification on login', () => {
-  it('records a security notification with the device name', async () => {
+  it('alerts only for a device never seen, in readable French', async () => {
     const a = await account();
-    await ctx.http
-      .post('/v1/auth/login')
-      .send({ identifier: a.identifier, password: PASSWORD, device: { platform: 'ios', name: 'Pixel de Test' } })
-      .expect(200);
-    await vi.waitFor(async () => {
-      const list = await ctx.http.get('/v1/notifications').set(bearer(a.token)).expect(200);
-      expect(list.body.items[0]).toMatchObject({ category: 'security', title: 'Nouvelle connexion', body: 'Pixel de Test' });
-    });
+    const login = (device: object) => ctx.http.post('/v1/auth/login').send({ identifier: a.identifier, password: PASSWORD, device }).expect(200);
+    const count = async () => Number((await ctx.sql.query(`SELECT count(*) FROM notifications WHERE user_id = $1 AND title = 'Nouvelle connexion'`, [a.id])).rows[0].count);
+    await login({ platform: 'ios', name: 'Pixel de Test' });
+    await vi.waitFor(async () => expect(await count()).toBe(1));
+    const list = await ctx.http.get('/v1/notifications').set(bearer(a.token)).expect(200);
+    const n = list.body.items.find((x: { title: string }) => x.title === 'Nouvelle connexion');
+    expect(n.body).toContain('un iPhone');
+    expect(n.body).not.toContain('other');
+    await login({ platform: 'ios', name: 'Pixel de Test' });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(await count()).toBe(1);
+    await login({ platform: 'android', name: 'Autre téléphone' });
+    await vi.waitFor(async () => expect(await count()).toBe(2));
   });
 });

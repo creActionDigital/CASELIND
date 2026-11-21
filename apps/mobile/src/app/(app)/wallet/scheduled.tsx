@@ -14,10 +14,8 @@ import { Button, ErrorState, Screen, Text, TextField } from '../../../ui';
 import { parseWalletAmount, WALLET_CURRENCIES } from '../../../wallet/amount';
 import { createScheduled, fetchNextRuns, fetchScheduled, fetchScheduledDetail, setScheduledState, walletFinanceKeys } from '../../../wallet/finance/api';
 import { financeErrorMessage } from '../../../wallet/finance/errors';
-import { parseDateOnly, parseLocalDateTime } from '../../../wallet/finance/logic';
+import { cleanHandle, HANDLE_RE, parseDateOnly, parseLocalDateTime, quickDateTime } from '../../../wallet/finance/logic';
 import { Card, FinanceHeader, PinPrompt } from '../../../wallet/finance/ui';
-
-const HANDLE_RE = /^[a-zA-Z0-9_.]{3,30}$/;
 
 /** Paiements programmés (mode test) : une fois, chaque semaine ou chaque mois, autorisés par votre PIN. */
 export default function WalletScheduled() {
@@ -40,7 +38,7 @@ export default function WalletScheduled() {
   const list = useQuery({ queryKey: walletFinanceKeys.scheduled, queryFn: fetchScheduled });
   const refresh = () => void qc.invalidateQueries({ queryKey: walletFinanceKeys.scheduled });
 
-  const clean = handle.trim().replace(/^@/, '').toLowerCase();
+  const clean = cleanHandle(handle);
   const parsed = parseWalletAmount(amount, currency);
   const minor = 'minor' in parsed ? parsed.minor : null;
   const firstIso = parseLocalDateTime(first);
@@ -123,6 +121,15 @@ export default function WalletScheduled() {
             scroll={false}
           />
           <TextField label={t('wf.sch.first')} value={first} onChangeText={setFirst} maxLength={16} placeholder="2026-12-01 09:00" autoCapitalize="none" />
+          <Chips
+            options={(['tomorrow', 'week', 'month'] as const).map((k) => ({ value: k, label: t(`wf.sch.quick.${k}` as const) }))}
+            value={null}
+            onChange={(k) => setFirst(quickDateTime(k))}
+            scroll={false}
+          />
+          <Text variant="caption" muted>
+            {t('wf.sch.tz', { tz: Intl.DateTimeFormat().resolvedOptions().timeZone })}
+          </Text>
           {frequency !== 'once' ? (
             <>
               <TextField label={t('wf.sch.ends')} value={ends} onChangeText={setEnds} maxLength={10} placeholder="2027-06-30" autoCapitalize="none" />

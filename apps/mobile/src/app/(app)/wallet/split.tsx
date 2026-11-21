@@ -14,7 +14,7 @@ import { Button, ErrorState, Screen, Text, TextField } from '../../../ui';
 import { parseWalletAmount, WALLET_CURRENCIES } from '../../../wallet/amount';
 import { cancelSplitBill, createSplitBill, fetchSplitBills, walletFinanceKeys } from '../../../wallet/finance/api';
 import { financeErrorMessage } from '../../../wallet/finance/errors';
-import { customSplitPreview, equalSplitPreview } from '../../../wallet/finance/logic';
+import { cleanHandle, customSplitPreview, equalSplitPreview } from '../../../wallet/finance/logic';
 import { Card, FinanceHeader } from '../../../wallet/finance/ui';
 
 type Mode = 'equal' | 'custom';
@@ -33,7 +33,7 @@ export default function WalletSplit() {
   const [error, setError] = useState<string | null>(null);
   const clientId = useRef<{ sig: string; id: string } | null>(null);
 
-  const handles = [...new Set(people.split(/[\s,;]+/).map((h) => h.replace(/^@/, '').toLowerCase()).filter(Boolean))];
+  const handles = [...new Set(people.split(/[\s,;]+/).map(cleanHandle).filter(Boolean))];
   const parsedTotal = parseWalletAmount(total, currency);
   const totalMinor = 'minor' in parsedTotal ? parsedTotal.minor : null;
   const customMinor = handles.map((h) => {

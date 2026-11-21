@@ -20,3 +20,9 @@ export function commerceTarget(data: unknown): { pathname: '/orders/[orderId]'; 
   const id = d.orderId;
   return typeof id === 'string' && id ? { pathname: '/orders/[orderId]', params: { orderId: id } } : null;
 }
+
+/** Frais de livraison à l'écran de paiement : « pending » tant qu'une zone doit encore être choisie, « free » seulement si le calcul le dit. */
+export function feeKind(p: { delivery: boolean; zoneCount: number; zoneChosen: boolean; feeMinor: number }): 'pending' | 'free' | 'amount' {
+  if (p.delivery && p.zoneCount > 0 && !p.zoneChosen) return 'pending';
+  return p.feeMinor > 0 ? 'amount' : 'free';
+}

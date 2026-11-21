@@ -59,7 +59,7 @@ export function PollSheet({ visible, onClose, onConfirm, busy }: Props) {
         {options.length < POLL_OPTIONS_MAX ? <Button variant="secondary" label={t('social.poll.addOption')} onPress={() => setOptions((all) => [...all, ''])} /> : null}
         <View style={styles.row}>
           <Text style={{ flex: 1 }}>{t('social.poll.multiple')}</Text>
-          <Switch accessibilityLabel={t('social.poll.multiple')} value={multiple} onValueChange={setMultiple} trackColor={{ true: colors.primary, false: colors.border }} />
+          <Switch accessibilityRole="switch" accessibilityState={{ checked: multiple }} accessibilityLabel={t('social.poll.multiple')} value={multiple} onValueChange={setMultiple} trackColor={{ true: colors.primary, false: colors.border }} />
         </View>
         {invalid ? (
           <Text variant="small" color={colors.danger} accessibilityLiveRegion="assertive">

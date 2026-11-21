@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { cck } from '../../../admin/console-api';
 import { AdminList, Denied, adminErrorMessage, adminStyles, useCursorList, useHasRole, when } from '../../../admin/kit';
 import { announcementAction, createAnnouncement, deleteAnnouncement, fetchAdminAnnouncements } from '../../../admin/ops2-api';
-import { announcementActions, announcementReady, audienceOf, dayToIso, type AnnouncementAction } from '../../../admin/ops2-logic';
+import { announcementActions, announcementReady, audienceLabel, audienceOf, endOfDayIso, type AnnouncementAction } from '../../../admin/ops2-logic';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { alertConfirm } from '../../../lib/confirm';
 import { Card, Chips } from '../../../seller/ui';
@@ -40,7 +40,7 @@ function AnnouncementCard({ a }: { a: AdminAnnouncement }) {
       <Text variant="bodyStrong">{a.title}</Text>
       <View style={adminStyles.badges}>
         <Badge tone={a.status === 'published' ? 'primary' : 'neutral'} label={t(`ops2.annStatus.${a.status}` as MessageKey)} />
-        <Badge tone="neutral" label={t('ops2.ann.audienceLine', { audience: a.audience })} />
+        <Badge tone="neutral" label={t('ops2.ann.audienceLine', { audience: audienceLabel(a.audience, t) })} />
       </View>
       <Text variant="small">{a.body}</Text>
       <Text variant="caption" muted>{t('ops2.ann.period', { from: when(a.startsAt, locale), to: when(a.endsAt, locale) })}</Text>
@@ -67,7 +67,7 @@ function NewAnnouncement() {
   const [error, setError] = useState<string | null>(null);
   const audience = audienceOf(type, value);
   const create = useMutation({
-    mutationFn: () => createAnnouncement({ title: title.trim(), body: body.trim(), audience: audience!, endsAt: dayToIso(endDay)! }),
+    mutationFn: () => createAnnouncement({ title: title.trim(), body: body.trim(), audience: audience!, endsAt: endOfDayIso(endDay)! }),
     onSuccess: () => { setNotice(t('ops2.ann.created')); setError(null); setTitle(''); setBody(''); void qc.invalidateQueries({ queryKey: cck.all }); },
     onError: (e) => { setNotice(null); setError(adminErrorMessage(e, t, locale)); },
   });

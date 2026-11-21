@@ -69,3 +69,24 @@ export function requestActions(r: Pick<MoneyRequest, 'status' | 'direction'>): {
 export function daysLeft(expiresAt: string, now: number = Date.now()): number {
   return Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 86_400_000));
 }
+
+export const HANDLE_RE = /^[a-zA-Z0-9_.]{3,30}$/;
+
+/** Identifiant saisi (« @nom », collé ou dicté) -> forme normalisée sans @, espaces ni caractères invisibles ; règle unique des écrans du wallet. */
+export function cleanHandle(input: string): string {
+  return input.normalize('NFKC').replace(/[\s​-‏⁠﻿]/g, '').replace(/^@+/, '').toLowerCase();
+}
+
+const p2 = (n: number) => String(n).padStart(2, '0');
+
+/** Date ISO -> `AAAA-MM-JJ HH:MM` en heure locale : l'inverse exact de `parseLocalDateTime`. */
+export function formatLocalDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+
+/** Raccourcis de date (9 h locale) : demain, dans 1 semaine, 1er du mois prochain. */
+export function quickDateTime(kind: 'tomorrow' | 'week' | 'month', now: Date = new Date()): string {
+  const d = kind === 'month' ? new Date(now.getFullYear(), now.getMonth() + 1, 1, 9, 0) : new Date(now.getFullYear(), now.getMonth(), now.getDate() + (kind === 'week' ? 7 : 1), 9, 0);
+  return formatLocalDateTime(d.toISOString());
+}

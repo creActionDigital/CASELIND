@@ -149,7 +149,7 @@ function Dashboard({ profile, onEdit }: { profile: DriverProfile; onEdit: () => 
         </Text>
         {!online ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <Switch
+            <Switch accessibilityRole="switch" accessibilityState={{ checked: consented }}
               value={consented}
               onValueChange={setConsented}
               accessibilityLabel={t('mobility.driver.consent')}
@@ -161,7 +161,7 @@ function Dashboard({ profile, onEdit }: { profile: DriverProfile; onEdit: () => 
           </View>
         ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <Switch
+          <Switch accessibilityRole="switch" accessibilityState={{ checked: online }}
             value={online}
             disabled={!approved || toggle.isPending || (!online && !consented)}
             onValueChange={(v) => toggle.mutate(v)}
@@ -302,7 +302,7 @@ function DriverForm({ initial, onDone }: { initial: DriverProfile | null; onDone
       />
       {kind === 'car' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <Switch value={comfort} onValueChange={setComfort} accessibilityLabel={t('mobility.driver.comfort')} trackColor={{ true: colors.primary }} />
+          <Switch accessibilityRole="switch" accessibilityState={{ checked: comfort }} value={comfort} onValueChange={setComfort} accessibilityLabel={t('mobility.driver.comfort')} trackColor={{ true: colors.primary }} />
           <Text variant="small" style={{ flex: 1 }}>
             {t('mobility.driver.comfort')}
           </Text>

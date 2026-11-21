@@ -243,7 +243,7 @@ function OfferForm({ scope, id, initial }: { scope: Scope; id: string | null; in
             {t('services.pro.offer.urgentHint')}
           </Text>
         </View>
-        <Switch value={d.urgentAvailable} onValueChange={(v) => set({ urgentAvailable: v })} accessibilityLabel={t('services.pro.offer.urgent')} />
+        <Switch accessibilityRole="switch" accessibilityState={{ checked: d.urgentAvailable }} value={d.urgentAvailable} onValueChange={(v) => set({ urgentAvailable: v })} accessibilityLabel={t('services.pro.offer.urgent')} />
       </View>
       <TextField
         label={t('services.pro.offer.guarantee')}

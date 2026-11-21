@@ -46,7 +46,7 @@ export default function SellerLoyalty() {
           <Text variant="small" muted>{t('loyalty.seller.stats', { members: q.data.members, points: q.data.pointsIssued })}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
             <Text style={{ flex: 1 }}>{t('loyalty.seller.enabled')}</Text>
-            <Switch accessibilityLabel={t('loyalty.seller.enabled')} value={enabled} onValueChange={setEnabled} trackColor={{ true: colors.primary, false: colors.border }} />
+            <Switch accessibilityRole="switch" accessibilityState={{ checked: enabled }} accessibilityLabel={t('loyalty.seller.enabled')} value={enabled} onValueChange={setEnabled} trackColor={{ true: colors.primary, false: colors.border }} />
           </View>
           <TextField label={t('loyalty.seller.ppu')} value={ppu} onChangeText={setPpu} keyboardType="number-pad" maxLength={3} error={valid ? null : t('loyalty.seller.invalid')} />
           <Text variant="caption" muted>{t('loyalty.seller.currency')}</Text>

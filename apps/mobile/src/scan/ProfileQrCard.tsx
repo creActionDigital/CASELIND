@@ -1,5 +1,6 @@
-import { Share, View } from 'react-native';
+import { View } from 'react-native';
 import { useI18n } from '../i18n';
+import { shareMessage } from '../lib/share';
 import { spacing } from '../theme/tokens';
 import { Button, Text } from '../ui';
 import { QrCode } from './QrCode';
@@ -15,7 +16,7 @@ export function ProfileQrCard({ handle, size = 200 }: { handle: string; size?: n
       <Text variant="small" muted style={{ textAlign: 'center' }}>
         {t('scan.profileQrHint')}
       </Text>
-      <Button variant="secondary" label={t('scan.profileQrShare')} onPress={() => void Share.share({ message: value }).catch(() => undefined)} />
+      <Button variant="secondary" label={t('scan.profileQrShare')} onPress={() => void shareMessage({ message: value }, t('share.copied'))} />
     </View>
   );
 }

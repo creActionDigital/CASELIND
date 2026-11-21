@@ -83,7 +83,7 @@ export default function NewCarpoolTrip() {
       <Text muted>{t('carpool.new.intro')}</Text>
       <View style={{ gap: spacing.sm }}>
         <PlaceRow label={t('carpool.origin')} point={points.origin} icon="radio-button-on" onPress={() => setEditing('origin')} />
-        <PlaceRow label={t('carpool.destination')} point={points.destination} icon="flag-outline" onPress={() => setEditing('destination')} />
+        <PlaceRow label={t('carpool.new.destination')} point={points.destination} icon="flag-outline" onPress={() => setEditing('destination')} />
         <TextField label={t('carpool.date')} value={date} onChangeText={setDate} maxLength={10} placeholder="2026-12-24" keyboardType="numbers-and-punctuation" autoCorrect={false} />
         <TextField label={t('carpool.time')} value={time} onChangeText={setTime} maxLength={5} placeholder="09:30" keyboardType="numbers-and-punctuation" autoCorrect={false} />
         <Text variant="bodyStrong">{t('carpool.seats')}</Text>

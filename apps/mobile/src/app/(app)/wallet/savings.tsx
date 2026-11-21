@@ -77,6 +77,7 @@ export default function WalletSavings() {
   function ask(goal: SavingsGoal, kind: 'deposit' | 'withdraw') {
     const p = parseWalletAmount(amounts[goal.id] ?? '', goal.currency);
     if (!('minor' in p)) return setError(t('wf.req.err.amount'));
+    if (kind === 'withdraw' && p.minor > goal.savedMinor) return setError(t('wf.sav.err.over', { amount: formatMoney(goal.savedMinor, goal.currency, locale) }));
     setError(null);
     setMove({ goal, kind, amountMinor: p.minor });
   }

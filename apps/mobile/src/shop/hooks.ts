@@ -12,6 +12,8 @@ export const shopKeys = {
   store: (slug: string) => ['shop-store', slug] as const,
   storeProducts: (slug: string) => ['shop-store-products', slug] as const,
   cart: ['cart'] as const,
+  /** Vrai une fois l'avis publié (ou refusé « déjà donné ») pendant la session : masque « Laisser un avis ». */
+  reviewed: (productId: string) => ['shop-reviewed', productId] as const,
   orders: ['orders'] as const,
   order: (id: string) => ['order', id] as const,
 };

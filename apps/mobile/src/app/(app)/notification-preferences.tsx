@@ -82,7 +82,7 @@ export default function NotificationPreferencesScreen() {
             return (
               <View key={c} style={styles.row}>
                 <Text style={styles.flex}>{label}</Text>
-                <Switch
+                <Switch accessibilityRole="switch" accessibilityState={{ checked: !!(!p.pushDisabledCategories.includes(c)) }}
                   accessibilityLabel={label}
                   value={!p.pushDisabledCategories.includes(c)}
                   onValueChange={(v) => toggle(c, v)}
@@ -130,7 +130,7 @@ export default function NotificationPreferencesScreen() {
         <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.row}>
             <Text style={styles.flex}>{t('notifications.previewsToggle')}</Text>
-            <Switch
+            <Switch accessibilityRole="switch" accessibilityState={{ checked: p.messagePreviews }}
               accessibilityLabel={t('notifications.previewsToggle')}
               value={p.messagePreviews}
               onValueChange={(v) => patch.mutate({ messagePreviews: v })}

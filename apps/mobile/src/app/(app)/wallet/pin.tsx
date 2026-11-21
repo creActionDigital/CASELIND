@@ -11,6 +11,7 @@ import { walletKeys } from '../../../wallet/hooks';
 import { checkPin, PIN_LENGTH, validatePinForm } from '../../../wallet/pin';
 import { setPaymentPin } from '../../../wallet/pin-api';
 import { PinPad, SandboxBanner } from '../../../wallet/ui';
+import { safeBack } from '../../../lib/back-target';
 
 type Step = 'enter' | 'confirm' | 'password' | 'done';
 const ISSUE_KEY: Record<'length' | 'weak' | 'mismatch' | 'password', MessageKey> = {
@@ -140,7 +141,7 @@ export default function WalletPin() {
               {t('wallet.pin.doneTitle')}
             </Text>
             <Text muted>{t('wallet.pin.doneBody')}</Text>
-            <Button label={t('wallet.send.finish')} onPress={() => router.back()} />
+            <Button label={t('wallet.send.finish')} onPress={() => safeBack(router, '/wallet')} />
           </>
         ) : null}
       </ScrollView>

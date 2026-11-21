@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ROUTES } from '../lib/back-target';
 import { notificationTarget as t } from './targets';
 
 type Row = [string, string, Record<string, string>, string, Record<string, string>?];
@@ -64,6 +65,19 @@ describe('notificationTarget', () => {
     const r = t({ category, data });
     expect(r?.pathname).toBe(pathname);
     if (params) expect(r?.params).toEqual(params);
+  });
+
+  it('ne renvoie que des écrans qui existent (pas de /security nu, ni /miniapps/activity sans id)', () => {
+    const extra: Record<string, string>[] = [
+      { kind: 'miniapp_reconsent' }, { kind: 'miniapp_notify' }, { kind: 'miniapp_payment_request' }, { kind: 'miniapp_status' }, { kind: 'miniapp_webhook_disabled' },
+    ];
+    const known = new Set<string>(ROUTES);
+    const all = [...rows.map((r) => ({ category: r[0], data: r[2] })), ...extra.map((data) => ({ category: 'system', data })), { category: 'security', data: {} }];
+    for (const n of all) {
+      const r = t(n);
+      if (r) expect(known.has(r.pathname), r.pathname).toBe(true);
+    }
+    expect(t({ category: 'system', data: { kind: 'miniapp_reconsent' } })?.pathname).toBe('/miniapps');
   });
 
   it('retombe sur null (feuille de détail) sans cible', () => {

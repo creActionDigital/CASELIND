@@ -3,11 +3,12 @@ import type { WalletCounterparty, WalletTransaction } from '@caselind/contracts'
 import { useMemo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SheetModal } from '../components/SheetModal';
+import { shareMessage } from '../lib/share';
 import { useI18n, type MessageKey } from '../i18n';
 import { formatMoney } from '../shop/format';
 import { radius, spacing, TOUCH, typography } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
-import { Text } from '../ui';
+import { Button, Text } from '../ui';
 import { PIN_LENGTH, appendDigit } from './pin';
 import { signedMinor } from './history';
 
@@ -117,6 +118,24 @@ export function TxSheet({ tx, onClose }: { tx: WalletTransaction | null; onClose
               </Text>
             </View>
           ))}
+          <Button
+            variant="secondary"
+            label={t('wallet.tx.share')}
+            onPress={() =>
+              void shareMessage(
+                {
+                  title: t('wallet.tx.shareTitle'),
+                  message: t('wallet.tx.shareText', {
+                    amount: `${tx.direction === 'in' ? '+' : '−'}${formatMoney(tx.amountMinor, tx.currency, locale)}`,
+                    party: `${t(tx.direction === 'in' ? 'wallet.tx.from' : 'wallet.tx.to')} ${lines[0]![1]}`,
+                    date: new Date(tx.createdAt).toLocaleString(locale, { dateStyle: 'long', timeStyle: 'short' }),
+                    ref: tx.id,
+                  }),
+                },
+                t('wallet.tx.copied'),
+              )
+            }
+          />
         </View>
       ) : null}
     </SheetModal>

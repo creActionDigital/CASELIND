@@ -21,6 +21,7 @@ function FallbackBack(props: Pick<ComponentProps<typeof HeaderBackButton>, 'tint
     <HeaderBackButton
       {...props}
       label={t('common.back')}
+      accessibilityLabel={t('common.back')}
       onPress={() => (router.canGoBack() ? router.back() : router.replace(parentRoute(pathname) as never))}
     />
   );

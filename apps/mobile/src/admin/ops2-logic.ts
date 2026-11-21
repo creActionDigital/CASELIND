@@ -57,6 +57,20 @@ export function dayToIso(day: string): string | null {
   return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== t ? null : d.toISOString();
 }
 
+/** Fin d'une annonce choisie comme jour : 23:59:59 à l'heure locale de cette date (sinon 00:00 UTC s'affiche « 02:00 » le jour même). */
+export function endOfDayIso(day: string): string | null {
+  if (dayToIso(day) === null) return null;
+  const [y, m, d] = day.trim().split('-').map(Number);
+  return new Date(y!, m! - 1, d!, 23, 59, 59).toISOString();
+}
+
+/** Libellé lisible d'une audience (`all`, `role:admin`, `country:CD`). */
+export function audienceLabel(audience: string, t: (k: 'ops2.ann.audience.all' | 'ops2.ann.audience.role' | 'ops2.ann.audience.country') => string): string {
+  const [kind, value] = audience.split(':');
+  const k = kind === 'role' || kind === 'country' ? kind : 'all';
+  return k === 'all' || !value ? t('ops2.ann.audience.all') : `${t(`ops2.ann.audience.${k}`)} : ${value}`;
+}
+
 export const announcementReady = (title: string, body: string, endDay: string): boolean =>
   title.trim().length >= 1 && title.trim().length <= 80 && body.trim().length >= 1 && body.trim().length <= 500 && dayToIso(endDay) !== null;
 

@@ -28,7 +28,8 @@ export function durationText(seconds: number, t: T): string {
 export function systemText(ev: SystemEvent, name: (userId: string | null) => string, t: T): string {
   switch (ev.type) {
     case 'group_created':
-      return t('chat.system.group_created', { name: name(ev.actorId) });
+      // « Vous a créé » serait faux : forme dédiée quand l'auteur est la personne connectée.
+      return name(ev.actorId) === t('chat.you') ? t('chat.system.group_created_you') : t('chat.system.group_created', { name: name(ev.actorId) });
     case 'member_added':
       // Rejoindre une communauté publique : la personne s'ajoute elle-même.
       if (ev.userId === ev.actorId) return t('chat.system.member_joined', { name: name(ev.userId) });

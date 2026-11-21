@@ -14,3 +14,12 @@ describe('systemText member_added', () => {
     expect(systemText(added('u1', 'u2'), name, t as never)).toBe('chat.system.member_added:n-u1,n-u2');
   });
 });
+
+describe('systemText group_created', () => {
+  const ev = { type: 'group_created', actorId: 'u1' } as unknown as SystemEvent;
+  it('utilise la forme « Vous avez créé » quand l’auteur est soi-même', () => {
+    const tt = (k: string) => k;
+    expect(systemText(ev, () => 'chat.you', tt as never)).toBe('chat.system.group_created_you');
+    expect(systemText(ev, name, t as never)).toBe('chat.system.group_created:n-u1');
+  });
+});

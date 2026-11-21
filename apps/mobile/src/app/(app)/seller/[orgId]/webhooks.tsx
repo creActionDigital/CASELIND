@@ -4,8 +4,9 @@ import { WEBHOOK_EVENTS, type Webhook, type WebhookEvent } from '@caselind/contr
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Share, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../../i18n';
+import { shareMessage } from '../../../../lib/share';
 import { ApiRequestError } from '../../../../lib/api';
 import { useMembership } from '../../../../seller/api';
 import { Card, Loading, SectionTitle, sellerErrorMessage } from '../../../../seller/ui';
@@ -93,7 +94,7 @@ export default function OrgWebhooks() {
               <Text variant="bodyStrong">{t('webhooks.secret.title')}</Text>
               <Text selectable style={{ fontFamily: 'monospace' }}>{secret}</Text>
               <Text variant="small" color={colors.danger}>{t('webhooks.secret.once')}</Text>
-              <Button variant="secondary" label={t('webhooks.secret.share')} onPress={() => void Share.share({ message: secret }).catch(() => undefined)} />
+              <Button variant="secondary" label={t('webhooks.secret.share')} onPress={() => void shareMessage({ message: secret }, t('share.copied'))} />
               <Button label={t('webhooks.secret.done')} onPress={() => setSecret(null)} />
             </Card>
           ) : null}

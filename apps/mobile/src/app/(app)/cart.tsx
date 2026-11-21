@@ -47,7 +47,7 @@ export default function Cart() {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 150 + insets.bottom }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 210 + insets.bottom }]}>
         {setItem.isError ? (
           <Text color={colors.danger} accessibilityLiveRegion="polite">
             {errorMessage(setItem.error, t, locale)}
@@ -124,6 +124,16 @@ export default function Cart() {
                     <Stepper value={l.quantity} max={99} removable onChange={(n) => setItem.mutate({ variantId: l.variantId, quantity: n })} />
                     <Text variant="bodyStrong">{formatMoney(l.lineTotalMinor, g.currency, locale)}</Text>
                   </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('cart.deleteLine', { title: l.title })}
+                    onPress={() => setItem.mutate({ variantId: l.variantId, quantity: 0 })}
+                    style={styles.removeBtn}
+                  >
+                    <Text color={colors.danger} style={{ fontWeight: '600' }}>
+                      {t('cart.delete')}
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
             ))}
@@ -146,6 +156,7 @@ export default function Cart() {
           </View>
         ))}
         <Button label={t('cart.checkout')} disabled={!ready} onPress={() => router.push('/checkout')} />
+        <Button variant="secondary" label={t('cart.continue')} onPress={() => router.push('/shop')} />
       </View>
     </View>
   );

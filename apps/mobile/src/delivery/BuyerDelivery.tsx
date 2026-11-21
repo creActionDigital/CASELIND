@@ -65,7 +65,7 @@ const STEP_KEY: Record<string, MessageKey> = {
 };
 
 /** Livraison vue par l'acheteur : frise, livreur, code, position du livreur, évaluation. */
-export function BuyerDelivery({ orderId, delivery }: { orderId: string; delivery: DeliveryView }) {
+export function BuyerDelivery({ orderId, delivery, done }: { orderId: string; delivery: DeliveryView; done?: boolean }) {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const [revealed, setRevealed] = useState(true);
@@ -125,7 +125,7 @@ export function BuyerDelivery({ orderId, delivery }: { orderId: string; delivery
         <Text accessibilityLabel={t('delivery.courierIs', { name: delivery.courier.displayName })}>
           {t('delivery.courier')} : <Text variant="bodyStrong">{delivery.courier.displayName}</Text>
         </Text>
-      ) : (
+      ) : done ? null : (
         <Text variant="small" muted>
           {t('delivery.noCourier')}
         </Text>
@@ -144,7 +144,7 @@ export function BuyerDelivery({ orderId, delivery }: { orderId: string; delivery
         </Text>
       ) : null}
 
-      {delivery.proofCode ? (
+      {delivery.proofCode && !done ? (
         <View style={[styles.codeBox, { backgroundColor: colors.primarySoft }]}>
           <Text variant="small" muted>
             {t('delivery.code.title')}

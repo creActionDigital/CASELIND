@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { safeBack } from '../../../../../lib/back-target';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useI18n } from '../../../../../i18n';
@@ -33,7 +34,7 @@ export default function NewCoupon() {
     mutationFn: () => createCoupon(orgId, toCouponRequest(d)),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: sk.coupons(orgId) });
-      router.back();
+      safeBack(router, `/seller/${orgId}/coupons`);
     },
     onError: (e) => setError(sellerErrorMessage(e, t, locale)),
   });

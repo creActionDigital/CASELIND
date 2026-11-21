@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customSplitPreview, daysLeft, equalSplitPreview, nextRunDates, parseDateOnly, parseLocalDateTime, requestActions, scheduledRunAt, splitEqual } from './logic';
+import { cleanHandle, customSplitPreview, formatLocalDateTime, HANDLE_RE, quickDateTime, daysLeft, equalSplitPreview, nextRunDates, parseDateOnly, parseLocalDateTime, requestActions, scheduledRunAt, splitEqual } from './logic';
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
@@ -105,5 +105,25 @@ describe('request helpers', () => {
     expect(daysLeft('2026-01-15T00:00:00Z', now)).toBe(14);
     expect(daysLeft('2026-01-01T06:00:00Z', now)).toBe(1);
     expect(daysLeft('2025-12-01T00:00:00Z', now)).toBe(0);
+  });
+});
+
+describe('saisies du wallet', () => {
+  it('aller-retour saisie -> ISO -> affichage', () => {
+    for (const s of ['2026-12-01 09:00', '2027-03-28 02:30', '2027-07-15 23:59']) {
+      const iso = parseLocalDateTime(s)!;
+      expect(formatLocalDateTime(iso)).toBe(s);
+      expect(new Date(iso).getHours()).toBe(Number(s.slice(11, 13)));
+    }
+  });
+  it('raccourcis de date à 9 h locale', () => {
+    const now = new Date(2026, 0, 31, 15, 0);
+    expect(quickDateTime('tomorrow', now)).toBe('2026-02-01 09:00');
+    expect(quickDateTime('week', now)).toBe('2026-02-07 09:00');
+    expect(quickDateTime('month', now)).toBe('2026-02-01 09:00');
+  });
+  it('identifiant : @, espaces et caractères invisibles ignorés', () => {
+    for (const h of ['@bob_test', ' @Bob_Test ', '​@bob_test', '＠bob_test']) expect(HANDLE_RE.test(cleanHandle(h))).toBe(true);
+    expect(HANDLE_RE.test(cleanHandle('@a'))).toBe(false);
   });
 });

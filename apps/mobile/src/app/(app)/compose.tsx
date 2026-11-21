@@ -82,7 +82,7 @@ export default function Compose() {
         visibility,
         media: media.map((m) => ({ uri: m.uri, mime: m.mime })),
       });
-      router.back();
+      safeBack(router, '/');
     } catch (e) {
       setSent(false);
       setError(errorMessage(e, t, locale));

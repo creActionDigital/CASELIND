@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Share, View } from 'react-native';
+import { View } from 'react-native';
 import { bk, fetchExportCsv, fetchProfitability } from '../../../../business/api';
 import { businessErrorMessage } from '../../../../business/errors';
 import { barWidths, exportFileName, marginPercent, PERIOD_PRESETS, periodFor, type PeriodPreset } from '../../../../business/logic';
 import { useI18n, type MessageKey } from '../../../../i18n';
+import { shareMessage } from '../../../../lib/share';
 import { useMembership } from '../../../../seller/api';
 import { formatMinor } from '../../../../seller/money';
 import { can } from '../../../../seller/permissions';
@@ -40,7 +41,7 @@ export default function SellerProfitability() {
     setInfo(null);
     try {
       const csv = await fetchExportCsv(orgId, kind, from, to);
-      await Share.share({ title: exportFileName(kind, from, to), message: csv });
+      await shareMessage({ title: exportFileName(kind, from, to), message: csv }, t('share.copied'));
     } catch (e) {
       setInfo(e instanceof Error && e.name === 'AbortError' ? null : businessErrorMessage(e, t, locale));
     } finally {

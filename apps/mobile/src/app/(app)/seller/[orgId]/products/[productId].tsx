@@ -439,11 +439,11 @@ function VariantCard({
       )}
       <View style={styles.switchRow}>
         <Text style={{ flex: 1 }}>{t('seller.variant.trackStock')}</Text>
-        <Switch accessibilityLabel={t('seller.variant.trackStock')} value={v.trackStock} onValueChange={(trackStock) => onChange({ trackStock })} trackColor={{ true: colors.primary }} />
+        <Switch accessibilityRole="switch" accessibilityState={{ checked: v.trackStock }} accessibilityLabel={t('seller.variant.trackStock')} value={v.trackStock} onValueChange={(trackStock) => onChange({ trackStock })} trackColor={{ true: colors.primary }} />
       </View>
       <View style={styles.switchRow}>
         <Text style={{ flex: 1 }}>{t('seller.variant.active')}</Text>
-        <Switch accessibilityLabel={t('seller.variant.active')} value={v.active} onValueChange={(active) => onChange({ active })} trackColor={{ true: colors.primary }} />
+        <Switch accessibilityRole="switch" accessibilityState={{ checked: v.active }} accessibilityLabel={t('seller.variant.active')} value={v.active} onValueChange={(active) => onChange({ active })} trackColor={{ true: colors.primary }} />
       </View>
     </Card>
   );

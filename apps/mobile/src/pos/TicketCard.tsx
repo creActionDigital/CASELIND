@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { alertConfirm } from '../lib/confirm';
-import { Share, View } from 'react-native';
+import { View } from 'react-native';
 import { useI18n } from '../i18n';
+import { shareMessage } from '../lib/share';
 import { sk } from '../seller/api';
 import { formatMinor } from '../seller/money';
 import { Card, sellerErrorMessage } from '../seller/ui';
@@ -36,7 +37,7 @@ export function TicketCard({ orgId, saleId, onClose }: { orgId: string; saleId: 
 
   const share = () => {
     const message = ticketText(data, { total: t('pos.ticket.total'), mode: t('pos.ticket.mode'), modeName, voided: t('pos.ticket.voided') }, locale);
-    void Share.share({ message });
+    void shareMessage({ message }, t('share.copied'));
   };
   const confirmVoid = () =>
     alertConfirm(t('pos.void'), t('pos.void.confirm'), [

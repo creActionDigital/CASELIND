@@ -46,7 +46,7 @@ export default function Consents() {
           <View key={c.kind} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.head}>
               <Text variant="bodyStrong" style={{ flex: 1 }}>{label(c.kind)}</Text>
-              <Switch
+              <Switch accessibilityRole="switch" accessibilityState={{ checked: c.granted }}
                 accessibilityLabel={label(c.kind)}
                 value={c.granted}
                 disabled={change.isPending}
