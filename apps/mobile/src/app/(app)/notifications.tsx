@@ -2,19 +2,13 @@ import type { Notification, NotificationList } from '@caselind/contracts';
 import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { api } from '../../auth/auth-context';
 import { useI18n, type MessageKey } from '../../i18n';
 import { formatListTime } from '../../messaging/api';
 import { qk } from '../../messaging/keys';
 import { fetchNotifications, useUnreadCount } from '../../notifications/hooks';
-import { deliveryTarget } from '../../delivery/routing';
-import { rideTarget } from '../../mobility/routing';
-import { commerceTarget } from '../../shop/order-logic';
-import { sellerTarget } from '../../seller/routing';
-import { socialTarget } from '../../social/routing';
-import { walletTarget } from '../../wallet/routing';
-import { bookingTarget } from '../../services/logic';
+import { notificationTarget } from '../../notifications/targets';
 import { spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, EmptyState, ErrorState, IconButton, Text } from '../../ui';
@@ -29,6 +23,7 @@ export default function NotificationCenter() {
   const qc = useQueryClient();
   const unread = useUnreadCount();
   const [refreshing, setRefreshing] = useState(false);
+  const [detail, setDetail] = useState<Notification | null>(null);
 
   const query = useInfiniteQuery({
     queryKey: qk.notifications,
@@ -58,32 +53,10 @@ export default function NotificationCenter() {
 
   function open(n: Notification) {
     if (!n.readAt) readOne.mutate(n.id);
-    const conversationId = n.data.conversationId;
-    if (conversationId) return router.push({ pathname: '/messages/[conversationId]', params: { conversationId } });
-    const ride = rideTarget(n.data);
-    if (ride) return router.push(ride);
-    if (n.category === 'delivery') {
-      const seller = sellerTarget(n.data);
-      if (seller) return router.push(seller);
-      const target = deliveryTarget(n.data);
-      if (target) return router.push(target);
-    }
-    if (n.category === 'commerce') {
-      // `data.orgId` présent : commande reçue par une boutique -> route vendeur ; sinon route acheteur (M3a).
-      const seller = sellerTarget(n.data);
-      if (seller) return router.push(seller);
-      const target = commerceTarget(n.data);
-      if (target) router.push(target);
-    }
-    if (n.category === 'booking') {
-      const target = bookingTarget(n.data);
-      if (target) return router.push(target);
-    }
-    if (n.category === 'payment') return router.push(walletTarget(n.data));
-    if (n.category === 'social') {
-      const target = socialTarget(n.data);
-      if (target) router.push(target);
-    }
+    const target = notificationTarget(n);
+    // Jamais « rien » : sans écran concerné, la feuille de détail montre le texte complet.
+    if (target) router.push(target as never);
+    else setDetail(n);
   }
 
   const header = (
@@ -160,6 +133,18 @@ export default function NotificationCenter() {
         </View>
       ) : null}
       {body}
+      <Modal visible={!!detail} transparent animationType="fade" onRequestClose={() => setDetail(null)}>
+        <View style={styles.backdrop}>
+          <View accessibilityViewIsModal style={[styles.sheet, { backgroundColor: colors.background }]}>
+            <Text variant="title">{detail?.title}</Text>
+            <Text variant="body">{detail?.body}</Text>
+            <Text variant="caption" muted>
+              {detail ? new Date(detail.createdAt).toLocaleString(locale) : ''}
+            </Text>
+            <Button label={t('common.close')} onPress={() => setDetail(null)} />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -171,5 +156,7 @@ const styles = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth },
   barBtn: { paddingHorizontal: spacing.md },
   row: { minHeight: TOUCH + 28, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: { gap: spacing.md, padding: spacing.xl, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   dot: { width: 10, height: 10, borderRadius: 5 },
 });

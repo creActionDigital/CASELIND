@@ -962,7 +962,7 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/me', summary: "The caller's account", tags: ['users'], auth: 'user', response: meSchema, status: 200 },
   { method: 'patch', path: '/v1/me', summary: "Update the caller's profile", tags: ['users'], auth: 'user', body: updateMeRequestSchema, response: meSchema, status: 200 },
   { method: 'get', path: '/v1/me/security-events', summary: "Recent security events on the caller's account", tags: ['users'], auth: 'user', response: itemsOf(securityEventSchema), status: 200 },
-  { method: 'get', path: '/v1/users/{handle}', summary: 'Public profile by handle (404 when blocked either way)', tags: ['users'], auth: 'user', params: { handle: z.string() }, response: publicProfileSchema, status: 200 },
+  { method: 'get', path: '/v1/users/{handle}', summary: 'Public profile by handle or user id (404 when blocked either way)', tags: ['users'], auth: 'user', params: { handle: z.string() }, response: publicProfileSchema, status: 200 },
 
   // Feature flags
   { method: 'get', path: '/v1/config/flags', summary: 'Feature flags evaluated for the caller (country and roles)', tags: ['flags'], auth: 'user', response: userFlagsSchema, status: 200 },

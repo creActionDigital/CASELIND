@@ -20,7 +20,7 @@ export const promoKeys = {
 export const fetchFlashSales = (cursor?: string, limit = PAGE) =>
   api.request('/promotions/flash', { query: { limit, cursor }, schema: storefrontProductListSchema });
 
-export const fetchWishlist = (cursor?: string) => api.request('/me/wishlist', { query: { limit: PAGE, cursor }, schema: wishlistListSchema });
+export const fetchWishlist = (cursor?: string, limit = PAGE) => api.request('/me/wishlist', { query: { limit, cursor }, schema: wishlistListSchema });
 export const addWish = (productId: string) => api.request(`/me/wishlist/${productId}`, { method: 'PUT' });
 export const removeWish = (productId: string) => api.request(`/me/wishlist/${productId}`, { method: 'DELETE' });
 

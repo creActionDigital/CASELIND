@@ -4,6 +4,7 @@ import { DEMO_LIVE } from '../../../hub/live/demo-data';
 import { LiveScreen } from '../../../hub/live/LiveScreen';
 import type { LiveComment, LiveSession } from '../../../hub/live/types';
 import { useI18n } from '../../../i18n';
+import { safeBack } from '../../../lib/back-target';
 
 /** Aperçu du design du live : données locales de démonstration, aucun appel réseau, messages jamais envoyés. */
 export default function LivePreview() {
@@ -20,10 +21,10 @@ export default function LivePreview() {
       <LiveScreen
         session={session}
         banner={t('live.demoBanner')}
-        onBack={() => router.back()}
-        onClose={() => router.back()}
+        onBack={() => safeBack(router, '/hub')}
+        onClose={() => safeBack(router, '/hub')}
         onSearch={() => router.push('/search')}
-        onSelectTab={() => router.back()}
+        onSelectTab={() => safeBack(router, '/hub')}
         onSend={send}
       />
     </>

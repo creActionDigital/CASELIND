@@ -47,18 +47,21 @@ export default function MyApplications() {
         query={query}
         keyExtractor={(a: Application) => a.id}
         renderItem={({ item }) => (
-          <Card onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: item.job.id } })} label={item.job.title} style={styles.card}>
-            <Text variant="bodyStrong" numberOfLines={2}>
-              {item.job.title}
-            </Text>
-            <Text variant="small" muted>
-              {item.job.orgName}
-            </Text>
-            <View style={styles.row}>
-              <Badge tone="neutral" label={t(statusKey(item.status))} />
-              {canWithdraw(item.status) ? <Button variant="ghost" label={t('jobs.withdraw')} loading={withdraw.isPending && withdraw.variables === item.id} onPress={() => withdraw.mutate(item.id)} /> : null}
-            </View>
-          </Card>
+          // Retirer reste hors de la carte cliquable : pas de bouton dans un bouton (HTML invalide sur le web).
+          <View>
+            <Card onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: item.job.id } })} label={item.job.title} style={styles.card}>
+              <Text variant="bodyStrong" numberOfLines={2}>
+                {item.job.title}
+              </Text>
+              <Text variant="small" muted>
+                {item.job.orgName}
+              </Text>
+              <View style={styles.row}>
+                <Badge tone="neutral" label={t(statusKey(item.status))} />
+              </View>
+            </Card>
+            {canWithdraw(item.status) ? <Button variant="ghost" label={t('jobs.withdraw')} loading={withdraw.isPending && withdraw.variables === item.id} onPress={() => withdraw.mutate(item.id)} /> : null}
+          </View>
         )}
         empty={{ icon: 'paper-plane-outline', title: t('jobs.applicationsEmpty') }}
       />

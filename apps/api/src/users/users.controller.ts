@@ -8,6 +8,7 @@ import {
   updateMeRequestSchema,
 } from '@caselind/contracts';
 import { ReqMeta, type RequestMeta } from '../common/request-meta.js';
+import { z } from 'zod';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
 import { UsersService } from './users.service.js';
@@ -35,10 +36,11 @@ export class UsersController {
     return { items: await this.users.securityEvents(user.userId) };
   }
 
+  /** `:handle` is a handle or a user id (the mobile profile screens open users by id). */
   @Get('users/:handle')
   profile(
     @CurrentUser() user: AuthUser,
-    @Param('handle', new ZodPipe(handleSchema)) handle: string,
+    @Param('handle', new ZodPipe(z.union([z.uuid(), handleSchema]))) handle: string,
   ): Promise<PublicProfile> {
     return this.users.publicProfile(handle, user.userId);
   }

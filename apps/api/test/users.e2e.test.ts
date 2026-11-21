@@ -55,9 +55,13 @@ describe('profile', () => {
 
     const res = await ctx.http.get(`/v1/users/${me.body.handle}`).set(bearer(viewer.tokens.accessToken)).expect(200);
     expect(Object.keys(res.body).sort()).toEqual(['avatarUrl', 'bio', 'displayName', 'handle', 'id']);
+    // Same profile by user id (the mobile profile screens open users by id).
+    expect((await ctx.http.get(`/v1/users/${me.body.id}`).set(bearer(viewer.tokens.accessToken)).expect(200)).body).toEqual(res.body);
+    await ctx.http.get('/v1/users/a').set(bearer(viewer.tokens.accessToken)).expect(400);
 
     await ctx.sql.query(`UPDATE users SET status = 'suspended' WHERE id = $1`, [me.body.id]);
     await ctx.http.get(`/v1/users/${me.body.handle}`).set(bearer(viewer.tokens.accessToken)).expect(404);
+    await ctx.http.get(`/v1/users/${me.body.id}`).set(bearer(viewer.tokens.accessToken)).expect(404);
   });
 
   it('shows the user their own security log without secrets', async () => {

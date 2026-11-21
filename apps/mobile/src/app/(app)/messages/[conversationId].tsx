@@ -72,6 +72,7 @@ import { isMuted } from '../../../messaging/cache';
 import { brandColor, radius, spacing, TOUCH, typography } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Avatar, Button, EmptyState, ErrorState, IconButton, Text } from '../../../ui';
+import { safeBack } from '../../../lib/back-target';
 
 const BODY_MAX = 4000;
 const FOREVER = '2100-01-01T00:00:00.000Z';
@@ -442,7 +443,7 @@ export default function ChatRoom() {
         : '';
   const topBar = (
     <View style={styles.topBar}>
-      <IconButton icon="chevron-back" label={t('common.back')} onPress={() => router.back()} style={{ backgroundColor: cc.card }} />
+      <IconButton icon="chevron-back" label={t('common.back')} onPress={() => safeBack(router, '/messages')} style={{ backgroundColor: cc.card }} />
       <Avatar name={title} size={42} />
       <View style={styles.flex}>
         <Text variant="bodyStrong" numberOfLines={1} accessibilityRole="header">

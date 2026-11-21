@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { takePendingLink } from '../../auth/pending-link';
 import { useI18n } from '../../i18n';
 import { IncomingCall } from '../../calllive/IncomingCall';
+import { fallbackHeaderLeft } from '../../components/FallbackBack';
 import { PushRouting } from '../../notifications/PushRouting';
 import { ReportSheet } from '../../report/ReportSheet';
 import { useTheme } from '../../theme/use-theme';
@@ -27,6 +28,8 @@ export default function AppLayout() {
         headerTintColor: colors.primary,
         headerTitleStyle: { color: colors.text },
         headerBackTitle: t('common.back'),
+        // Sans historique (lien, notification, rechargement) : retour vers l'écran parent plutôt que pas de retour du tout.
+        headerLeft: fallbackHeaderLeft,
         contentStyle: { backgroundColor: colors.background },
       }}
     >
@@ -43,6 +46,7 @@ export default function AppLayout() {
       <Stack.Screen name="wallet/topup" options={{ title: t('wallet.topup.title') }} />
       <Stack.Screen name="wallet/receive" options={{ title: t('wallet.receive.title') }} />
       <Stack.Screen name="wallet/pin" options={{ title: t('wallet.pin.title') }} />
+      <Stack.Screen name="health/index" options={{ title: t('health.title') }} />
       <Stack.Screen name="scan" options={{ title: t('scan.title') }} />
       <Stack.Screen name="pay" options={{ title: t('pay.title') }} />
       <Stack.Screen name="u/[handle]" options={{ title: t('profile.social.title') }} />

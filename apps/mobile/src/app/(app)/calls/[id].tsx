@@ -9,6 +9,7 @@ import { useRealtime } from '../../../realtime/realtime-context';
 import { Card, Loading } from '../../../seller/ui';
 import { spacing } from '../../../theme/tokens';
 import { Button, ErrorState, Screen, Text } from '../../../ui';
+import { safeBack } from '../../../lib/back-target';
 
 /** Écran d'appel : état de la sonnerie et de la communication, boutons répondre / refuser / raccrocher. La signalisation est réelle, pas le média. */
 export default function CallScreen() {
@@ -57,7 +58,7 @@ export default function CallScreen() {
           ) : null}
           {call.status === 'ringing' && !incoming ? <Button variant="danger" label={t('calls.hangup')} onPress={() => act.mutate('end')} /> : null}
           {call.status === 'active' ? <Button variant="danger" label={t('calls.hangup')} loading={act.isPending} onPress={() => act.mutate('end')} /> : null}
-          {over ? <Button variant="secondary" label={t('common.back')} onPress={() => router.back()} /> : null}
+          {over ? <Button variant="secondary" label={t('common.back')} onPress={() => safeBack(router, '/messages')} /> : null}
         </View>
       ) : null}
     </Screen>

@@ -1,8 +1,8 @@
 import type { StorefrontProductDetail } from '@caselind/contracts';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { shopKeys } from '../shop/hooks';
-import { addWish, promoKeys, removeWish } from './api';
+import { addWish, fetchWishlist, promoKeys, removeWish } from './api';
 
 /** Heure courante rafraîchie chaque seconde (compte à rebours) ; à ne monter que si une promotion est affichée. */
 export function useNow(intervalMs = 1000): number {
@@ -30,5 +30,45 @@ export function useToggleWish(productId: string) {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: promoKeys.wishlist }),
+  });
+}
+
+/** Ensemble des produits de la liste de souhaits (200 au plus : 2 pages de 100), pour les cœurs des cartes produit. */
+export function useWishedIds(): Set<string> {
+  const q = useQuery({
+    queryKey: [...promoKeys.wishlist, 'ids'],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const ids: string[] = [];
+      let cursor: string | undefined;
+      for (let i = 0; i < 2; i++) {
+        const page = await fetchWishlist(cursor, 100);
+        ids.push(...page.items.map((w) => w.productId));
+        if (!page.nextCursor) break;
+        cursor = page.nextCursor;
+      }
+      return ids;
+    },
+  });
+  return new Set(q.data ?? []);
+}
+
+/** Cœur d'une carte produit : bascule optimiste de l'ensemble ci-dessus, annulée si le serveur refuse (liste pleine...). */
+export function useToggleWishFromCard() {
+  const qc = useQueryClient();
+  const key = [...promoKeys.wishlist, 'ids'];
+  return useMutation({
+    mutationFn: ({ productId, wish }: { productId: string; wish: boolean }) => (wish ? addWish(productId) : removeWish(productId)),
+    onMutate: async ({ productId, wish }) => {
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<string[]>(key);
+      qc.setQueryData<string[]>(key, (ids = []) => (wish ? [...ids, productId] : ids.filter((id) => id !== productId)));
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => qc.setQueryData(key, ctx?.prev),
+    onSettled: (_d, _e, { productId }) => {
+      void qc.invalidateQueries({ queryKey: promoKeys.wishlist });
+      void qc.invalidateQueries({ queryKey: shopKeys.product(productId) });
+    },
   });
 }

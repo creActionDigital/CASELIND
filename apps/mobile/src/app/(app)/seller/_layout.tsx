@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { fallbackHeaderLeft } from '../../../components/FallbackBack';
 import { useI18n } from '../../../i18n';
 import { useTheme } from '../../../theme/use-theme';
 
@@ -13,6 +14,8 @@ export default function SellerLayout() {
         headerTintColor: colors.primary,
         headerTitleStyle: { color: colors.text },
         headerBackTitle: t('common.back'),
+        // Premier écran de cette pile : retour vers la pile parente (sinon aucun bouton retour).
+        headerLeft: fallbackHeaderLeft,
         contentStyle: { backgroundColor: colors.background },
       }}
     />

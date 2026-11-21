@@ -9,6 +9,7 @@ import { useRealtime } from '../../../realtime/realtime-context';
 import { Card, Loading } from '../../../seller/ui';
 import { spacing } from '../../../theme/tokens';
 import { Button, ErrorState, Screen, Text, TextField } from '../../../ui';
+import { safeBack } from '../../../lib/back-target';
 
 /** Salon d'un live : compteur et chat en temps réel ; la vidéo attend un serveur média (voir la note affichée). */
 export default function LiveRoom() {
@@ -72,10 +73,10 @@ export default function LiveRoom() {
               ))}
               <TextField label={t('lives.chat.placeholder')} value={text} onChangeText={setText} maxLength={300} />
               <Button label={t('lives.chat.send')} disabled={text.trim().length === 0} loading={send.isPending} onPress={() => send.mutate()} />
-              {isHost ? <Button variant="danger" label={t('lives.end')} loading={end.isPending} onPress={() => end.mutate()} /> : <Button variant="ghost" label={t('lives.leave')} onPress={() => router.back()} />}
+              {isHost ? <Button variant="danger" label={t('lives.end')} loading={end.isPending} onPress={() => end.mutate()} /> : <Button variant="ghost" label={t('lives.leave')} onPress={() => safeBack(router, '/hub')} />}
             </>
           ) : (
-            <Button variant="secondary" label={t('common.back')} onPress={() => router.back()} />
+            <Button variant="secondary" label={t('common.back')} onPress={() => safeBack(router, '/hub')} />
           )}
         </View>
       ) : null}

@@ -16,6 +16,7 @@ import { VisibilityPicker } from '../../social/VisibilityPicker';
 import { onMedia, radius, spacing, TOUCH, typography } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, Screen, Text } from '../../ui';
+import { safeBack } from '../../lib/back-target';
 
 const MAX_BODY = 5000;
 const MAX_PHOTOS = 10;
@@ -94,7 +95,7 @@ export default function Compose() {
         options={{
           title: mode === 'video' ? t('compose.titleVideo') : t('compose.title'),
           headerLeft: () => (
-            <Pressable accessibilityRole="button" accessibilityLabel={t('compose.close')} onPress={() => router.back()} style={styles.headBtn}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('compose.close')} onPress={() => safeBack(router)} style={styles.headBtn}>
               <Text color={colors.primary}>{t('common.cancel')}</Text>
             </Pressable>
           ),

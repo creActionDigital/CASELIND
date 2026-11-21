@@ -12,6 +12,7 @@ import { requestIdentifierChange, verifyIdentifierChange } from '../../../securi
 import { securityErrorMessage } from '../../../security/errors';
 import { Card } from '../../../security/ui';
 import { Button, Screen, Text, TextField } from '../../../ui';
+import { safeBack } from '../../../lib/back-target';
 
 type Step = 'form' | 'code' | 'done';
 
@@ -114,7 +115,7 @@ export default function ChangeIdentifier() {
               {t('security.identifier.doneTitle')}
             </Text>
             <Text muted>{t('security.identifier.doneBody')}</Text>
-            <Button label={t('common.close')} onPress={() => router.back()} />
+            <Button label={t('common.close')} onPress={() => safeBack(router, '/profile')} />
           </>
         ) : null}
       </View>

@@ -10,3 +10,5 @@ apps/api/.data/
 graphify-out/
 scripts/.seed-demo-state.json
 deploy/prod.env
+
+qa-out/

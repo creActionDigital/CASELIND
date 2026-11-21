@@ -73,7 +73,7 @@ export class UsersService {
     const [u] = await this.db
       .select()
       .from(users)
-      .where(and(eq(users.handle, handle), eq(users.status, 'active'), isNull(users.deletionRequestedAt)))
+      .where(and(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle) ? eq(users.id, handle) : eq(users.handle, handle), eq(users.status, 'active'), isNull(users.deletionRequestedAt)))
       .limit(1);
     if (!u) throw AppError.notFound('Profile not found');
     if (u.id !== viewerId && (await this.privacy.isBlockedEitherWay(viewerId, u.id))) {

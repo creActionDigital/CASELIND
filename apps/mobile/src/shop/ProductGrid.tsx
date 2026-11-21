@@ -8,20 +8,26 @@ import { onMedia, radius, shadow, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, EmptyState, ErrorState, Text } from '../ui';
 import { PromoBadge, PromoPrice } from '../promotions/parts';
+import { useToggleWishFromCard, useWishedIds } from '../promotions/hooks';
+import { Ionicons } from '@expo/vector-icons';
 import { formatMoney } from './format';
 
-/** Carte produit : image arrondie, pastille « Rupture » posée dessus (voile uni sombre), nom puis prix. */
+/** Carte produit : image arrondie, pastille « Rupture » posée dessus (voile uni sombre), cœur « souhaits », nom puis prix. */
 export const ProductCard = memo(function ProductCard({ product, width }: { product: StorefrontProduct; width?: number }) {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const router = useRouter();
   const price = formatMoney(product.minPriceMinor, product.currency, locale);
+  const wished = useWishedIds().has(product.id);
+  const wish = useToggleWishFromCard();
   return (
+    // Le cœur est un frère de la carte cliquable (pas de bouton dans un bouton).
+    <View style={{ width }}>
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={t('shop.productA11y', { title: product.title, price, shop: product.org.name })}
       onPress={() => router.push({ pathname: '/product/[productId]', params: { productId: product.id } })}
-      style={({ pressed }) => [styles.card, shadow.card, { width, backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
+      style={({ pressed }) => [styles.card, shadow.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
     >
       <View>
         <AuthImage contentUrl={product.coverUrl} label={product.title} style={styles.image} />
@@ -43,6 +49,17 @@ export const ProductCard = memo(function ProductCard({ product, width }: { produ
         <PromoPrice priceMinor={product.minPriceMinor} compareAtMinor={product.compareAtPriceMinor} currency={product.currency} />
       </View>
     </Pressable>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t(wished ? 'wish.remove' : 'wish.add')}
+      accessibilityState={{ selected: wished }}
+      hitSlop={6}
+      onPress={() => wish.mutate({ productId: product.id, wish: !wished })}
+      style={[styles.heart, { backgroundColor: colors.surface }]}
+    >
+      <Ionicons name={wished ? 'heart' : 'heart-outline'} size={18} color={wished ? colors.danger : colors.text} />
+    </Pressable>
+    </View>
   );
 });
 
@@ -114,7 +131,8 @@ const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.xl, padding: spacing.sm },
   image: { width: '100%', aspectRatio: 1, borderRadius: radius.lg },
   badge: { position: 'absolute', top: spacing.sm, left: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: 'rgba(0,0,0,0.72)' },
-  promo: { position: 'absolute', top: spacing.sm, right: spacing.sm },
+  promo: { position: 'absolute', bottom: spacing.sm, left: spacing.sm },
+  heart: { position: 'absolute', top: spacing.md, right: spacing.md, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', ...shadow.card },
   info: { paddingHorizontal: spacing.xs, paddingTop: spacing.sm, paddingBottom: spacing.xs, gap: 2 },
   name: { fontWeight: '600', minHeight: 40 },
 });

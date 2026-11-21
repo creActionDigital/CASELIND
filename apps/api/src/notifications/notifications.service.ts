@@ -171,7 +171,7 @@ export class NotificationsService {
           to,
           title: i.title,
           body: hideBody ? MESSAGE_PREVIEW_PLACEHOLDER : i.body,
-          data: i.data ?? {},
+          data: { ...(i.data ?? {}), category: i.category }, // le mobile route le tap push avec la catégorie
           urgent,
         });
       }
