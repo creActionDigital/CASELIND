@@ -85,10 +85,13 @@ describe('verified reviews', () => {
     }
     await review(buyer, s.productId).expect(403); // shipped is not delivered
     await ctx.http.post(`/v1/orgs/${s.orgId}/orders/${orderId}/status`).set(bearer(s.owner.token)).send({ status: 'delivered' }).expect(200);
+    const itemOf = async () => (await ctx.http.get(`/v1/orders/${orderId}`).set(bearer(buyer.token)).expect(200)).body.items[0];
+    expect((await itemOf()).reviewed).toBe(false);
 
     const created = await review(buyer, s.productId, { rating: 4, body: '  Très bien  ' }).expect(201);
     expect(created.body).toMatchObject({ productId: s.productId, rating: 4, body: 'Très bien', verifiedPurchase: true, reply: null, author: { userId: buyer.id } });
     await review(stranger, s.productId).expect(403);
+    expect((await itemOf()).reviewed).toBe(true); // the order screen now shows "review given"
   });
 
   it('refuses a cancelled order and validates the input and the product', async () => {

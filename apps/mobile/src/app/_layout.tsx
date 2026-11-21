@@ -17,6 +17,7 @@ import { I18nProvider } from '../i18n';
 import { RealtimeProvider } from '../realtime/realtime-context';
 import { useTheme } from '../theme/use-theme';
 import { Wordmark } from '../ui';
+import { shouldRetry } from '../lib/api';
 
 function Gate() {
   const { status } = useAuth();
@@ -63,7 +64,7 @@ function Gate() {
 
 export default function RootLayout() {
   const [client] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false } } }),
+    () => new QueryClient({ defaultOptions: { queries: { retry: shouldRetry, staleTime: 30_000, refetchOnWindowFocus: false } } }),
   );
   return (
     <SafeAreaProvider>

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { ApiRequestError, createApiClient } from './api';
+import { ApiRequestError, createApiClient, shouldRetry } from './api';
 
 const pair = (n: number) => ({
   accessToken: `access-${n}`,
@@ -97,5 +97,15 @@ describe('api client', () => {
     await expect(client.request('/me', { schema: z.object({ ok: z.boolean() }) })).rejects.toMatchObject({
       code: 'invalid_response',
     });
+  });
+});
+
+describe('shouldRetry', () => {
+  it('ne réessaie jamais une 4xx, une fois sinon', () => {
+    expect(shouldRetry(0, new ApiRequestError(404, 'not_found', 'x'))).toBe(false);
+    expect(shouldRetry(0, new ApiRequestError(403, 'forbidden', 'x'))).toBe(false);
+    expect(shouldRetry(0, new ApiRequestError(503, 'unavailable', 'x'))).toBe(true);
+    expect(shouldRetry(0, new TypeError('Network request failed'))).toBe(true);
+    expect(shouldRetry(1, new TypeError('Network request failed'))).toBe(false);
   });
 });

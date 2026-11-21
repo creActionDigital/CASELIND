@@ -55,6 +55,8 @@ export const swSocial: Partial<Record<MessageKey, string>> = {
   'hub.search': 'Tafuta',
   'hub.publish': 'Chapisha',
   'hub.react': 'Itikia',
+  'hub.soundOn': 'Washa sauti',
+  'hub.soundOff': 'Zima sauti',
   'hub.comments': 'Maoni',
   'hub.share': 'Shiriki',
   'hub.buy': 'Nunua',

@@ -3,7 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n';
 import { shareMessage } from '../lib/share';
@@ -21,12 +21,32 @@ const fetchVideos = (cursor?: string) => api.request('/feed/videos', { query: { 
 function Surface({ uri, active }: { uri: string; active: boolean }) {
   const player = useVideoPlayer({ uri }, (p) => {
     p.loop = true;
+    // Navigateurs : lecture automatique refusée avec le son tant que l'utilisateur n'a pas touché la page (comme TikTok web, on démarre muet).
+    p.muted = Platform.OS === 'web';
   });
+  const { t } = useI18n();
+  const [muted, setMuted] = useState(Platform.OS === 'web');
   useEffect(() => {
     if (active) player.play();
     else player.pause();
   }, [active, player]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
+  return (
+    <>
+      <VideoView player={player} style={styles.video} contentFit="cover" nativeControls={false} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t(muted ? 'hub.soundOn' : 'hub.soundOff')}
+        onPress={() => {
+          player.muted = !muted;
+          setMuted(!muted);
+        }}
+        hitSlop={8}
+        style={styles.sound}
+      >
+        <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={20} color={onMedia} />
+      </Pressable>
+    </>
+  );
 }
 
 function Page({ post, active, height }: { post: CachedPost; active: boolean; height: number }) {
@@ -164,6 +184,9 @@ export function VideosPane({ active, height }: { active: boolean; height: number
 }
 
 const styles = StyleSheet.create({
+  // Largeur et hauteur explicites : sur le web, absoluteFill seul laisse la vidéo à sa taille d'origine.
+  video: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  sound: { position: 'absolute', top: 96, left: 16, width: TOUCH, height: TOUCH, borderRadius: TOUCH / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: glass.dark },
   page: { backgroundColor: '#0B0B10', justifyContent: 'flex-end' },
   center: { alignItems: 'center', justifyContent: 'center' },
   state: { flex: 1, alignItems: 'center', justifyContent: 'center' },

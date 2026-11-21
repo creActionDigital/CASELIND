@@ -46,7 +46,7 @@ export function HubTabs({ active, onSelect, left, right }: Props) {
               onPress={() => onSelect(i)}
               style={styles.tab}
             >
-              <Text variant={on ? 'bodyStrong' : 'body'} color={onMedia} style={{ opacity: on ? 1 : 0.8 }}>
+              <Text variant={on ? 'bodyStrong' : 'body'} color={onMedia} numberOfLines={1} style={{ opacity: on ? 1 : 0.8, flexShrink: 1 }}>
                 {t(`hub.tab.${k}` as const)}
               </Text>
               <View style={[styles.underline, { backgroundColor: on ? onMedia : 'transparent' }]} />
@@ -74,8 +74,9 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   slot: { width: TOUCH, alignItems: 'flex-start' },
-  tabs: { flexDirection: 'row', alignItems: 'center' },
-  tab: { minHeight: TOUCH, paddingHorizontal: 10, justifyContent: 'center', alignItems: 'center' },
+  // Les onglets se partagent la place entre les deux boutons (libellés longs en sw : sinon débordement à 375 px).
+  tabs: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  tab: { minHeight: TOUCH, flexShrink: 1, minWidth: 0, paddingHorizontal: 6, justifyContent: 'center', alignItems: 'center' },
   underline: { height: 2, width: 18, borderRadius: 1, marginTop: 2 },
   round: {
     width: TOUCH,

@@ -156,6 +156,8 @@ export const en: Record<MessageKey, string> = {
   'hub.search': 'Search',
   'hub.publish': 'Publish',
   'hub.react': 'React',
+  'hub.soundOn': 'Turn sound on',
+  'hub.soundOff': 'Mute',
   'hub.comments': 'Comments',
   'hub.share': 'Share',
   'hub.buy': 'Buy',

@@ -110,7 +110,7 @@ export default function OrderDetail() {
                 <Text variant="small" muted>
                   {i.quantity} × {money(i.unitPriceMinor)}
                 </Text>
-                {canReview(o.status) ? <ReviewLink productId={i.productId} title={i.title} /> : null}
+                {canReview(o.status) ? <ReviewLink productId={i.productId} title={i.title} done={i.reviewed === true} /> : null}
               </View>
               <Text variant="small">{money(i.lineTotalMinor)}</Text>
             </View>
@@ -208,13 +208,13 @@ export default function OrderDetail() {
   );
 }
 
-function ReviewLink({ productId, title }: { productId: string; title: string }) {
+function ReviewLink({ productId, title, done }: { productId: string; title: string; done: boolean }) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const router = useRouter();
-  // Observateur seul (jamais de requête) : se met à jour quand l'écran d'avis écrit `reviewed`.
+  // `done` vient du serveur ; l'observateur (jamais de requête) couvre l'avis publié pendant cette session.
   const reviewed = useQuery({ queryKey: shopKeys.reviewed(productId), queryFn: () => true, enabled: false });
-  if (reviewed.data) {
+  if (done || reviewed.data) {
     return (
       <Text variant="small" muted style={styles.link}>
         {t('orders.reviewed')}

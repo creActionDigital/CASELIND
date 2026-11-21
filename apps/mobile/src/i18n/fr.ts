@@ -154,6 +154,8 @@ export const fr = {
   'hub.search': 'Rechercher',
   'hub.publish': 'Publier',
   'hub.react': 'Réagir',
+  'hub.soundOn': 'Activer le son',
+  'hub.soundOff': 'Couper le son',
   'hub.comments': 'Commentaires',
   'hub.share': 'Partager',
   'hub.buy': 'Acheter',

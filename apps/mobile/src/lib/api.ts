@@ -168,3 +168,9 @@ export function createApiClient(options: ApiClientOptions) {
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;
+
+/** Nouvel essai des requêtes : jamais sur une réponse 4xx (404, 403... ne changeront pas : on affiche l'erreur tout de suite), une fois sinon. */
+export function shouldRetry(failureCount: number, error: unknown): boolean {
+  if (error instanceof ApiRequestError && error.status >= 400 && error.status < 500) return false;
+  return failureCount < 1;
+}

@@ -111,6 +111,8 @@ export const orderItemSchema = z.object({
   unitPriceMinor: z.number().int(),
   quantity: z.number().int(),
   lineTotalMinor: z.number().int(),
+  /** The buyer already reviewed this product (the order screen then shows "review given" instead of "leave a review"). */
+  reviewed: z.boolean().optional(),
 });
 export type OrderItem = z.infer<typeof orderItemSchema>;
 

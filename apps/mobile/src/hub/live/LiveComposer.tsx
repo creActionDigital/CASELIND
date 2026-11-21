@@ -63,6 +63,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: {
     flex: 1,
+    minWidth: 0, // web : sinon le champ garde sa largeur implicite et pousse le bouton Fermer hors de l'écran
     minHeight: TOUCH,
     paddingHorizontal: 18,
     borderRadius: 999,

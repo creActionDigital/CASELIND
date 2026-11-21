@@ -1,9 +1,9 @@
 import { randomInt } from 'node:crypto';
 import type { Order, OrderAddress, OrderDetail, OrderEvent, OrderItem, OrderStatus } from '@caselind/contracts';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { AppError } from '../common/app-error.js';
 import type { DbExecutor } from '../commerce/catalog.port.js';
-import { organizations, orderEvents, orderItems, type OrderEventRow, type OrderItemRow, type OrderRow } from '../db/schema.js';
+import { organizations, orderEvents, orderItems, reviews, type OrderEventRow, type OrderItemRow, type OrderRow } from '../db/schema.js';
 
 export { UUID_RE, decodeCursor, encodeCursor, validationError } from '../social/social.shared.js';
 
@@ -80,8 +80,18 @@ export async function hydrateOrders(db: DbExecutor, rows: OrderRow[]): Promise<O
       .where(inArray(organizations.id, [...new Set(rows.map((r) => r.orgId))])),
   ]);
   const orgNames = new Map(orgRows.map((o) => [o.id, o.name]));
+  // Products each buyer already reviewed (one query for the whole page).
+  const reviewedRows = itemRows.length === 0 ? [] : await db
+    .select({ userId: reviews.userId, productId: reviews.productId })
+    .from(reviews)
+    .where(and(inArray(reviews.userId, [...new Set(rows.map((r) => r.buyerId))]), inArray(reviews.productId, [...new Set(itemRows.map((i) => i.productId))])));
+  const reviewed = new Set(reviewedRows.map((r) => `${r.userId}:${r.productId}`));
+  const buyerOf = new Map(rows.map((r) => [r.id, r.buyerId]));
   const itemsByOrder = new Map<string, OrderItem[]>();
-  for (const it of itemRows) itemsByOrder.set(it.orderId, [...(itemsByOrder.get(it.orderId) ?? []), toItem(it)]);
+  for (const it of itemRows) {
+    const item = { ...toItem(it), reviewed: reviewed.has(`${buyerOf.get(it.orderId)}:${it.productId}`) };
+    itemsByOrder.set(it.orderId, [...(itemsByOrder.get(it.orderId) ?? []), item]);
+  }
   return rows.map((o) => ({
     id: o.id,
     number: o.number,
