@@ -10,13 +10,13 @@ import { Text } from '../ui';
 import { fetchFlashSales, promoKeys } from './api';
 
 /** Section « Ventes flash » de la boutique (absente sans vente en cours ou si le service est indisponible) + lien vers les souhaits. */
-export function FlashStrip() {
+export function FlashStrip({ hideFlash }: { hideFlash?: boolean } = {}) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const router = useRouter();
   const { status } = useAuth();
   const flash = useQuery({ queryKey: promoKeys.flash, queryFn: () => fetchFlashSales(undefined, 10), enabled: status === 'signedIn', staleTime: 60_000, retry: false });
-  const items = flash.data?.items ?? [];
+  const items = hideFlash ? [] : flash.data?.items ?? [];
   return (
     <View style={styles.wrap}>
       {status === 'signedIn' ? (

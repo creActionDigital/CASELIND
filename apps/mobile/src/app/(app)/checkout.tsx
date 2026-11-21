@@ -2,7 +2,7 @@ import type { DeliverySpeed, DeliveryZone, Fulfillment } from '@caselind/contrac
 import { Steps } from '../../shop/Steps';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +32,7 @@ export default function Checkout() {
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
   const cart = useCart();
+  const { coupon } = useLocalSearchParams<{ coupon?: string }>();
   // Clé d'idempotence conservée pour les nouvelles tentatives de cette commande.
   const clientId = useRef(uuidv4());
 
@@ -49,6 +50,11 @@ export default function Checkout() {
   const [slotText, setSlotText] = useState('');
   const [slotError, setSlotError] = useState<string | null>(null);
 
+  // Code saisi dans le panier : préremplit le champ de la première boutique (validé par le serveur à la commande).
+  const firstOrg = cart.data?.groups[0]?.orgId;
+  useEffect(() => {
+    if (coupon && firstOrg) setCoupons((c) => (Object.keys(c).length ? c : { [firstOrg]: String(coupon) }));
+  }, [coupon, firstOrg]);
   useEffect(() => {
     let live = true;
     void loadAddress().then((a) => live && a && setForm((f) => (f.name || f.line1 ? f : a)));

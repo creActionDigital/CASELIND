@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { memo, useState, type ReactElement } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useI18n } from '../i18n';
-import { onMedia, radius, shadow, spacing } from '../theme/tokens';
+import { brandAccent, onMedia, radius, spacing } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, EmptyState, ErrorState, Text } from '../ui';
 import { PromoBadge, PromoPrice } from '../promotions/parts';
@@ -27,7 +27,7 @@ export const ProductCard = memo(function ProductCard({ product, width }: { produ
       accessibilityRole="button"
       accessibilityLabel={t('shop.productA11y', { title: product.title, price, shop: product.org.name })}
       onPress={() => router.push({ pathname: '/product/[productId]', params: { productId: product.id } })}
-      style={({ pressed }) => [styles.card, shadow.card, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
+      style={({ pressed }) => [styles.card, { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.85 : 1 }]}
     >
       <View>
         <AuthImage contentUrl={product.coverUrl} label={product.title} style={styles.image} />
@@ -55,9 +55,9 @@ export const ProductCard = memo(function ProductCard({ product, width }: { produ
       accessibilityState={{ selected: wished }}
       hitSlop={6}
       onPress={() => wish.mutate({ productId: product.id, wish: !wished })}
-      style={[styles.heart, { backgroundColor: colors.surface }]}
+      style={styles.heart}
     >
-      <Ionicons name={wished ? 'heart' : 'heart-outline'} size={18} color={wished ? colors.danger : colors.text} />
+      <Ionicons name={wished ? 'heart' : 'heart-outline'} size={20} color={onMedia} />
     </Pressable>
     </View>
   );
@@ -128,11 +128,11 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, flexGrow: 1, paddingBottom: spacing.xxl },
   columns: { gap: spacing.md },
   cell: { flex: 1, maxWidth: '50%' },
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.xl, padding: spacing.sm },
-  image: { width: '100%', aspectRatio: 1, borderRadius: radius.lg },
+  card: { borderRadius: radius.xl, padding: spacing.sm, overflow: 'hidden' },
+  image: { width: '100%', aspectRatio: 1, borderRadius: radius.lg, backgroundColor: 'transparent' },
   badge: { position: 'absolute', top: spacing.sm, left: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: 'rgba(0,0,0,0.72)' },
   promo: { position: 'absolute', bottom: spacing.sm, left: spacing.sm },
-  heart: { position: 'absolute', top: spacing.md, right: spacing.md, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', ...shadow.card },
+  heart: { position: 'absolute', top: 0, right: 0, width: 40, height: 40, borderTopRightRadius: radius.xl, borderBottomLeftRadius: radius.lg, backgroundColor: brandAccent, alignItems: 'center', justifyContent: 'center' },
   info: { paddingHorizontal: spacing.xs, paddingTop: spacing.sm, paddingBottom: spacing.xs, gap: 2 },
-  name: { fontWeight: '600', minHeight: 40 },
+  name: { fontWeight: '500', minHeight: 40 },
 });

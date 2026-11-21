@@ -1,5 +1,7 @@
-import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../i18n';
 import { errorMessage } from '../../lib/errors';
@@ -7,11 +9,11 @@ import { canCheckout, totalsByCurrency } from '../../shop/cart-logic';
 import { formatMoney } from '../../shop/format';
 import { useCart, useSetCartItem } from '../../shop/hooks';
 import { mediaContentUrl } from '../../shop/order-logic';
-import { Stepper } from '../../shop/parts';
-import { radius, spacing, TOUCH } from '../../theme/tokens';
+import { brandAccent, fonts, onMedia, radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
-import { AuthImage, Button, EmptyState, ErrorState, Text } from '../../ui';
-import { BottomActionBar } from '../../ui/premium';
+import { AuthImage, EmptyState, ErrorState, Text } from '../../ui';
+import { PressableScale } from '../../ui/premium';
+import { safeBack } from '../../lib/back-target';
 import { Steps } from '../../shop/Steps';
 
 export default function Cart() {
@@ -21,6 +23,8 @@ export default function Cart() {
   const insets = useSafeAreaInsets();
   const cart = useCart();
   const setItem = useSetCartItem();
+  const [promo, setPromo] = useState('');
+  const [applied, setApplied] = useState('');
 
   if (cart.isPending) {
     return (
@@ -48,8 +52,18 @@ export default function Cart() {
   const ready = canCheckout(data);
 
   return (
-    <View style={[styles.flex, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 190 + insets.bottom }]}>
+    <View style={[styles.flex, { backgroundColor: colors.background, paddingTop: insets.top + spacing.sm }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.head}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('product.back')} onPress={() => safeBack(router, '/shop')} style={[styles.round, { backgroundColor: colors.surface }]}>
+          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        </Pressable>
+        <Text variant="heading" accessibilityRole="header" style={styles.headTitle}>
+          {t('mc.mk.cartTitle')}
+        </Text>
+        <View style={styles.round} />
+      </View>
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Steps current={0} />
         {setItem.isError ? (
           <Text color={colors.danger} accessibilityLiveRegion="polite">
@@ -57,7 +71,7 @@ export default function Cart() {
           </Text>
         ) : null}
         {data.unavailable.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: colors.dangerSoft, borderColor: colors.danger }]}>
+          <View style={[styles.card, { backgroundColor: colors.dangerSoft, borderColor: colors.danger, borderWidth: StyleSheet.hairlineWidth }]}>
             <Text variant="bodyStrong" accessibilityRole="header">
               {t('cart.unavailableTitle')}
             </Text>
@@ -67,12 +81,7 @@ export default function Cart() {
                 <Text variant="small" style={styles.flex}>
                   {t('cart.unavailableLine', { n: u.quantity })}
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('cart.remove')}
-                  onPress={() => setItem.mutate({ variantId: u.variantId, quantity: 0 })}
-                  style={styles.removeBtn}
-                >
+                <Pressable accessibilityRole="button" accessibilityLabel={t('cart.remove')} onPress={() => setItem.mutate({ variantId: u.variantId, quantity: 0 })} style={styles.removeBtn}>
                   <Text color={colors.danger} style={{ fontWeight: '600' }}>
                     {t('cart.remove')}
                   </Text>
@@ -83,14 +92,9 @@ export default function Cart() {
         ) : null}
 
         {data.groups.map((g) => (
-          <View key={`${g.orgId}-${g.currency}`} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={g.orgName}
-              onPress={() => router.push({ pathname: '/store/[slug]', params: { slug: g.orgSlug } })}
-              style={styles.groupHead}
-            >
-              <Text variant="heading" numberOfLines={1} style={styles.flex}>
+          <View key={`${g.orgId}-${g.currency}`} style={{ gap: spacing.sm }}>
+            <Pressable accessibilityRole="button" accessibilityLabel={g.orgName} onPress={() => router.push({ pathname: '/store/[slug]', params: { slug: g.orgSlug } })} style={styles.groupHead}>
+              <Text variant="bodyStrong" numberOfLines={1} style={styles.flex}>
                 {g.orgName}
               </Text>
               <Text variant="caption" muted>
@@ -98,52 +102,46 @@ export default function Cart() {
               </Text>
             </Pressable>
             {g.lines.map((l) => (
-              <View key={l.variantId} style={styles.line}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={l.title}
-                  onPress={() => router.push({ pathname: '/product/[productId]', params: { productId: l.productId } })}
-                >
-                  <AuthImage contentUrl={mediaContentUrl(l.imageAssetId)} label={l.title} style={styles.thumb} />
+              <View key={l.variantId} style={[styles.card, styles.line, { backgroundColor: colors.surface }]}>
+                <Pressable accessibilityRole="button" accessibilityLabel={l.title} onPress={() => router.push({ pathname: '/product/[productId]', params: { productId: l.productId } })}>
+                  <AuthImage contentUrl={mediaContentUrl(l.imageAssetId)} label={l.title} style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]} />
                 </Pressable>
                 <View style={styles.flex}>
-                  <Text variant="small" numberOfLines={2} style={{ fontWeight: '600' }}>
-                    {l.title}
-                  </Text>
-                  {l.variantLabel ? (
-                    <Text variant="caption" muted numberOfLines={1}>
-                      {l.variantLabel}
+                  <View style={styles.nameRow}>
+                    <Text variant="bodyStrong" numberOfLines={2} style={styles.flex}>
+                      {l.title}
                     </Text>
-                  ) : null}
-                  <Text variant="small" muted>
-                    {t('cart.unit', { price: formatMoney(l.unitPriceMinor, g.currency, locale) })}
-                  </Text>
-                  {l.compareAtPriceMinor ? (
-                    <Text variant="caption" muted style={{ textDecorationLine: 'line-through' }}>
-                      {formatMoney(l.compareAtPriceMinor, g.currency, locale)}
-                    </Text>
-                  ) : null}
-                  <View style={styles.lineFoot}>
-                    <Stepper value={l.quantity} max={99} removable onChange={(n) => setItem.mutate({ variantId: l.variantId, quantity: n })} />
-                    <Text variant="bodyStrong">{formatMoney(l.lineTotalMinor, g.currency, locale)}</Text>
+                    <Pressable accessibilityRole="button" accessibilityLabel={t('cart.deleteLine', { title: l.title })} onPress={() => setItem.mutate({ variantId: l.variantId, quantity: 0 })} hitSlop={8} style={styles.trash}>
+                      <Ionicons name="trash-outline" size={22} color={brandAccent} />
+                    </Pressable>
                   </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t('cart.deleteLine', { title: l.title })}
-                    onPress={() => setItem.mutate({ variantId: l.variantId, quantity: 0 })}
-                    style={styles.removeBtn}
-                  >
-                    <Text color={colors.danger} style={{ fontWeight: '600' }}>
-                      {t('cart.delete')}
-                    </Text>
-                  </Pressable>
+                  <Text variant="small" muted numberOfLines={1}>
+                    {l.variantLabel || g.orgName}
+                  </Text>
+                  <View style={styles.lineFoot}>
+                    <View>
+                      <Text variant="bodyStrong">{formatMoney(l.lineTotalMinor, g.currency, locale)}</Text>
+                      {l.compareAtPriceMinor ? (
+                        <Text variant="caption" muted style={{ textDecorationLine: 'line-through' }}>
+                          {formatMoney(l.compareAtPriceMinor * l.quantity, g.currency, locale)}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={[styles.pill, { backgroundColor: colors.surfaceAlt }]}>
+                      <Pressable accessibilityRole="button" accessibilityLabel={t('product.dec')} accessibilityState={{ disabled: l.quantity <= 1 }} disabled={l.quantity <= 1} onPress={() => setItem.mutate({ variantId: l.variantId, quantity: l.quantity - 1 })} style={[styles.pillBtn, { opacity: l.quantity <= 1 ? 0.4 : 1 }]}>
+                        <Ionicons name="remove" size={18} color={colors.text} />
+                      </Pressable>
+                      <Text variant="bodyStrong" style={styles.qty}>
+                        {l.quantity}
+                      </Text>
+                      <Pressable accessibilityRole="button" accessibilityLabel={t('product.inc')} accessibilityState={{ disabled: l.quantity >= 99 }} disabled={l.quantity >= 99} onPress={() => setItem.mutate({ variantId: l.variantId, quantity: l.quantity + 1 })} style={[styles.pillBtn, { opacity: l.quantity >= 99 ? 0.4 : 1 }]}>
+                        <Ionicons name="add" size={18} color={colors.text} />
+                      </Pressable>
+                    </View>
+                  </View>
                 </View>
               </View>
             ))}
-            <View style={styles.subtotal}>
-              <Text muted>{t('cart.subtotal')}</Text>
-              <Text variant="bodyStrong">{formatMoney(g.subtotalMinor, g.currency, locale)}</Text>
-            </View>
           </View>
         ))}
         <Text variant="small" muted>
@@ -151,14 +149,52 @@ export default function Cart() {
         </Text>
       </ScrollView>
 
-      <View style={styles.bottomWrap}>
+      <View style={[styles.panel, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]}>
+        <View style={[styles.promo, { backgroundColor: colors.surfaceAlt }]}>
+          <TextInput
+            accessibilityLabel={t('mc.mk.promo')}
+            placeholder={t('mc.mk.promo')}
+            placeholderTextColor={colors.textMuted}
+            value={promo}
+            onChangeText={setPromo}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={40}
+            style={[styles.promoInput, { color: colors.text }]}
+          />
+          <PressableScale accessibilityLabel={t('mc.mk.apply')} disabled={!promo.trim()} onPress={() => setApplied(promo.trim())} style={[styles.apply, { opacity: promo.trim() ? 1 : 0.5 }]}>
+            <Text color={onMedia} style={styles.big}>
+              {t('mc.mk.apply')}
+            </Text>
+          </PressableScale>
+        </View>
+        {applied ? (
+          <Text variant="small" color={colors.success} accessibilityLiveRegion="polite">
+            {t('mc.mk.promoSaved', { code: applied })}
+          </Text>
+        ) : null}
         {totals.map((x) => (
-          <View key={x.currency} style={[styles.subtotal, styles.totalRow, { backgroundColor: colors.surface }]}>
-            <Text variant="bodyStrong">{t('cart.total')}</Text>
-            <Text variant="heading">{formatMoney(x.totalMinor, x.currency, locale)}</Text>
+          <View key={x.currency} style={{ gap: spacing.xs }}>
+            <View style={styles.subtotal}>
+              <Text muted>{t('cart.subtotal')}</Text>
+              <Text variant="bodyStrong">{formatMoney(x.totalMinor, x.currency, locale)}</Text>
+            </View>
+            <View style={[styles.subtotal, styles.totalRow, { borderTopColor: colors.border }]}>
+              <Text variant="bodyStrong">{t('cart.total')}</Text>
+              <Text variant="title">{formatMoney(x.totalMinor, x.currency, locale)}</Text>
+            </View>
           </View>
         ))}
-        <BottomActionBar label={t('cart.checkout')} disabled={!ready} onPress={() => router.push('/checkout')} />
+        <PressableScale
+          accessibilityLabel={t('cart.checkout')}
+          disabled={!ready}
+          onPress={() => (applied ? router.push({ pathname: '/checkout', params: { coupon: applied } }) : router.push('/checkout'))}
+          style={[styles.checkout, { opacity: ready ? 1 : 0.5 }]}
+        >
+          <Text color={onMedia} style={styles.big}>
+            {t('cart.checkout')}
+          </Text>
+        </PressableScale>
       </View>
     </View>
   );
@@ -167,15 +203,27 @@ export default function Cart() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  headTitle: { fontSize: 20, lineHeight: 26 },
+  round: { width: TOUCH, height: TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, gap: spacing.md },
-  card: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: spacing.md, gap: spacing.md },
+  card: { borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: TOUCH },
   line: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  nameRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  trash: { minWidth: TOUCH - 8, minHeight: 32, alignItems: 'flex-end', justifyContent: 'center' },
   lineFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
-  thumb: { width: 72, height: 72 },
+  thumb: { width: 84, height: 84, borderRadius: radius.lg },
+  pill: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill },
+  pillBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  qty: { minWidth: 22, textAlign: 'center' },
   subtotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm },
   removeBtn: { minHeight: TOUCH, justifyContent: 'center' },
-  bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  totalRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, gap: spacing.xs },
+  panel: { borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },
+  promo: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingLeft: spacing.lg, paddingRight: spacing.xs, minHeight: 56 },
+  promoInput: { flex: 1, minHeight: TOUCH, fontFamily: fonts.regular, fontSize: 16 },
+  apply: { minHeight: 44, paddingHorizontal: spacing.lg, borderRadius: radius.pill, backgroundColor: brandAccent, alignItems: 'center', justifyContent: 'center' },
+  checkout: { minHeight: 60, borderRadius: radius.pill, backgroundColor: brandAccent, alignItems: 'center', justifyContent: 'center' },
+  big: { fontSize: 18, lineHeight: 24, fontWeight: '700', fontFamily: fonts.bold },
 });

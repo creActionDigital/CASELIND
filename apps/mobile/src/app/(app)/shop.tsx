@@ -1,18 +1,19 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SheetModal } from '../../components/SheetModal';
 import { useI18n } from '../../i18n';
 import { FlashStrip } from '../../promotions/FlashStrip';
-import { MarketRows } from '../../shop/MarketRows';
 import { fetchCategories, fetchProducts, type ShopFilters } from '../../shop/api';
 import { parseMajorToMinor } from '../../shop/format';
 import { shopKeys } from '../../shop/hooks';
-import { CategoryPill, Chip } from '../../shop/parts';
+import { CategoryRound, ShopBanner } from '../../shop/MarketHome';
+import { Chip } from '../../shop/parts';
 import { ProductGrid } from '../../shop/ProductGrid';
-import { brandColor, fonts, onMedia, radius, spacing, TOUCH } from '../../theme/tokens';
+import { brandAccent, fonts, onMedia, radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, TextField, Text } from '../../ui';
 import { SponsoredStrip } from '../../ads/SponsoredStrip';
@@ -23,6 +24,7 @@ const SORTS = ['recent', 'price_asc', 'price_desc'] as const;
 /** Boutique : recherche, catégories en pastilles, filtres et tri dans une feuille, grille à défilement infini. */
 export default function Shop() {
   const { colors } = useTheme();
+  const router = useRouter();
   const { t, locale } = useI18n();
   const params = useLocalSearchParams<{ q?: string }>();
   const [text, setText] = useState(typeof params.q === 'string' ? params.q : '');
@@ -64,7 +66,7 @@ export default function Shop() {
 
   const header = (
     <View style={styles.header}>
-      <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.search, { backgroundColor: colors.surfaceAlt }]}>
         <Ionicons name="search" size={20} color={colors.textMuted} />
         <TextInput
           accessibilityLabel={t('shop.search')}
@@ -81,25 +83,42 @@ export default function Shop() {
           accessibilityRole="button"
           accessibilityLabel={activeFilters > 0 ? `${t('shop.filters')} (${activeFilters})` : t('shop.filters')}
           onPress={openSheet}
-          style={[styles.filterBtn, { backgroundColor: activeFilters > 0 ? brandColor : colors.surfaceAlt }]}
+          style={[styles.filterBtn, { borderLeftColor: colors.border, backgroundColor: activeFilters > 0 ? brandAccent : 'transparent' }]}
         >
           <Ionicons name="options-outline" size={20} color={activeFilters > 0 ? onMedia : colors.text} />
         </Pressable>
       </View>
       <SponsoredStrip placement="marketplace" />
+      <ShopBanner />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel={t('shop.categories')}>
-        <CategoryPill label={t('shop.all')} selected={!categoryId} onPress={() => setCategoryId(undefined)} />
+        <CategoryRound all label={t('shop.all')} selected={!categoryId} onPress={() => setCategoryId(undefined)} />
         {categories.data?.items.map((c) => (
-          <CategoryPill key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)} />
+          <CategoryRound key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)} />
         ))}
       </ScrollView>
-      {!q && !categoryId ? <MarketRows /> : null}
-      <FlashStrip />
+      {!q && !categoryId ? (
+        <Pressable accessibilityRole="link" onPress={() => router.push('/deals')} style={styles.seeAll}>
+          <Text variant="small" color={colors.primary} style={{ fontWeight: '600' }}>
+            {t('mc.home.deals')}
+          </Text>
+        </Pressable>
+      ) : null}
+      <FlashStrip hideFlash />
+      <View style={styles.sectionRow}>
+        <Text variant="title" accessibilityRole="header" style={styles.sectionTitle}>
+          {t('mc.mk.forYou')}
+        </Text>
+        <Pressable accessibilityRole="link" onPress={() => router.push('/categories')} style={styles.seeAll}>
+          <Text variant="small" muted>
+            {t('mc.mk.seeAll')}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 
   return (
-    <View style={[styles.flex, { backgroundColor: colors.background }]}>
+    <View style={[styles.flex, { backgroundColor: colors.surface }]}>
       <Stack.Screen options={{ title: t('shop.title') }} />
       <ProductGrid query={query} header={header} emptyTitle={t('shop.emptyTitle')} emptyBody={t('shop.emptyBody')} />
       <SheetModal visible={sheet} onClose={() => setSheet(false)}>
@@ -140,10 +159,13 @@ export default function Shop() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { gap: spacing.md, marginBottom: spacing.sm },
-  search: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 56, paddingLeft: spacing.lg, paddingRight: spacing.sm, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth },
+  search: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 56, paddingLeft: spacing.lg, paddingRight: spacing.xs, borderRadius: radius.pill },
   input: { flex: 1, minHeight: TOUCH, fontFamily: fonts.regular, fontSize: 16 },
-  filterBtn: { width: TOUCH, height: TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  filterBtn: { width: 48, height: 44, borderRadius: radius.pill, borderLeftWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   chips: { gap: spacing.sm, paddingBottom: spacing.xs },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: 22, lineHeight: 28, flex: 1 },
+  seeAll: { minHeight: TOUCH, justifyContent: 'center' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   priceRow: { flexDirection: 'row', gap: spacing.md },
 });
