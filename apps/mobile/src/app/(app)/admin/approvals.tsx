@@ -44,7 +44,8 @@ export default function AdminApprovals() {
   const label = (a: AdminApproval) => {
     const d = describeApproval(a);
     const state = `aops.approvals.state.${d.state}` as MessageKey;
-    return t(`aops.approvals.kind.${a.kind}` as MessageKey, { name: d.name, state: t(state) !== state ? t(state) : d.state });
+    const tr = t(state); // undefined pour un état sans libellé (ex. portée « country:CD » d'un réglage)
+    return t(`aops.approvals.kind.${a.kind}` as MessageKey, { name: d.name, state: tr && tr !== state ? tr : d.state.replace(/^(country|city):/, '') });
   };
   const confirm = (a: AdminApproval, what: What) => {
     const msg = t(`aops.approvals.confirm${what === 'approve' ? 'Approve' : what === 'reject' ? 'Reject' : 'Cancel'}` as MessageKey, { what: label(a) });

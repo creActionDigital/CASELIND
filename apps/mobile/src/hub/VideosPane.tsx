@@ -185,7 +185,7 @@ export function VideosPane({ active, height }: { active: boolean; height: number
 
 const styles = StyleSheet.create({
   // Largeur et hauteur explicites : sur le web, absoluteFill seul laisse la vidéo à sa taille d'origine.
-  video: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  video: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   sound: { position: 'absolute', top: 96, left: 16, width: TOUCH, height: TOUCH, borderRadius: TOUCH / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: glass.dark },
   page: { backgroundColor: '#0B0B10', justifyContent: 'flex-end' },
   center: { alignItems: 'center', justifyContent: 'center' },
