@@ -229,6 +229,15 @@ describe('seats', () => {
 });
 
 describe('search', () => {
+  it('lists the upcoming trips of everyone but me when no departure is given', async () => {
+    const d = await driver();
+    const trip = await makeTrip(d);
+    const viewer = await user();
+    expect(ids(await search(viewer, ''))).toContain(trip.id);
+    expect(ids(await search(d, ''))).not.toContain(trip.id);
+    await search(viewer, 'originLat=-1.66').expect(400);
+  });
+
   it('finds open trips near the origin and the destination, rounds the points, and paginates', async () => {
     const d = await driver();
     const viewer = await user();

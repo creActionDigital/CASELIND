@@ -208,6 +208,8 @@ export const mediaAssets = pgTable('media_assets', {
   mime: text('mime'),
   /** mode number: limits are far below 2^53. */
   sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+  /** Sanitised original name (documents sent in messages). */
+  fileName: text('file_name'),
   sha256: text('sha256'),
   status: text('status').$type<'pending' | 'ready' | 'rejected'>().notNull().default('pending'),
   storageKey: text('storage_key').notNull(),

@@ -473,3 +473,13 @@ describe('account export and purge', () => {
     expect(await balance(b)).toBe(1_000);
   });
 });
+
+describe('fx quote', () => {
+  it('is indicative, needs authentication and a known currency', async () => {
+    const u = await user();
+    const ok = await ctx.http.get('/v1/wallet/fx-quote?from=USD&to=CDF&amountMinor=1000').set(bearer(u.token)).expect(200);
+    expect(ok.body).toMatchObject({ indicative: true, mode: 'sandbox', convertedMinor: 2_800_000 });
+    await ctx.http.get('/v1/wallet/fx-quote?from=EUR&to=CDF&amountMinor=1').set(bearer(u.token)).expect(400);
+    await ctx.http.get('/v1/wallet/fx-quote?from=USD&to=CDF&amountMinor=1').expect(401);
+  });
+});

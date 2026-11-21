@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../../../auth/auth-context';
@@ -17,7 +18,8 @@ import { useWalletEnabled } from '../../../../wallet/hooks';
 import type { SocialStats } from '../../../../social/types';
 import { spacing, TOUCH } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
-import { Avatar, Button, EmptyState, ErrorState, Text } from '../../../../ui';
+import { AuthImage, Avatar, Button, EmptyState, ErrorState, Text } from '../../../../ui';
+import { PremiumBadge } from '../../../../premium/PremiumBadge';
 
 /** Profil social : en-tête (compteurs, Suivre, Message), puis les publications de la personne. */
 export default function UserProfile() {
@@ -33,6 +35,7 @@ export default function UserProfile() {
   const walletOn = useWalletEnabled() === true;
   const [pay, setPay] = useState<PayTarget | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [tab, setTab] = useState<'posts' | 'media'>('posts');
 
   const profile = useQuery({ queryKey: sk.profile(id), queryFn: () => fetchProfile(id) });
   const stats = useQuery({ queryKey: sk.stats(id), queryFn: () => fetchStats(id) });
@@ -42,7 +45,9 @@ export default function UserProfile() {
     queryFn: ({ pageParam }) => fetchUserPosts(id, pageParam),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
-  const items = (posts.data?.pages.flatMap((p) => p.items) ?? []) as CachedPost[];
+  const all = (posts.data?.pages.flatMap((p) => p.items) ?? []) as CachedPost[];
+  // Onglet « Photos et vidéos » : publications avec média, en grille.
+  const items = tab === 'media' ? all.filter((p) => p.media.length > 0) : all;
 
   const follow = useMutation({
     mutationFn: (on: boolean) => setFollow(id, on),
@@ -113,10 +118,17 @@ export default function UserProfile() {
 
   const head = (
     <View style={[styles.head, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-      <Avatar name={p.displayName} size={80} contentUrl={p.avatarUrl} />
+      {/* Couverture : aplat de marque (pas de dégradé), l'avatar la chevauche. */}
+      <View style={[styles.cover, { backgroundColor: colors.primary }]} importantForAccessibility="no-hide-descendants" />
+      <View style={[styles.avatarRing, { backgroundColor: colors.surface }]}>
+        <Avatar name={p.displayName} size={88} contentUrl={p.avatarUrl} />
+      </View>
       <Text variant="title" style={styles.center} numberOfLines={2}>
         {p.displayName}
       </Text>
+      <View style={{ alignItems: "center" }}>
+        <PremiumBadge userId={p.id} />
+      </View>
       <Text muted>
         @{p.handle}
         {s?.followsYou && !mine ? ` · ${t('profile.social.followsYou')}` : ''}
@@ -152,9 +164,21 @@ export default function UserProfile() {
         )}
       </View>
       <PaySheet target={pay} onClose={() => setPay(null)} />
-      <Text variant="bodyStrong" style={styles.section}>
-        {t('profile.social.posts')}
-      </Text>
+      <View style={styles.tabs} accessibilityRole="tablist">
+        {(['posts', 'media'] as const).map((k) => (
+          <Pressable
+            key={k}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === k }}
+            onPress={() => setTab(k)}
+            style={[styles.tabBtn, { borderBottomColor: tab === k ? colors.primary : 'transparent' }]}
+          >
+            <Text variant="bodyStrong" color={tab === k ? colors.primary : colors.textMuted}>
+              {t(k === 'posts' ? 'profile.social.posts' : 'ma.profile.media')}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 
@@ -162,9 +186,30 @@ export default function UserProfile() {
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {title}
       <FlatList
+        key={tab}
         data={items}
+        numColumns={tab === 'media' ? 3 : 1}
         keyExtractor={(x) => x.id}
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={({ item }) =>
+          tab === 'media' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={item.media[0]?.mime?.startsWith('video') ? t('ma.profile.videoA11y') : t('ma.profile.photoA11y')}
+              onPress={() => router.push({ pathname: '/post/[postId]', params: { postId: item.id } })}
+              style={styles.tile}
+            >
+              {item.media[0]?.mime?.startsWith('video') ? (
+                <View style={[styles.fill, styles.center, { backgroundColor: colors.surfaceAlt }]}>
+                  <Ionicons name="play-circle" size={36} color={colors.primary} />
+                </View>
+              ) : (
+                <AuthImage contentUrl={item.media[0]?.contentUrl ?? null} localUri={item.local ? (item.media[0] as { localUri?: string })?.localUri : undefined} label={t('ma.profile.photoA11y')} style={styles.fill} />
+              )}
+            </Pressable>
+          ) : (
+            <PostCard post={item} />
+          )
+        }
         ListHeaderComponent={head}
         ListEmptyComponent={
           posts.isPending ? (
@@ -172,7 +217,7 @@ export default function UserProfile() {
           ) : posts.isError ? (
             <ErrorState error={posts.error} onRetry={() => posts.refetch()} />
           ) : (
-            <EmptyState icon="newspaper-outline" title={t('profile.social.posts')} body={mine ? t('profile.social.noPostsMine') : t('profile.social.noPosts')} />
+            <EmptyState icon="newspaper-outline" title={t('profile.social.posts')} body={tab === 'media' ? t('ma.profile.noMedia') : mine ? t('profile.social.noPostsMine') : t('profile.social.noPosts')} />
           )
         }
         ListFooterComponent={posts.isFetchingNextPage ? <ActivityIndicator style={styles.pad} color={colors.primary} accessibilityLabel={t('common.loading')} /> : undefined}
@@ -195,10 +240,16 @@ export default function UserProfile() {
 }
 
 const styles = StyleSheet.create({
+  tabs: { flexDirection: 'row', alignSelf: 'stretch', marginTop: spacing.md },
+  tabBtn: { flex: 1, minHeight: TOUCH, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2 },
+  tile: { width: '33.333%', aspectRatio: 1, padding: 1 },
+  fill: { flex: 1, width: '100%', height: '100%' },
   flex: { flex: 1 },
   center: { textAlign: 'center', alignItems: 'center', justifyContent: 'center' },
   pad: { padding: spacing.xl },
-  head: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth },
+  head: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg, paddingTop: 96 + spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  cover: { position: 'absolute', top: 0, left: 0, right: 0, height: 96 },
+  avatarRing: { marginTop: -56, padding: 4, borderRadius: 48 },
   counts: { flexDirection: 'row', gap: spacing.xxl, marginVertical: spacing.sm },
   count: { minHeight: TOUCH, minWidth: TOUCH, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: spacing.sm, alignSelf: 'stretch' },

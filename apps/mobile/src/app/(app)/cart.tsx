@@ -11,6 +11,8 @@ import { Stepper } from '../../shop/parts';
 import { radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { AuthImage, Button, EmptyState, ErrorState, Text } from '../../ui';
+import { BottomActionBar } from '../../ui/premium';
+import { Steps } from '../../shop/Steps';
 
 export default function Cart() {
   const { colors } = useTheme();
@@ -47,7 +49,8 @@ export default function Cart() {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 210 + insets.bottom }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 190 + insets.bottom }]}>
+        <Steps current={0} />
         {setItem.isError ? (
           <Text color={colors.danger} accessibilityLiveRegion="polite">
             {errorMessage(setItem.error, t, locale)}
@@ -148,15 +151,14 @@ export default function Cart() {
         </Text>
       </ScrollView>
 
-      <View style={[styles.bottom, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom + spacing.md }]}>
+      <View style={styles.bottomWrap}>
         {totals.map((x) => (
-          <View key={x.currency} style={styles.subtotal}>
+          <View key={x.currency} style={[styles.subtotal, styles.totalRow, { backgroundColor: colors.surface }]}>
             <Text variant="bodyStrong">{t('cart.total')}</Text>
             <Text variant="heading">{formatMoney(x.totalMinor, x.currency, locale)}</Text>
           </View>
         ))}
-        <Button label={t('cart.checkout')} disabled={!ready} onPress={() => router.push('/checkout')} />
-        <Button variant="secondary" label={t('cart.continue')} onPress={() => router.push('/shop')} />
+        <BottomActionBar label={t('cart.checkout')} disabled={!ready} onPress={() => router.push('/checkout')} />
       </View>
     </View>
   );
@@ -173,5 +175,7 @@ const styles = StyleSheet.create({
   thumb: { width: 72, height: 72 },
   subtotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   removeBtn: { minHeight: TOUCH, justifyContent: 'center' },
+  bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  totalRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, gap: spacing.xs },
 });

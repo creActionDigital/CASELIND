@@ -5,11 +5,12 @@
  * `ROUTES` = écrans de src/app/(app) en forme d'URL ; back-target.test.ts vérifie qu'elle suit les fichiers.
  */
 export const ROUTES = [
-  '/', '/admin', '/admin/ai', '/admin/analytics', '/admin/announcements', '/admin/appeals', '/admin/approvals', '/admin/audit', '/admin/boosts',
-  '/admin/commissions', '/admin/disputes', '/admin/flags', '/admin/games', '/admin/governance', '/admin/health', '/admin/kyc', '/admin/ledger',
-  '/admin/miniapp-versions', '/admin/miniapps', '/admin/mobility', '/admin/moderation', '/admin/sanctions', '/admin/settings', '/admin/wallet-alerts',
-  '/ai', '/ai/[id]', '/ai/settings', '/announcements', '/bookings', '/bookings/[id]', '/bookmarks', '/calls/[id]', '/carpool', '/carpool/[id]',
-  '/carpool/mine', '/carpool/new', '/cart', '/chat-info/[conversationId]', '/checkout', '/compose', '/consents', '/courier', '/courier/[id]',
+  '/about', '/ui-kit', '/appearance', '/discover', '/help', '/permissions', '/setup-profile', '/support', '/security/biometrics',
+  '/', '/admin', '/admin/ai', '/admin/ads', '/admin/analytics', '/admin/announcements', '/admin/appeals', '/admin/approvals', '/admin/audit', '/admin/boosts',
+  '/admin/commissions', '/admin/disputes', '/admin/flags', '/admin/games', '/admin/governance', '/admin/help', '/admin/health', '/admin/kyc', '/admin/ledger',
+  '/admin/miniapp-versions', '/admin/miniapps', '/admin/mobility', '/admin/moderation', '/admin/sanctions', '/admin/settings', '/admin/subscriptions', '/admin/wallet-alerts',
+  '/ai', '/ai/[id]', '/ai/settings', '/ads', '/ads/[id]', '/ads/billing', '/ads/new', '/announcements', '/bookings', '/bookings/[id]', '/bookmarks', '/calls', '/calls/[id]', '/help-requests', '/carpool', '/carpool/[id]',
+  '/carpool/mine', '/carpool/new', '/cart', '/categories', '/categories/[categoryId]', '/claims', '/deals', '/chat-info/[conversationId]', '/checkout', '/compose', '/consents', '/courier', '/courier/[id]',
   '/courier/available', '/courier/route', '/creator', '/deliveries', '/deliveries/[deliveryId]', '/downloads', '/education', '/education/[id]',
   '/education/edit/[id]', '/education/exam/[id]', '/education/mine', '/education/new', '/education/quiz/[id]', '/education/verify', '/favorites',
   '/freelance', '/freelance/[id]', '/freelance/contract/[id]', '/freelance/disputes', '/freelance/freelancers', '/freelance/mine', '/freelance/new',
@@ -17,10 +18,10 @@ export const ROUTES = [
   '/health/book', '/health/patient/[id]', '/health/pro', '/health/professionals', '/health/record', '/health/reminders', '/health/results',
   '/health/sharing', '/hub', '/jobs', '/jobs/[id]', '/jobs/alerts', '/jobs/applications', '/jobs/cv', '/jobs/interviews', '/kyc', '/language',
   '/listings', '/listings/[id]', '/listings/alerts', '/listings/compare', '/listings/mine', '/listings/new', '/listings/offers', '/listings/visits',
-  '/live/preview', '/lives/[id]', '/loyalty', '/maps', '/messages', '/messages/[conversationId]', '/miniapps', '/miniapps/activity/[appId]',
+  '/live/preview', '/lives/[id]', '/loyalty', '/maps', '/messages', '/messages/[conversationId]', '/messages/pins', '/miniapps', '/miniapps/activity/[appId]',
   '/miniapps/consent', '/miniapps/developer', '/miniapps/developer/[id]', '/miniapps/developer/manifest/[id]', '/miniapps/developer/new',
   '/miniapps/developer/revenue/[id]', '/miniapps/developer/webhook/[id]', '/more', '/my-data', '/my-reports', '/my-sanctions',
-  '/notification-preferences', '/notifications', '/orders', '/orders/[orderId]', '/pay', '/post/[postId]', '/privacy', '/product/[productId]',
+  '/notification-preferences', '/notifications', '/orders', '/orders/[orderId]', '/pay', '/post/[postId]', '/premium', '/premium/history', '/premium/pro', '/privacy', '/product/[productId]',
   '/product/compare', '/profile', '/provider/[scope]', '/provider/[scope]/availability', '/provider/[scope]/offer/[id]', '/provider/[scope]/requests',
   '/provider/[scope]/reviews', '/rentals', '/rentals/[id]', '/rentals/mine', '/review/new', '/rides', '/rides/[rideId]', '/rides/contacts',
   '/rides/driver', '/rides/history', '/rides/places', '/roadside', '/roadside/available', '/scan', '/scheduled', '/school', '/school/[classId]',
@@ -33,13 +34,14 @@ export const ROUTES = [
   '/seller/[orgId]/pos', '/seller/[orgId]/product-files', '/seller/[orgId]/products', '/seller/[orgId]/products/[productId]',
   '/seller/[orgId]/profitability', '/seller/[orgId]/promotions', '/seller/[orgId]/purchasing', '/seller/[orgId]/purchasing/[poId]',
   '/seller/[orgId]/purchasing/new', '/seller/[orgId]/qr', '/seller/[orgId]/questions', '/seller/[orgId]/rentals', '/seller/[orgId]/returns',
-  '/seller/[orgId]/reviews', '/seller/[orgId]/sales', '/seller/[orgId]/school', '/seller/[orgId]/school/[classId]',
+  '/seller/[orgId]/reviews', '/seller/[orgId]/sales', '/seller/[orgId]/team', '/seller/[orgId]/school', '/seller/[orgId]/school/[classId]',
   '/seller/[orgId]/school/fees/[classId]', '/seller/[orgId]/school/guardians', '/seller/[orgId]/school/scholarships', '/seller/[orgId]/services',
   '/seller/[orgId]/stock', '/seller/[orgId]/updates', '/seller/[orgId]/vitrine', '/seller/[orgId]/wallet', '/seller/[orgId]/webhooks',
   '/seller/[orgId]/zones', '/seller/[orgId]/zones/[zoneId]', '/seller/new', '/services', '/services/[id]', '/sessions', '/shop', '/store/[slug]',
   '/story/[userId]', '/story/new', '/u/[handle]', '/user/[userId]', '/user/[userId]/followers', '/user/[userId]/following', '/wallet', '/wallet/alerts',
-  '/wallet/cards', '/wallet/finance', '/wallet/manage', '/wallet/pin', '/wallet/receive', '/wallet/requests', '/wallet/savings', '/wallet/scheduled',
+  '/wallet/cards', '/wallet/convert', '/wallet/limits', '/wallet/qr', '/wallet/receipts', '/wallet/finance', '/wallet/manage', '/wallet/pin', '/wallet/receive', '/wallet/requests', '/wallet/savings', '/wallet/scheduled',
   '/wallet/send', '/wallet/split', '/wallet/topup', '/wishlist', '/work',
+  '/place/[slug]', '/places/add', '/places/explore', '/transport', '/videos',
 ] as const;
 
 const PATTERNS = ROUTES.map((r) => r.split('/').filter(Boolean));

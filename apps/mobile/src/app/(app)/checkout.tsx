@@ -1,4 +1,5 @@
 import type { DeliverySpeed, DeliveryZone, Fulfillment } from '@caselind/contracts';
+import { Steps } from '../../shop/Steps';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
@@ -181,6 +182,7 @@ export default function Checkout() {
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: t('checkout.title') }} />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 140 + insets.bottom }]} keyboardShouldPersistTaps="handled">
+        <Steps current={1} />
         {conflict ? (
           <View style={[styles.card, { backgroundColor: colors.dangerSoft, borderColor: colors.danger }]} accessibilityLiveRegion="polite">
             <Text variant="bodyStrong">{t('checkout.conflictBanner')}</Text>

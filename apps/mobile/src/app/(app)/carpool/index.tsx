@@ -30,10 +30,9 @@ export default function CarpoolHome() {
 
   const results = useInfiniteQuery({
     queryKey: extraKeys.carpoolSearch(JSON.stringify(submitted)),
-    queryFn: ({ pageParam }) => searchCarpool({ ...submitted!, cursor: pageParam }),
+    queryFn: ({ pageParam }) => searchCarpool({ ...(submitted ?? {}), cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (p) => p.nextCursor ?? undefined,
-    enabled: submitted !== null,
     retry: false,
   });
 
@@ -75,7 +74,13 @@ export default function CarpoolHome() {
           {extraErrorMessage(results.error, t, locale)}
         </Text>
       ) : null}
-      {submitted && results.isSuccess && items.length === 0 ? <EmptyState icon="car-outline" title={t('carpool.empty')} body={t('carpool.empty.body')} /> : null}
+      {results.isSuccess && items.length === 0 ? <EmptyState icon="car-outline" title={t('carpool.empty')} body={t('carpool.empty.body')} /> : null}
+      {items.length > 0 && !submitted ? (
+        <Text variant="heading" accessibilityRole="header" style={{ marginTop: spacing.md }}>
+          {t('mb.carpool.upcoming')}
+        </Text>
+      ) : null}
+      {results.isPending ? <Text muted>{t('common.loading')}</Text> : null}
       {items.map((trip) => (
         <Card
           key={trip.id}

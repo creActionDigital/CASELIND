@@ -2,6 +2,9 @@ import { Body, Controller, Get, HttpCode, Param, Post, Query, Res } from '@nestj
 import {
   type AdminLedgerAccount,
   type ApprovalPending,
+  type FxQuote,
+  type FxQuoteQuery,
+  fxQuoteQuerySchema,
   type LedgerReconciliation,
   type OrgWallet,
   type SandboxTopupRequest,
@@ -21,6 +24,7 @@ import { ZodPipe } from '../common/zod.pipe.js';
 import { RequireFlag } from '../flags/flag.guard.js';
 import { CurrentMembership, type OrgMembership, OrgPermission } from '../orgs/org.guard.js';
 import { type AuthUser, CurrentUser, Roles } from '../security/auth.guard.js';
+import { fxQuote } from './fx.js';
 import { WalletService } from './wallet.service.js';
 
 /** Sandbox wallet of the caller (fictitious funds, no real money). */
@@ -32,6 +36,12 @@ export class WalletController {
   @Get()
   get(@CurrentUser() user: AuthUser): Promise<Wallet> {
     return this.wallet.wallet(user.userId);
+  }
+
+  /** Indicative rate only (sandbox): no balance is converted. */
+  @Get('fx-quote')
+  fx(@Query(new ZodPipe(fxQuoteQuerySchema)) q: FxQuoteQuery): FxQuote {
+    return fxQuote(q);
   }
 
   @Get('transactions')

@@ -68,7 +68,7 @@ export type CourierRequestStatusValue = 'requested' | 'accepted' | 'picked_up' |
 export const courierRequests = pgTable('courier_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
   requesterId: uuid('requester_id').notNull(),
-  kind: text('kind').$type<'parcel' | 'document'>().notNull(),
+  kind: text('kind').$type<'parcel' | 'document' | 'meal' | 'groceries'>().notNull(),
   size: text('size').$type<'small' | 'medium' | 'large' | null>(),
   pickupLat: doublePrecision('pickup_lat').notNull(),
   pickupLng: doublePrecision('pickup_lng').notNull(),

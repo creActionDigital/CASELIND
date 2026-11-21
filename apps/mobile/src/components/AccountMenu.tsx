@@ -15,7 +15,7 @@ import { Avatar, Badge, Button, Text } from '../ui';
 import { SheetModal } from './SheetModal';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
-type Path = '/profile' | '/ai' | '/sessions' | '/security/2fa' | '/security/identifier' | '/kyc' | '/privacy' | '/my-data' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/deliveries' | '/bookings' | '/rides/history' | '/provider/me' | '/seller' | '/seller/new';
+type Path = '/profile' | '/ai' | '/sessions' | '/security/2fa' | '/security/identifier' | '/security/biometrics' | '/appearance' | '/permissions' | '/help' | '/about' | '/discover' | '/kyc' | '/privacy' | '/my-data' | '/language' | '/notifications' | '/notification-preferences' | '/my-reports' | '/favorites' | '/scheduled' | '/wallet/pin' | '/orders' | '/deliveries' | '/bookings' | '/rides/history' | '/provider/me' | '/seller' | '/seller/new';
 
 /** Menu Compte : MyProfile, Sessions, Confidentialité, Langue, Déconnexion (avec confirmation). */
 export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -62,6 +62,11 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
     { icon: 'star-outline', label: t('messagesX.fav.title'), path: '/favorites' },
     { icon: 'time-outline', label: t('messagesX.scheduled.menu'), path: '/scheduled' },
     { icon: 'language-outline', label: t('account.language'), path: '/language' },
+    { icon: 'contrast-outline', label: t('ma.appearance.title'), path: '/appearance' },
+    { icon: 'hand-left-outline', label: t('ma.perm.title'), path: '/permissions' },
+    { icon: 'compass-outline', label: t('ma.discover.title'), path: '/discover' },
+    { icon: 'help-circle-outline', label: t('ma.help.title'), path: '/help' },
+    { icon: 'information-circle-outline', label: t('ma.about.title'), path: '/about' },
   ];
 
   // Section « Sécurité » : sessions, double authentification, identifiant, PIN de paiement, vérification d'identité.
@@ -71,6 +76,7 @@ export function AccountMenu({ visible, onClose }: { visible: boolean; onClose: (
     { icon: 'swap-horizontal-outline', label: t('security.identifier.title'), path: '/security/identifier' },
     { icon: 'keypad-outline', label: t('account.paymentSecurity'), path: '/wallet/pin' },
     { icon: 'id-card-outline', label: t('kyc.title'), path: '/kyc' },
+    { icon: 'finger-print-outline', label: t('ma.bio.title'), path: '/security/biometrics' },
   ];
 
   return (

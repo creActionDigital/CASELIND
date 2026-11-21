@@ -6,6 +6,7 @@ import { cck, fetchPendingCount } from '../../../admin/console-api';
 import { countLabel, hasAdminAccess, visibleTiles, type AdminTile } from '../../../admin/console-logic';
 import { useAuth } from '../../../auth/auth-context';
 import { useI18n, type MessageKey } from '../../../i18n';
+import { groupTiles } from '../../../messaging/module-d-logic';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Badge, EmptyState, Screen, Text } from '../../../ui';
@@ -45,7 +46,12 @@ export default function AdminHub() {
       <Text variant="title" accessibilityRole="header">{t('adm.hub.title')}</Text>
       <Text muted style={{ marginBottom: spacing.lg }}>{t('adm.hub.intro')}</Text>
       {hasAdminAccess(me?.roles) ? (
-        <View style={styles.grid}>{tiles.map((tile) => <Tile key={tile.id} tile={tile} />)}</View>
+        groupTiles(tiles).map((g) => (
+          <View key={g.section} style={{ gap: spacing.sm, marginBottom: spacing.lg }}>
+            <Text variant="bodyStrong" accessibilityRole="header">{t(`md.adm.sec.${g.section}` as MessageKey)}</Text>
+            <View style={styles.grid}>{g.tiles.map((tile) => <Tile key={tile.id} tile={tile} />)}</View>
+          </View>
+        ))
       ) : (
         <EmptyState icon="lock-closed-outline" title={t('adm.hub.none')} />
       )}

@@ -223,6 +223,7 @@ export class NotificationsService {
   async list(userId: string, q: NotificationListQuery): Promise<NotificationList> {
     const filters = [eq(notifications.userId, userId)];
     if (q.unreadOnly === 'true') filters.push(isNull(notifications.readAt));
+    if (q.category) filters.push(eq(notifications.category, q.category));
     if (q.cursor) {
       const c = decodeCursor(q.cursor);
       filters.push(sql`(${notifications.createdAt}, ${notifications.id}) < (${c.createdAt}::timestamptz, ${c.id}::uuid)`);

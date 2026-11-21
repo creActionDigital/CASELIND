@@ -29,10 +29,10 @@ export const isCompleteCourierCode = (code: string): boolean => /^\d{6}$/.test(c
 export const formatCourierCode = (code: string): string => (code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code);
 
 /** Un colis a une taille, un document aucune. */
-export const needsSize = (kind: 'parcel' | 'document'): boolean => kind === 'parcel';
+export const needsSize = (kind: 'parcel' | 'document' | 'meal' | 'groceries'): boolean => kind === 'parcel';
 
 /** Demande prête à estimer ou envoyer : les deux points, et la taille d'un colis. */
-export function isRequestReady(d: { kind: 'parcel' | 'document'; size: string | null; pickup: unknown; dropoff: unknown }): boolean {
+export function isRequestReady(d: { kind: 'parcel' | 'document' | 'meal' | 'groceries'; size: string | null; pickup: unknown; dropoff: unknown }): boolean {
   return !!d.pickup && !!d.dropoff && (!needsSize(d.kind) || !!d.size);
 }
 

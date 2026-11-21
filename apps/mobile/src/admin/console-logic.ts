@@ -26,6 +26,7 @@ export const ADMIN_TILES: readonly AdminTile[] = [
   { id: 'approvals', route: '/admin/approvals', icon: 'people-circle-outline', roles: A },
   { id: 'analytics', route: '/admin/analytics', icon: 'stats-chart-outline', roles: A },
   { id: 'governance', route: '/admin/governance', icon: 'shield-checkmark-outline', roles: A },
+  { id: 'help', route: '/admin/help', icon: 'help-buoy-outline', roles: A },
   { id: 'kyc', route: '/admin/kyc', icon: 'id-card-outline', roles: A, count: 'kyc' },
   { id: 'miniapps', route: '/admin/miniapps', icon: 'apps-outline', roles: AM, count: 'miniapps' },
   { id: 'flags', route: '/admin/flags', icon: 'toggle-outline', roles: A },
@@ -41,6 +42,8 @@ export const ADMIN_TILES: readonly AdminTile[] = [
   { id: 'commissions', route: '/admin/commissions', icon: 'cash-outline', roles: A },
   { id: 'walletAlerts', route: '/admin/wallet-alerts', icon: 'warning-outline', roles: A },
   { id: 'boosts', route: '/admin/boosts', icon: 'rocket-outline', roles: AM },
+  { id: 'ads', route: '/admin/ads', icon: 'megaphone-outline', roles: AM },
+  { id: 'subscriptions', route: '/admin/subscriptions', icon: 'ribbon-outline', roles: A },
 ];
 
 export function visibleTiles(roles: readonly string[] | undefined | null): AdminTile[] {

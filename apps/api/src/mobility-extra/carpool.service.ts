@@ -171,8 +171,10 @@ export class CarpoolService implements OnModuleInit {
     const filters = [
       sql`t.status = 'open' AND NOT t.hidden AND t.departs_at > now() AND t.driver_id <> ${viewerId}::uuid`,
       sql`NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = t.driver_id AND b.blocked_id = ${viewerId}::uuid) OR (b.blocker_id = ${viewerId}::uuid AND b.blocked_id = t.driver_id))`,
-      sql.raw(`${HAVERSINE_SQL(String(q.originLat), String(q.originLng), 'round(t.origin_lat::numeric, 3)::float8', 'round(t.origin_lng::numeric, 3)::float8')} <= ${Number(q.radiusKm)}`),
     ];
+    if (q.originLat !== undefined && q.originLng !== undefined) {
+      filters.push(sql.raw(`${HAVERSINE_SQL(String(q.originLat), String(q.originLng), 'round(t.origin_lat::numeric, 3)::float8', 'round(t.origin_lng::numeric, 3)::float8')} <= ${Number(q.radiusKm)}`));
+    }
     if (q.destLat !== undefined && q.destLng !== undefined) {
       filters.push(sql.raw(`${HAVERSINE_SQL(String(q.destLat), String(q.destLng), 'round(t.dest_lat::numeric, 3)::float8', 'round(t.dest_lng::numeric, 3)::float8')} <= ${Number(q.radiusKm)}`));
     }

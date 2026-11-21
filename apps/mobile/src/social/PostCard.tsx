@@ -17,6 +17,7 @@ import { useTheme } from '../theme/use-theme';
 import { Avatar, Button, Text } from '../ui';
 import { useDeletePost, useEditPost, useReact } from './hooks';
 import { formatRelativeTime, nextReaction, REACTION_TYPES, totalReactions, type CachedPost } from './logic';
+import { PostAttachmentView } from './PostAttachmentView';
 import { PostMedia, type MediaItem } from './PostMedia';
 import { discardPublish, retryPublish } from './publisher';
 import type { ReactionType } from './types';
@@ -143,6 +144,7 @@ export const PostCard = memo(function PostCard({ post, detail }: Props) {
       ) : null}
 
       <PostMedia items={media} />
+      <PostAttachmentView post={post} />
 
       {local ? (
         <View style={styles.status}>

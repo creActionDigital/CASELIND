@@ -2,6 +2,7 @@ import type { MessageKey } from './fr';
 import { swChatWallet } from './sw-chat-wallet';
 import { swCommerce } from './sw-commerce';
 import { swSocial } from './sw-social';
+import { swModuleB } from './sw-module-b';
 import { swBusiness } from './sw-business';
 import { swCommunity } from './sw-community';
 import { swDeliveryAi } from './sw-delivery-ai';
@@ -21,9 +22,13 @@ import { swReturnsCourier2 } from './sw-returns-courier-2';
 import { swCreatorOps2 } from './sw-creator-ops-2';
 import { swMiniapps2 } from './sw-miniapps-2';
 import { swShopPrivacy2 } from './sw-shop-privacy-2';
+import { swModuleA } from './sw-module-a';
+import { swModuleC } from './sw-module-c';
 import { swMobilityExtra2 } from './sw-mobility-extra-2';
 import { swAdminOps3 } from './sw-admin-ops-3';
 import { swMiniapps3 } from './sw-miniapps-3';
+import { swModuleE } from './sw-module-e';
+import { swModuleD } from './sw-module-d';
 
 /**
  * Kiswahili : socle de l'interface (navigation, connexion, menu Plus). Les clés absentes retombent sur l'anglais
@@ -86,6 +91,7 @@ export const sw: Partial<Record<MessageKey, string>> = {
   'language.sw': 'Kiswahili',
   ...swCommerce,
   ...swSocial,
+  ...swModuleB,
   ...swChatWallet,
   ...swBusiness,
   ...swCommunity,
@@ -106,7 +112,11 @@ export const sw: Partial<Record<MessageKey, string>> = {
   ...swCreatorOps2,
   ...swMiniapps2,
   ...swShopPrivacy2,
+  ...swModuleA,
+  ...swModuleC,
   ...swMobilityExtra2,
   ...swAdminOps3,
   ...swMiniapps3,
+  ...swModuleE,
+  ...swModuleD,
 };

@@ -10,6 +10,7 @@ import {
   removePost,
   totalReactions,
   updatePost,
+  pollPercent,
   withMyReaction,
   type CachedPost,
   type PostPages,
@@ -134,5 +135,12 @@ describe('socialTarget', () => {
     expect(socialTarget({ kind: 'follow', actorId: 'u1' })).toEqual({ pathname: '/user/[userId]', params: { userId: 'u1' } });
     expect(socialTarget({ conversationId: 'c1' })).toBeNull();
     expect(socialTarget(null)).toBeNull();
+  });
+});
+
+describe('pollPercent', () => {
+  it('arrondit et évite la division par zéro', () => {
+    expect(pollPercent(1, 3)).toBe(33);
+    expect(pollPercent(0, 0)).toBe(0);
   });
 });

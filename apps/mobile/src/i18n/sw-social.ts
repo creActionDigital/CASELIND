@@ -328,4 +328,9 @@ export const swSocial: Partial<Record<MessageKey, string>> = {
   'pay.error.revoked': 'Msimbo huu wa QR umefutwa na mfanyabiashara.',
   'pay.error.already_used': 'Msimbo huu wa QR umeshatumika.',
   'pay.error.amount_required': 'Msimbo huu hauna kiasi: weka kiasi cha kulipa.',
+  'create.title': 'Unda',
+  'create.story': 'Hadithi',
+  'create.sell': 'Uza bidhaa',
+  'create.listing': 'Tangazo dogo',
+  'create.explore': 'Gundua video',
 };

@@ -1,7 +1,7 @@
-import type { CourierRequest, CourierRequestKind, CourierRequestSize, RidePoint } from '@caselind/contracts';
+import { courierRequestKindSchema, type CourierRequest, type CourierRequestKind, type CourierRequestSize, type RidePoint } from '@caselind/contracts';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { courierKeys, createCourierRequest, estimateCourier, fetchMyCourierRequests } from '../../../courier/api';
@@ -27,8 +27,9 @@ export default function CourierHome() {
   const { t, locale } = useI18n();
   const router = useRouter();
   const qc = useQueryClient();
-  const [kind, setKind] = useState<CourierRequestKind>('parcel');
-  const [size, setSize] = useState<CourierRequestSize | null>('small');
+  const { kind: kindParam } = useLocalSearchParams<{ kind?: string }>();
+  const [kind, setKind] = useState<CourierRequestKind>(() => courierRequestKindSchema.safeParse(kindParam).data ?? 'parcel');
+  const [size, setSize] = useState<CourierRequestSize | null>(() => (courierRequestKindSchema.safeParse(kindParam).data ?? 'parcel') === 'parcel' ? 'small' : null);
   const [points, setPoints] = useState<Record<Slot, RidePoint | null>>({ pickup: null, dropoff: null });
   const [editing, setEditing] = useState<Slot | null>(null);
   const [note, setNote] = useState('');
@@ -95,6 +96,8 @@ export default function CourierHome() {
         options={[
           { value: 'parcel', label: t('courier.kind.parcel') },
           { value: 'document', label: t('courier.kind.document') },
+          { value: 'meal', label: t('courier.kind.meal') },
+          { value: 'groceries', label: t('courier.kind.groceries') },
         ]}
         value={kind}
         onChange={(k) => {

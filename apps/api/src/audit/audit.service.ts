@@ -312,6 +312,7 @@ export type AuditAction =
   /** Covoiturage, location de vehicules, depannage : metadata {ids, statuts, devise, montant}. Jamais une note, un libelle ou une position. */
   | 'courier_request.proof_reset'
   | 'admin.announcement_changed'
+  | 'help.request_resolved'
   | 'admin.sanction_issued'
   | 'admin.sanction_lifted'
   | 'admin.sanction_expired'
@@ -355,7 +356,17 @@ export type AuditAction =
   | 'ai.model_toggled'
   /** Creator tools: metadata {boostId, postId[, days, budgetMinor, currency, refunded]}. Test funds only; never a post text. */
   | 'creator.boost_created'
-  | 'creator.boost_rejected';
+  | 'creator.boost_rejected'
+  /** Monetisation (mode test) : metadata {subscriptionId|campaignId, planCode|status, amountMinor, currency}. Jamais de PIN. */
+  | 'premium.subscribed'
+  | 'premium.renewed'
+  | 'premium.cancelled'
+  | 'premium.admin_cancelled'
+  | 'premium.plan_updated'
+  | 'ads.campaign_created'
+  | 'ads.campaign_changed'
+  | 'ads.campaign_reviewed'
+  | 'ads.campaign_refunded';
 
 export interface AuditInput {
   action: AuditAction;

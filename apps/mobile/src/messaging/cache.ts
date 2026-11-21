@@ -18,6 +18,9 @@ export type CachedMessage = Message & {
   local?: 'sending' | 'failed';
   localUri?: string;
   localMime?: string;
+  /** Document en cours d'envoi : nom et taille d'origine. */
+  localName?: string;
+  localSize?: number;
 };
 export type CachedMessageList = { items: CachedMessage[]; hasMore: boolean };
 export type MessagePages = Pages<CachedMessageList>;
@@ -34,6 +37,8 @@ export function buildOptimisticMessage(input: {
   replyToId?: string | null;
   localUri?: string;
   localMime?: string;
+  localName?: string;
+  localSize?: number;
   now?: Date;
 }): CachedMessage {
   return {
@@ -59,6 +64,8 @@ export function buildOptimisticMessage(input: {
     local: 'sending',
     localUri: input.localUri,
     localMime: input.localMime,
+    localName: input.localName,
+    localSize: input.localSize,
   };
 }
 

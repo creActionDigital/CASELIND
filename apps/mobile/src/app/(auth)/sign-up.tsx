@@ -3,9 +3,11 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAuth } from '../../auth/auth-context';
 import { AuthShell } from '../../auth/AuthShell';
+import { SocialSoon } from '../../auth/SocialSoon';
 import { FormError } from '../../auth/FormError';
 import { useI18n } from '../../i18n';
 import { errorMessage } from '../../lib/errors';
+import { setPrefs } from '../../prefs/store';
 import { Button, TextField, TextLink } from '../../ui';
 
 export default function SignUp() {
@@ -30,6 +32,7 @@ export default function SignUp() {
     setLoading(true);
     try {
       const challenge = await register({ identifier, password, displayName });
+      setPrefs({ profileSetupPending: true });
       router.push({ pathname: '/otp-verify', params: { challengeId: challenge.challengeId, channel: challenge.channel } });
     } catch (err) {
       setError(errorMessage(err, t, locale));
@@ -66,6 +69,7 @@ export default function SignUp() {
       />
       <Button label={t('auth.signUp.submit')} onPress={submit} loading={loading} />
       <TextLink label={t('auth.signUp.toSignIn')} href="/sign-in" />
+      <SocialSoon />
     </AuthShell>
   );
 }

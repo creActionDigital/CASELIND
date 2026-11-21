@@ -24,13 +24,19 @@ export async function uploadImage(uri: string, mime: MediaMime, purpose: UploadP
   return uploadBody(blob, blob.size, mime, purpose);
 }
 
+/** Document de messagerie : même envoi, avec le nom d'origine (nettoyé côté serveur). */
+export async function uploadDocument(uri: string, mime: MediaMime, fileName: string): Promise<string> {
+  const blob = await (await fetch(uri)).blob();
+  return uploadBody(blob, blob.size, mime, 'message', fileName);
+}
+
 /** Même envoi pour des octets déjà en mémoire (ex. signature PNG tracée à l'écran) : le Uint8Array part tel quel comme corps. */
 export const uploadBytes = (bytes: Uint8Array, mime: MediaMime, purpose: UploadPurpose): Promise<string> => uploadBody(bytes, bytes.byteLength, mime, purpose);
 
-async function uploadBody(body: Blob | Uint8Array, sizeBytes: number, mime: MediaMime, purpose: UploadPurpose): Promise<string> {
+async function uploadBody(body: Blob | Uint8Array, sizeBytes: number, mime: MediaMime, purpose: UploadPurpose, fileName?: string): Promise<string> {
   const announce = await api.request('/media/uploads', {
     method: 'POST',
-    body: { purpose, mime, sizeBytes },
+    body: { purpose, mime, sizeBytes, fileName },
     schema: createUploadResponseSchema,
   });
 

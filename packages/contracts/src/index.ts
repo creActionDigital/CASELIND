@@ -70,3 +70,6 @@ export * from './inventory-ops.js';
 export * from './creator.js';
 export * from './wallet-finance.js';
 export * from './admin-ops2.js';
+export * from './module-d.js';
+export * from './discover.js';
+export * from './monetization.js';

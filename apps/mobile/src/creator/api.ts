@@ -2,6 +2,7 @@ import {
   boostResponseSchema,
   creatorOverviewSchema,
   hashtagListSchema,
+  popularCreatorListSchema,
   postListSchema,
   recordImpressionsResponseSchema,
   tipResponseSchema,
@@ -16,6 +17,7 @@ export const putBookmark = (postId: string, on: boolean) =>
 export const fetchBookmarks = (cursor?: string) => api.request('/me/bookmarks/posts', { query: { limit: PAGE, cursor }, schema: postListSchema });
 
 export const fetchTrending = () => api.request('/hashtags/trending', { query: { hours: 24 }, schema: hashtagListSchema });
+export const fetchPopularCreators = () => api.request('/creators/popular', { schema: popularCreatorListSchema });
 export const fetchTagPosts = (tag: string, cursor?: string) =>
   api.request(`/hashtags/${encodeURIComponent(tag)}/posts`, { query: { limit: PAGE, cursor }, schema: postListSchema });
 

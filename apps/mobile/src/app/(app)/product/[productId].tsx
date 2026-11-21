@@ -12,7 +12,11 @@ import { shareMessage } from '../../../lib/share';
 import { useToggleWish } from '../../../promotions/hooks';
 import { PromoBadge, PromoCountdown, PromoPrice } from '../../../promotions/parts';
 import { openReport } from '../../../report/open-report';
-import { fetchCategories, fetchProduct, fetchReviews } from '../../../shop/api';
+import { fetchCategories, fetchProduct, fetchProducts, fetchReviews, fetchStore } from '../../../shop/api';
+import { ContactSeller } from '../../../shop/ContactSeller';
+import { GalleryViewer } from '../../../shop/GalleryViewer';
+import { similarProducts } from '../../../shop/market-logic';
+import { ProductCard } from '../../../shop/ProductGrid';
 import { toggleCompareProductId, useCompareProductIds } from '../../../shop/compare-store';
 import { quantityOf } from '../../../shop/cart-logic';
 import { formatMoney } from '../../../shop/format';
@@ -45,6 +49,14 @@ export default function ProductScreen() {
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
   const categories = useQuery({ queryKey: shopKeys.categories, queryFn: fetchCategories, staleTime: 10 * 60_000 });
+  const similar = useQuery({
+    queryKey: ['similar-products', product.data?.categoryId, id],
+    queryFn: () => fetchProducts({ categoryId: product.data!.categoryId!, sort: 'recent' }),
+    enabled: !!product.data?.categoryId,
+    staleTime: 60_000,
+  });
+  const store = useQuery({ queryKey: ['store-contact', product.data?.org.slug], queryFn: () => fetchStore(product.data!.org.slug), enabled: !!product.data, staleTime: 5 * 60_000 });
+  const [gallery, setGallery] = useState(false);
   const cart = useCart();
   const setItem = useSetCartItem();
   const wish = useToggleWish(id);
@@ -133,11 +145,13 @@ export default function ProductScreen() {
               getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
               onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
               renderItem={({ item, index }) => (
-                <AuthImage
-                  contentUrl={item.contentUrl}
-                  label={t('product.photo', { n: index + 1, total: p.media.length })}
-                  style={{ width, height: heroH, borderRadius: 0 }}
-                />
+                <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('mc.gallery.open')} onPress={() => { setPage(index); setGallery(true); }}>
+                  <AuthImage
+                    contentUrl={item.contentUrl}
+                    label={t('product.photo', { n: index + 1, total: p.media.length })}
+                    style={{ width, height: heroH, borderRadius: 0 }}
+                  />
+                </Pressable>
               )}
             />
           ) : (
@@ -309,6 +323,29 @@ export default function ProductScreen() {
             </Pressable>
           </View>
 
+          <View style={[styles.group, { backgroundColor: colors.surfaceAlt, padding: spacing.md, borderRadius: radius.xl }]}>
+            <Text variant="bodyStrong" accessibilityRole="header">
+              {t('mc.bulk.title')}
+            </Text>
+            <Text variant="small" muted>
+              {t('mc.bulk.body')}
+            </Text>
+            <ContactSeller contactUserId={store.data?.contactUserId} labelKey="mc.bulk.ask" />
+          </View>
+
+          {similarProducts(similar.data?.items ?? [], p.id).length > 0 ? (
+            <View style={styles.group}>
+              <Text variant="heading" accessibilityRole="header">
+                {t('mc.similar.title')}
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md }}>
+                {similarProducts(similar.data?.items ?? [], p.id).map((sp) => (
+                  <ProductCard key={sp.id} product={sp} width={156} />
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+
           <View style={styles.group}>
             <Text variant="heading" accessibilityRole="header">
               {t('product.reviews')}
@@ -350,6 +387,7 @@ export default function ProductScreen() {
         </View>
       </ScrollView>
 
+      <GalleryViewer media={p.media} startIndex={page} visible={gallery} onClose={() => setGallery(false)} />
       <View style={[styles.bottom, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom + spacing.md }]}>
         {notice ? (
           <View style={styles.noticeRow} accessibilityLiveRegion="polite">

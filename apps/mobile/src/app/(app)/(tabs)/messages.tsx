@@ -21,6 +21,7 @@ import { PushCard } from '../../../notifications/PushCard';
 import { brandColor, radius, shadow, spacing, TAB_BAR_SPACE, TOUCH, typography } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Button, EmptyState, ErrorState, IconButton, Text } from '../../../ui';
+import { SkeletonList } from '../../../ui/premium';
 
 const FOREVER = '2100-01-01T00:00:00.000Z';
 
@@ -118,7 +119,7 @@ export default function Messages() {
 
   let content;
   if (query.isPending) {
-    content = <ActivityIndicator style={styles.center} color={colors.primary} accessibilityLabel={t('common.loading')} />;
+    content = <SkeletonList rows={6} label={t('common.loading')} />;
   } else if (query.isError && items.length === 0) {
     // Inclut l'accès refusé (403 : messagerie désactivée ou non autorisée).
     content = <ErrorState error={query.error} onRetry={() => query.refetch()} />;
@@ -185,6 +186,8 @@ export default function Messages() {
           }}
           style={{ backgroundColor: cc.card }}
         />
+        <IconButton icon="call-outline" label={t('md.calls.entry')} onPress={() => router.push('/calls' as never)} style={{ backgroundColor: cc.card }} />
+        <IconButton icon="help-buoy-outline" label={t('md.help.title')} onPress={() => router.push('/help-requests' as never)} style={{ backgroundColor: cc.card }} />
         <IconButton icon="create-outline" label={t('chat.newMessage')} onPress={() => setComposing(true)} disabled={denied} style={{ backgroundColor: cc.card }} />
       </View>
       {searching ? (

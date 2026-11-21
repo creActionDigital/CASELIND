@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type {
   CreatePostRequest,
+  FeedQuery,
+  PostAttachment,
   PlatformRole,
   Post,
   PostKind,
@@ -32,6 +34,11 @@ export interface PostWithAuthor {
 const EMPTY_COUNTS = (): ReactionCounts => ({ like: 0, love: 0, haha: 0, wow: 0, sad: 0, angry: 0 });
 
 export { isPrivileged };
+
+/** Sans texte ni media, le titre de l'evenement ou le lieu tient lieu de texte (une publication de type texte en exige un). */
+function attachmentText(a: CreatePostRequest['attachment']): string | null {
+  return a?.type === 'event' ? a.title : a?.type === 'location' ? a.label : null;
+}
 
 function pgCode(err: unknown): { code?: string; constraint?: string } {
   return ((err as { cause?: unknown }).cause ?? err) as { code?: string; constraint?: string };
@@ -136,6 +143,7 @@ export class PostsService {
       c[r.type] = r.n;
       counts.set(r.postId, c);
     }
+    const attachments = await this.attachmentsOf(viewerId, ids);
     const myReaction = new Map(mine.map((m) => [m.postId, m.type]));
     const comments = new Map(commentRows.map((c) => [c.postId, c.n]));
     return items.map(({ row, author }) => ({
@@ -148,12 +156,53 @@ export class PostsService {
       reactions: counts.get(row.id) ?? EMPTY_COUNTS(),
       myReaction: myReaction.get(row.id) ?? null,
       commentsCount: comments.get(row.id) ?? 0,
+      attachment: attachments.get(row.id) ?? null,
       bookmarked: saved.has(row.id),
       sponsored: false,
       moderation: row.hidden ? 'hidden' : 'visible',
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }));
+  }
+
+  /** Pieces jointes (evenement, sondage, localisation) des publications donnees ; sondage : decomptes et vote du lecteur. */
+  private async attachmentsOf(viewerId: string, ids: string[]): Promise<Map<string, PostAttachment>> {
+    const list = sql`ARRAY[${sql.join(ids.map((i) => sql`${i}::uuid`), sql`, `)}]`;
+    const [att, votes] = await Promise.all([
+      this.db.execute<{ post_id: string; type: string; data: Record<string, unknown> }>(sql`SELECT post_id, type, data FROM post_attachments WHERE post_id = ANY(${list})`),
+      this.db.execute<{ post_id: string; option_idx: number; n: number; mine: boolean }>(
+        sql`SELECT post_id, option_idx, count(*)::int AS n, bool_or(user_id = ${viewerId}::uuid) AS mine FROM post_poll_votes WHERE post_id = ANY(${list}) GROUP BY post_id, option_idx`,
+      ),
+    ]);
+    const out = new Map<string, PostAttachment>();
+    for (const r of att.rows) {
+      if (r.type === 'poll') {
+        const labels = (r.data.options as string[]) ?? [];
+        const mine = votes.rows.find((v) => v.post_id === r.post_id && v.mine);
+        out.set(r.post_id, {
+          type: 'poll',
+          options: labels.map((label, i) => ({ label, votes: votes.rows.find((v) => v.post_id === r.post_id && v.option_idx === i)?.n ?? 0 })),
+          myVote: mine ? mine.option_idx : null,
+        });
+      } else if (r.type === 'event') {
+        out.set(r.post_id, { type: 'event', title: String(r.data.title), startsAt: String(r.data.startsAt), place: (r.data.place as string | undefined) ?? null });
+      } else {
+        out.set(r.post_id, { type: 'location', lat: Number(r.data.lat), lng: Number(r.data.lng), label: String(r.data.label) });
+      }
+    }
+    return out;
+  }
+
+  /** Un vote par personne, modifiable ; l'auteur peut voter aussi. */
+  async votePoll(userId: string, roles: readonly PlatformRole[], postId: string, option: number): Promise<Post> {
+    const found = await this.requireVisible(userId, roles, postId);
+    const [a] = (await this.db.execute<{ data: { options: string[] } }>(sql`SELECT data FROM post_attachments WHERE post_id = ${postId}::uuid AND type = 'poll'`)).rows;
+    if (!a) throw validationError('option', 'this post has no poll');
+    if (option >= a.data.options.length) throw validationError('option', 'unknown option');
+    await this.db.execute(
+      sql`INSERT INTO post_poll_votes (post_id, user_id, option_idx) VALUES (${postId}::uuid, ${userId}::uuid, ${option}) ON CONFLICT (post_id, user_id) DO UPDATE SET option_idx = EXCLUDED.option_idx`,
+    );
+    return this.hydrateOne(userId, found);
   }
 
   private async hydrateOne(viewerId: string, item: PostWithAuthor): Promise<Post> {
@@ -193,10 +242,14 @@ export class PostsService {
       postId = await this.db.transaction(async (tx) => {
         const [p] = await tx
           .insert(posts)
-          .values({ authorId: userId, clientId: req.clientId, kind, body: req.body ?? null, visibility: req.visibility })
+          .values({ authorId: userId, clientId: req.clientId, kind, body: req.body ?? attachmentText(req.attachment), visibility: req.visibility })
           .returning({ id: posts.id });
         if (req.mediaIds.length > 0) {
           await tx.insert(postMedia).values(req.mediaIds.map((mediaId, position) => ({ postId: p!.id, mediaId, position })));
+        }
+        if (req.attachment) {
+          const { type, ...data } = req.attachment;
+          await tx.execute(sql`INSERT INTO post_attachments (post_id, type, data) VALUES (${p!.id}::uuid, ${type}, ${JSON.stringify(data)}::jsonb)`);
         }
         await replacePostHashtags(tx, p!.id, req.body);
         return p!.id;
@@ -281,6 +334,30 @@ export class PostsService {
       q,
       sql`(${posts.authorId} = ${viewerId}::uuid OR ${posts.authorId} IN (SELECT followee_id FROM follows WHERE follower_id = ${viewerId}::uuid))`,
     );
+  }
+
+  /** Home tabs: following (default), for you (recent public posts), popular (public posts of the last 7 days by engagement). */
+  feedByScope(viewerId: string, roles: readonly PlatformRole[], q: FeedQuery): Promise<PostList> {
+    if (q.scope === 'forYou') return this.page(viewerId, roles, q, sql`${posts.visibility} = 'public'`);
+    if (q.scope === 'popular') return this.popular(viewerId, roles, q);
+    return this.feed(viewerId, roles, q);
+  }
+
+  /** Engagement order has no stable keyset, so the cursor is an offset (capped): fine for a short ranking. */
+  private async popular(viewerId: string, roles: readonly PlatformRole[], q: FeedQuery): Promise<PostList> {
+    const offset = q.cursor && /^\d{1,3}$/.test(q.cursor) ? Number(q.cursor) : 0;
+    const score = sql`((SELECT count(*) FROM post_reactions r WHERE r.post_id = ${posts.id}) + 2 * (SELECT count(*) FROM post_comments c WHERE c.post_id = ${posts.id} AND c.deleted_at IS NULL AND c.hidden = false))`;
+    const rows = await this.baseSelect()
+      .where(and(this.visibleTo(viewerId, roles), sql`${posts.visibility} = 'public' AND ${posts.createdAt} > now() - interval '7 days'`))
+      .orderBy(desc(score), desc(posts.createdAt), desc(posts.id))
+      .limit(q.limit + 1)
+      .offset(offset);
+    const slice = rows.slice(0, q.limit);
+    const hasMore = rows.length > q.limit && offset + q.limit <= 500;
+    return {
+      items: await this.hydrate(viewerId, slice.map((r) => this.toWithAuthor(r))),
+      nextCursor: hasMore ? String(offset + q.limit) : null,
+    };
   }
 
   /** Short-video feed, simple version: recent public `video` posts, chronological (no ranking). */

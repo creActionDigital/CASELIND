@@ -4,11 +4,15 @@ import {
   type CommentList,
   type CreateCommentRequest,
   createCommentRequestSchema,
+  type FeedQuery,
+  feedQuerySchema,
   type CreatePostRequest,
   createPostRequestSchema,
   type Post as PostDto,
   type PostList,
   type SetReactionRequest,
+  type VotePostPollRequest,
+  votePostPollRequestSchema,
   setReactionRequestSchema,
   type SocialPageQuery,
   socialPageQuerySchema,
@@ -20,6 +24,7 @@ import {
 import type { Response } from 'express';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { BoostsService } from '../creator/boosts.service.js';
+import { AdsService } from '../ads/ads.service.js';
 import { RequireFlag } from '../flags/flag.guard.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
 import { CommentsService } from './comments.service.js';
@@ -27,6 +32,7 @@ import { FollowsService } from './follows.service.js';
 import { PostsService } from './posts.service.js';
 
 const pageQuery = new ZodPipe(socialPageQuerySchema);
+const feedQuery = new ZodPipe(feedQuerySchema);
 
 /** Follows, posts, feed, reactions and comments (lot 4A). An invisible item is a 404. */
 @Controller()
@@ -37,6 +43,7 @@ export class SocialController {
     private readonly posts: PostsService,
     private readonly comments: CommentsService,
     private readonly boosts: BoostsService,
+    private readonly ads: AdsService,
   ) {}
 
   // ---- follows ----
@@ -75,8 +82,8 @@ export class SocialController {
   // ---- feed ----
   @Get('feed')
   /** The feed, with at most one labelled sponsored post (`sponsored: true`) per 10 posts. */
-  async feed(@CurrentUser() user: AuthUser, @Query(pageQuery) q: SocialPageQuery): Promise<PostList> {
-    return this.boosts.injectSponsored(user, await this.posts.feed(user.userId, user.roles, q));
+  async feed(@CurrentUser() user: AuthUser, @Query(feedQuery) q: FeedQuery): Promise<PostList> {
+    return this.ads.injectIntoFeed(user, await this.boosts.injectSponsored(user, await this.posts.feedByScope(user.userId, user.roles, q)));
   }
 
   @Get('feed/videos')
@@ -109,6 +116,15 @@ export class SocialController {
     @Body(new ZodPipe(updatePostRequestSchema)) body: UpdatePostRequest,
   ): Promise<PostDto> {
     return this.posts.update(user.userId, user.roles, id, body);
+  }
+
+  @Put('posts/:id/poll-vote')
+  votePoll(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(new ZodPipe(votePostPollRequestSchema)) body: VotePostPollRequest,
+  ): Promise<PostDto> {
+    return this.posts.votePoll(user.userId, user.roles, id, body.option);
   }
 
   @Delete('posts/:id')

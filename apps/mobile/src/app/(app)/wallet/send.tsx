@@ -35,7 +35,7 @@ export default function WalletSend() {
   const router = useRouter();
   const qc = useQueryClient();
   const { me } = useAuth();
-  const params = useLocalSearchParams<{ to?: string }>();
+  const params = useLocalSearchParams<{ to?: string; amount?: string; currency?: string }>();
   const enabled = useWalletEnabled();
   const prefs = useWalletPrefs();
   const kyc = useKyc();
@@ -43,8 +43,8 @@ export default function WalletSend() {
   const [step, setStep] = useState<Step>('form');
   const [handle, setHandle] = useState(params.to ?? '');
   const [debounced, setDebounced] = useState(handle);
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<string>(prefs.currency);
+  const [amount, setAmount] = useState(() => (/^\d{1,12}$/.test(params.amount ?? '') && (params.currency === 'USD' || params.currency === 'CDF') ? (Number(params.amount) / 100).toFixed(2) : ''));
+  const [currency, setCurrency] = useState<string>(params.currency === 'USD' || params.currency === 'CDF' ? params.currency : prefs.currency);
   const [note, setNote] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);

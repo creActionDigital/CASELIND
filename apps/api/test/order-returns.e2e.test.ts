@@ -288,6 +288,20 @@ describe('buyer steps', () => {
   });
 });
 
+describe('claims centre', () => {
+  it('lists only my own claims, filters by status and needs authentication', async () => {
+    const s = await setup();
+    const r = (await ask(s).expect(201)).body;
+    const stranger = await user();
+    const mine = (await ctx.http.get('/v1/me/returns').set(bearer(s.buyer.token)).expect(200)).body;
+    expect(mine.items.map((x: any) => x.id)).toEqual([r.id]);
+    expect((await ctx.http.get('/v1/me/returns').set(bearer(stranger.token)).expect(200)).body.items).toEqual([]);
+    expect((await ctx.http.get('/v1/me/returns?status=approved').set(bearer(s.buyer.token)).expect(200)).body.items).toEqual([]);
+    expect((await ctx.http.get('/v1/me/returns?status=requested').set(bearer(s.buyer.token)).expect(200)).body.items).toHaveLength(1);
+    await ctx.http.get('/v1/me/returns').expect(401);
+  });
+});
+
 describe('dispute', () => {
   it('escalates a rejection, is arbitrated by admin or support only, and the seller then settles it', async () => {
     const s = await setup();

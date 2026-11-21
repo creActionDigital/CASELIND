@@ -46,6 +46,7 @@ export const invalidClient = (): AppError => new AppError(401, ErrorCodes.unauth
 export const appNotFound = (): AppError => AppError.notFound('Application not found');
 
 export type AppRow = {
+  category?: string | null;
   id: string;
   org_id: string;
   name: string;
@@ -72,7 +73,7 @@ export type AppRow = {
 };
 
 export const APP_COLUMNS =
-  'id, org_id, name, description, icon_media_id, launch_url, redirect_uris, scopes, confidential, client_id, client_secret_hash, status, review_note, reviewed_at, published_at, current_version, rate_limit_per_minute, manifest, certified_at, certification_note, revenue_share_bps, created_at, updated_at';
+  'id, org_id, name, description, icon_media_id, launch_url, redirect_uris, scopes, confidential, client_id, client_secret_hash, status, review_note, reviewed_at, published_at, current_version, rate_limit_per_minute, manifest, certified_at, certification_note, revenue_share_bps, category, created_at, updated_at';
 
 /** `certified` (certification admin), `reviewed` (application approuvee par la revue), sinon `unreviewed`. */
 export const certificationOf = (r: { certified_at: string | Date | null; published_at: string | Date | null }): MiniAppCertification =>
@@ -100,6 +101,7 @@ export function toApp(r: AppRow): MiniApp {
     rateLimitPerMinute: r.rate_limit_per_minute,
     manifest: r.manifest ?? null,
     certification: certificationOf(r),
+    category: (r.category ?? null) as MiniApp['category'],
     certifiedAt: r.certified_at ? iso(r.certified_at) : null,
     certificationNote: r.certification_note,
     revenueShareBps: r.revenue_share_bps,
@@ -121,6 +123,7 @@ export function toPublicApp(r: PublicAppRow): MiniAppPublic {
     scopes: r.scopes as MiniAppScope[],
     version: r.current_version,
     certification: certificationOf(r),
+    category: (r.category ?? null) as MiniApp['category'],
     costModel: readManifest(r.manifest)?.costs.model ?? null,
     organization: { id: r.org_id, name: r.org_name, verified: r.org_verification === 'verified' },
   };

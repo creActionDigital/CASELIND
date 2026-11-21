@@ -35,6 +35,10 @@ export default function WalletManage() {
     { icon: 'add-circle-outline', label: 'wallet.action.topup', onPress: () => router.push('/wallet/topup') },
     { icon: 'qr-code-outline', label: 'wallet.manage.qr', onPress: () => router.push('/wallet/receive') },
     { icon: 'pie-chart-outline', label: 'wallet.finance.title', onPress: () => router.push('/wallet/finance') },
+    { icon: 'qr-code-outline', label: 'mc.qr.title', onPress: () => router.push('/wallet/qr') },
+    { icon: 'swap-horizontal-outline', label: 'mc.fx.title', onPress: () => router.push('/wallet/convert') },
+    { icon: 'receipt-outline', label: 'mc.rcpt.title', onPress: () => router.push('/wallet/receipts') },
+    { icon: 'speedometer-outline', label: 'mc.lim.title', onPress: () => router.push('/wallet/limits') },
     ...(shops.length > 0
       ? [{ icon: 'storefront-outline' as IconName, label: 'wallet.manage.shop' as MessageKey, onPress: () => (shopPath ? router.push(shopPath) : router.push('/seller')) }]
       : []),

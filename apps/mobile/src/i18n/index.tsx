@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { usePrefs } from '../prefs/store';
 import { en } from './en';
 import { fr, type MessageKey } from './fr';
 import { sw } from './sw';
@@ -33,6 +34,11 @@ const I18nContext = createContext<I18nValue | null>(null);
 /** Français par défaut ; l'anglais n'est choisi que sur demande (menu Langue) ou via le profil. */
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>('fr');
+  // Langue choisie au premier lancement, relue depuis les préférences de l'appareil.
+  const prefs = usePrefs();
+  useEffect(() => {
+    if (prefs.loaded && prefs.locale) setLocale(prefs.locale);
+  }, [prefs.loaded, prefs.locale]);
   const t = useCallback((key: MessageKey, params?: Params) => translate(locale, key, params), [locale]);
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, t]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

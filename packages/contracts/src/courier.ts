@@ -17,7 +17,7 @@ export const COURIER_SCHEDULE_MAX_DAYS = 7;
 export const COURIER_ROUTE_MAX_STOPS = 20;
 export const COURIER_CODE_LENGTH = 6;
 
-export const courierRequestKindSchema = z.enum(['parcel', 'document']);
+export const courierRequestKindSchema = z.enum(['parcel', 'document', 'meal', 'groceries']);
 export type CourierRequestKind = z.infer<typeof courierRequestKindSchema>;
 export const courierRequestSizeSchema = z.enum(['small', 'medium', 'large']);
 export type CourierRequestSize = z.infer<typeof courierRequestSizeSchema>;
@@ -37,7 +37,7 @@ const routeFields = {
 };
 const sizeRule = (v: { kind: string; size?: string | undefined }, ctx: z.RefinementCtx): void => {
   if (v.kind === 'parcel' && !v.size) ctx.addIssue({ code: 'custom', path: ['size'], message: 'a parcel needs a size' });
-  if (v.kind === 'document' && v.size) ctx.addIssue({ code: 'custom', path: ['size'], message: 'a document has no size' });
+  if (v.kind !== 'parcel' && v.size) ctx.addIssue({ code: 'custom', path: ['size'], message: 'only a parcel has a size' });
 };
 
 export const courierRequestEstimateRequestSchema = z.object(routeFields).superRefine(sizeRule);

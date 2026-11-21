@@ -135,6 +135,11 @@ export class OrderReturnsService {
     return this.move(id, { kind: 'buyer', userId: buyerId }, 'disputed', () => ({ disputeReason: reason }));
   }
 
+  /** The buyer's own claims across all orders (claims centre); only rows the caller requested. */
+  listMine(buyerId: string, q: ReturnListQuery): Promise<ReturnList> {
+    return this.page(q, eq(orderReturns.requestedBy, buyerId));
+  }
+
   /* ------------------------------------------------------------------ seller */
 
   listForOrg(orgId: string, q: ReturnListQuery): Promise<ReturnList> {

@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Chip, ChipRow } from '../../../ui/premium';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { fetchStore, fetchStoreProducts } from '../../../shop/api';
 import { shopKeys } from '../../../shop/hooks';
@@ -30,6 +31,7 @@ export default function StoreScreen() {
   const { t } = useI18n();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const s = String(slug);
+  const [tab, setTab] = useState<'products' | 'reviews' | 'info'>('products');
 
   const store = useQuery({ queryKey: shopKeys.store(s), queryFn: () => fetchStore(s) });
   const products = useInfiniteQuery({
@@ -100,6 +102,21 @@ export default function StoreScreen() {
       </View>
       <ContactSeller contactUserId={o.contactUserId} />
 
+      <ChipRow>
+        {(['products', 'reviews', 'info'] as const).map((k) => (
+          <Chip key={k} label={t(`mc.store.tab.${k}` as MessageKey)} selected={tab === k} onPress={() => setTab(k)} />
+        ))}
+      </ChipRow>
+      {tab === 'products' && (selling || hasProducts) ? (
+        <Text variant="heading" accessibilityRole="header" style={{ marginTop: spacing.sm }}>
+          {t('shop.store.products')}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  const infoView = (
+    <View style={styles.header}>
       {o.address || o.phone || o.email || o.website ? (
         <Block title={t('vitrine.public.contact')}>
           {o.address ? <Info icon="location-outline" text={[o.address, o.city].filter(Boolean).join(', ')} /> : null}
@@ -131,16 +148,6 @@ export default function StoreScreen() {
           ))}
         </Block>
       ) : null}
-      {selling || hasProducts ? (
-        <Text variant="heading" accessibilityRole="header" style={{ marginTop: spacing.sm }}>
-          {t('shop.store.products')}
-        </Text>
-      ) : null}
-    </View>
-  );
-
-  const footer = (
-    <View style={styles.header}>
       {o.page.faq.length > 0 ? (
         <Block title={t('vitrine.public.faq')}>
           {o.page.faq.map((q, i) => (
@@ -148,6 +155,11 @@ export default function StoreScreen() {
           ))}
         </Block>
       ) : null}
+    </View>
+  );
+
+  const reviewsView = (
+    <View style={styles.header}>
       <StoreReviews org={o} />
       <StoreQuestions org={o} />
     </View>
@@ -156,7 +168,14 @@ export default function StoreScreen() {
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: o.name }} />
-      <ProductGrid query={products} header={header} footer={footer} hideWhenEmpty={!selling} emptyTitle={t('shop.store.emptyTitle')} emptyBody={t('shop.store.emptyBody')} />
+      {tab === 'products' ? (
+        <ProductGrid query={products} header={header} hideWhenEmpty={!selling} emptyTitle={t('shop.store.emptyTitle')} emptyBody={t('shop.store.emptyBody')} />
+      ) : (
+        <ScrollView>
+          {header}
+          {tab === 'info' ? infoView : reviewsView}
+        </ScrollView>
+      )}
     </View>
   );
 }

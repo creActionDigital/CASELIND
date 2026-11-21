@@ -64,8 +64,9 @@ export type CarpoolQuote = z.infer<typeof carpoolQuoteSchema>;
 
 export const carpoolSearchQuerySchema = z
   .object({
-    originLat: z.coerce.number().min(-90).max(90),
-    originLng: z.coerce.number().min(-180).max(180),
+    /** Sans depart : les prochains trajets, tous lieux confondus. */
+    originLat: z.coerce.number().min(-90).max(90).optional(),
+    originLng: z.coerce.number().min(-180).max(180).optional(),
     destLat: z.coerce.number().min(-90).max(90).optional(),
     destLng: z.coerce.number().min(-180).max(180).optional(),
     radiusKm: z.coerce.number().min(1).max(100).default(25),
@@ -74,7 +75,8 @@ export const carpoolSearchQuerySchema = z
     cursor: cursorSchema,
     limit: z.coerce.number().int().min(1).max(50).default(20),
   })
-  .refine((q) => (q.destLat === undefined) === (q.destLng === undefined), { message: 'destLat and destLng go together', path: ['destLat'] });
+  .refine((q) => (q.destLat === undefined) === (q.destLng === undefined), { message: 'destLat and destLng go together', path: ['destLat'] })
+  .refine((q) => (q.originLat === undefined) === (q.originLng === undefined), { message: 'originLat and originLng go together', path: ['originLat'] });
 export type CarpoolSearchQuery = z.infer<typeof carpoolSearchQuerySchema>;
 
 export const carpoolDriverSchema = personRefSchema.extend({ ratingAvg: z.number().nullable(), ratingCount: z.number().int() });

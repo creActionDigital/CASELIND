@@ -7,6 +7,7 @@ import { getDevicePosition } from '../../../places/device-location';
 import { DEFAULT_RADIUS_KM, GOMA_CENTER, RADII_KM, type LatLng } from '../../../places/geo';
 import { useDebouncedValue } from '../../../search/api';
 import { Chips, PagedList } from '../../../seller/ui';
+import { Chip, ChipRow, FadeInView } from '../../../ui/premium';
 import { fetchDiscovery, fetchServiceCategories, svcKeys } from '../../../services/api';
 import { OfferCard } from '../../../services/ui';
 import { spacing } from '../../../theme/tokens';
@@ -58,11 +59,11 @@ export default function Services() {
           <TextField label={t('services.search')} value={text} onChangeText={setText} returnKeyType="search" autoCapitalize="none" />
         </View>
       </View>
-      <Chips
-        options={[{ value: '', label: t('services.all') }, ...(categories.data?.items ?? []).map((c) => ({ value: c.id, label: c.name }))]}
-        value={categoryId}
-        onChange={(v) => setCategoryId(v === categoryId ? '' : v)}
-      />
+      <ChipRow>
+        {[{ id: '', name: t('services.all') }, ...(categories.data?.items ?? [])].map((c) => (
+          <Chip key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(c.id === categoryId ? '' : c.id)} />
+        ))}
+      </ChipRow>
       <View style={styles.originRow}>
         <Text variant="small" muted>
           {t('services.near.label')}
@@ -105,7 +106,11 @@ export default function Services() {
         query={query}
         keyExtractor={(o) => o.id}
         header={header}
-        renderItem={({ item }) => <OfferCard offer={item} onPress={() => router.push({ pathname: '/services/[id]', params: { id: item.id } })} />}
+        renderItem={({ item, index }) => (
+          <FadeInView index={index}>
+            <OfferCard offer={item} onPress={() => router.push({ pathname: '/services/[id]', params: { id: item.id } })} />
+          </FadeInView>
+        )}
         empty={{ icon: 'construct-outline', title: t('services.emptyTitle'), body: t('services.emptyBody') }}
       />
     </View>

@@ -25,6 +25,7 @@ import { guardiansFr } from '../school/messages-guardians';
 import { salesFr } from '../seller/sales-messages';
 import { loyaltyFr } from '../loyalty/messages';
 import { compareFr } from '../shop/compare-messages';
+import { moduleCFr } from '../shop/messages-c';
 import { digitalFr } from '../digital/messages';
 import { placesFr } from '../places/messages';
 import { posFr } from '../pos/messages';
@@ -33,10 +34,14 @@ import { updatesFr } from '../vitrine/updates-messages';
 import { extraFr } from '../mobility/extra/messages';
 import { walletFinanceFr } from '../wallet/finance/messages';
 import { creatorFr } from '../creator/messages';
+import { moduleEFr } from '../ads/messages';
 import { assistFr } from '../ai/assist-messages';
+import { moduleDFr } from '../messaging/messages-d';
 import { courierFr } from '../courier/messages';
+import { moduleBFr } from '../hub/messages-b';
 import { promotionsFr } from '../promotions/messages';
 import { privacyFr } from '../privacy/messages';
+import { maFr } from '../onboarding/messages-a';
 import { adminOpsFr } from '../admin-ops/messages';
 import { returnsFr } from '../returns/messages';
 import { webhooksFr } from '../webhooks/messages';
@@ -147,6 +152,11 @@ export const fr = {
   'publish.product': 'Produit',
   'publish.live': 'Live',
   'publish.listing': 'Annonce',
+  'create.title': 'Créer',
+  'create.story': 'Story',
+  'create.sell': 'Vendre un produit',
+  'create.listing': 'Petite annonce',
+  'create.explore': 'Explorer les vidéos',
   'hub.tab.live': 'Live',
   'hub.tab.videos': 'Vidéos',
   'hub.tab.posts': 'Posts',
@@ -489,7 +499,10 @@ export const fr = {
   'chat.attach.title': 'Joindre',
   'chat.attach.photo': 'Photo',
   'chat.attach.position': 'Position',
-  'chat.attach.files': 'Fichiers',
+  'chat.attach.files': 'Document',
+  'chat.document': 'Document',
+  'chat.file.unsupported': "Format non accepté. Envoyez un PDF, Word, Excel ou PowerPoint.",
+  'chat.file.openError': "Impossible d'ouvrir ce fichier. Réessayez.",
   'chat.attach.contacts': 'Contacts',
   'chat.attach.soon': 'bientôt',
   'chat.attach.open': 'Joindre un élément',
@@ -1347,6 +1360,7 @@ export const fr = {
   ...guardiansFr,
   ...loyaltyFr,
   ...compareFr,
+  ...moduleCFr,
   ...digitalFr,
   ...placesFr,
   ...posFr,
@@ -1355,10 +1369,14 @@ export const fr = {
   ...extraFr,
   ...walletFinanceFr,
   ...creatorFr,
+  ...moduleEFr,
   ...assistFr,
+  ...moduleDFr,
   ...courierFr,
+  ...moduleBFr,
   ...promotionsFr,
   ...privacyFr,
+  ...maFr,
   ...adminOpsFr,
   ...returnsFr,
   ...webhooksFr,

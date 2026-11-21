@@ -1,6 +1,7 @@
 import { meSchema } from '@caselind/contracts';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
+import { PremiumBadge } from '../../premium/PremiumBadge';
 import { View } from 'react-native';
 import { api, useAuth } from '../../auth/auth-context';
 import { FormError } from '../../auth/FormError';
@@ -75,6 +76,7 @@ export default function Profile() {
     <Screen edges={['bottom']}>
       <View style={{ alignItems: 'center', marginBottom: spacing.xl, gap: spacing.sm }}>
         <Avatar name={me.displayName} size={80} contentUrl={me.avatarUrl} />
+        <PremiumBadge userId={me.id} />
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <Button variant="secondary" label={t('profile.photo.change')} loading={photoBusy} onPress={() => setPhoto(true)} />
           {me.avatarUrl ? <Button variant="secondary" label={t('profile.photo.remove')} disabled={photoBusy} onPress={() => setPhoto(false)} /> : null}

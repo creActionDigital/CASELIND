@@ -158,3 +158,6 @@ export function groupComments<C extends { id: string; replyToId: string | null }
   }
   return order;
 }
+
+/** Pourcentage entier d'un choix de sondage (0 sans vote). */
+export const pollPercent = (votes: number, total: number): number => (total === 0 ? 0 : Math.round((votes / total) * 100));

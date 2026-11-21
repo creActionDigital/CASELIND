@@ -269,7 +269,7 @@ export class CourierRequestsService {
                                                           OR (b.blocker_id = ${courierId}::uuid AND b.blocked_id = r.requester_id))
       ) x WHERE pd <= ${radius} ORDER BY pd, created_at, id LIMIT 20`);
     type R = {
-      id: string; kind: 'parcel' | 'document'; size: 'small' | 'medium' | 'large' | null; currency: string; fee_estimate_minor: string | number;
+      id: string; kind: 'parcel' | 'document' | 'meal' | 'groceries'; size: 'small' | 'medium' | 'large' | null; currency: string; fee_estimate_minor: string | number;
       distance_km: number; scheduled_for: Date | string | null; expires_at: Date | string; created_at: Date | string;
       plat: number; plng: number; dlat: number; dlng: number; pd: number;
     };

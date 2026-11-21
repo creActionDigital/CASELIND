@@ -14,6 +14,7 @@ import { nextReaction, totalReactions, type CachedPost } from '../social/logic';
 import { glass, onMedia, TAB_BAR_SPACE, TOUCH } from '../theme/tokens';
 import { Avatar, ErrorState, Text } from '../ui';
 import { postListSchema } from '@caselind/contracts';
+import { recordVideoView } from '../creator/video-history';
 import { formatCount } from './logic';
 
 const fetchVideos = (cursor?: string) => api.request('/feed/videos', { query: { limit: 10, cursor }, schema: postListSchema });
@@ -70,6 +71,11 @@ function Page({ post, active, height }: { post: CachedPost; active: boolean; hei
       live = false;
     };
   }, [active, contentUrl, uri]);
+
+  // Historique local : une video compte comme vue des qu'elle devient la video active.
+  useEffect(() => {
+    if (active) void recordVideoView(post.id);
+  }, [active, post.id]);
 
   const liked = post.myReaction != null;
   const open = () => router.push({ pathname: '/post/[postId]', params: { postId: post.id } });

@@ -2,6 +2,7 @@ import { identifierSchema } from '@caselind/contracts';
 import { useState } from 'react';
 import { useAuth } from '../../auth/auth-context';
 import { AuthShell } from '../../auth/AuthShell';
+import { SocialSoon } from '../../auth/SocialSoon';
 import { TwoFactorStep } from '../../auth/TwoFactorStep';
 import { FormError } from '../../auth/FormError';
 import { useI18n } from '../../i18n';
@@ -79,6 +80,7 @@ export default function SignIn() {
       <Button label={t('auth.signIn.submit')} onPress={submit} loading={loading} />
       <TextLink label={t('auth.signIn.forgot')} href="/forgot-password" />
       <TextLink label={t('auth.signIn.toSignUp')} href="/sign-up" />
+      <SocialSoon />
     </AuthShell>
   );
 }

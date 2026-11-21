@@ -33,6 +33,11 @@ import { OrderReturnsService } from './order-returns.service.js';
 export class OrderReturnsController {
   constructor(private readonly returns: OrderReturnsService) {}
 
+  @Get('me/returns')
+  mine(@CurrentUser() user: AuthUser, @Query(new ZodPipe(returnListQuerySchema)) q: ReturnListQuery): Promise<ReturnList> {
+    return this.returns.listMine(user.userId, q);
+  }
+
   @Post('orders/:id/returns')
   request(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodPipe(createReturnRequestSchema)) body: CreateReturnRequest, @ReqMeta() meta: RequestMeta): Promise<OrderReturn> {
     return this.returns.request(user.userId, id, body, meta);

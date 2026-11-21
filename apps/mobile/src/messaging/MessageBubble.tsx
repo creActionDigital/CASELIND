@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { memo } from 'react';
-import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
+import { memo, useState } from 'react';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { splitMentions } from '../ai/assist-logic';
 import { useI18n } from '../i18n';
 import { radius, spacing, TOUCH } from '../theme/tokens';
@@ -8,6 +8,9 @@ import { chatColors } from './chat-theme';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, Text } from '../ui';
 import { messagePreview, systemText } from './api';
+import { fileKind, formatFileSize, isDocumentMime } from './file-logic';
+import { parseLocation } from './module-d-logic';
+import { openMessageFile } from './open-file';
 import { PollCard } from './PollCard';
 import type { CachedMessage } from './cache';
 import type { MessageStatus } from './receipts';
@@ -29,6 +32,44 @@ interface Props {
   onToggleTranslation?: (m: CachedMessage) => void;
   /** Pseudos des membres mentionnés dans ce message : rendus en gras. */
   mentionHandles?: readonly string[];
+}
+
+const FILE_ICON = { pdf: 'document-text-outline', word: 'document-outline', sheet: 'grid-outline', slides: 'easel-outline', other: 'attach-outline' } as const;
+
+/** Pièce jointe document : icône selon le type, nom, taille ; un toucher ouvre ou télécharge. */
+function FileCard({ message: m, fg, sub }: { message: CachedMessage; fg: string; sub: string }) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const mime = m.media?.mime ?? m.localMime ?? '';
+  const name = m.media?.fileName ?? m.localName ?? t('chat.document');
+  const size = m.media?.sizeBytes ?? m.localSize;
+  const url = m.media?.contentUrl;
+  const open = async () => {
+    if (!url || busy) return;
+    setBusy(true);
+    setFailed(false);
+    try {
+      await openMessageFile(url, mime, name);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={name} disabled={!url} onPress={() => void open()} style={styles.file}>
+      {m.local === 'sending' || busy ? <ActivityIndicator color={fg} /> : <Ionicons name={FILE_ICON[fileKind(mime)]} size={28} color={fg} />}
+      <View style={styles.fileText}>
+        <Text color={fg} numberOfLines={2} style={styles.link}>
+          {name}
+        </Text>
+        <Text variant="caption" color={failed ? undefined : sub}>
+          {failed ? t('chat.file.openError') : size != null ? formatFileSize(size) : ''}
+        </Text>
+      </View>
+    </Pressable>
+  );
 }
 
 function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPress, onRetry, translation, translating, onToggleTranslation, mentionHandles }: Props) {
@@ -53,7 +94,7 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
   const statusLabel = status ? t(`chat.status.${status}`) : '';
   const fwd = m.forwarded && !m.recalled;
   const expiry = m.expiresAt && !m.recalled ? new Date(m.expiresAt).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' }) : '';
-  const summary = m.recalled ? t('chat.recalled') : m.kind === 'media' ? t('chat.photo') : m.kind === 'poll' ? t('social.poll.preview', { question: m.body ?? '' }) : (m.body ?? '');
+  const summary = m.recalled ? t('chat.recalled') : m.kind === 'media' ? (m.media?.fileName || m.localName ? t('chat.document') : t('chat.photo')) : m.kind === 'poll' ? t('social.poll.preview', { question: m.body ?? '' }) : (m.body ?? '');
 
   return (
     <View style={[styles.wrap, mine ? styles.right : styles.left]}>
@@ -91,8 +132,18 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
           </Text>
         ) : m.kind === 'poll' && m.poll ? (
           <PollCard message={{ ...m, poll: m.poll }} mine={mine} fg={fg} />
+        ) : m.kind === 'media' && isDocumentMime(m.media?.mime ?? (m.localName ? (m.localMime ?? 'application/octet-stream') : null)) ? (
+          <FileCard message={m} fg={fg} sub={sub} />
         ) : m.kind === 'media' ? (
           <AuthImage contentUrl={m.media?.contentUrl ?? null} localUri={m.localUri} label={t('chat.photo')} style={styles.image} />
+        ) : parseLocation(m.body) ? (
+          <Pressable accessibilityRole="link" accessibilityLabel={t('md.loc.open')} onPress={() => void Linking.openURL(parseLocation(m.body)!.url)} style={styles.fwd}>
+            <Ionicons name="location" size={20} color={fg} />
+            <View>
+              <Text color={fg} style={{ fontWeight: '600' }}>{t('md.loc.card')}</Text>
+              <Text variant="caption" color={sub}>{t('md.loc.open')}</Text>
+            </View>
+          </Pressable>
         ) : (
           <Text color={fg} style={styles.body}>
             {translation && !translation.showOriginal
@@ -188,6 +239,8 @@ const styles = StyleSheet.create({
   translation: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   link: { fontWeight: '600', textDecorationLine: 'underline' },
   image: { width: 220, height: 220 },
+  file: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 200, maxWidth: 260, minHeight: TOUCH },
+  fileText: { flexShrink: 1 },
   reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   pill: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
   meta: { flexDirection: 'row', alignSelf: 'flex-end', alignItems: 'center', gap: 4 },

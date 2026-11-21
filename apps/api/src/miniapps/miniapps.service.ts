@@ -41,7 +41,7 @@ type Executor = Pick<Db, 'execute'>;
 
 const PUBLIC_SELECT = sql.raw(
   `a.id, a.org_id, a.name, a.description, a.icon_media_id, a.launch_url, a.redirect_uris, a.scopes, a.confidential, a.client_id,
-   a.client_secret_hash, a.status, a.review_note, a.reviewed_at, a.published_at, a.current_version, a.rate_limit_per_minute, a.manifest, a.certified_at, a.certification_note, a.revenue_share_bps, a.created_at, a.updated_at,
+   a.client_secret_hash, a.status, a.review_note, a.reviewed_at, a.published_at, a.current_version, a.rate_limit_per_minute, a.manifest, a.certified_at, a.certification_note, a.revenue_share_bps, a.category, a.created_at, a.updated_at,
    o.name AS org_name, o.verification_status AS org_verification`,
 );
 
@@ -78,9 +78,9 @@ export class MiniAppsService {
     const secret = body.confidential ? randomToken(SECRET_PREFIX) : null;
     const row = await this.db.transaction(async (tx) => {
       const res = await tx.execute<AppRow>(sql`
-        INSERT INTO miniapps (org_id, created_by, name, description, icon_media_id, launch_url, redirect_uris, scopes, confidential, client_id, client_secret_hash, manifest)
+        INSERT INTO miniapps (org_id, created_by, name, description, icon_media_id, launch_url, redirect_uris, scopes, confidential, client_id, client_secret_hash, manifest, category)
         VALUES (${orgId}::uuid, ${userId}::uuid, ${body.name}, ${body.description ?? null}, ${body.iconMediaId ?? null}::uuid, ${body.launchUrl},
-                ${textArray(body.redirectUris)}, ${textArray(body.scopes)}, ${body.confidential}, ${newClientId()}, ${secret ? sha256(secret) : null}, ${jsonbOf(body.manifest)})
+                ${textArray(body.redirectUris)}, ${textArray(body.scopes)}, ${body.confidential}, ${newClientId()}, ${secret ? sha256(secret) : null}, ${jsonbOf(body.manifest)}, ${body.category ?? null})
         RETURNING ${sql.raw(APP_COLUMNS)}`);
       const r = res.rows[0]!;
       await this.audit.record({ action: 'miniapp.created', actorUserId: userId, meta, metadata: { orgId, appId: r.id } }, tx);
@@ -138,6 +138,7 @@ export class MiniAppsService {
           redirect_uris = ${textArray(patch.redirectUris ?? cur.redirect_uris)},
           scopes = ${textArray(patch.scopes ?? cur.scopes)},
           manifest = ${patch.manifest === undefined ? sql`manifest` : jsonbOf(patch.manifest)},
+          category = ${patch.category === undefined ? cur.category ?? null : patch.category},
           status = 'draft'
         WHERE id = ${appId}::uuid RETURNING ${sql.raw(APP_COLUMNS)}`);
       await this.audit.record({ action: 'miniapp.updated', actorUserId: userId, meta, metadata: { orgId, appId, fields: Object.keys(patch) } }, tx);
@@ -240,6 +241,7 @@ export class MiniAppsService {
       SELECT ${PUBLIC_SELECT}, a.created_at::text AS ts FROM miniapps a JOIN organizations o ON o.id = a.org_id
       WHERE a.status = 'published' AND o.status = 'active'
         ${like ? sql`AND (a.name ILIKE ${like} OR a.description ILIKE ${like})` : sql``}
+        ${q.category ? sql`AND a.category = ${q.category}` : sql``}
         ${cursor ? sql`AND (a.created_at, a.id) < (${cursor.ts}::timestamptz, ${cursor.id}::uuid)` : sql``}
       ORDER BY a.created_at DESC, a.id DESC LIMIT ${q.limit + 1}`);
     return this.page(res.rows, q.limit, toPublicApp);

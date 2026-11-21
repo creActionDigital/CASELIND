@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { HASHTAG_MAX_LENGTH, type HashtagCount, type HashtagList, type PlatformRole, type PostList, type SocialPageQuery } from '@caselind/contracts';
+import { HASHTAG_MAX_LENGTH, type HashtagCount, type HashtagList, type PlatformRole, type PopularCreatorList, type PostList, type SocialPageQuery } from '@caselind/contracts';
 import { sql } from 'drizzle-orm';
 import { DB, type Db } from '../db/db.module.js';
 import { posts } from '../db/schema.js';
@@ -31,6 +31,20 @@ export class HashtagsService {
       WHERE p.created_at > now() - (${hours} * interval '1 hour') AND ${publicVisible(viewerId)}
       GROUP BY h.tag ORDER BY n DESC, h.tag LIMIT ${TRENDING_MAX}`);
     return { hours, items: res.rows.map((r): HashtagCount => ({ tag: r.tag, postsCount: r.n })) };
+  }
+
+  /** Les 20 comptes actifs les plus suivis qui ont publie ; ni moi, ni un compte bloque dans un sens ou dans l'autre. */
+  async popularCreators(viewerId: string): Promise<PopularCreatorList> {
+    const res = await this.db.execute<{ id: string; handle: string; display_name: string; avatar_url: string | null; f: number; p: number }>(sql`
+      SELECT u.id, u.handle::text AS handle, u.display_name, u.avatar_url,
+             (SELECT count(*)::int FROM follows f WHERE f.followee_id = u.id) AS f,
+             (SELECT count(*)::int FROM posts p WHERE p.author_id = u.id AND p.visibility = 'public' AND NOT p.hidden AND p.deleted_at IS NULL) AS p
+      FROM users u
+      WHERE u.status = 'active' AND u.id <> ${viewerId}::uuid
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${viewerId}::uuid AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = ${viewerId}::uuid))
+        AND EXISTS (SELECT 1 FROM posts p WHERE p.author_id = u.id AND p.visibility = 'public' AND NOT p.hidden AND p.deleted_at IS NULL)
+      ORDER BY f DESC, p DESC, u.id LIMIT 20`);
+    return { items: res.rows.map((r) => ({ userId: r.id, handle: r.handle, displayName: r.display_name, avatarUrl: r.avatar_url, followersCount: r.f, postsCount: r.p })) };
   }
 
   /** Tags starting with the typed text (a leading # is ignored), most used first. */

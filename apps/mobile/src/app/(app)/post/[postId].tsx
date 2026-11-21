@@ -1,7 +1,8 @@
 import type { Comment } from '@caselind/contracts';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { clickAdPost } from '../../../ads/api';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../../auth/auth-context';
@@ -34,6 +35,10 @@ export default function PostDetail() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const post = useQuery({ queryKey: sk.post(id), queryFn: () => fetchPost(id) });
+  // Ouvrir une publication promue compte comme un clic de la campagne (le serveur ignore tout autre cas).
+  useEffect(() => {
+    void clickAdPost(id).catch(() => undefined);
+  }, [id]);
   const comments = useInfiniteQuery({
     queryKey: sk.comments(id),
     initialPageParam: undefined as string | undefined,

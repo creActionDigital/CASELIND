@@ -136,7 +136,7 @@ export async function loadMessages(exec: Exec, rows: MessageRow[], viewerId: str
     mediaIds.length === 0
       ? []
       : await exec
-          .select({ id: mediaAssets.id, mime: mediaAssets.mime, sizeBytes: mediaAssets.sizeBytes, status: mediaAssets.status })
+          .select({ id: mediaAssets.id, mime: mediaAssets.mime, sizeBytes: mediaAssets.sizeBytes, fileName: mediaAssets.fileName, status: mediaAssets.status })
           .from(mediaAssets)
           .where(inArray(mediaAssets.id, mediaIds));
   const mediaById = new Map(mediaRows.map((m) => [m.id, m]));
@@ -178,6 +178,7 @@ export async function loadMessages(exec: Exec, rows: MessageRow[], viewerId: str
               id: media.id,
               mime: media.mime,
               sizeBytes: media.sizeBytes,
+              fileName: media.fileName,
               contentUrl: media.status === 'ready' ? contentUrlOf(media.id) : null,
             }
           : null,

@@ -7,11 +7,21 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { aiKeys, createAiConversation, fetchAiConversations, fetchAiModels, fetchAiSettings, updateAiSettings } from '../../../ai/api';
 import { effectiveModel, needsDataNotice, titleFrom } from '../../../ai/logic';
 import { useAuth } from '../../../auth/auth-context';
-import { useI18n } from '../../../i18n';
+import { useI18n, type MessageKey } from '../../../i18n';
+import { FadeInView } from '../../../ui/premium/FadeInView';
+import { PressableScale } from '../../../ui/premium/PressableScale';
 import { errorMessage } from '../../../lib/errors';
 import { radius, spacing, TOUCH, typography } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Avatar, Button, ErrorState, IconButton, Screen, Text } from '../../../ui';
+
+const ASSISTANTS = [
+  { id: 'purchase', icon: 'cart-outline' },
+  { id: 'compare', icon: 'git-compare-outline' },
+  { id: 'seller', icon: 'storefront-outline' },
+  { id: 'pro', icon: 'briefcase-outline' },
+  { id: 'finance', icon: 'wallet-outline' },
+] as const;
 
 /** Assistant IA : accueil (modèles réels, historique, outils à venir) et barre de message. */
 export default function AiHome() {
@@ -125,6 +135,27 @@ export default function AiHome() {
             </ScrollView>
           )}
 
+          <Text variant="bodyStrong" accessibilityRole="header">{t('md.ai.assistants')}</Text>
+          <Text variant="small" muted>{t('md.ai.assistantHint')}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modelRow} style={styles.bleed}>
+            {ASSISTANTS.map((a, i) => (
+              <FadeInView key={a.id} index={i}>
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t(`md.ai.a.${a.id}` as MessageKey)}. ${t(`md.ai.a.${a.id}Desc` as MessageKey)}`}
+                  onPress={() => !create.isPending && create.mutate(t(`md.ai.a.${a.id}Q` as MessageKey))}
+                  style={[styles.agent, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={[styles.modelIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Ionicons name={a.icon} size={20} color={colors.primary} />
+                  </View>
+                  <Text style={{ fontWeight: '600' }} numberOfLines={2}>{t(`md.ai.a.${a.id}` as MessageKey)}</Text>
+                  <Text variant="caption" muted numberOfLines={3}>{t(`md.ai.a.${a.id}Desc` as MessageKey)}</Text>
+                </PressableScale>
+              </FadeInView>
+            ))}
+          </ScrollView>
+
           <View style={[styles.history, { backgroundColor: colors.surface }]}>
             <Text variant="heading">{t('ai.history')}</Text>
             <Text variant="small" muted>
@@ -176,6 +207,8 @@ export default function AiHome() {
               </View>
             ))}
           </View>
+          <Text variant="small" muted>{t('md.ai.unavailable')}</Text>
+          <Text variant="small" muted>{t('md.ai.credits')}</Text>
           <Text variant="small" muted>
             {t('ai.privacyNote')}
           </Text>
@@ -224,6 +257,7 @@ const styles = StyleSheet.create({
   bleed: { marginHorizontal: -spacing.lg },
   modelRow: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   model: { width: 112, minHeight: 104, borderRadius: radius.xl, borderWidth: 1.5, padding: spacing.md, gap: spacing.sm },
+  agent: { width: 168, minHeight: 148, borderRadius: radius.xl, borderWidth: 1.5, padding: spacing.md, gap: spacing.xs },
   modelIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   emptyModels: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg },
   history: { borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs },

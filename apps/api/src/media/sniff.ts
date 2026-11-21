@@ -1,7 +1,7 @@
 import type { MediaMime } from '@caselind/contracts';
 
 /** Bytes read from the start of an upload for type detection; enough for every signature below. */
-export const SNIFF_HEAD_BYTES = 4096;
+export const SNIFF_HEAD_BYTES = 8192;
 
 const ascii = (buf: Uint8Array, start: number, text: string): boolean => {
   if (buf.length < start + text.length) return false;
@@ -64,6 +64,15 @@ function sniffMpegAudio(head: Uint8Array): MediaMime | null {
   return 'audio/mpeg';
 }
 
+/** OOXML = a zip whose entry names (in the first local headers) include word/, xl/ or ppt/. shortcut: a plain zip crafted with such a name passes, harmless since served as an attachment under nosniff + sandbox CSP. */
+function sniffOoxml(head: Uint8Array): MediaMime | null {
+  const P = 'application/vnd.openxmlformats-officedocument.';
+  if (indexOfAscii(head, 'word/', 30, head.length) >= 0) return `${P}wordprocessingml.document` as MediaMime;
+  if (indexOfAscii(head, 'xl/', 30, head.length) >= 0) return `${P}spreadsheetml.sheet` as MediaMime;
+  if (indexOfAscii(head, 'ppt/', 30, head.length) >= 0) return `${P}presentationml.presentation` as MediaMime;
+  return null;
+}
+
 /**
  * Detects the type of an upload from its first bytes (magic numbers). Returns null for anything that
  * is not one of the accepted types: SVG, HTML, XML, scripts, executables, archives, HEIC, QuickTime...
@@ -75,6 +84,8 @@ export function sniffMime(head: Uint8Array): MediaMime | null {
   if (ascii(head, 0, 'GIF87a') || ascii(head, 0, 'GIF89a')) return 'image/gif';
   if (ascii(head, 0, 'RIFF') && ascii(head, 8, 'WEBP')) return 'image/webp';
   if (ascii(head, 0, '%PDF-')) return 'application/pdf';
+  if (startsWith(head, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) return 'application/msword';
+  if (startsWith(head, [0x50, 0x4b, 0x03, 0x04])) return sniffOoxml(head);
   return sniffMp4(head) ?? sniffWebm(head) ?? sniffOgg(head) ?? sniffMpegAudio(head);
 }
 

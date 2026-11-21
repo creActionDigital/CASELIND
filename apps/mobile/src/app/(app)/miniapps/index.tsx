@@ -1,7 +1,12 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Chip, ChipRow, SkeletonList } from '../../../ui/premium';
+import { MINIAPP_CATEGORIES, type MiniAppPublic } from '@caselind/contracts';
+import { fetchFavoriteApps, mdKeys, setFavoriteApp } from '../../../messaging/module-d-api';
+import { loadRecents, pushRecent } from '../../../miniapps/recents';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
@@ -11,11 +16,11 @@ import { setAppMuted } from '../../../miniapps/platform-api';
 import { confirmPayment, declinePayment, fetchDirectory, fetchGrants, fetchPaymentRequests, maKeys, revokeGrant } from '../../../miniapps/api';
 import { Card, Chips, Loading } from '../../../seller/ui';
 import { formatMoney } from '../../../shop/format';
-import { spacing } from '../../../theme/tokens';
+import { brandAccent, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Badge, Button, ErrorState, Screen, Text, TextField } from '../../../ui';
 
-type Tab = 'directory' | 'mine' | 'payments';
+type Tab = 'directory' | 'favorites' | 'recent' | 'mine' | 'payments';
 
 /** Annuaire des mini-apps, apps autorisées (révocation) et demandes de paiement (confirmation par PIN). */
 export default function MiniApps() {
@@ -26,17 +31,13 @@ export default function MiniApps() {
     <Screen>
       <Stack.Screen options={{ title: t('miniapps.title') }} />
       <Button variant="secondary" label={t('miniapps.dev.open')} onPress={() => router.push('/miniapps/developer' as never)} />
-      <Chips<Tab>
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'directory', label: t('miniapps.title') },
-          { value: 'mine', label: t('miniapps.mine') },
-          { value: 'payments', label: t('miniapps.payments') },
-        ]}
-      />
+      <ChipRow>
+        {([['directory', t('miniapps.title')], ['favorites', t('md.apps.tabFavorites')], ['recent', t('md.apps.tabRecent')], ['mine', t('miniapps.mine')], ['payments', t('miniapps.payments')]] as [Tab, string][]).map(([v, label]) => (
+          <Chip key={v} label={label} selected={tab === v} onPress={() => setTab(v)} />
+        ))}
+      </ChipRow>
       <View style={{ gap: spacing.md, marginTop: spacing.md }}>
-        {tab === 'directory' ? <Directory /> : tab === 'mine' ? <Mine onDiscover={() => setTab('directory')} /> : <Payments onDiscover={() => setTab('directory')} />}
+        {tab === 'directory' ? <Directory /> : tab === 'favorites' ? <Favorites /> : tab === 'recent' ? <Recents /> : tab === 'mine' ? <Mine onDiscover={() => setTab('directory')} /> : <Payments onDiscover={() => setTab('directory')} />}
       </View>
     </Screen>
   );
@@ -47,9 +48,10 @@ const scopeKey = (s: string) => `miniapps.scope.${s}` as MessageKey;
 function Directory() {
   const { t } = useI18n();
   const [q, setQ] = useState('');
+  const [category, setCategory] = useState('');
   const list = useInfiniteQuery({
-    queryKey: maKeys.directory(q),
-    queryFn: ({ pageParam }) => fetchDirectory(q.trim(), pageParam),
+    queryKey: maKeys.directory(q, category),
+    queryFn: ({ pageParam }) => fetchDirectory(q.trim(), pageParam, category),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (p) => p.nextCursor ?? undefined,
   });
@@ -57,12 +59,20 @@ function Directory() {
   return (
     <>
       <TextField label={t('miniapps.search')} value={q} onChangeText={setQ} autoCapitalize="none" />
-      {list.isPending ? <Loading /> : null}
+      <Chips<string>
+        value={category}
+        onChange={setCategory}
+        options={[{ value: '', label: t('md.apps.catAll') }, ...MINIAPP_CATEGORIES.map((c) => ({ value: c as string, label: t(`md.apps.cat.${c}` as MessageKey) }))]}
+      />
+      {list.isPending ? <SkeletonList rows={3} label={t('common.loading')} /> : null}
       {list.isError ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : null}
       {list.data && items.length === 0 ? <Text muted>{t('miniapps.empty')}</Text> : null}
       {items.map((a) => (
         <Card key={a.id}>
-          <Text variant="bodyStrong">{a.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text variant="bodyStrong" style={{ flex: 1 }}>{a.name}</Text>
+            <FavoriteHeart appId={a.id} />
+          </View>
           <Text variant="small" muted>{t('miniapps.by', { name: a.organization.name })}</Text>
           <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
             <CertBadge level={a.certification} />
@@ -73,7 +83,7 @@ function Directory() {
           {a.scopes.map((s) => <Text key={s} variant="small">• {t(scopeKey(s))}</Text>)}
           <Details id={a.id} />
           <Text variant="caption" muted>{t('miniapps.openHint')}</Text>
-          <Button variant="secondary" label={t('miniapps.open')} onPress={() => void Linking.openURL(a.launchUrl)} />
+          <Button variant="secondary" label={t('miniapps.open')} onPress={() => { void pushRecent(a.id); void Linking.openURL(a.launchUrl); }} />
         </Card>
       ))}
       {list.hasNextPage ? <Button variant="ghost" label={t('miniapps.more')} loading={list.isFetchingNextPage} onPress={() => list.fetchNextPage()} /> : null}
@@ -207,4 +217,61 @@ function Payments({ onDiscover }: { onDiscover: () => void }) {
       ))}
     </>
   );
+}
+
+function FavoriteHeart({ appId }: { appId: string }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  const qc = useQueryClient();
+  const favs = useQuery({ queryKey: mdKeys.favorites, queryFn: fetchFavoriteApps });
+  const on = !!favs.data?.items.some((a) => a.id === appId);
+  const toggle = useMutation({ mutationFn: () => setFavoriteApp(appId, !on), onSettled: () => void qc.invalidateQueries({ queryKey: mdKeys.favorites }) });
+  const label = on ? t('md.apps.favRemove') : t('md.apps.favAdd');
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: on }} onPress={() => toggle.mutate()} hitSlop={10} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={on ? 'heart' : 'heart-outline'} size={24} color={on ? brandAccent : colors.textMuted} />
+    </Pressable>
+  );
+}
+
+function AppRows({ items }: { items: MiniAppPublic[] }) {
+  const { t } = useI18n();
+  return (
+    <>
+      {items.map((a) => (
+        <Card key={a.id}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text variant="bodyStrong" style={{ flex: 1 }}>{a.name}</Text>
+            <FavoriteHeart appId={a.id} />
+          </View>
+          <Text variant="small" muted>{t('miniapps.by', { name: a.organization.name })}</Text>
+          {a.description ? <Text>{a.description}</Text> : null}
+          <Button variant="secondary" label={t('miniapps.open')} onPress={() => { void pushRecent(a.id); void Linking.openURL(a.launchUrl); }} />
+        </Card>
+      ))}
+    </>
+  );
+}
+
+function Favorites() {
+  const { t } = useI18n();
+  const favs = useQuery({ queryKey: mdKeys.favorites, queryFn: fetchFavoriteApps });
+  if (favs.isPending) return <Loading />;
+  if (favs.isError) return <ErrorState error={favs.error} onRetry={() => void favs.refetch()} />;
+  return favs.data.items.length === 0 ? <Text muted>{t('md.apps.favEmpty')}</Text> : <AppRows items={favs.data.items} />;
+}
+
+function Recents() {
+  const { t } = useI18n();
+  const apps = useQuery({
+    queryKey: mdKeys.recents,
+    queryFn: async () => {
+      const ids = await loadRecents();
+      const found = await Promise.all(ids.map((id) => fetchMiniApp(id).catch(() => null)));
+      return found.filter((a): a is MiniAppPublic => a !== null);
+    },
+  });
+  if (apps.isPending) return <Loading />;
+  if (apps.isError) return <ErrorState error={apps.error} onRetry={() => void apps.refetch()} />;
+  return apps.data.length === 0 ? <Text muted>{t('md.apps.recentEmpty')}</Text> : <AppRows items={apps.data} />;
 }

@@ -27,8 +27,8 @@ describe('tuiles par rôle', () => {
       expect(visibleTiles(['admin']).some((t) => t.route === route)).toBe(true);
     }
   });
-  it('modérateur : modération, sanctions, recours, mini-apps et boosts seulement', () => {
-    expect(ids(['user', 'moderator'])).toEqual(['moderation', 'sanctions', 'appeals', 'miniapps', 'boosts']);
+  it('modérateur : modération, sanctions, recours, mini-apps, boosts et publicités seulement', () => {
+    expect(ids(['user', 'moderator'])).toEqual(['moderation', 'sanctions', 'appeals', 'miniapps', 'boosts', 'ads']);
   });
   it('administrateur : paramètres, commissions, annonces et alertes du portefeuille lui sont réservés', () => {
     for (const route of ['/admin/settings', '/admin/commissions', '/admin/announcements', '/admin/wallet-alerts', '/admin/sanctions', '/admin/appeals', '/admin/boosts']) {

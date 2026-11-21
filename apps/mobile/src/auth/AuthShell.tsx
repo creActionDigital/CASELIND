@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useI18n } from '../i18n';
 import { spacing } from '../theme/tokens';
 import { Screen, Text, Wordmark } from '../ui';
+import { FadeInView } from '../ui/premium';
 
 /** Cadre commun des écrans d'authentification. */
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
@@ -24,7 +25,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
         ) : (
           <View style={{ height: spacing.lg }} />
         )}
-        {children}
+        <FadeInView>{children}</FadeInView>
       </View>
     </Screen>
   );

@@ -58,3 +58,19 @@ describe('montants', () => {
     expect(buildCreateQr({ ...base, mode: 'free', amount: '', label: 'x'.repeat(81) })).toEqual({ issue: 'label' });
   });
 });
+
+describe('QR payez-moi', () => {
+  it('construit puis reconnaît un montant entier avec sa devise', async () => {
+    const { buildPayRequestQr, classifyScan, scanRoute } = await import('./scan-logic');
+    const raw = buildPayRequestQr('@Awa_K', 2550, 'USD');
+    expect(raw).toBe('caselind://pay/awa_k?a=2550&c=USD');
+    expect(classifyScan(raw)).toEqual({ kind: 'pay_user', handle: 'awa_k', amountMinor: 2550, currency: 'USD' });
+    expect(scanRoute(classifyScan(raw))).toEqual({ pathname: '/wallet/send', params: { to: 'awa_k', amount: '2550', currency: 'USD' } });
+  });
+  it('refuse montant nul, devise inconnue ou format libre', async () => {
+    const { classifyScan } = await import('./scan-logic');
+    expect(classifyScan('caselind://pay/awa_k?a=0&c=USD').kind).toBe('unknown');
+    expect(classifyScan('caselind://pay/awa_k?a=100&c=EUR').kind).toBe('unknown');
+    expect(classifyScan('caselind://pay/awa_k?a=-5&c=USD').kind).toBe('unknown');
+  });
+});

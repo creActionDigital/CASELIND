@@ -27,6 +27,19 @@ export type HashtagCount = z.infer<typeof hashtagCountSchema>;
 export const hashtagListSchema = z.object({ hours: z.number().int(), items: z.array(hashtagCountSchema) });
 export type HashtagList = z.infer<typeof hashtagListSchema>;
 
+/** GET /v1/creators/popular : comptes actifs les plus suivis (hors moi et blocages), avec leurs compteurs. */
+export const popularCreatorSchema = z.object({
+  userId: z.uuid(),
+  handle: z.string(),
+  displayName: z.string(),
+  avatarUrl: z.string().nullable(),
+  followersCount: z.number().int().min(0),
+  postsCount: z.number().int().min(0),
+});
+export type PopularCreator = z.infer<typeof popularCreatorSchema>;
+export const popularCreatorListSchema = z.object({ items: z.array(popularCreatorSchema) });
+export type PopularCreatorList = z.infer<typeof popularCreatorListSchema>;
+
 // ---- impressions -----------------------------------------------------------------------------
 
 export const recordImpressionsRequestSchema = z.object({

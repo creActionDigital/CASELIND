@@ -24,6 +24,7 @@ import { guardiansEn } from '../school/messages-guardians';
 import { salesEn } from '../seller/sales-messages';
 import { loyaltyEn } from '../loyalty/messages';
 import { compareEn } from '../shop/compare-messages';
+import { moduleCEn } from '../shop/messages-c';
 import { digitalEn } from '../digital/messages';
 import { placesEn } from '../places/messages';
 import { posEn } from '../pos/messages';
@@ -32,10 +33,14 @@ import { updatesEn } from '../vitrine/updates-messages';
 import { extraEn } from '../mobility/extra/messages';
 import { walletFinanceEn } from '../wallet/finance/messages';
 import { creatorEn } from '../creator/messages';
+import { moduleEEn } from '../ads/messages';
 import { assistEn } from '../ai/assist-messages';
+import { moduleDEn } from '../messaging/messages-d';
 import { courierEn } from '../courier/messages';
+import { moduleBEn } from '../hub/messages-b';
 import { promotionsEn } from '../promotions/messages';
 import { privacyEn } from '../privacy/messages';
+import { maEn } from '../onboarding/messages-a';
 import { adminOpsEn } from '../admin-ops/messages';
 import { returnsEn } from '../returns/messages';
 import { webhooksEn } from '../webhooks/messages';
@@ -149,6 +154,11 @@ export const en: Record<MessageKey, string> = {
   'publish.product': 'Product',
   'publish.live': 'Live',
   'publish.listing': 'Listing',
+  'create.title': 'Create',
+  'create.story': 'Story',
+  'create.sell': 'Sell a product',
+  'create.listing': 'Classified ad',
+  'create.explore': 'Explore videos',
   'hub.tab.live': 'Live',
   'hub.tab.videos': 'Videos',
   'hub.tab.posts': 'Posts',
@@ -491,7 +501,10 @@ export const en: Record<MessageKey, string> = {
   'chat.attach.title': 'Attach',
   'chat.attach.photo': 'Photo',
   'chat.attach.position': 'Location',
-  'chat.attach.files': 'Files',
+  'chat.attach.files': 'Document',
+  'chat.document': 'Document',
+  'chat.file.unsupported': "Unsupported format. Send a PDF, Word, Excel or PowerPoint file.",
+  'chat.file.openError': "Could not open this file. Try again.",
   'chat.attach.contacts': 'Contacts',
   'chat.attach.soon': 'soon',
   'chat.attach.open': 'Attach an item',
@@ -1349,6 +1362,7 @@ export const en: Record<MessageKey, string> = {
   ...guardiansEn,
   ...loyaltyEn,
   ...compareEn,
+  ...moduleCEn,
   ...digitalEn,
   ...placesEn,
   ...posEn,
@@ -1357,10 +1371,14 @@ export const en: Record<MessageKey, string> = {
   ...extraEn,
   ...walletFinanceEn,
   ...creatorEn,
+  ...moduleEEn,
   ...assistEn,
+  ...moduleDEn,
   ...courierEn,
+  ...moduleBEn,
   ...promotionsEn,
   ...privacyEn,
+  ...maEn,
   ...adminOpsEn,
   ...returnsEn,
   ...webhooksEn,

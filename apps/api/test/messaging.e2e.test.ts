@@ -574,3 +574,27 @@ describe('account data', () => {
     await send(b, dm).expect(403);
   });
 });
+
+describe('document messages', () => {
+  const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\n%%EOF\n');
+  const put = async (u: TU, mime: string, content: Buffer, fileName?: string) => {
+    const up = await ctx.http.post('/v1/media/uploads').set(bearer(u.token)).send({ purpose: 'message', mime, sizeBytes: content.length, fileName }).expect(201);
+    const r = await ctx.http.put(up.body.uploadUrl).set(bearer(u.token)).set('X-Upload-Token', up.body.uploadToken).set('Content-Type', 'application/octet-stream').send(content);
+    return { id: up.body.assetId as string, status: r.status };
+  };
+  it('sends a PDF with a cleaned name: members read it, others do not; executables are refused', async () => {
+    const [a, b, c] = [await user(), await user(), await user()];
+    const id = await direct(a, b);
+    const doc = await put(a, 'application/pdf', PDF, '..\evil/"rapport".pdf');
+    expect(doc.status).toBe(200);
+    const msg = await send(a, id, { kind: 'media', body: undefined, mediaId: doc.id }).expect(201);
+    expect(msg.body.media).toMatchObject({ id: doc.id, mime: 'application/pdf', fileName: 'rapport.pdf' });
+    const dl = await ctx.http.get(`/v1/media/${doc.id}/content`).set(bearer(b.token)).expect(200);
+    expect(dl.headers['content-disposition']).toContain('attachment');
+    await ctx.http.get(`/v1/media/${doc.id}/content`).set(bearer(c.token)).expect(404);
+    await ctx.http.post('/v1/media/uploads').set(bearer(a.token)).send({ purpose: 'message', mime: 'application/x-msdownload', sizeBytes: 10 }).expect(400);
+    const exe = await put(a, 'application/pdf', Buffer.from('MZ\x90\x00\x03 executable'));
+    expect(exe.status).toBeGreaterThanOrEqual(400);
+    await send(a, id, { kind: 'media', body: undefined, mediaId: exe.id }).expect(400);
+  });
+});

@@ -7,6 +7,7 @@ import {
   publicProfileSchema,
   socialStatsSchema,
   socialUserListSchema,
+  type PostAttachmentInput,
   type PostVisibility,
   type ReactionType,
 } from '@caselind/contracts';
@@ -14,7 +15,8 @@ import { api } from '../auth/auth-context';
 
 const PAGE = 20;
 
-export const fetchFeed = (cursor?: string) => api.request('/feed', { query: { limit: PAGE, cursor }, schema: postListSchema });
+export const fetchFeed = (cursor?: string, scope: 'following' | 'forYou' | 'popular' = 'following') =>
+  api.request('/feed', { query: { limit: PAGE, cursor, scope }, schema: postListSchema });
 export const fetchUserPosts = (userId: string, cursor?: string) =>
   api.request(`/users/${userId}/posts`, { query: { limit: PAGE, cursor }, schema: postListSchema });
 export const fetchPost = (id: string) => api.request(`/posts/${id}`, { schema: postSchema });
@@ -33,8 +35,11 @@ export const setFollow = (userId: string, follow: boolean) =>
 export const putReaction = (postId: string, type: ReactionType | null) =>
   api.request(`/posts/${postId}/reaction`, { method: 'PUT', body: { type }, schema: postSchema });
 
-export const createPost = (body: { clientId: string; body?: string; mediaIds: string[]; visibility: PostVisibility }) =>
+export const createPost = (body: { clientId: string; body?: string; mediaIds: string[]; visibility: PostVisibility; attachment?: PostAttachmentInput }) =>
   api.request('/posts', { method: 'POST', body, schema: postSchema });
+
+export const votePostPoll = (postId: string, option: number) =>
+  api.request(`/posts/${postId}/poll-vote`, { method: 'PUT', body: { option }, schema: postSchema });
 
 export const patchPost = (id: string, body: { body?: string | null; visibility?: PostVisibility }) =>
   api.request(`/posts/${id}`, { method: 'PATCH', body, schema: postSchema });

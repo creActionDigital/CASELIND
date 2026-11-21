@@ -4,6 +4,7 @@ export type ScanTarget =
   | { kind: 'merchant'; payload: string }
   | { kind: 'web_login'; payload: string }
   | { kind: 'profile'; handle: string }
+  | { kind: 'pay_user'; handle: string; amountMinor: number; currency: string }
   | { kind: 'unknown' };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -11,6 +12,8 @@ const HANDLE = /^[a-zA-Z0-9_.]{3,30}$/;
 /** `CLQ1.<orgId>.<qrId>.<montant>.<devise>.<expiration>.<signature>` */
 const MERCHANT_PARTS = 7;
 const WEB_LOGIN_PREFIX = 'caselind-qr1';
+/** `caselind://pay/<handle>?a=<montant mineur>&c=<devise>` : demande de paiement d'une personne. */
+const PAY_RE = /^caselind:\/\/\/?pay\/([a-zA-Z0-9_.]{3,30})\?a=(\d{1,12})&c=(USD|CDF)$/i;
 const PROFILE_RE = /^caselind:\/\/\/?u\/([^/?#\s]+)\/?$/i;
 
 export function classifyScan(raw: string): ScanTarget {
@@ -27,6 +30,12 @@ export function classifyScan(raw: string): ScanTarget {
   if (s.startsWith(`${WEB_LOGIN_PREFIX}:`)) {
     const p = s.split(':');
     return p.length === 3 && p[1] && p[2] ? { kind: 'web_login', payload: s } : { kind: 'unknown' };
+  }
+
+  const pay = PAY_RE.exec(s);
+  if (pay) {
+    const amountMinor = Number(pay[2]);
+    return amountMinor > 0 ? { kind: 'pay_user', handle: pay[1]!.toLowerCase(), amountMinor, currency: pay[3]!.toUpperCase() } : { kind: 'unknown' };
   }
 
   const m = PROFILE_RE.exec(s);
@@ -47,7 +56,8 @@ export function classifyScan(raw: string): ScanTarget {
 export type ScanRoute =
   | { pathname: '/pay'; params: { payload: string } }
   | { pathname: '/security/qr-approve'; params: { payload: string } }
-  | { pathname: '/u/[handle]'; params: { handle: string } };
+  | { pathname: '/u/[handle]'; params: { handle: string } }
+  | { pathname: '/wallet/send'; params: { to: string; amount: string; currency: string } };
 
 export function scanRoute(target: ScanTarget): ScanRoute | null {
   switch (target.kind) {
@@ -57,6 +67,8 @@ export function scanRoute(target: ScanTarget): ScanRoute | null {
       return { pathname: '/security/qr-approve', params: { payload: target.payload } };
     case 'profile':
       return { pathname: '/u/[handle]', params: { handle: target.handle } };
+    case 'pay_user':
+      return { pathname: '/wallet/send', params: { to: target.handle, amount: String(target.amountMinor), currency: target.currency } };
     default:
       return null;
   }
@@ -65,4 +77,9 @@ export function scanRoute(target: ScanTarget): ScanRoute | null {
 /** Contenu du QR de profil : `caselind://u/<handle>` (reconnu par `classifyScan`). */
 export function buildProfileQr(handle: string): string {
   return `caselind://u/${encodeURIComponent(handle.trim().replace(/^@/, '').toLowerCase())}`;
+}
+
+/** Contenu du QR « payez-moi » : identifiant, montant entier en unités mineures et devise (jamais de mélange). */
+export function buildPayRequestQr(handle: string, amountMinor: number, currency: 'USD' | 'CDF'): string {
+  return `caselind://pay/${handle.trim().replace(/^@/, '').toLowerCase()}?a=${Math.trunc(amountMinor)}&c=${currency}`;
 }

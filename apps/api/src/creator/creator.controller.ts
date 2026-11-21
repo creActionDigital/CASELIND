@@ -7,6 +7,7 @@ import {
   type BoostPostRequest,
   boostPostRequestSchema,
   type BoostResponse,
+  type PopularCreatorList,
   type CreatorOverview,
   type CreatorOverviewQuery,
   creatorOverviewQuerySchema,
@@ -66,6 +67,11 @@ export class CreatorController {
   }
 
   // Static paths first: `hashtags/trending` and `hashtags/suggest` before `hashtags/:tag/posts`.
+  @Get('creators/popular')
+  popular(@CurrentUser() user: AuthUser): Promise<PopularCreatorList> {
+    return this.hashtags.popularCreators(user.userId);
+  }
+
   @Get('hashtags/trending')
   trending(@CurrentUser() user: AuthUser, @Query(new ZodPipe(trendingHashtagsQuerySchema)) q: TrendingHashtagsQuery): Promise<HashtagList> {
     return this.hashtags.trending(user.userId, q.hours);

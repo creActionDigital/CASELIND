@@ -65,6 +65,9 @@ describe('estimate and creation', () => {
     const doc = await post(u, '/v1/courier-requests/estimate', { kind: 'document', pickup: PICKUP, dropoff: DROPOFF }).expect(200);
     expect(doc.body).toMatchObject({ estimated: true, currency: 'USD', paymentMode: 'cash' });
     expect(doc.body.feeMinor).toBeGreaterThanOrEqual(100);
+    const meal = await post(u, '/v1/courier-requests/estimate', { kind: 'meal', pickup: PICKUP, dropoff: DROPOFF }).expect(200);
+    expect(meal.body.feeMinor).toBe(doc.body.feeMinor);
+    await post(u, '/v1/courier-requests/estimate', { kind: 'groceries', size: 'small', pickup: PICKUP, dropoff: DROPOFF }).expect(400);
     const small = await post(u, '/v1/courier-requests/estimate', { kind: 'parcel', size: 'small', pickup: PICKUP, dropoff: DROPOFF }).expect(200);
     const large = await post(u, '/v1/courier-requests/estimate', { kind: 'parcel', size: 'large', pickup: PICKUP, dropoff: DROPOFF }).expect(200);
     expect(large.body.feeMinor).toBeGreaterThan(small.body.feeMinor);
@@ -101,6 +104,7 @@ describe('estimate and creation', () => {
 
     // Document: no size. Scheduled slot between 2 hours and 7 days.
     await create(u, { kind: 'document', size: undefined, note: undefined }).expect(201);
+    await create(u, { kind: 'groceries', size: undefined, note: undefined }).expect(201);
     const soon = await create(u, { scheduledFor: new Date(Date.now() + 3_600_000).toISOString() });
     expect(soon.status).toBe(400);
     expect(soon.body.error.details[0].reason).toBe('schedule_out_of_range');

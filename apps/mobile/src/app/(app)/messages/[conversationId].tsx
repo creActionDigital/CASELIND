@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 import type { Message } from '@caselind/contracts';
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
@@ -15,7 +17,10 @@ import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
 import { uuidv4 } from '../../../lib/uuid';
-import { imageMime, uploadMessageImage } from '../../../media/upload';
+import { imageMime, uploadDocument, uploadMessageImage } from '../../../media/upload';
+import { documentMime } from '../../../messaging/file-logic';
+import { locationBody } from '../../../messaging/module-d-logic';
+import { setPin } from '../../../messaging/module-d-api';
 import {
   conversationTitle,
   fetchConversation,
@@ -247,7 +252,8 @@ export default function ChatRoom() {
         let mediaId: string | undefined;
         if (m.kind === 'media') {
           if (!m.localUri) throw new Error('no local file');
-          mediaId = await uploadMessageImage(m.localUri, imageMime(m.localMime, m.localUri));
+          const docMime = m.localName ? documentMime(m.localMime, m.localName) : null;
+          mediaId = docMime ? await uploadDocument(m.localUri, docMime, m.localName!) : await uploadMessageImage(m.localUri, imageMime(m.localMime, m.localUri));
         }
         const server: Message = await postMessage(id, {
           clientId: m.clientId!,
@@ -365,6 +371,55 @@ export default function ChatRoom() {
         replyToId: replyTo?.id,
         localUri: asset.uri,
         localMime: asset.mimeType ?? undefined,
+      });
+      setReplyTo(null);
+      setOutbox((o) => outboxAdd(o, msg));
+      void deliver(msg);
+    } catch (err) {
+      setNotice(errorMessage(err, t, locale));
+    }
+  }
+
+  async function shareLocation() {
+    setNotice(null);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.status !== 'granted') return setNotice(t('md.loc.denied'));
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const msg = buildOptimisticMessage({ conversationId: id, senderId: myId, clientId: uuidv4(), kind: 'text', body: locationBody(pos.coords.latitude, pos.coords.longitude), replyToId: replyTo?.id });
+      setReplyTo(null);
+      setOutbox((o) => outboxAdd(o, msg));
+      void deliver(msg);
+    } catch {
+      setNotice(t('md.loc.unavailable'));
+    }
+  }
+  async function pinMessage(m: CachedMessage) {
+    setActions(null);
+    try {
+      await setPin(m.id, true);
+      router.push({ pathname: '/messages/pins', params: { conversationId: id } });
+    } catch (err) {
+      setNotice(err instanceof ApiRequestError && err.detail<string>('reason') === 'pin_limit' ? t('md.pin.limit') : errorMessage(err, t, locale));
+    }
+  }
+  async function attachDocument() {
+    setNotice(null);
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+      const asset = res.canceled ? null : res.assets[0];
+      if (!asset) return;
+      if (!documentMime(asset.mimeType, asset.name)) return setNotice(t('chat.file.unsupported'));
+      const msg = buildOptimisticMessage({
+        conversationId: id,
+        senderId: myId,
+        clientId: uuidv4(),
+        kind: 'media',
+        replyToId: replyTo?.id,
+        localUri: asset.uri,
+        localMime: asset.mimeType ?? undefined,
+        localName: asset.name,
+        localSize: asset.size ?? undefined,
       });
       setReplyTo(null);
       setOutbox((o) => outboxAdd(o, msg));
@@ -689,6 +744,14 @@ export default function ChatRoom() {
                 <MenuRow icon="notifications-off-outline" label={t('chat.muteAlways')} onPress={() => patchState({ mutedUntil: FOREVER })} />
               </>
             )}
+            <MenuRow
+              icon="pin-outline"
+              label={t('md.pin.menu')}
+              onPress={() => {
+                setMenu(false);
+                router.push({ pathname: '/messages/pins', params: { conversationId: id } });
+              }}
+            />
             <MenuRow icon="timer-outline" label={t('chat.menu.disappearing')} onPress={goInfo} />
             <MenuRow icon="archive-outline" label={conv.data.archived ? t('chat.unarchive') : t('chat.archive')} onPress={() => patchState({ archived: !conv.data.archived })} />
             {conv.data.peer ? (
@@ -729,8 +792,22 @@ export default function ChatRoom() {
               setPollOpen(true);
             }}
           />
-          <MenuRow icon="location-outline" label={t('chat.attach.position')} soon={t('chat.attach.soon')} />
-          <MenuRow icon="document-outline" label={t('chat.attach.files')} soon={t('chat.attach.soon')} />
+          <MenuRow
+            icon="location-outline"
+            label={t('md.loc.share')}
+            onPress={() => {
+              setAttachOpen(false);
+              void shareLocation();
+            }}
+          />
+          <MenuRow
+            icon="document-outline"
+            label={t('chat.attach.files')}
+            onPress={() => {
+              setAttachOpen(false);
+              void attachDocument();
+            }}
+          />
           <MenuRow icon="person-outline" label={t('chat.attach.contacts')} soon={t('chat.attach.soon')} />
         </View>
       </SheetModal>
@@ -785,6 +862,7 @@ export default function ChatRoom() {
                   label={isFavorite(actions) ? t('messagesX.fav.remove') : t('messagesX.fav.add')}
                   onPress={() => toggleFavorite(actions)}
                 />
+                <Button variant="secondary" label={t('md.pin.add')} onPress={() => void pinMessage(actions)} />
               </>
             ) : null}
             {actionsMine && !actions.local && !actions.recalled ? (

@@ -2,13 +2,13 @@ import { miniappGrantListSchema, miniappPaymentRequestListSchema, miniappPayment
 import { api } from '../auth/auth-context';
 
 export const maKeys = {
-  directory: (q: string) => ['miniapps', 'directory', q] as const,
+  directory: (q: string, category = '') => ['miniapps', 'directory', q, category] as const,
   one: (id: string) => ['miniapps', 'one', id] as const,
   grants: ['miniapps', 'grants'] as const,
   payments: ['miniapps', 'payments'] as const,
 };
 
-export const fetchDirectory = (q: string, cursor?: string) => api.request('/miniapps', { query: { q: q || undefined, limit: 20, cursor }, schema: miniappPublicListSchema });
+export const fetchDirectory = (q: string, cursor?: string, category?: string) => api.request('/miniapps', { query: { q: q || undefined, category: category || undefined, limit: 20, cursor }, schema: miniappPublicListSchema });
 export const fetchMiniApp = (id: string) => api.request(`/miniapps/${id}`, { schema: miniappPublicSchema });
 export const fetchGrants = () => api.request('/me/miniapp-grants', { schema: miniappGrantListSchema });
 export const revokeGrant = (appId: string) => api.request(`/me/miniapp-grants/${appId}`, { method: 'DELETE' });

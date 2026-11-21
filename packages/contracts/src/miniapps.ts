@@ -6,6 +6,10 @@ export const MINIAPP_SCOPES = ['profile.basic', 'profile.phone', 'profile.email'
 export const miniappScopeSchema = z.enum(MINIAPP_SCOPES);
 export type MiniAppScope = z.infer<typeof miniappScopeSchema>;
 
+export const MINIAPP_CATEGORIES = ['restaurants', 'hotels', 'ticketing', 'education', 'health', 'realestate', 'jobs', 'services', 'events', 'insurance', 'finance', 'administration'] as const;
+export const miniappCategorySchema = z.enum(MINIAPP_CATEGORIES);
+export type MiniAppCategory = z.infer<typeof miniappCategorySchema>;
+
 export const SCOPE_DESCRIPTIONS: Record<MiniAppScope, string> = {
   'profile.basic': 'Votre identifiant, votre nom, votre @pseudo et votre avatar',
   'profile.phone': 'Votre numéro de téléphone vérifié',
@@ -57,6 +61,8 @@ export const createMiniAppRequestSchema = z.object({
   confidential: z.boolean().default(true),
   /** Manifeste declaratif (valide par le serveur avec `miniappManifestSchema` ; obligatoire a la soumission). */
   manifest: z.unknown().optional(),
+  /** Categorie du catalogue (optionnelle). */
+  category: miniappCategorySchema.nullable().optional(),
 });
 export type CreateMiniAppRequest = z.infer<typeof createMiniAppRequestSchema>;
 
@@ -89,6 +95,7 @@ export const miniappSchema = z.object({
   /** Manifeste declaratif de la version approuvee (ou en preparation avant la premiere approbation). */
   manifest: z.unknown().nullable().optional(),
   certification: z.enum(['unreviewed', 'reviewed', 'certified']).optional(),
+  category: miniappCategorySchema.nullable().optional(),
   certifiedAt: z.iso.datetime().nullable().optional(),
   certificationNote: z.string().nullable().optional(),
   /** Part de la plateforme en points de base (0-3000), fixee par l'administrateur. */
@@ -135,6 +142,7 @@ export const miniappPublicSchema = z.object({
   certification: z.enum(['unreviewed', 'reviewed', 'certified']).optional(),
   /** Modele de cout declare (free, per_use, subscription, other). */
   costModel: z.string().nullable().optional(),
+  category: miniappCategorySchema.nullable().optional(),
   /** Manifeste approuve (detail d'une application seulement ; a valider avec `miniappManifestSchema`). */
   manifest: z.unknown().nullable().optional(),
   organization: z.object({ id: z.uuid(), name: z.string(), verified: z.boolean() }),
@@ -143,6 +151,7 @@ export type MiniAppPublic = z.infer<typeof miniappPublicSchema>;
 
 export const miniappDirectoryQuerySchema = z.object({
   q: z.string().trim().min(1).max(100).optional(),
+  category: miniappCategorySchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   cursor: z.string().max(200).optional(),
 });

@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
+import { SponsoredStrip } from '../../ads/SponsoredStrip';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../i18n';
 import { ApiRequestError } from '../../lib/api';
@@ -199,6 +200,7 @@ function History({ onPick }: { onPick: (e: { query: string; scope: SearchScope }
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <View style={styles.histHead}>
+          <SponsoredStrip placement="search" />
           {mutationError ? (
             <Text color={colors.danger} accessibilityRole="alert">
               {errorMessage(mutationError, t, locale)}

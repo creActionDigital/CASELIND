@@ -1,4 +1,4 @@
-import { MINIAPP_SCOPES, type MiniAppScope } from '@caselind/contracts';
+import { MINIAPP_CATEGORIES, MINIAPP_SCOPES, type MiniAppCategory, type MiniAppScope } from '@caselind/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
@@ -28,6 +28,7 @@ export default function NewMiniApp() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [iconId, setIconId] = useState<string | null>(null);
+  const [category, setCategory] = useState<MiniAppCategory | ''>('');
   const [launchUrl, setLaunchUrl] = useState('https://');
   const [redirects, setRedirects] = useState('https://');
   const [scopes, setScopes] = useState<MiniAppScope[]>(['profile.basic']);
@@ -45,6 +46,7 @@ export default function NewMiniApp() {
         redirectUris: parseRedirectUris(redirects),
         scopes,
         confidential,
+        category: category || null,
       }),
     onSuccess: (app) => {
       if (app.clientSecret) holdSecret(app.id, app.clientSecret);
@@ -96,6 +98,12 @@ export default function NewMiniApp() {
         ) : null}
         <TextField label={t('miniapps.dev.new.name')} value={name} onChangeText={setName} maxLength={60} />
         <TextField label={t('miniapps.dev.new.description')} value={description} onChangeText={setDescription} multiline maxLength={500} />
+        <Text variant="small" style={{ fontWeight: '600' }}>{t('md.apps.devCategory')}</Text>
+        <Chips<MiniAppCategory | ''>
+          value={category}
+          onChange={setCategory}
+          options={[{ value: '', label: t('md.apps.catAll') }, ...MINIAPP_CATEGORIES.map((c) => ({ value: c, label: t(`md.apps.cat.${c}` as MessageKey) }))]}
+        />
         <Button variant="secondary" label={iconId ? t('miniapps.dev.new.iconDone') : t('miniapps.dev.new.icon')} disabled={busy} onPress={pickIcon} />
         <TextField label={t('miniapps.dev.new.launchUrl')} value={launchUrl} onChangeText={setLaunchUrl} keyboardType="url" autoCapitalize="none" autoCorrect={false} />
         <TextField label={t('miniapps.dev.new.redirectUris')} value={redirects} onChangeText={setRedirects} multiline autoCapitalize="none" autoCorrect={false} />

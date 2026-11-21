@@ -44,6 +44,11 @@ export const mediaMimeSchema = z.enum([
   'audio/ogg',
   'audio/mpeg',
   'application/pdf',
+  /** Office files, sent as message attachments (detected from the zip/OLE structure). */
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/msword',
 ]);
 export type MediaMime = z.infer<typeof mediaMimeSchema>;
 
@@ -60,6 +65,12 @@ export function mediaKindOf(mime: MediaMime): MediaKind {
 const IMAGES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 const VIDEOS = ['video/mp4', 'video/webm'] as const;
 const AUDIO = ['audio/mp4', 'audio/ogg', 'audio/mpeg'] as const;
+const OFFICE = [
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/msword',
+] as const;
 
 /** Accepted types per purpose (CDC §6, §29). */
 export const MEDIA_ALLOWED_MIMES: Readonly<Record<MediaPurpose, readonly MediaMime[]>> = {
@@ -70,7 +81,7 @@ export const MEDIA_ALLOWED_MIMES: Readonly<Record<MediaPurpose, readonly MediaMi
   listing: IMAGES,
   post: [...IMAGES, ...VIDEOS],
   story: [...IMAGES, ...VIDEOS],
-  message: [...IMAGES, ...VIDEOS, ...AUDIO, 'application/pdf'],
+  message: [...IMAGES, ...VIDEOS, ...AUDIO, 'application/pdf', ...OFFICE],
   document: ['application/pdf'],
   kyc_document: [...IMAGES, 'application/pdf'],
   cv: ['application/pdf'],
@@ -106,6 +117,8 @@ export const createUploadRequestSchema = z
     purpose: mediaPurposeSchema,
     mime: mediaMimeSchema,
     sizeBytes: z.number().int().positive(),
+    /** Original file name (documents sent in messages); sanitised by the server. */
+    fileName: z.string().max(255).optional(),
   })
   .refine((v) => isMimeAllowedFor(v.purpose, v.mime), {
     path: ['mime'],
@@ -153,6 +166,7 @@ export const mediaAssetSchema = z.object({
   uploadedAt: z.iso.datetime().nullable(),
   /** Why the content was refused (owner only): unsupported_type, type_mismatch, too_large. */
   rejectedReason: z.string().nullable(),
+  fileName: z.string().nullable().optional(),
 });
 export type MediaAsset = z.infer<typeof mediaAssetSchema>;
 

@@ -8,6 +8,8 @@ import { AccountController } from './account/account.controller.js';
 import { AccountService } from './account/account.service.js';
 import { ConsentsController } from './consents/consents.controller.js';
 import { ConsentsService } from './consents/consents.service.js';
+import { DiscoverController } from './discover/discover.controller.js';
+import { DiscoverService } from './discover/discover.service.js';
 import { AdminController } from './admin/admin.controller.js';
 import { GovernanceController } from './admin/governance.controller.js';
 import { GovernanceService } from './admin/governance.service.js';
@@ -80,6 +82,9 @@ import { ConversationMembersService } from './messaging/members.service.js';
 import { MessagesService } from './messaging/messages.service.js';
 import { MessageExtrasService } from './messaging/message-extras.service.js';
 import { ScheduledMessagesService } from './messaging/scheduled-messages.service.js';
+import { MessagePinsController, MessagePinsService } from './messaging/message-pins.js';
+import { HelpAdminController, HelpMeController, HelpService } from './support/help.js';
+import { MiniAppFavoritesController, MiniAppFavoritesService } from './miniapps/miniapp-favorites.js';
 import { ConversationsController, MessagesController, MessagingMeController, SEND_MESSAGE_HANDLER } from './messaging/messaging.controller.js';
 import { MessagingRooms } from './messaging/rooms.js';
 // Polls, message search and presence.
@@ -163,6 +168,11 @@ import { AdminBoostsController, CreatorController, CreatorPaymentsController } f
 import { CreatorStatsService } from './creator/creator-stats.service.js';
 import { HashtagsService } from './creator/hashtags.service.js';
 import { TipsService } from './creator/tips.service.js';
+import { AdminAdsController, AdsController } from './ads/ads.controller.js';
+import { AdsService } from './ads/ads.service.js';
+import { AdminPremiumController, PremiumController } from './premium/premium.controller.js';
+import { MonetizationPayService } from './premium/pay.service.js';
+import { PremiumService } from './premium/premium.service.js';
 import { AnomalyService } from './wallet-finance/anomaly.service.js';
 import { MoneyRequestsService } from './wallet-finance/money-requests.service.js';
 import { SavingsService } from './wallet-finance/savings.service.js';
@@ -473,6 +483,7 @@ export class AppModule {
         PrivacyController,
         AccountController,
         ConsentsController,
+        DiscoverController,
         OrgsController,
         DigitalProductsController,
         MyOrgsController,
@@ -491,6 +502,10 @@ export class AppModule {
         AvatarController,
         ConversationsController,
         MessagesController,
+        MessagePinsController,
+        HelpMeController,
+        HelpAdminController,
+        MiniAppFavoritesController,
         // Lot 3b
         MessagingMeController,
         ConversationPollsController,
@@ -512,6 +527,11 @@ export class AppModule {
         CreatorController,
         CreatorPaymentsController,
         AdminBoostsController,
+        // Monetisation (mode test) : Premium, forfaits pros et publicité payante
+        PremiumController,
+        AdminPremiumController,
+        AdsController,
+        AdminAdsController,
         // Gestion d'entreprise : fournisseurs, achats, dépenses, rentabilité, exports
         PurchasingController,
         FinanceOpsController,
@@ -597,6 +617,7 @@ export class AppModule {
         PrivacyService,
         AccountService,
         ConsentsService,
+        DiscoverService,
         OrgsService,
         DigitalProductsService,
         OrgUpdatesService,
@@ -625,6 +646,9 @@ export class AppModule {
         HashtagsService,
         CreatorStatsService,
         TipsService,
+        MonetizationPayService,
+        PremiumService,
+        AdsService,
         AnomalyService,
         MoneyRequestsService,
         SplitBillsService,
@@ -751,6 +775,9 @@ export class AppModule {
         MessagesService,
         // Lot 3b
         MessageExtrasService,
+        MessagePinsService,
+        HelpService,
+        MiniAppFavoritesService,
         ScheduledMessagesService,
         PollsService,
         MessageSearchService,

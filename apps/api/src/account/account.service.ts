@@ -655,7 +655,7 @@ export class AccountService {
     const rows = await this.db.execute(sql`
       SELECT id, requester_id, kind, status, pickup_label, dropoff_label, note, fee_estimate_minor, currency, requester_rating, courier_rating, created_at, delivered_at
       FROM courier_requests WHERE requester_id = ${userId}::uuid OR courier_id = ${userId}::uuid ORDER BY created_at, id`);
-    type R = { id: string; requester_id: string; kind: 'parcel' | 'document'; status: AccountExport['courierRequests'][number]['status']; pickup_label: string; dropoff_label: string; note: string | null; fee_estimate_minor: string | number; currency: string; requester_rating: number | null; courier_rating: number | null; created_at: string | Date; delivered_at: string | Date | null };
+    type R = { id: string; requester_id: string; kind: 'parcel' | 'document' | 'meal' | 'groceries'; status: AccountExport['courierRequests'][number]['status']; pickup_label: string; dropoff_label: string; note: string | null; fee_estimate_minor: string | number; currency: string; requester_rating: number | null; courier_rating: number | null; created_at: string | Date; delivered_at: string | Date | null };
     return (rows.rows as unknown as R[]).map((r) => {
       const asRequester = r.requester_id === userId;
       return {

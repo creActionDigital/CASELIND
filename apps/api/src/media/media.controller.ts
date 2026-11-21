@@ -30,7 +30,7 @@ function sendMedia(
   res.setHeader('Content-Type', mime);
   res.setHeader('Content-Length', String(asset.sizeBytes));
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Content-Disposition', `${mediaKindOf(mime) === 'document' ? 'attachment' : 'inline'}; filename="${filename}"`);
+  res.setHeader('Content-Disposition', `${mediaKindOf(mime) === 'document' ? 'attachment' : 'inline'}; filename="${filename}"${asset.fileName ? `; filename*=UTF-8''${encodeURIComponent(asset.fileName)}` : ''}`);
   res.setHeader('Cache-Control', cacheControl);
   res.setHeader('ETag', `"${asset.sha256}"`);
   // Even if a browser rendered the bytes as a document, nothing in it could run.

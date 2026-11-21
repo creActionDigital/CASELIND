@@ -162,3 +162,21 @@ export const exportedWalletSchema = z.object({
   transactions: z.array(walletTransactionSchema),
 });
 export type ExportedWallet = z.infer<typeof exportedWalletSchema>;
+
+/** Indicative exchange quote (sandbox): informs only, the wallet never converts a balance and never mixes currencies. */
+export const FX_CURRENCIES = ['USD', 'CDF'] as const;
+export const fxCurrencySchema = z.enum(FX_CURRENCIES);
+export const fxQuoteQuerySchema = z.object({ from: fxCurrencySchema, to: fxCurrencySchema, amountMinor: z.coerce.number().int().min(0).max(WALLET_AMOUNT_MAX) });
+export type FxQuoteQuery = z.infer<typeof fxQuoteQuerySchema>;
+export const fxQuoteSchema = z.object({
+  mode: walletModeSchema,
+  indicative: z.literal(true),
+  from: fxCurrencySchema,
+  to: fxCurrencySchema,
+  amountMinor: z.number().int(),
+  convertedMinor: z.number().int(),
+  /** Units of `to` for one unit of `from`. */
+  rate: z.number().positive(),
+  asOf: z.iso.datetime(),
+});
+export type FxQuote = z.infer<typeof fxQuoteSchema>;

@@ -1,4 +1,4 @@
-import type { MediaMime } from '@caselind/contracts';
+import type { MediaMime, PostAttachmentInput } from '@caselind/contracts';
 import type { QueryClient } from '@tanstack/react-query';
 import { ApiRequestError } from '../lib/api';
 import { createPost } from './api';
@@ -13,6 +13,7 @@ export interface PublishInput {
   body: string | null;
   visibility: PostVisibility;
   media: { uri: string; mime: MediaMime }[];
+  attachment?: PostAttachmentInput;
 }
 
 /** Envois en cours ou échoués (réessai avec le même clientId, sans renvoyer les médias déjà envoyés). */
@@ -20,6 +21,7 @@ const pending = new Map<string, { input: PublishInput; uploaded: string[] }>();
 
 function patchLists(qc: QueryClient, authorId: string, fn: (d: PostPages | undefined) => PostPages | undefined) {
   qc.setQueryData<PostPages>(sk.feed, fn);
+  qc.setQueryData<PostPages>([...sk.feed, 'forYou'], fn);
   qc.setQueryData<PostPages>(sk.userPosts(authorId), fn);
 }
 
@@ -40,6 +42,7 @@ async function run(qc: QueryClient, clientId: string): Promise<void> {
       body: input.body ?? undefined,
       mediaIds: job.uploaded,
       visibility: input.visibility,
+      attachment: input.attachment,
     });
     pending.delete(clientId);
     patchLists(qc, input.author.id, (d) => mergeServerPost(d, clientId, server));

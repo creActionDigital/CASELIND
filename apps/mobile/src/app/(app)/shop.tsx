@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { SheetModal } from '../../components/SheetModal';
 import { useI18n } from '../../i18n';
 import { FlashStrip } from '../../promotions/FlashStrip';
+import { MarketRows } from '../../shop/MarketRows';
 import { fetchCategories, fetchProducts, type ShopFilters } from '../../shop/api';
 import { parseMajorToMinor } from '../../shop/format';
 import { shopKeys } from '../../shop/hooks';
@@ -14,6 +15,7 @@ import { ProductGrid } from '../../shop/ProductGrid';
 import { brandColor, fonts, onMedia, radius, spacing, TOUCH } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
 import { Button, TextField, Text } from '../../ui';
+import { SponsoredStrip } from '../../ads/SponsoredStrip';
 
 const CURRENCIES = ['USD', 'CDF'];
 const SORTS = ['recent', 'price_asc', 'price_desc'] as const;
@@ -84,12 +86,14 @@ export default function Shop() {
           <Ionicons name="options-outline" size={20} color={activeFilters > 0 ? onMedia : colors.text} />
         </Pressable>
       </View>
+      <SponsoredStrip placement="marketplace" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel={t('shop.categories')}>
         <CategoryPill label={t('shop.all')} selected={!categoryId} onPress={() => setCategoryId(undefined)} />
         {categories.data?.items.map((c) => (
           <CategoryPill key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)} />
         ))}
       </ScrollView>
+      {!q && !categoryId ? <MarketRows /> : null}
       <FlashStrip />
     </View>
   );

@@ -8,6 +8,9 @@ import { useI18n, type MessageKey } from '../../../../i18n';
 import { fetchOrders, fetchProducts, sk, useMyOrgs } from '../../../../seller/api';
 import { can, canEditProfile, canManageHr, canManageInventory, canReadCatalog, canViewReviews } from '../../../../seller/permissions';
 import { canManageWebhooks } from '../../../../webhooks/logic';
+import { SalesGlance } from '../../../../seller/SalesGlance';
+import { splitBySector } from '../../../../business/sector';
+import { canViewTeam } from '../../../../seller/team-logic';
 import { Card, Chips, Loading, SectionTitle } from '../../../../seller/ui';
 import { radius, spacing } from '../../../../theme/tokens';
 import { useTheme } from '../../../../theme/use-theme';
@@ -83,7 +86,18 @@ export default function SellerDashboard() {
     { icon: 'car-sport-outline', label: 'rentals.org.title', path: '/rentals', show: can(role, 'catalog.manage') },
     { icon: 'git-network-outline', label: 'webhooks.title', path: '/webhooks', show: canManageWebhooks(role) },
     { icon: 'qr-code-outline', label: 'sellerQr.title', path: '/qr', show: canViewFinance(role) || can(role, 'orders.manage') },
+    { icon: 'people-outline', label: 'mc.team.title', path: '/team', show: canViewTeam(role) },
   ];
+  const { core, others } = splitBySector(current.org.kind, shortcuts.filter((s) => s.show));
+  const renderCard = (s: (typeof shortcuts)[number]) => (
+    <Card key={s.path} label={t(s.label)} onPress={() => base(s.path)}>
+      <View style={styles.line}>
+        <Ionicons name={s.icon} size={24} color={colors.primary} />
+        <Text style={{ flex: 1 }}>{t(s.label)}</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </View>
+    </Card>
+  );
 
   return (
     <>
@@ -132,16 +146,12 @@ export default function SellerDashboard() {
             ) : null}
           </View>
 
+          {can(role, 'orders.view') ? <SalesGlance orgId={orgId} /> : null}
           <SectionTitle>{t('seller.shortcuts')}</SectionTitle>
-          {shortcuts.filter((s) => s.show).map((s) => (
-            <Card key={s.path} label={t(s.label)} onPress={() => base(s.path)}>
-              <View style={styles.line}>
-                <Ionicons name={s.icon} size={24} color={colors.primary} />
-                <Text style={{ flex: 1 }}>{t(s.label)}</Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </View>
-            </Card>
-          ))}
+          {core.length > 0 ? <SectionTitle>{t('mc.sector.title', { kind: t(`seller.kind.${current.org.kind}` as MessageKey) })}</SectionTitle> : null}
+          {core.map(renderCard)}
+          {core.length > 0 && others.length > 0 ? <SectionTitle>{t('mc.sector.others')}</SectionTitle> : null}
+          {others.map(renderCard)}
           {!shortcuts.some((s) => s.show) ? <Text muted>{t('seller.noAccess')}</Text> : null}
         </View>
       </ScrollView>

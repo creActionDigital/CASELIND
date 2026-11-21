@@ -15,6 +15,7 @@ import { flattenGroups, groupByDay } from '../../wallet/history';
 import { useKyc, useTransactions, useWallet, useWalletEnabled, walletKeys } from '../../wallet/hooks';
 import { setWalletPrefs, useWalletPrefs } from '../../wallet/prefs';
 import { SandboxBanner, TxRow, TxSheet } from '../../wallet/ui';
+import { ActionCircle, FadeInView, SkeletonList } from '../../ui/premium';
 
 /** Wallet sandbox : solde, comptes présentés comme des cartes, actions, historique en défilement infini. */
 export default function Wallet() {
@@ -92,6 +93,7 @@ export default function Wallet() {
         </Pressable>
       </View>
       <SandboxBanner />
+      <FadeInView>
       <View style={[styles.totalCard, { backgroundColor: colors.surface }]}>
         <View style={styles.totalTop}>
           <Text variant="small" muted>
@@ -148,6 +150,7 @@ export default function Wallet() {
           <Action icon="warning-outline" label={t('wf.menu.alerts')} onPress={() => router.push('/wallet/alerts')} />
         </View>
       </View>
+      </FadeInView>
 
       <View style={styles.sectionRow}>
         <Text variant="bodyStrong" accessibilityRole="header">
@@ -226,7 +229,7 @@ export default function Wallet() {
         }
         ListEmptyComponent={
           history.isPending ? (
-            <ActivityIndicator color={colors.primary} accessibilityLabel={t('common.loading')} />
+            <SkeletonList rows={4} label={t('common.loading')} />
           ) : history.isError ? (
             <ErrorState error={history.error} onRetry={() => history.refetch()} />
           ) : (
@@ -247,17 +250,7 @@ export default function Wallet() {
 }
 
 function Action({ icon, label, onPress }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.action, { opacity: pressed ? 0.7 : 1 }]}>
-      <View style={[styles.actionIcon, { backgroundColor: colors.background }]}>
-        <Ionicons name={icon} size={22} color={colors.text} />
-      </View>
-      <Text variant="caption" style={{ textAlign: 'center' }} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
+  return <ActionCircle icon={icon} label={label} onPress={onPress} />;
 }
 
 const styles = StyleSheet.create({

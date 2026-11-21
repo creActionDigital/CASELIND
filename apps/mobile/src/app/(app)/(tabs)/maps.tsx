@@ -17,11 +17,13 @@ import {
   type LatLng,
   type MapsPlatform,
 } from '../../../places/geo';
+import { placeHref } from '../../../places/kinds';
 import { TileMap } from '../../../places/TileMap';
 import { radiusPoints } from '../../../places/tiles';
 import { useDebouncedValue } from '../../../search/api';
 import { Chips } from '../../../seller/ui';
-import { radius, spacing, TAB_BAR_SPACE, TOUCH } from '../../../theme/tokens';
+import { brandAccent, radius, spacing, TAB_BAR_SPACE, TOUCH } from '../../../theme/tokens';
+import { ServiceTile, SkeletonList } from '../../../ui/premium';
 import { useTheme } from '../../../theme/use-theme';
 import { AuthImage, Button, EmptyState, ErrorState, Text } from '../../../ui';
 
@@ -37,6 +39,7 @@ export default function Maps() {
   const { colors } = useTheme();
   const { t } = useI18n();
   const { height } = useWindowDimensions();
+  const router = useRouter();
   // La position reste en mémoire de l'écran : jamais persistée, envoyée seulement en paramètres de requête.
   const [origin, setOrigin] = useState<{ point: LatLng; device: boolean }>({ point: GOMA_CENTER, device: false });
   const [locError, setLocError] = useState<'denied' | 'unavailable' | null>(null);
@@ -100,6 +103,13 @@ export default function Maps() {
         value={String(radiusKm)}
         onChange={(v) => setRadiusKm(Number(v))}
       />
+      <View style={styles.shortcuts}>
+        <ServiceTile icon="car-outline" label={t('mb.transport.ride')} onPress={() => router.push('/rides' as never)} />
+        <ServiceTile icon="cube-outline" label={t('mb.transport.parcel')} tint={brandAccent} onPress={() => router.push('/courier?kind=parcel' as never)} />
+        <ServiceTile icon="compass-outline" label={t('mb.explore.title')} onPress={() => router.push('/places/explore' as never)} />
+        <ServiceTile icon="add-circle-outline" label={t('mb.add.link')} onPress={() => router.push('/places/add' as never)} />
+      </View>
+      <Button label={t('mb.transport.title')} variant="ghost" onPress={() => router.push('/transport' as never)} />
       <View style={styles.originRow}>
         <Text variant="caption" muted style={styles.flex}>
           {origin.device ? t('places.origin.device') : t('places.origin.goma')}
@@ -129,7 +139,7 @@ export default function Maps() {
   );
 
   let state;
-  if (query.isPending) state = <ActivityIndicator style={styles.pad} color={colors.primary} accessibilityLabel={t('common.loading')} />;
+  if (query.isPending) state = <SkeletonList rows={3} label={t('common.loading')} />;
   else if (query.isError && items.length === 0) state = <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   else if (items.length === 0) state = <EmptyState icon="map-outline" title={t('places.emptyTitle')} body={t('places.emptyBody')} />;
 
@@ -208,7 +218,7 @@ const PlaceCard = memo(function PlaceCard({ place, selected, onFocus }: { place:
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('places.placeA11y', { name: place.name, kind, distance })}
-        onPress={() => router.push({ pathname: '/store/[slug]', params: { slug: place.slug } })}
+        onPress={() => router.push(placeHref(place))}
         onLongPress={onFocus}
         style={({ pressed }) => [styles.main, { opacity: pressed ? 0.85 : 1 }]}
       >
@@ -242,6 +252,7 @@ const PlaceCard = memo(function PlaceCard({ place, selected, onFocus }: { place:
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  shortcuts: { flexDirection: 'row', gap: spacing.sm },
   pad: { padding: spacing.xl },
   content: { paddingHorizontal: spacing.lg, paddingBottom: TAB_BAR_SPACE, gap: spacing.md, flexGrow: 1 },
   search: {

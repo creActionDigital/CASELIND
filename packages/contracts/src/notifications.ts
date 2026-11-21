@@ -46,6 +46,8 @@ export type Notification = z.infer<typeof notificationSchema>;
 
 export const notificationListQuerySchema = pageQuerySchema.extend({
   unreadOnly: z.enum(['true', 'false']).optional(),
+  /** Filtre du centre de notifications : une seule catégorie. */
+  category: notificationCategorySchema.optional(),
 });
 export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
 

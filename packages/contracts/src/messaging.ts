@@ -29,6 +29,8 @@ export const messageMediaSchema = z.object({
   mime: z.string().nullable(),
   sizeBytes: z.number().int(),
   contentUrl: z.string().nullable(),
+  /** Sanitised original name of a document attachment. */
+  fileName: z.string().nullable().optional(),
 });
 export type MessageMedia = z.infer<typeof messageMediaSchema>;
 
