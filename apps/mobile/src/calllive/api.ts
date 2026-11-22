@@ -1,4 +1,4 @@
-import { callListSchema, callSchema, liveListSchema, liveMessageListSchema, liveMessageSchema, liveSchema } from '@caselind/contracts';
+import { callListSchema, callSchema, iceServersSchema, liveListSchema, liveMessageListSchema, liveMessageSchema, liveSchema } from '@caselind/contracts';
 import { api } from '../auth/auth-context';
 
 export const clKeys = {
@@ -20,3 +20,5 @@ export const sendLiveMessage = (id: string, body: string) => api.request(`/lives
 export const fetchCalls = () => api.request('/me/calls', { schema: callListSchema });
 export const startCall = (conversationId: string, kind: 'audio' | 'video') => api.request(`/conversations/${conversationId}/calls`, { method: 'POST', body: { kind }, schema: callSchema });
 export const callAction = (id: string, action: 'accept' | 'decline' | 'end') => api.request(`/calls/${id}/${action}`, { method: 'POST', schema: callSchema });
+export const fetchIceServers = () => api.request('/calls/ice-servers', { schema: iceServersSchema });
+export const sendCallSignal = (id: string, type: 'offer' | 'answer' | 'ice', payload: string) => api.request(`/calls/${id}/signal`, { method: 'POST', body: { type, payload } });

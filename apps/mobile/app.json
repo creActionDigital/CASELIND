@@ -64,6 +64,13 @@
         {
           "microphonePermission": "CASELIND utilise le micro pour enregistrer vos messages vocaux. L'audio n'est envoyé qu'à vos destinataires."
         }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "CASELIND utilise la caméra pour vos appels vidéo.",
+          "microphonePermission": "CASELIND utilise le micro pour vos appels audio et vidéo."
+        }
       ]
     ],
     "experiments": {}
