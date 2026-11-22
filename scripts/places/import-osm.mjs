@@ -36,12 +36,16 @@ const kindOf = (t) => MAP.find(([k, v]) => (v === '*' ? t[k] : t[k] === v))?.[2]
 const union = MAP.map(([k, v]) => `nwr["${k}"${v === '*' ? '' : `="${v}"`}]["name"](${bbox});`).join('');
 const query = `[out:json][timeout:60];(${union});out center tags;`;
 
-const res = await fetch('https://overpass-api.de/api/interpreter', {
-  method: 'POST',
-  body: new URLSearchParams({ data: query }),
-  headers: { 'user-agent': 'caselind-places-import/1.0' },
-});
-if (!res.ok) throw new Error(`Overpass ${res.status}`);
+// Instances publiques Overpass, essayées l'une après l'autre (surcharge fréquente : 429/502/504) ; une seule réponse utile suffit.
+const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+let res;
+for (const url of ENDPOINTS) {
+  res = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: query }), headers: { 'user-agent': 'caselind-places-import/1.0' } }).catch(() => null);
+  if (res?.ok) break;
+  console.log(`Overpass ${url} : ${res ? res.status : 'injoignable'}, instance suivante`);
+  await new Promise((r) => setTimeout(r, 5000));
+}
+if (!res?.ok) throw new Error(`Overpass indisponible (${res?.status ?? 'réseau'})`);
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'caselind-osm-'));
 const file = path.join(dir, 'overpass.json');
 fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
