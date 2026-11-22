@@ -4,14 +4,16 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useAuth } from '../../../auth/auth-context';
 import { clKeys, endLive, fetchLive, fetchLiveMessages, joinLive, leaveLive, sendLiveMessage } from '../../../calllive/api';
+import { StreamView } from '../../../calllive/StreamView';
+import { useRtcLive } from '../../../calllive/useRtcLive';
 import { useI18n } from '../../../i18n';
 import { useRealtime } from '../../../realtime/realtime-context';
 import { Card, Loading } from '../../../seller/ui';
-import { spacing } from '../../../theme/tokens';
+import { radius, spacing } from '../../../theme/tokens';
 import { Button, ErrorState, Screen, Text, TextField } from '../../../ui';
 import { safeBack } from '../../../lib/back-target';
 
-/** Salon d'un live : compteur et chat en temps réel ; la vidéo attend un serveur média (voir la note affichée). */
+/** Salon d'un live : vidéo WebRTC directe de l'hôte (maillage, 8 spectateurs au plus), compteur et chat en temps réel. */
 export default function LiveRoom() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useI18n();
@@ -25,6 +27,7 @@ export default function LiveRoom() {
   const open = live.data?.status === 'live';
   const joined = useMutation({ mutationFn: () => joinLive(id), onSuccess: (l) => qc.setQueryData(clKeys.live(id), l) });
   const messages = useQuery({ queryKey: clKeys.liveMessages(id), queryFn: () => fetchLiveMessages(id), enabled: open && (isHost || joined.isSuccess), retry: false });
+  const media = useRtcLive({ liveId: id, isHost, active: !!open && (isHost || joined.isSuccess) });
 
   // Un spectateur rejoint à l'ouverture et quitte en partant.
   useEffect(() => {
@@ -63,8 +66,23 @@ export default function LiveRoom() {
             <Text variant="caption" muted>{t('lives.peak', { n: live.data.peakViewers })}</Text>
             {isHost && open ? <Text variant="small" style={{ fontWeight: '600' }}>{t('lives.host')}</Text> : null}
             {!open ? <Text>{t('lives.ended')}</Text> : null}
-            {open ? <Text variant="caption" muted>{t('lives.mediaNote')}</Text> : null}
           </Card>
+          {open ? (
+            <View style={{ gap: spacing.sm }}>
+              <View style={{ height: 340, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
+                {isHost ? <StreamView stream={media.local} muted mirror /> : <StreamView stream={media.remote} />}
+                {!isHost && !media.remote ? <Text color="#fff" style={{ position: 'absolute' }}>{media.error === 'failed' ? t('lives.videoFailed') : t('lives.connecting')}</Text> : null}
+                {media.error === 'denied' ? <Text color="#fff" style={{ position: 'absolute', padding: spacing.md }}>{t('calls.noMedia')}</Text> : null}
+                {media.error === 'unsupported' ? <Text color="#fff" style={{ position: 'absolute', padding: spacing.md }}>{t('calls.unsupported')}</Text> : null}
+              </View>
+              {isHost ? (
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <View style={{ flex: 1 }}><Button variant="secondary" label={t(media.micOn ? 'calls.mute' : 'calls.unmute')} onPress={media.toggleMic} /></View>
+                  <View style={{ flex: 1 }}><Button variant="secondary" label={t(media.camOn ? 'calls.cameraOff' : 'calls.cameraOn')} onPress={media.toggleCam} /></View>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           {open ? (
             <>
               {messages.data && messages.data.items.length === 0 ? <Text muted>{t('lives.chat.empty')}</Text> : null}

@@ -22,3 +22,4 @@ export const startCall = (conversationId: string, kind: 'audio' | 'video') => ap
 export const callAction = (id: string, action: 'accept' | 'decline' | 'end') => api.request(`/calls/${id}/${action}`, { method: 'POST', schema: callSchema });
 export const fetchIceServers = () => api.request('/calls/ice-servers', { schema: iceServersSchema });
 export const sendCallSignal = (id: string, type: 'offer' | 'answer' | 'ice', payload: string) => api.request(`/calls/${id}/signal`, { method: 'POST', body: { type, payload } });
+export const sendLiveSignal = (id: string, type: 'offer' | 'answer' | 'ice', payload: string, to?: string) => api.request(`/lives/${id}/signal`, { method: 'POST', body: { type, payload, ...(to ? { to } : {}) } });

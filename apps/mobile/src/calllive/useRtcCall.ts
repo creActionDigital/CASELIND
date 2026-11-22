@@ -4,13 +4,12 @@ import { useRealtime } from '../realtime/realtime-context';
 import { fetchIceServers, sendCallSignal } from './api';
 import { phaseFromIce, shouldCreateOffer, shouldRestartIce, splitSignals, type CallPhase, type Signal } from './call-machine';
 import { rtc } from './rtc';
-import type { CandidateLike, IceServer, PeerLike, SdpLike, StreamLike } from './rtc-types';
+import { speaker } from './speaker';
+import { candidatePayload, FALLBACK_ICE, sdpPayload } from './rtc-payload';
+import type { CandidateLike, PeerLike, SdpLike, StreamLike } from './rtc-types';
 
 export type MediaError = 'denied' | 'unsupported' | null;
-const FALLBACK_ICE: IceServer[] = [{ urls: ['stun:stun.l.google.com:19302'] }];
 
-const sdpPayload = (d: SdpLike) => JSON.stringify({ type: d.type, sdp: d.sdp });
-const candidatePayload = (c: CandidateLike) => JSON.stringify(c.toJSON ? c.toJSON() : { candidate: c.candidate, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex });
 
 /**
  * Média d'un appel 1:1 (web : navigateur ; natif : react-native-webrtc). Démarre quand l'appel devient « actif » : l'appelant crée l'offre,
@@ -31,6 +30,8 @@ export function useRtcCall(call: Call | undefined, meId: string | undefined) {
   const [camOn, setCamOn] = useState(true);
   const [error, setError] = useState<MediaError>(null);
   const [seconds, setSeconds] = useState(0);
+  const [speakerOn, setSpeakerOn] = useState(false);
+  const speakerRef = useRef(false);
 
   const pcRef = useRef<PeerLike | null>(null);
   const localRef = useRef<StreamLike | null>(null);
@@ -186,6 +187,23 @@ export function useRtcCall(call: Call | undefined, meId: string | undefined) {
     return () => clearInterval(timer);
   }, [active]);
 
+  // Natif : l'audio part sur écouteur, la vidéo sur haut-parleur ; la bascule reste manuelle.
+  useEffect(() => {
+    const s = speaker;
+    if (!active || !s) return;
+    const video = kind === 'video';
+    s.start(video);
+    speakerRef.current = video;
+    setSpeakerOn(video);
+    return () => s.stop();
+  }, [active, kind]);
+  const toggleSpeaker = useCallback(() => {
+    const next = !speakerRef.current;
+    speakerRef.current = next;
+    speaker?.setSpeaker(next);
+    setSpeakerOn(next);
+  }, []);
+
   const toggleMic = useCallback(() => {
     const tracks = localRef.current?.getAudioTracks() ?? [];
     const next = !(tracks[0]?.enabled ?? true);
@@ -223,5 +241,5 @@ export function useRtcCall(call: Call | undefined, meId: string | undefined) {
     }
   }, []);
 
-  return { local, remote, phase, micOn, camOn, error, seconds, toggleMic, toggleCam, flip };
+  return { local, remote, phase, micOn, camOn, error, seconds, toggleMic, toggleCam, flip, speakerOn, toggleSpeaker, canSpeaker: !!speaker };
 }

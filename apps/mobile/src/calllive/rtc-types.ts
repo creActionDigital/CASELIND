@@ -34,6 +34,7 @@ export interface PeerLike {
   setRemoteDescription(d: SdpLike): Promise<void>;
   addIceCandidate(c: CandidateLike): Promise<void>;
   addTrack(t: TrackLike, s: StreamLike): unknown;
+  addTransceiver(kind: 'audio' | 'video', init?: { direction: 'recvonly' | 'sendonly' | 'sendrecv' }): unknown;
   getSenders(): { track: TrackLike | null; replaceTrack(t: TrackLike | null): Promise<void> }[];
   close(): void;
   onicecandidate: ((e: { candidate: CandidateLike | null }) => void) | null;

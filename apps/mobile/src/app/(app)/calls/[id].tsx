@@ -96,6 +96,7 @@ export default function CallScreen() {
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.lg, paddingBottom: insets.bottom + spacing.xl, paddingTop: spacing.md }}>
           <RoundButton icon={media.micOn ? 'mic' : 'mic-off'} label={t(media.micOn ? 'calls.mute' : 'calls.unmute')} off={!media.micOn} onPress={media.toggleMic} />
           {video ? <RoundButton icon={media.camOn ? 'videocam' : 'videocam-off'} label={t(media.camOn ? 'calls.cameraOff' : 'calls.cameraOn')} off={!media.camOn} onPress={media.toggleCam} /> : null}
+          {media.canSpeaker ? <RoundButton icon={media.speakerOn ? 'volume-high' : 'volume-low'} label={t(media.speakerOn ? 'calls.speakerOff' : 'calls.speakerOn')} off={media.speakerOn} onPress={media.toggleSpeaker} /> : null}
           {video ? <RoundButton icon="camera-reverse" label={t('calls.flip')} onPress={() => void media.flip()} /> : null}
           <RoundButton icon="call" label={t('calls.hangup')} danger onPress={() => act.mutate('end')} />
         </View>
