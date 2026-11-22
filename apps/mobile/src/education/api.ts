@@ -61,3 +61,6 @@ export const saveExam = (id: string, examMinutes: number | null) => api.request(
 export const startExam = (id: string) => api.request(`/courses/${id}/exam/sessions`, { method: 'POST', schema: examSessionSchema });
 export const submitExam = (id: string, sid: string, answers: number[]) => api.request(`/courses/${id}/exam/sessions/${sid}/answers`, { method: 'POST', body: { answers }, schema: examResultSchema });
 export const fetchExamHistory = (id: string) => api.request(`/courses/${id}/exam/attempts`, { schema: examHistorySchema });
+
+export const setLessonFiles = (id: string, lessonId: string, assetIds: string[]) =>
+  api.request(`/courses/${id}/lessons/${lessonId}/files`, { method: 'PUT', body: { assetIds }, schema: courseDetailSchema });

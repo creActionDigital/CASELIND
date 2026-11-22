@@ -118,5 +118,5 @@ export default function OrgScholarships() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   form: { padding: spacing.lg, gap: spacing.sm },
-  pad: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  pad: {},
 });

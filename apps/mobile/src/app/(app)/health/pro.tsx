@@ -78,7 +78,9 @@ export default function ProSpace() {
 
         {profile ? (
           <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Badge tone="neutral" label={t(`health.pro.status.${profile.status}`)} />
+            <View style={{ alignSelf: 'flex-start' }}>
+              <Badge tone="neutral" label={t(`health.pro.status.${profile.status}`)} />
+            </View>
             <Text variant="bodyStrong">
               {t(proKindKey(profile.kind))} · {profile.city}
             </Text>
@@ -116,7 +118,9 @@ export default function ProSpace() {
                 <Text variant="small" muted>
                   {new Date(a.startsAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}
                 </Text>
-                <Badge tone="neutral" label={t(`health.appt.${a.status}`)} />
+                <View style={{ alignSelf: 'flex-start' }}>
+                  <Badge tone="neutral" label={t(`health.appt.${a.status}`)} />
+                </View>
                 {a.reason ? <Text variant="small">{a.reason}</Text> : null}
                 {appointmentActions('professional', a.status).map((action) => (
                   <Button key={action} variant={action === 'decline' || action === 'cancel' ? 'ghost' : 'primary'} label={t(`health.appt.${action}`)} loading={act.isPending && act.variables?.id === a.id && act.variables.action === action} onPress={() => act.mutate({ id: a.id, action })} />

@@ -28,3 +28,17 @@ export async function getDevicePosition(): Promise<LocationOutcome> {
     return { ok: false, reason: 'unavailable' };
   }
 }
+
+/** La permission est-elle déjà accordée ? (sans jamais la demander : sert à centrer d'emblée la carte sur l'utilisateur). */
+export async function isLocationGranted(): Promise<boolean> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof navigator === 'undefined' || !navigator.permissions) return false;
+      return (await navigator.permissions.query({ name: 'geolocation' as PermissionName })).state === 'granted';
+    }
+    const Location = await import('expo-location');
+    return (await Location.getForegroundPermissionsAsync()).status === 'granted';
+  } catch {
+    return false;
+  }
+}

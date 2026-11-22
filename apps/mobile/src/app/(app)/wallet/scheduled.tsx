@@ -1,3 +1,5 @@
+import { PersonField } from '../../../components/PersonField';
+import type { Person } from '../../../people/logic';
 import { SCHEDULED_NOTE_MAX, type ScheduledFrequency, type ScheduledPayment } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
@@ -23,6 +25,7 @@ export default function WalletScheduled() {
   const { colors } = useTheme();
   const qc = useQueryClient();
   const [handle, setHandle] = useState('');
+  const [person, setPerson] = useState<Person | null>(null);
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<string>('USD');
   const [note, setNote] = useState('');
@@ -110,7 +113,7 @@ export default function WalletScheduled() {
           <Text variant="bodyStrong" accessibilityRole="header">
             {t('wf.sch.new')}
           </Text>
-          <TextField label={t('wf.sch.recipient')} value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} />
+          <PersonField label={t('wf.sch.recipient')} value={clean ? { handle: clean, displayName: person?.displayName ?? clean, avatarUrl: person?.avatarUrl } : null} onChange={(x) => { setPerson(x); setHandle(x?.handle ?? ''); }} />
           <Chips options={WALLET_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency as 'USD' | 'CDF'} onChange={setCurrency} scroll={false} />
           <TextField label={t('wf.amount')} value={amount} onChangeText={setAmount} maxLength={12} keyboardType="decimal-pad" placeholder="0,00" error={amount && minor === null ? t('wf.req.err.amount') : null} />
           <TextField label={t('wf.note')} value={note} onChangeText={setNote} maxLength={SCHEDULED_NOTE_MAX} />

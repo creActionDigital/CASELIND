@@ -85,3 +85,13 @@ describe('montants de test', () => {
     expect(parseBoostDays('x')).toBeNull();
   });
 });
+
+import { completeHashtag, typingHashtag } from './logic';
+describe('hashtag en cours de frappe', () => {
+  it('détecte et complète', () => {
+    expect(typingHashtag('salut #ma')).toBe('ma');
+    expect(typingHashtag('salut ma')).toBeNull();
+    expect(typingHashtag('mail a#b')).toBeNull();
+    expect(completeHashtag('salut #ma', '#marché')).toBe('salut #marché ');
+  });
+});

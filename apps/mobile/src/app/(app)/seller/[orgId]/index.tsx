@@ -17,6 +17,7 @@ import { useTheme } from '../../../../theme/use-theme';
 import { canManageJobs } from '../../../../jobs/logic';
 import { canViewFinance } from '../../../../wallet/org-access';
 import { ErrorState, Text } from '../../../../ui';
+import { ServiceGrid } from '../../../../ui/premium';
 
 type Icon = ComponentProps<typeof Ionicons>['name'];
 
@@ -58,6 +59,7 @@ export default function SellerDashboard() {
     { icon: 'pricetags-outline', label: 'seller.products', path: '/products', show: can(role, 'catalog.manage') },
     { icon: 'layers-outline', label: 'seller.stock', path: '/stock', show: canReadCatalog(role) },
     { icon: 'ticket-outline', label: 'seller.coupons', path: '/coupons', show: can(role, 'orders.manage') },
+    { icon: 'navigate-outline', label: 'odel.title', path: '/deliveries', show: can(role, 'orders.view') },
     { icon: 'bicycle-outline', label: 'delivery.zones.title', path: '/zones', show: can(role, 'orders.manage') },
     { icon: 'stats-chart-outline', label: 'sales.title', path: '/sales', show: can(role, 'orders.view') },
     { icon: 'document-text-outline', label: 'docs.title', path: '/documents', show: can(role, 'orders.view') },
@@ -89,15 +91,7 @@ export default function SellerDashboard() {
     { icon: 'people-outline', label: 'mc.team.title', path: '/team', show: canViewTeam(role) },
   ];
   const { core, others } = splitBySector(current.org.kind, shortcuts.filter((s) => s.show));
-  const renderCard = (s: (typeof shortcuts)[number]) => (
-    <Card key={s.path} label={t(s.label)} onPress={() => base(s.path)}>
-      <View style={styles.line}>
-        <Ionicons name={s.icon} size={24} color={colors.primary} />
-        <Text style={{ flex: 1 }}>{t(s.label)}</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      </View>
-    </Card>
-  );
+  const renderGrid = (list: typeof shortcuts) => <ServiceGrid items={list.map((s) => ({ id: s.path, icon: s.icon, label: t(s.label), onPress: () => base(s.path) }))} />;
 
   return (
     <>
@@ -149,9 +143,9 @@ export default function SellerDashboard() {
           {can(role, 'orders.view') ? <SalesGlance orgId={orgId} /> : null}
           <SectionTitle>{t('seller.shortcuts')}</SectionTitle>
           {core.length > 0 ? <SectionTitle>{t('mc.sector.title', { kind: t(`seller.kind.${current.org.kind}` as MessageKey) })}</SectionTitle> : null}
-          {core.map(renderCard)}
+          {core.length > 0 ? renderGrid(core) : null}
           {core.length > 0 && others.length > 0 ? <SectionTitle>{t('mc.sector.others')}</SectionTitle> : null}
-          {others.map(renderCard)}
+          {others.length > 0 ? renderGrid(others) : null}
           {!shortcuts.some((s) => s.show) ? <Text muted>{t('seller.noAccess')}</Text> : null}
         </View>
       </ScrollView>

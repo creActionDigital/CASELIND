@@ -42,3 +42,29 @@ export function placeHref(p: { slug: string; lat?: number; lng?: number; label?:
   if (p.label) params.label = p.label;
   return { pathname: '/place/[slug]', params };
 }
+
+type PinIcon = keyof typeof import('@expo/vector-icons').Ionicons.glyphMap;
+
+/** Icône et couleur de repère par catégorie (blanc sur ces couleurs : contraste ≥ 4,5:1). */
+export const KIND_STYLE: Record<OrgKind, { icon: PinIcon; color: string }> = {
+  shop: { icon: 'bag-handle', color: '#0F70B7' },
+  restaurant: { icon: 'restaurant', color: '#C2410C' },
+  fuel_station: { icon: 'speedometer', color: '#B45309' },
+  pharmacy: { icon: 'medkit', color: '#15803D' },
+  hospital: { icon: 'medical', color: '#B91C1C' },
+  hotel: { icon: 'bed', color: '#6D28D9' },
+  school: { icon: 'school', color: '#A16207' },
+  bank: { icon: 'card', color: '#0E7490' },
+  services: { icon: 'construct', color: '#475569' },
+  warehouse: { icon: 'cube', color: '#475569' },
+  other: { icon: 'location', color: '#475569' },
+};
+
+/** Pastilles de la carte, dans l'ordre demandé (« Santé » = hospital). */
+export const MAP_CATEGORIES = ['shop', 'restaurant', 'fuel_station', 'pharmacy', 'hospital', 'hotel', 'school', 'bank', 'services'] as const satisfies readonly OrgKind[];
+
+/** Adresse de /rides avec la destination préremplie (lue par l'écran de commande de course). */
+export const rideToHref = (p: { lat: number; lng: number; name: string }): { pathname: '/rides'; params: Record<string, string> } => ({
+  pathname: '/rides',
+  params: { destLat: String(p.lat), destLng: String(p.lng), destLabel: p.name },
+});

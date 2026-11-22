@@ -121,8 +121,11 @@ export default function SellerLocation() {
         <Text variant="small" muted style={{ marginBottom: spacing.lg }}>
           {t('places.pickHint')}
         </Text>
-        <TextField label={t('seller.location.lat')} value={lat} onChangeText={setLat} keyboardType="numbers-and-punctuation" autoCapitalize="none" error={submitted && latN === null ? t('seller.location.invalid') : null} />
-        <TextField label={t('seller.location.lng')} value={lng} onChangeText={setLng} keyboardType="numbers-and-punctuation" autoCapitalize="none" error={submitted && lngN === null ? t('seller.location.invalid') : null} />
+        {submitted && !valid ? (
+          <Text color={colors.danger} accessibilityLiveRegion="polite" style={{ marginBottom: spacing.md }}>
+            {t('seller.location.invalid')}
+          </Text>
+        ) : null}
         <TextField label={t('seller.location.label')} hint={t('seller.location.labelHint')} value={label} onChangeText={setLabel} maxLength={120} />
         {info ? (
           <Text color={info.tone === 'ok' ? colors.success : colors.danger} accessibilityLiveRegion="polite" style={{ marginBottom: spacing.md }}>

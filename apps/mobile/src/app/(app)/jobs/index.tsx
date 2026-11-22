@@ -92,6 +92,6 @@ const styles = StyleSheet.create({
   header: { paddingTop: spacing.sm },
   pad: { paddingHorizontal: spacing.lg },
   actions: { flexDirection: 'row' },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, gap: spacing.xs },
+  card: { gap: spacing.xs },
   badges: { flexDirection: 'row', gap: spacing.xs },
 });

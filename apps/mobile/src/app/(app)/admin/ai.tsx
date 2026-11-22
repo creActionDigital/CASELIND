@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { View } from 'react-native';
 import { cck, fetchAiModels, setAiModel } from '../../../admin/console-api';
 import { Denied, adminErrorMessage, adminStyles, isDenied, useHasRole } from '../../../admin/kit';
-import { useI18n } from '../../../i18n';
+import { useI18n, type MessageKey } from '../../../i18n';
 import { alertConfirm } from '../../../lib/confirm';
 import { Card, Loading } from '../../../seller/ui';
 import { Badge, Button, EmptyState, ErrorState, Screen, Text } from '../../../ui';
@@ -30,7 +30,7 @@ export default function AiModels() {
           <Card key={m.id} style={adminStyles.cardFlat}>
             <Text variant="bodyStrong">{m.label}</Text>
             <Text variant="small" muted>{m.provider} · {m.model}</Text>
-            <Text variant="small" muted>{t('adm.ai.trains', { v: String(m.trainsOnData) })}</Text>
+            <Text variant="small" muted>{t('adm.ai.trains', { v: t(`adm.ai.trains.${String(m.trainsOnData)}` as MessageKey) })}</Text>
             <View style={adminStyles.badges}>
               <Badge tone={m.enabled ? 'primary' : 'neutral'} label={t(m.enabled ? 'adm.flags.on' : 'adm.flags.off')} />
               {m.free ? <Badge tone="neutral" label={t('adm.ai.free')} /> : null}

@@ -80,8 +80,8 @@ export default function SellerExpenses() {
           {canWrite ? (
             <>
               <SectionTitle>{t('biz.expenses.new')}</SectionTitle>
-              <Chips options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: catLabel(c) }))} value={form.category} onChange={(category) => set({ category })} />
-              <Chips options={SELLER_CURRENCIES.map((c) => ({ value: c, label: c }))} value={form.currency} onChange={(currency) => set({ currency })} scroll={false} />
+              <Chips flush options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: catLabel(c) }))} value={form.category} onChange={(category) => set({ category })} />
+              <Chips flush options={SELLER_CURRENCIES.map((c) => ({ value: c, label: c }))} value={form.currency} onChange={(currency) => set({ currency })} scroll={false} />
               <TextField label={t('biz.expenses.amount', { currency: form.currency })} value={form.amount} onChangeText={(v) => set({ amount: v })} keyboardType="decimal-pad" />
               <TextField label={t('biz.expenses.date')} value={form.spentOn} onChangeText={(v) => set({ spentOn: v })} maxLength={10} autoCapitalize="none" />
               <TextField label={t('biz.expenses.note')} value={form.note} onChangeText={(v) => set({ note: v })} maxLength={200} />
@@ -93,7 +93,7 @@ export default function SellerExpenses() {
           )}
 
           <SectionTitle>{t('biz.expenses.title')}</SectionTitle>
-          <Chips options={PERIOD_PRESETS.map((p) => ({ value: p, label: t(`biz.period.${p}` as MessageKey) }))} value={preset} onChange={setPreset} />
+          <Chips flush options={PERIOD_PRESETS.map((p) => ({ value: p, label: t(`biz.period.${p}` as MessageKey) }))} value={preset} onChange={setPreset} />
           {!canWrite && info ? <Text color={colors.danger}>{info}</Text> : null}
           {list.isPending ? <Loading /> : null}
           {list.isError ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : null}

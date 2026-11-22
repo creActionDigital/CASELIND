@@ -33,7 +33,7 @@ export default function MyWork() {
       {title}
       <Screen edges={['bottom']}>
         <View style={{ gap: spacing.md }}>
-          {active.length > 1 ? <Chips options={active.map((m) => ({ value: m.org.id, label: m.org.name }))} value={orgId} onChange={setPicked} /> : null}
+          {active.length > 1 ? <Chips flush options={active.map((m) => ({ value: m.org.id, label: m.org.name }))} value={orgId} onChange={setPicked} /> : null}
           <WorkOrg key={orgId} orgId={orgId} />
         </View>
       </Screen>
@@ -89,7 +89,7 @@ function WorkOrg({ orgId }: { orgId: string }) {
           ? t('work.balanceNoQuota', { year: b.year, used: b.annualUsedDays, pending: b.annualPendingDays })
           : t('work.balance', { year: b.year, used: b.annualUsedDays, pending: b.annualPendingDays, remaining: b.annualRemainingDays ?? 0, quota: b.annualQuotaDays })}
       </Text>
-      <Chips options={KINDS.map((k) => ({ value: k, label: t(`hr.leave.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} />
+      <Chips flush options={KINDS.map((k) => ({ value: k, label: t(`hr.leave.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} />
       <TextField label={t('hr.f.startedOn')} value={startsOn} onChangeText={setStartsOn} autoCapitalize="none" />
       <TextField label={t('work.fieldEnd')} value={endsOn} onChangeText={setEndsOn} autoCapitalize="none" />
       <TextField label={t('work.fieldReason')} value={reason} onChangeText={setReason} multiline maxLength={300} />

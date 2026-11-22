@@ -1,6 +1,6 @@
 /**
  * Identité visuelle CASELIND : langage inspiré des principes Apple (HIG) — base neutre, couleurs du logo officiel
- * (bleu #0F70B7 principal, orange #ED6B1B secondaire), typographie Poppins, surfaces calmes et séparateurs fins.
+ * (bleu #0F70B7 principal, orange #ED6B1B secondaire), typographie Mulish (police de la maquette du propriétaire), surfaces calmes et séparateurs fins.
  * Le rouge est réservé aux pastilles et aux alertes. Contrastes vérifiés AA (texte ≥ 4.5:1, interface ≥ 3:1).
  */
 export interface Palette {
@@ -13,6 +13,10 @@ export interface Palette {
   primary: string;
   onPrimary: string;
   primarySoft: string;
+  /** Actions principales (boutons, barres d'action, boutons flottants) : orange du logo ; le bleu reste à la navigation et à l'information. */
+  action: string;
+  onAction: string;
+  actionSoft: string;
   accent: string;
   onAccent: string;
   danger: string;
@@ -33,6 +37,9 @@ export const light: Palette = {
   primary: '#0F70B7', // bleu du logo : 5.2:1 avec blanc, 4.7:1 sur background
   onPrimary: '#FFFFFF',
   primarySoft: '#E3EFF8',
+  action: '#ED6B1B', // orange du logo ; libellé blanc en gros texte gras (≥ 19 px, contraste 3,1:1 suffisant)
+  onAction: '#FFFFFF',
+  actionSoft: '#FDEBDD',
   accent: '#D70015', // pastilles de notification : 5.9:1 avec blanc
   onAccent: '#FFFFFF',
   danger: '#D70015',
@@ -53,6 +60,9 @@ export const dark: Palette = {
   primary: '#4DA3E8', // bleu du logo éclairci : 7.7:1 sur background
   onPrimary: '#04121F', // 7.4:1 sur primary
   primarySoft: '#0E2A40',
+  action: '#ED6B1B',
+  onAction: '#FFFFFF',
+  actionSoft: '#3A2010',
   accent: '#FF453A',
   onAccent: '#1A0000', // 6.0:1
   danger: '#FF6961', // 7.4:1 sur background
@@ -79,12 +89,13 @@ export const brandAccent = '#ED6B1B';
 /** Surfaces sombres « vitrées » posées sur une photo ou une vidéo (live, visionneuses). */
 export const glass = { dark: 'rgba(17,17,24,0.55)', light: 'rgba(255,255,255,0.18)', border: 'rgba(255,255,255,0.22)' } as const;
 
-/** Police de marque (Poppins, chargée au démarrage) ; un poids = une famille sous React Native. */
+/** Police de marque : Mulish, celle de la maquette du propriétaire (chargée au démarrage) ; un poids = une famille sous React Native. */
 export const fonts = {
-  regular: 'Poppins_400Regular',
-  medium: 'Poppins_500Medium',
-  semibold: 'Poppins_600SemiBold',
-  bold: 'Poppins_700Bold',
+  regular: 'Mulish_400Regular',
+  medium: 'Mulish_500Medium',
+  semibold: 'Mulish_600SemiBold',
+  bold: 'Mulish_700Bold',
+  extrabold: 'Mulish_800ExtraBold',
 } as const;
 
 /** Texte et icônes posés sur un média ou sur l'overlay (toujours clair, quel que soit le thème). */
@@ -100,7 +111,7 @@ export const TOUCH = 44;
 export const motion = { fast: 150, base: 250 } as const;
 
 export const typography = {
-  // Poppins (géométrique, chargée au démarrage) ; le système prend le relais tant qu'elle n'est pas prête.
+  // Mulish (chargée au démarrage) ; le système prend le relais tant qu'elle n'est pas prête.
   family: fonts.regular as string | undefined,
   display: { fontFamily: fonts.bold, fontSize: 32, lineHeight: 40, fontWeight: '700' as const, letterSpacing: -0.6 },
   title: { fontFamily: fonts.bold, fontSize: 26, lineHeight: 33, fontWeight: '700' as const, letterSpacing: -0.4 },

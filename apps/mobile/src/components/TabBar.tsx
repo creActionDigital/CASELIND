@@ -4,8 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState } from 'react';
-import { CreateSheet } from './CreateSheet';
 import { useI18n, type MessageKey } from '../i18n';
 import { brandGradient, shadow, spacing } from '../theme/tokens';
 
@@ -24,7 +22,6 @@ const TABS: { name: string; label: MessageKey; icon: Icon; iconOn: Icon }[] = [
 export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
-  const [creating, setCreating] = useState(false);
   const activeName = state.routes[state.index]?.name;
 
   return (
@@ -41,9 +38,10 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
             return (
               <View key={tab.name} style={styles.centerCell}>
                 <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('create.title')}
-                  onPress={() => setCreating(true)}
+                  accessibilityRole="tab"
+                  accessibilityLabel={t(tab.label)}
+                  accessibilityState={{ selected: focused }}
+                  onPress={go}
                   style={({ pressed }) => [styles.centerBtn, shadow.float, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}
                 >
                   <LinearGradient colors={brandGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.centerFill}>
@@ -69,7 +67,6 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
           );
         })}
       </View>
-      <CreateSheet visible={creating} onClose={() => setCreating(false)} />
     </View>
   );
 }

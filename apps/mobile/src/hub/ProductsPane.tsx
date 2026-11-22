@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-
 import { useI18n } from '../i18n';
 import { fetchProducts } from '../shop/api';
 import { formatMoney } from '../shop/format';
-import { brandColor, glass, onMedia, radius, TAB_BAR_SPACE, TOUCH } from '../theme/tokens';
+import { brandAccent, glass, onMedia, radius, TAB_BAR_SPACE, TOUCH } from '../theme/tokens';
 import { AuthImage, EmptyState, ErrorState, Text } from '../ui';
 
 /** Vitrine sociale : un produit par page plein écran, bouton « Acheter » vers la fiche. */
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     marginTop: 4,
     borderRadius: radius.pill,
-    backgroundColor: brandColor,
+    backgroundColor: brandAccent,
   },
   out: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: glass.dark },
 });

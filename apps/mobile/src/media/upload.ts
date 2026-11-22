@@ -2,6 +2,7 @@ import { createUploadResponseSchema, mediaMimeSchema, type MediaMime } from '@ca
 import { api } from '../auth/auth-context';
 import { ApiRequestError } from '../lib/api';
 import { absoluteUrl } from '../lib/config';
+import { voiceMime } from '../messaging/voice-logic';
 
 const IMAGE_MIMES: MediaMime[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
@@ -16,12 +17,18 @@ export function imageMime(declared: string | null | undefined, uri: string): Med
   return 'image/jpeg';
 }
 
-export type UploadPurpose = 'message' | 'story' | 'product' | 'kyc_document' | 'listing' | 'avatar' | 'org_logo' | 'org_banner' | 'org_gallery' | 'delivery_proof' | 'health_result' | 'digital_file';
+export type UploadPurpose = 'message' | 'story' | 'product' | 'kyc_document' | 'listing' | 'avatar' | 'org_logo' | 'org_banner' | 'org_gallery' | 'delivery_proof' | 'health_result' | 'digital_file' | 'cv' | 'lesson';
 
 /** Annonce (POST /media/uploads) puis envoie les octets (PUT avec X-Upload-Token). Renvoie l'id de l'asset. */
 export async function uploadImage(uri: string, mime: MediaMime, purpose: UploadPurpose): Promise<string> {
   const blob = await (await fetch(uri)).blob();
   return uploadBody(blob, blob.size, mime, purpose);
+}
+
+/** Fichier choisi par l'utilisateur (CV, pièce de leçon) : même envoi, avec son nom d'origine. */
+export async function uploadFile(uri: string, mime: MediaMime, purpose: UploadPurpose, fileName: string): Promise<string> {
+  const blob = await (await fetch(uri)).blob();
+  return uploadBody(blob, blob.size, mime, purpose, fileName);
 }
 
 /** Document de messagerie : même envoi, avec le nom d'origine (nettoyé côté serveur). */
@@ -30,13 +37,19 @@ export async function uploadDocument(uri: string, mime: MediaMime, fileName: str
   return uploadBody(blob, blob.size, mime, 'message', fileName);
 }
 
+/** Vocal de messagerie : le type vient du fichier enregistré (webm sur le web, m4a sur mobile), la durée est annoncée à l'API. */
+export async function uploadVoice(uri: string, durationSec: number): Promise<string> {
+  const blob = await (await fetch(uri)).blob();
+  return uploadBody(blob, blob.size, voiceMime(blob.type), 'message', undefined, durationSec);
+}
+
 /** Même envoi pour des octets déjà en mémoire (ex. signature PNG tracée à l'écran) : le Uint8Array part tel quel comme corps. */
 export const uploadBytes = (bytes: Uint8Array, mime: MediaMime, purpose: UploadPurpose): Promise<string> => uploadBody(bytes, bytes.byteLength, mime, purpose);
 
-async function uploadBody(body: Blob | Uint8Array, sizeBytes: number, mime: MediaMime, purpose: UploadPurpose, fileName?: string): Promise<string> {
+async function uploadBody(body: Blob | Uint8Array, sizeBytes: number, mime: MediaMime, purpose: UploadPurpose, fileName?: string, durationSec?: number): Promise<string> {
   const announce = await api.request('/media/uploads', {
     method: 'POST',
-    body: { purpose, mime, sizeBytes, fileName },
+    body: { purpose, mime, sizeBytes, fileName, durationSec },
     schema: createUploadResponseSchema,
   });
 

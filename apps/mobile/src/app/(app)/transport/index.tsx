@@ -5,10 +5,10 @@ import { StyleSheet, View } from 'react-native';
 import { courierKeys, fetchMyCourierRequests } from '../../../courier/api';
 import { useI18n } from '../../../i18n';
 import { TRANSPORT_SERVICES, TRANSPORT_SPACES } from '../../../mobility/services';
-import { brandAccent, radius, spacing, TOUCH } from '../../../theme/tokens';
+import { radius, spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Screen, Text } from '../../../ui';
-import { FadeInView, PressableScale, SectionHeader, ServiceTile } from '../../../ui/premium';
+import { FadeInView, PressableScale, SectionHeader, ServiceGrid } from '../../../ui/premium';
 
 const RIDES = TRANSPORT_SERVICES.slice(0, 4);
 const DELIVERY = TRANSPORT_SERVICES.slice(4);
@@ -33,16 +33,12 @@ export default function TransportHome() {
         </PressableScale>
       </FadeInView>
       <SectionHeader title={t('mb.transport.suggestions')} />
-      <FadeInView index={1} style={styles.grid}>
-        {RIDES.map((s) => (
-          <ServiceTile key={s.id} icon={s.icon} label={t(s.key)} onPress={() => router.push(s.href as never)} />
-        ))}
+      <FadeInView index={1}>
+        <ServiceGrid items={RIDES.map((s) => ({ id: s.id, icon: s.icon, label: t(s.key), onPress: () => router.push(s.href as never) }))} />
       </FadeInView>
       <SectionHeader title={t('mb.transport.deliveryTitle')} />
-      <FadeInView index={2} style={styles.grid}>
-        {DELIVERY.map((s) => (
-          <ServiceTile key={s.id} icon={s.icon} label={t(s.key)} tint={brandAccent} badge={s.id === 'parcel' ? running : undefined} onPress={() => router.push(s.href as never)} />
-        ))}
+      <FadeInView index={2}>
+        <ServiceGrid items={DELIVERY.map((s) => ({ id: s.id, icon: s.icon, label: t(s.key), accent: true, badge: s.id === 'parcel' ? running : undefined, onPress: () => router.push(s.href as never) }))} />
       </FadeInView>
       <SectionHeader title={t('mb.transport.spaces')} />
       {TRANSPORT_SPACES.map((s, i) => (
@@ -60,6 +56,5 @@ export default function TransportHome() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   where: { minHeight: TOUCH + 8, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg },
-  grid: { flexDirection: 'row', gap: spacing.sm },
   row: { minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
 });

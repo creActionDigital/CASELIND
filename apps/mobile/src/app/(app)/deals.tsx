@@ -20,6 +20,7 @@ export default function Deals() {
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
   const header = (
+    <View style={styles.headerGap}>
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <Text variant="bodyStrong" accessibilityRole="header">
         {t('mc.deals.couponTitle')}
@@ -28,6 +29,7 @@ export default function Deals() {
         {t('mc.deals.couponBody')}
       </Text>
       <Button variant="secondary" label={t('mc.deals.cart')} onPress={() => router.push('/cart')} />
+    </View>
       <Text variant="heading" accessibilityRole="header">
         {t('mc.deals.flash')}
       </Text>
@@ -43,5 +45,6 @@ export default function Deals() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  headerGap: { gap: spacing.lg },
   card: { borderRadius: 20, padding: spacing.lg, gap: spacing.sm },
 });

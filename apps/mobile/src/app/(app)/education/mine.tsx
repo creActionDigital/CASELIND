@@ -82,5 +82,5 @@ export default function MyEducation() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   tabs: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, gap: spacing.xs },
+  card: { gap: spacing.xs },
 });

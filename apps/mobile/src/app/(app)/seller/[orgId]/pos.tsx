@@ -89,7 +89,7 @@ export default function Pos() {
               <Text variant="small" muted>{t('pos.todayNone')}</Text>
             )}
             <ShiftPanel orgId={orgId} />
-            <Chips options={METHODS.map((m) => ({ value: m, label: t(`pos.method.${m}` as const) }))} value={method} onChange={setMethod} />
+            <Chips flush options={METHODS.map((m) => ({ value: m, label: t(`pos.method.${m}` as const) }))} value={method} onChange={setMethod} />
             <Text variant="caption" muted>{t('pos.methodHint')}</Text>
             <Text variant="bodyStrong" accessibilityLiveRegion="polite">{t('pos.cart', { n: count, total: formatMinor(total, currency, locale) })}</Text>
             {mixed ? <Text variant="small" color={colors.danger}>{t('pos.mixed')}</Text> : null}

@@ -94,5 +94,5 @@ export default function MyFreelance() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   tabs: { paddingTop: spacing.sm },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, gap: spacing.xs },
+  card: { gap: spacing.xs },
 });

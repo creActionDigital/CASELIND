@@ -18,7 +18,7 @@ import { MessageSearchPanel } from '../../../messaging/MessageSearchPanel';
 import { qk } from '../../../messaging/keys';
 import { NewConversationSheet } from '../../../messaging/NewConversationSheet';
 import { PushCard } from '../../../notifications/PushCard';
-import { brandColor, radius, shadow, spacing, TAB_BAR_SPACE, TOUCH, typography } from '../../../theme/tokens';
+import { brandAccent, brandColor, radius, shadow, spacing, TAB_BAR_SPACE, TOUCH, typography } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Button, EmptyState, ErrorState, IconButton, Text } from '../../../ui';
 import { SkeletonList } from '../../../ui/premium';
@@ -258,7 +258,7 @@ export default function Messages() {
         accessibilityLabel={t('chat.new.title')}
         disabled={denied}
         onPress={() => setComposing(true)}
-        style={({ pressed }) => [styles.fab, shadow.float, { backgroundColor: brandColor, opacity: denied ? 0.5 : pressed ? 0.85 : 1 }]}
+        style={({ pressed }) => [styles.fab, shadow.float, { backgroundColor: brandAccent, opacity: denied ? 0.5 : pressed ? 0.85 : 1 }]}
       >
         <Ionicons name="add" size={30} color="#FFFFFF" />
       </Pressable>

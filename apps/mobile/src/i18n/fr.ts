@@ -4,6 +4,7 @@ import { hrFr } from '../business/hr/messages';
 import { inventoryFr } from '../business/inventory/messages';
 import { aiFr } from '../ai/messages';
 import { walletUiFr } from '../wallet/messages';
+import { peopleFr } from '../people/messages';
 import { deliveryFr } from '../delivery/messages';
 import { proofFr } from '../delivery/proof-messages';
 import { servicesFr } from '../services/messages';
@@ -39,8 +40,10 @@ import { assistFr } from '../ai/assist-messages';
 import { moduleDFr } from '../messaging/messages-d';
 import { courierFr } from '../courier/messages';
 import { moduleBFr } from '../hub/messages-b';
+import { menuFr } from '../menu/messages';
 import { promotionsFr } from '../promotions/messages';
 import { privacyFr } from '../privacy/messages';
+import { blocksFr } from '../privacy/blocks-messages';
 import { maFr } from '../onboarding/messages-a';
 import { adminOpsFr } from '../admin-ops/messages';
 import { returnsFr } from '../returns/messages';
@@ -501,6 +504,20 @@ export const fr = {
   'chat.attach.position': 'Position',
   'chat.attach.files': 'Document',
   'chat.document': 'Document',
+  "chat.voice": "Message vocal",
+  "chat.voice.mic": "Maintenir pour enregistrer un message vocal",
+  "chat.voice.play": "Écouter le message vocal",
+  "chat.voice.pause": "Mettre en pause",
+  "chat.voice.seek": "Position dans le message vocal",
+  "chat.voice.speed": "Vitesse de lecture {rate}",
+  "chat.voice.error": "Lecture impossible",
+  "chat.voice.slide": "Glissez pour annuler",
+  "chat.voice.cancel": "Annuler l'enregistrement",
+  "chat.voice.send": "Envoyer le message vocal",
+  "chat.voice.recording": "Enregistrement en cours",
+  "chat.voice.denied": "Accès au micro refusé. Autorisez-le dans les réglages pour envoyer des messages vocaux.",
+  "chat.voice.unsupported": "L'enregistrement vocal n'est pas disponible sur ce navigateur.",
+  "chat.voice.failed": "L'enregistrement a échoué. Réessayez.",
   'chat.file.unsupported': "Format non accepté. Envoyez un PDF, Word, Excel ou PowerPoint.",
   'chat.file.openError': "Impossible d'ouvrir ce fichier. Réessayez.",
   'chat.attach.contacts': 'Contacts',
@@ -708,7 +725,7 @@ export const fr = {
   'story.viewer.deleteTitle': 'Supprimer ce statut ?',
   'story.viewer.deleteBody': 'Il disparaîtra pour tout le monde. Cette action est définitive.',
   'story.viewer.emptyTitle': 'Aucun statut à afficher',
-  'story.viewer.emptyBody': 'Cette statut a expiré ou n’est plus disponible.',
+  'story.viewer.emptyBody': 'Ce statut a expiré ou n’est plus disponible.',
   'story.new.title': 'Nouveau statut',
   'story.new.pickImage': 'Choisir une image',
   'story.new.changeImage': 'Changer d’image',
@@ -771,7 +788,7 @@ export const fr = {
   'seller.createShop': 'Créer ma boutique',
   'seller.shortcuts': 'Raccourcis',
   'seller.noAccess': 'Votre rôle ne donne accès à aucun module de vente.',
-  'seller.count.pending': 'Commandes en attente',
+  'seller.count.pending': 'À traiter',
   'seller.count.published': 'Produits publiés',
   'seller.count.outOfStock': 'Ruptures',
   'seller.orders': 'Commandes',
@@ -829,6 +846,7 @@ export const fr = {
   'seller.kind.hotel': 'Hôtel',
   'seller.kind.pharmacy': 'Pharmacie',
   'seller.kind.fuel_station': 'Station-service',
+  'seller.kind.bank': 'Banque / distributeur',
   'seller.kind.school': 'École',
   'seller.kind.hospital': 'Hôpital',
   'seller.kind.services': 'Services',
@@ -1374,8 +1392,10 @@ export const fr = {
   ...moduleDFr,
   ...courierFr,
   ...moduleBFr,
+  ...menuFr,
   ...promotionsFr,
   ...privacyFr,
+  ...blocksFr,
   ...maFr,
   ...adminOpsFr,
   ...returnsFr,
@@ -1396,6 +1416,7 @@ export const fr = {
   ...proofFr,
   ...aiFr,
   ...walletUiFr,
+  ...peopleFr,
   ...mobilityFr,
   ...businessFr,
   ...hrFr,

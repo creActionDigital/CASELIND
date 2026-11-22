@@ -59,5 +59,5 @@ export default function Scholarships() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { padding: spacing.lg },
-  pad: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  pad: {},
 });

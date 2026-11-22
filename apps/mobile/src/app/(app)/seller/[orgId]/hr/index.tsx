@@ -100,7 +100,7 @@ export default function HrHome() {
             <Card key={e.userId}>
               <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
                 <Text variant="bodyStrong" style={{ flex: 1 }}>{e.displayName}</Text>
-                <Badge tone="neutral" label={e.role} />
+                <Badge tone="neutral" label={t(`seller.role.${e.role}` as MessageKey)} />
               </View>
               <Text variant="small" muted>
                 {e.profile ? [e.profile.jobTitle, e.profile.department, t(`hr.type.${e.profile.employmentType}` as MessageKey)].filter(Boolean).join(' · ') : t('hr.emp.noProfile')}

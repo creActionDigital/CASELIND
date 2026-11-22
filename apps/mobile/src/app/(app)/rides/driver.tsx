@@ -291,7 +291,7 @@ function DriverForm({ initial, onDone }: { initial: DriverProfile | null; onDone
       <KycReminder />
 
       <SectionTitle>{t('mobility.driver.vehicleKind')}</SectionTitle>
-      <Chips<DriverVehicleKind>
+      <Chips<DriverVehicleKind> flush
         scroll={false}
         options={[
           { value: 'moto', label: t('mobility.driver.moto') },

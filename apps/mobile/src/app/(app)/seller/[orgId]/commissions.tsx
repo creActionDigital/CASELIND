@@ -50,6 +50,6 @@ export default function SellerCommissions() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  head: { padding: spacing.md, gap: spacing.xs },
-  card: { marginHorizontal: spacing.md, marginBottom: spacing.sm },
+  head: { gap: spacing.xs },
+  card: {},
 });

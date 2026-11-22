@@ -32,7 +32,7 @@ export default function Videos() {
     <Screen>
       <Stack.Screen options={{ title: t('mb.videos.title') }} />
       <View style={styles.row}>
-        <Button label={t('mb.videos.fullscreen')} onPress={() => router.push('/hub' as never)} style={styles.flex} />
+        <Button label={t('mb.videos.fullscreen')} onPress={() => router.push('/hub' as never)} style={[styles.flex, { flex: 0.8 }]} />
         <Button label={t('mb.videos.create')} variant="secondary" onPress={() => router.push('/compose?mode=video' as never)} style={styles.flex} />
       </View>
       <Button label={t('mb.videos.studio')} variant="ghost" onPress={() => router.push('/creator' as never)} />

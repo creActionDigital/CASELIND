@@ -18,6 +18,13 @@ type Params = Record<string, string | number>;
 export function translate(locale: Locale, key: MessageKey, params?: Params): string {
   let text = dictionaries[locale][key] ?? fr[key];
   if (params) {
+    // Pluriel : « mot(s) » / « mot(x) » après {k} devient singulier ou pluriel selon la valeur numérique de k (fr : 0 et 1 au singulier).
+    text = text.replace(/\{(\w+)\}([^{]*)/g, (m, k: string, rest: string) => {
+      const n = Number(params[k]);
+      if (params[k] === undefined || params[k] === '' || !Number.isFinite(n)) return m;
+      const one = locale === 'fr' ? Math.abs(n) < 2 : Math.abs(n) === 1;
+      return `{${k}}${rest.replace(/\((s|x|es)\)/g, (_, suf: string) => (one ? '' : suf))}`;
+    });
     for (const [k, v] of Object.entries(params)) text = text.split(`{${k}}`).join(String(v));
   }
   return text;

@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Text as RNText } from 'react-native';
 import { useI18n } from '../i18n';
+import { fonts } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Text } from '../ui';
 import { splitHashtags } from './logic';
@@ -21,7 +22,7 @@ export function HashtagText({ children, ...rest }: Omit<TextProps, 'children'> &
             accessibilityRole="link"
             accessibilityLabel={t('creator.hashtag.open', { tag: `#${part.tag}` })}
             onPress={() => router.push({ pathname: '/hashtag/[tag]', params: { tag: part.tag! } })}
-            style={{ color: colors.primary, fontWeight: '600' }}
+            style={{ color: colors.primary, fontWeight: '600', fontFamily: fonts.semibold }}
           >
             {part.text}
           </RNText>

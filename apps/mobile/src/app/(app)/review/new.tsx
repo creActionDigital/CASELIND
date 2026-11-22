@@ -7,7 +7,7 @@ import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { safeBack } from '../../../lib/back-target';
 import { errorMessage } from '../../../lib/errors';
-import { createReview, fetchProduct } from '../../../shop/api';
+import { createReview, fetchProduct, updateReview } from '../../../shop/api';
 import { shopKeys } from '../../../shop/hooks';
 import { spacing, TOUCH } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -18,16 +18,16 @@ export default function NewReview() {
   const { t, locale } = useI18n();
   const router = useRouter();
   const qc = useQueryClient();
-  const { productId } = useLocalSearchParams<{ productId: string }>();
+  const { productId, reviewId, r, b } = useLocalSearchParams<{ productId: string; reviewId?: string; r?: string; b?: string }>();
   const id = String(productId);
-  const [rating, setRating] = useState(0);
-  const [body, setBody] = useState('');
+  const [rating, setRating] = useState(Number(r) || 0);
+  const [body, setBody] = useState(b ?? '');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<'sent' | 'already' | null>(null);
 
   const product = useQuery({ queryKey: shopKeys.product(id), queryFn: () => fetchProduct(id) });
   const send = useMutation({
-    mutationFn: () => createReview(id, { rating, ...(body.trim() ? { body: body.trim() } : {}) }),
+    mutationFn: () => reviewId ? updateReview(reviewId, { rating, body: body.trim() || null }) : createReview(id, { rating, ...(body.trim() ? { body: body.trim() } : {}) }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: shopKeys.reviews(id) });
       qc.setQueryData(shopKeys.reviewed(id), true);

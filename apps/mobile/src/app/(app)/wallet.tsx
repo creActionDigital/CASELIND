@@ -15,7 +15,7 @@ import { flattenGroups, groupByDay } from '../../wallet/history';
 import { useKyc, useTransactions, useWallet, useWalletEnabled, walletKeys } from '../../wallet/hooks';
 import { setWalletPrefs, useWalletPrefs } from '../../wallet/prefs';
 import { SandboxBanner, TxRow, TxSheet } from '../../wallet/ui';
-import { ActionCircle, FadeInView, SkeletonList } from '../../ui/premium';
+import { FadeInView, ServiceGrid, SkeletonList } from '../../ui/premium';
 
 /** Wallet sandbox : solde, comptes présentés comme des cartes, actions, historique en défilement infini. */
 export default function Wallet() {
@@ -136,18 +136,20 @@ export default function Wallet() {
             </Text>
           ) : null}
         </View>
-        <View style={[styles.actions, { borderTopColor: colors.border }]}>
-          <Action icon="arrow-up" label={t('wallet.action.send')} onPress={() => router.push('/wallet/send')} />
-          <Action icon="add" label={t('wallet.action.topup')} onPress={() => router.push('/wallet/topup')} />
-          <Action icon="arrow-down" label={t('wallet.action.receive')} onPress={() => router.push('/wallet/receive')} />
-          <Action icon="scan-outline" label={t('wallet.action.scan')} onPress={() => router.push('/scan')} />
-        </View>
         <View style={[styles.actions, { borderTopColor: colors.border }]} accessibilityLabel={t('wf.menu.title')}>
-          <Action icon="cash-outline" label={t('wf.menu.requests')} onPress={() => router.push('/wallet/requests')} />
-          <Action icon="people-outline" label={t('wf.menu.split')} onPress={() => router.push('/wallet/split')} />
-          <Action icon="calendar-outline" label={t('wf.menu.scheduled')} onPress={() => router.push('/wallet/scheduled')} />
-          <Action icon="flag-outline" label={t('wf.menu.savings')} onPress={() => router.push('/wallet/savings')} />
-          <Action icon="warning-outline" label={t('wf.menu.alerts')} onPress={() => router.push('/wallet/alerts')} />
+          <ServiceGrid
+            items={[
+              { id: '/wallet/send', icon: 'arrow-up', label: t('wallet.action.send'), onPress: () => router.push('/wallet/send') },
+              { id: '/wallet/topup', icon: 'add', label: t('wallet.action.topup'), onPress: () => router.push('/wallet/topup') },
+              { id: '/wallet/receive', icon: 'arrow-down', label: t('wallet.action.receive'), onPress: () => router.push('/wallet/receive') },
+              { id: '/scan', icon: 'scan-outline', label: t('wallet.action.scan'), onPress: () => router.push('/scan') },
+              { id: '/wallet/requests', icon: 'cash-outline', label: t('wf.menu.requests'), onPress: () => router.push('/wallet/requests') },
+              { id: '/wallet/split', icon: 'people-outline', label: t('wf.menu.split'), onPress: () => router.push('/wallet/split') },
+              { id: '/wallet/scheduled', icon: 'calendar-outline', label: t('wf.menu.scheduled'), onPress: () => router.push('/wallet/scheduled') },
+              { id: '/wallet/savings', icon: 'flag-outline', label: t('wf.menu.savings'), onPress: () => router.push('/wallet/savings') },
+              { id: '/wallet/alerts', icon: 'warning-outline', label: t('wf.menu.alerts'), onPress: () => router.push('/wallet/alerts') },
+            ]}
+          />
         </View>
       </View>
       </FadeInView>
@@ -249,10 +251,6 @@ export default function Wallet() {
   );
 }
 
-function Action({ icon, label, onPress }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void }) {
-  return <ActionCircle icon={icon} label={label} onPress={onPress} />;
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { gap: spacing.md },
@@ -263,7 +261,7 @@ const styles = StyleSheet.create({
   totalTop: { alignItems: 'center', padding: spacing.lg, gap: spacing.xs },
   balanceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   eye: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
-  actions: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth },
+  actions: { paddingVertical: spacing.lg, paddingHorizontal: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth },
   action: { flex: 1, alignItems: 'center', gap: spacing.xs, minHeight: TOUCH },
   actionIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },

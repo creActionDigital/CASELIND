@@ -8,8 +8,7 @@ import { aiKeys, createAiConversation, fetchAiConversations, fetchAiModels, fetc
 import { effectiveModel, needsDataNotice, titleFrom } from '../../../ai/logic';
 import { useAuth } from '../../../auth/auth-context';
 import { useI18n, type MessageKey } from '../../../i18n';
-import { FadeInView } from '../../../ui/premium/FadeInView';
-import { PressableScale } from '../../../ui/premium/PressableScale';
+import { SectionHeader, ServiceGrid } from '../../../ui/premium';
 import { errorMessage } from '../../../lib/errors';
 import { radius, spacing, TOUCH, typography } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -100,9 +99,7 @@ export default function AiHome() {
             </View>
           </View>
 
-          <Text variant="bodyStrong" accessibilityRole="header">
-            {t('ai.models')}
-          </Text>
+          <SectionHeader title={t('ai.models')} />
           {models.isSuccess && cards.length === 0 ? (
             <View style={[styles.emptyModels, { backgroundColor: colors.surface }]}>
               <Ionicons name="sparkles-outline" size={22} color={colors.textMuted} />
@@ -135,26 +132,11 @@ export default function AiHome() {
             </ScrollView>
           )}
 
-          <Text variant="bodyStrong" accessibilityRole="header">{t('md.ai.assistants')}</Text>
+          <SectionHeader title={t('md.ai.assistants')} />
           <Text variant="small" muted>{t('md.ai.assistantHint')}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modelRow} style={styles.bleed}>
-            {ASSISTANTS.map((a, i) => (
-              <FadeInView key={a.id} index={i}>
-                <PressableScale
-                  accessibilityRole="button"
-                  accessibilityLabel={`${t(`md.ai.a.${a.id}` as MessageKey)}. ${t(`md.ai.a.${a.id}Desc` as MessageKey)}`}
-                  onPress={() => !create.isPending && create.mutate(t(`md.ai.a.${a.id}Q` as MessageKey))}
-                  style={[styles.agent, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                >
-                  <View style={[styles.modelIcon, { backgroundColor: colors.primarySoft }]}>
-                    <Ionicons name={a.icon} size={20} color={colors.primary} />
-                  </View>
-                  <Text style={{ fontWeight: '600' }} numberOfLines={2}>{t(`md.ai.a.${a.id}` as MessageKey)}</Text>
-                  <Text variant="caption" muted numberOfLines={3}>{t(`md.ai.a.${a.id}Desc` as MessageKey)}</Text>
-                </PressableScale>
-              </FadeInView>
-            ))}
-          </ScrollView>
+          <ServiceGrid
+            items={ASSISTANTS.map((a) => ({ id: a.id, icon: a.icon, label: t(`md.ai.a.${a.id}` as MessageKey), onPress: () => !create.isPending && create.mutate(t(`md.ai.a.${a.id}Q` as MessageKey)) }))}
+          />
 
           <View style={[styles.history, { backgroundColor: colors.surface }]}>
             <Text variant="heading">{t('ai.history')}</Text>
@@ -231,9 +213,9 @@ export default function AiHome() {
             accessibilityState={{ disabled: !draft.trim() }}
             disabled={!draft.trim()}
             onPress={submit}
-            style={[styles.sendBtn, { backgroundColor: colors.primary, opacity: draft.trim() ? 1 : 0.4 }]}
+            style={[styles.sendBtn, { backgroundColor: colors.action, opacity: draft.trim() ? 1 : 0.4 }]}
           >
-            <Ionicons name="arrow-up" size={20} color={colors.onPrimary} />
+            <Ionicons name="arrow-up" size={20} color={colors.onAction} />
           </Pressable>
           <View
             accessible
@@ -257,7 +239,6 @@ const styles = StyleSheet.create({
   bleed: { marginHorizontal: -spacing.lg },
   modelRow: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   model: { width: 112, minHeight: 104, borderRadius: radius.xl, borderWidth: 1.5, padding: spacing.md, gap: spacing.sm },
-  agent: { width: 168, minHeight: 148, borderRadius: radius.xl, borderWidth: 1.5, padding: spacing.md, gap: spacing.xs },
   modelIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   emptyModels: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg },
   history: { borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs },

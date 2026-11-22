@@ -11,6 +11,9 @@ import { qk } from '../../../../messaging/keys';
 import { startChatErrorKey } from '../../../../messaging/api';
 import { fetchProfile, fetchStats, fetchUserPosts, openDirect, setFollow } from '../../../../social/api';
 import { sk } from '../../../../social/keys';
+import { alertConfirm } from '../../../../lib/confirm';
+import { setBlocked } from '../../../../privacy/api';
+import { openReport } from '../../../../report/open-report';
 import type { CachedPost } from '../../../../social/logic';
 import { PaySheet, type PayTarget } from '../../../../creator/PaySheet';
 import { PostCard } from '../../../../social/PostCard';
@@ -80,6 +83,22 @@ export default function UserProfile() {
       setNotice(key ? t(key) : errorMessage(e, t, locale));
     },
   });
+
+  const block = useMutation({
+    mutationFn: () => setBlocked(id, true),
+    onSuccess: () => {
+      setNotice(t('blocks.done', { name: profile.data?.displayName ?? '' }));
+      void qc.invalidateQueries({ queryKey: ['blocks'] });
+    },
+    onError: (e) => setNotice(errorMessage(e, t, locale)),
+  });
+  const confirmBlock = () => {
+    const name = profile.data?.displayName ?? '';
+    alertConfirm(t('blocks.confirmTitle', { name }), t('blocks.confirmBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('blocks.block'), style: 'destructive', onPress: () => block.mutate() },
+    ]);
+  };
 
   const title = <Stack.Screen options={{ title: profile.data?.displayName ?? t('profile.social.title') }} />;
 
@@ -163,6 +182,12 @@ export default function UserProfile() {
           </>
         )}
       </View>
+      {mine ? null : (
+        <View style={styles.actions}>
+          <Button variant="ghost" label={t('report.action')} onPress={() => openReport({ targetType: 'user', targetId: id })} style={styles.flex} />
+          <Button variant="ghost" label={t('blocks.block')} loading={block.isPending} onPress={confirmBlock} style={styles.flex} />
+        </View>
+      )}
       <PaySheet target={pay} onClose={() => setPay(null)} />
       <View style={styles.tabs} accessibilityRole="tablist">
         {(['posts', 'media'] as const).map((k) => (

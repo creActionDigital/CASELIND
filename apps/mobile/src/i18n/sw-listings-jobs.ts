@@ -2,7 +2,7 @@ import type { MessageKey } from './fr';
 
 /** Kiswahili : annonces et emplois. À relire par un locuteur natif avant la mise en production. */
 export const swListingsJobs: Partial<Record<MessageKey, string>> = {
-  'listings.title': 'Matangazo',
+  'listings.title': 'Matangazo madogo',
   'listings.search': 'Tafuta matangazo',
   'listings.all': 'Yote',
   'listings.kind.property_rent': 'Za kupangisha',

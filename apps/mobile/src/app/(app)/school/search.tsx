@@ -60,5 +60,5 @@ export default function Schools() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { padding: spacing.lg, gap: spacing.sm },
-  pad: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  pad: {},
 });

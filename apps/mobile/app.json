@@ -45,6 +45,12 @@
           "imageWidth": 220
         }
       ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "CASELIND compare les numéros de votre répertoire à ceux des membres pour vous proposer des personnes à contacter. Les numéros ne sont pas conservés."
+        }
+      ],
       "expo-video",
       [
         "expo-camera",
@@ -52,7 +58,13 @@
           "cameraPermission": "CASELIND utilise la caméra pour scanner des codes QR (paiement, connexion web, profil)."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "CASELIND utilise le micro pour enregistrer vos messages vocaux. L'audio n'est envoyé qu'à vos destinataires."
+        }
+      ]
     ],
     "experiments": {}
   }

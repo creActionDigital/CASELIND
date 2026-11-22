@@ -148,7 +148,7 @@ export default function OrgRentals() {
 
       <SectionTitle>{t('rentals.org.add')}</SectionTitle>
       <TextField label={t('rentals.org.fieldTitle')} value={title} onChangeText={setTitle} maxLength={80} />
-      <Chips<RentalKind> options={KINDS.map((k) => ({ value: k, label: t(`rentals.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} />
+      <Chips<RentalKind> flush options={KINDS.map((k) => ({ value: k, label: t(`rentals.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} />
       <TextField label={t('rentals.org.fieldRate')} value={rate} onChangeText={setRate} keyboardType="decimal-pad" placeholder="50,00" />
       <TextField label={t('rentals.org.fieldDeposit')} value={deposit} onChangeText={setDeposit} keyboardType="decimal-pad" />
       <TextField label={t('rentals.city')} value={city} onChangeText={setCity} maxLength={80} />

@@ -1,3 +1,5 @@
+import { PersonField } from '../../../components/PersonField';
+import type { Person } from '../../../people/logic';
 import type { MoneyRequest } from '@caselind/contracts';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
@@ -30,6 +32,7 @@ export default function WalletRequests() {
   const [side, setSide] = useState<Side>('received');
   const [paying, setPaying] = useState<MoneyRequest | null>(null);
   const [handle, setHandle] = useState(params.to ?? '');
+  const [person, setPerson] = useState<Person | null>(null);
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<string>('USD');
   const [note, setNote] = useState('');
@@ -116,7 +119,7 @@ export default function WalletRequests() {
           <Text variant="bodyStrong" accessibilityRole="header">
             {t('wf.req.new')}
           </Text>
-          <TextField label={t('wf.handle')} value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} />
+          <PersonField label={t('wf.handle')} value={clean ? { handle: clean, displayName: person?.displayName ?? clean, avatarUrl: person?.avatarUrl } : null} onChange={(x) => { setPerson(x); setHandle(x?.handle ?? ''); }} />
           <Chips options={WALLET_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency as 'USD' | 'CDF'} onChange={setCurrency} scroll={false} />
           <TextField label={t('wf.amount')} value={amount} onChangeText={setAmount} maxLength={12} keyboardType="decimal-pad" placeholder="0,00" error={amount && minor === null ? t('wf.req.err.amount') : null} />
           <TextField label={t('wf.note')} value={note} onChangeText={setNote} maxLength={WALLET_NOTE_MAX} />

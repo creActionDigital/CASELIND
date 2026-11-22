@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
 import { PlanPanel } from '../../../premium/PlanPanel';
 import { fetchMyOrgs } from '../../../seller/api';
@@ -35,7 +35,9 @@ export default function ProPlans() {
           <Text variant="small" muted>
             {t('mon.pro.org')}
           </Text>
-          <Chips value={orgId} onChange={setPicked} options={mine.map((m) => ({ value: m.org.id, label: m.org.name }))} />
+          <View style={{ marginHorizontal: -spacing.lg }}>
+            <Chips value={orgId} onChange={setPicked} options={mine.map((m) => ({ value: m.org.id, label: m.org.name }))} />
+          </View>
           <Card>
             <Text>{t('mon.pro.benefit')}</Text>
           </Card>

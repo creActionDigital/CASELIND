@@ -55,7 +55,7 @@ export default function RentalsHome() {
       </Text>
       <Text muted>{t('rentals.intro')}</Text>
       <TextField label={t('rentals.city')} value={city} onChangeText={setCity} maxLength={80} />
-      <Chips<KindFilter> options={KINDS.map((k) => ({ value: k, label: t(`rentals.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} />
+      <View style={{ marginHorizontal: -spacing.lg }}><Chips<KindFilter> options={KINDS.map((k) => ({ value: k, label: t(`rentals.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} /></View>
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <View style={{ flex: 1 }}>
           <TextField label={t('rentals.from')} value={from} onChangeText={setFrom} maxLength={10} placeholder="2026-12-24" keyboardType="numbers-and-punctuation" autoCorrect={false} />

@@ -166,6 +166,9 @@ export const consoleFr = {
   'adm.ai.enable': 'Activer',
   'adm.ai.disable': 'Désactiver',
   'adm.ai.trains': 'Entraîne sur les données : {v}',
+  'adm.ai.trains.true': 'oui',
+  'adm.ai.trains.false': 'non',
+  'adm.ai.trains.unknown': 'inconnu',
 } as const;
 
 export const consoleEn: Record<keyof typeof consoleFr, string> = {
@@ -325,4 +328,7 @@ export const consoleEn: Record<keyof typeof consoleFr, string> = {
   'adm.ai.enable': 'Enable',
   'adm.ai.disable': 'Disable',
   'adm.ai.trains': 'Trains on data: {v}',
+  'adm.ai.trains.true': 'yes',
+  'adm.ai.trains.false': 'no',
+  'adm.ai.trains.unknown': 'unknown',
 };

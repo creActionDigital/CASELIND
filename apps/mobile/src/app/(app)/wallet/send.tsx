@@ -16,6 +16,8 @@ import { Avatar, Button, Text, TextField } from '../../../ui';
 import { Chips } from '../../../seller/ui';
 import { parseWalletAmount, WALLET_CURRENCIES } from '../../../wallet/amount';
 import { classifyWalletError, failureMessage } from '../../../wallet/errors';
+import { PersonField } from '../../../components/PersonField';
+import type { Person } from '../../../people/logic';
 import { fetchUserByHandle, sendTransfer } from '../../../wallet/api';
 import { useKyc, useTransactions, useWalletEnabled, walletKeys } from '../../../wallet/hooks';
 import { inPeriod, type Period } from '../../../wallet/history';
@@ -53,7 +55,7 @@ export default function WalletSend() {
   const [newBalance, setNewBalance] = useState<number | null>(null);
   const [period, setPeriod] = useState<Period>('week');
   const clientId = useRef<{ sig: string; id: string } | null>(null);
-  const [focusSearch, setFocusSearch] = useState(false);
+  const [picked, setPicked] = useState<Person | null>(null);
   const recents = useTransactions(prefs.currency);
   const recentItems = (recents.data?.pages.flatMap((p) => p.items) ?? []).filter((x) => x.counterparty?.kind === 'user');
   const suggested = recentItems.reduce<{ handle: string; name: string }[]>((acc, x) => {
@@ -217,14 +219,6 @@ export default function WalletSend() {
           {t('wallet.send.suggested')}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.lg }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('wallet.send.add')} onPress={() => setFocusSearch(true)} style={styles.contact}>
-            <View style={[styles.addCircle, { borderColor: colors.border }]}>
-              <Ionicons name="add" size={24} color={colors.textMuted} />
-            </View>
-            <Text variant="caption" muted numberOfLines={1}>
-              {t('wallet.send.add')}
-            </Text>
-          </Pressable>
           {suggested.map((c) => (
             <Pressable key={c.handle} accessibilityRole="button" accessibilityLabel={`${c.name}, @${c.handle}`} onPress={() => setHandle(c.handle)} style={styles.contact}>
               <Avatar name={c.name} size={56} />
@@ -234,31 +228,12 @@ export default function WalletSend() {
             </Pressable>
           ))}
         </ScrollView>
-        <TextField
-          key={focusSearch ? 'f' : 'n'}
-          autoFocus={focusSearch}
+        <PersonField
           label={t('wallet.send.recipient')}
-          hint={t('wallet.send.searchHint')}
-          value={handle}
-          onChangeText={setHandle}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder={t('wallet.send.searchPlaceholder')}
+          value={clean ? { handle: clean, displayName: recipient?.displayName ?? picked?.displayName ?? clean, avatarUrl: recipient?.avatarUrl ?? picked?.avatarUrl } : null}
+          onChange={(x) => { setPicked(x); setHandle(x?.handle ?? ''); }}
           error={isSelf ? t('wallet.error.self') : handleOk && lookup.isError ? t('wallet.error.recipient') : null}
         />
-        {recipient ? (
-          <View style={[styles.preview, { backgroundColor: colors.surface }]} accessible accessibilityLabel={t('wallet.send.recipientFound', { name: recipient.displayName, handle: recipient.handle })}>
-            <Avatar name={recipient.displayName} size={40} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '600' }} numberOfLines={1}>
-                {recipient.displayName}
-              </Text>
-              <Text variant="small" muted numberOfLines={1}>
-                @{recipient.handle}
-              </Text>
-            </View>
-          </View>
-        ) : null}
         <Chips options={WALLET_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency as 'USD' | 'CDF'} onChange={setCurrency} scroll={false} />
         <TextField
           label={t('wallet.send.amount')}

@@ -6,12 +6,13 @@ export interface PlacesFilters extends LatLng {
   radiusKm: number;
   kind?: OrgKind;
   q?: string;
+  limit?: number;
 }
 
 /** La position ne sort de l'appareil que comme paramètres de cette requête (ADR-019) ; elle n'est jamais stockée. */
 export const fetchPlaces = (f: PlacesFilters, cursor?: string) =>
   api.request('/places', {
-    query: { lat: f.lat, lng: f.lng, radiusKm: f.radiusKm, kind: f.kind, q: f.q || undefined, limit: 20, cursor },
+    query: { lat: f.lat, lng: f.lng, radiusKm: f.radiusKm, kind: f.kind, q: f.q || undefined, limit: f.limit ?? 20, cursor },
     schema: placeListSchema,
   });
 

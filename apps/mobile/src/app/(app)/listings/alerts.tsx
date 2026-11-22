@@ -74,7 +74,7 @@ export default function ListingAlerts() {
         ))}
         <TextField label={t('listings.alerts.q')} value={q} onChangeText={setQ} maxLength={100} autoCapitalize="none" />
         <TextField label={t('listings.alerts.city')} value={city} onChangeText={setCity} maxLength={80} />
-        <Chips
+        <Chips flush
           options={[{ value: '' as const, label: t('listings.all') }, ...KINDS.map((c) => ({ value: c, label: t(kindKey(c)) }))]}
           value={kind}
           onChange={(v) => setKind(v === kind ? '' : v)}

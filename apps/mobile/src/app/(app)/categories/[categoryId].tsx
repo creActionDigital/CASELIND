@@ -1,9 +1,9 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../i18n';
-import { fetchProducts, type ShopFilters } from '../../../shop/api';
+import { fetchCategories, fetchProducts, type ShopFilters } from '../../../shop/api';
 import { priceBounds } from '../../../shop/market-logic';
 import { shopKeys } from '../../../shop/hooks';
 import { Chip } from '../../../shop/parts';
@@ -19,7 +19,10 @@ const CURRENCIES = ['USD', 'CDF'];
 export default function CategoryPage() {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
-  const { categoryId, name } = useLocalSearchParams<{ categoryId: string; name?: string }>();
+  const { categoryId, name: nameParam } = useLocalSearchParams<{ categoryId: string; name?: string }>();
+  // Lien sans nom (notification, lien partagé) : le titre vient de la liste des catégories (en cache le plus souvent).
+  const cats = useQuery({ queryKey: shopKeys.categories, queryFn: fetchCategories, staleTime: 10 * 60_000, enabled: !nameParam });
+  const name = nameParam || cats.data?.items.find((x) => x.id === String(categoryId))?.name;
   const [sort, setSort] = useState<ShopFilters['sort']>('recent');
   const [currency, setCurrency] = useState<string | undefined>();
   const [draft, setDraft] = useState({ min: '', max: '' });

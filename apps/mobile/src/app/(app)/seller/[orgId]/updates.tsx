@@ -72,7 +72,7 @@ export default function OrgUpdates() {
       {title}
       <Screen edges={['bottom']}>
         <View style={{ gap: spacing.md }}>
-          <Chips options={KINDS.map((k) => ({ value: k, label: kindLabel(k) }))} value={form.kind} onChange={(kind) => set({ kind })} />
+          <Chips flush options={KINDS.map((k) => ({ value: k, label: kindLabel(k) }))} value={form.kind} onChange={(kind) => set({ kind })} />
           <TextField label={t('vitrine.updates.fieldTitle')} value={form.title} onChangeText={(v) => set({ title: v })} maxLength={80} />
           <TextField label={t('vitrine.updates.fieldBody')} value={form.body} onChangeText={(v) => set({ body: v })} multiline maxLength={1000} />
           {form.kind !== 'post' ? (

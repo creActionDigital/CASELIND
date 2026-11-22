@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import { radius, spacing, typography } from '../theme/tokens';
+import { fonts, radius, spacing, typography } from '../theme/tokens';
 import { useTheme } from '../theme/use-theme';
 import { Text } from './Text';
 
@@ -17,7 +17,7 @@ export function Button({ label, onPress, variant = 'primary', loading, disabled,
   const { colors } = useTheme();
   const inactive = disabled || loading;
   const palette = {
-    primary: { bg: colors.primary, fg: colors.onPrimary, border: colors.primary },
+    primary: { bg: colors.action, fg: colors.onAction, border: colors.action },
     // Bouton teinté (style iOS) : action secondaire sans contour.
     secondary: { bg: colors.primarySoft, fg: colors.primary, border: colors.primarySoft },
     ghost: { bg: 'transparent', fg: colors.primary, border: 'transparent' },
@@ -42,12 +42,14 @@ export function Button({ label, onPress, variant = 'primary', loading, disabled,
         style,
       ]}
     >
-      {loading ? <ActivityIndicator color={palette.fg} /> : <Text style={[typography.bodyStrong, { color: palette.fg }]}>{label}</Text>}
+      {loading ? <ActivityIndicator color={palette.fg} /> : <Text style={[typography.bodyStrong, variant === 'primary' && styles.actionLabel, { color: palette.fg }]}>{label}</Text>}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  // Libellé blanc sur l'orange du logo : gros texte gras (WCAG « grand texte », contraste 3:1 suffisant).
+  actionLabel: { fontSize: 19, lineHeight: 24, fontWeight: '700', fontFamily: fonts.bold },
   base: {
     minHeight: 50,
     paddingHorizontal: spacing.xl,

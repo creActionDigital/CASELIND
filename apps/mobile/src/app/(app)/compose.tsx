@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchHashtagSuggestions } from '../../creator/api';
+import { completeHashtag, typingHashtag } from '../../creator/logic';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -50,6 +52,8 @@ export default function Compose() {
   const [attach, setAttach] = useState<AttachmentDraft>(() =>
     mode === 'event' ? { type: 'event', title: '', when: '', place: '' } : mode === 'poll' ? { type: 'poll', options: ['', ''] } : mode === 'location' ? { type: 'location', lat: null, lng: null, label: '' } : { type: 'none' },
   );
+  const typing = typingHashtag(body);
+  const suggest = useQuery({ queryKey: ['hashtag-suggest', typing], queryFn: () => fetchHashtagSuggestions(typing!), enabled: typing !== null });
   const [picking, setPicking] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -155,6 +159,15 @@ export default function Compose() {
           placeholderTextColor={colors.textMuted}
           style={[styles.input, typography.body, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
         />
+        {typing !== null && suggest.data && suggest.data.items.length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {suggest.data.items.map((h) => (
+              <Pressable key={h.tag} accessibilityRole="button" accessibilityLabel={`#${h.tag.replace(/^#/, '')}`} onPress={() => setBody(completeHashtag(body, h.tag))} style={{ minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}>
+                <Text variant="small" color={colors.primary}>{`#${h.tag.replace(/^#/, '')}`}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <Text variant="caption" muted style={styles.counter} accessibilityLiveRegion="polite">
           {t('compose.counter', { n: body.length, max: MAX_BODY })}
         </Text>

@@ -1,6 +1,6 @@
 /** Textes du lot 15 (petites annonces). Fusionnés dans `fr` et `en`. */
 export const listingsFr = {
-  'listings.title': 'Annonces',
+  'listings.title': 'Petites annonces',
   'listings.search': 'Rechercher une annonce',
   'listings.all': 'Toutes',
   'listings.kind.property_rent': 'Location',
@@ -120,7 +120,7 @@ export const listingsFr = {
 } as const;
 
 export const listingsEn = {
-  'listings.title': 'Listings',
+  'listings.title': 'Classifieds',
   'listings.search': 'Search listings',
   'listings.all': 'All',
   'listings.kind.property_rent': 'For rent',

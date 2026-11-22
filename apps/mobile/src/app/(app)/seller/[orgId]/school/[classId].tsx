@@ -1,3 +1,5 @@
+import { PersonField } from '../../../../../components/PersonField';
+import type { Person } from '../../../../../people/logic';
 import type { SchoolRole } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,6 +23,7 @@ export default function ManageClass() {
   const { orgId, classId } = useLocalSearchParams<{ orgId: string; classId: string }>();
   const [error, setError] = useState<string | null>(null);
   const [handle, setHandle] = useState('');
+  const [person, setPerson] = useState<Person | null>(null);
   const [role, setRole] = useState<SchoolRole>('student');
   const [lesson, setLesson] = useState({ weekday: '1', startsAt: '', endsAt: '', subject: '', room: '' });
   const [news, setNews] = useState({ title: '', body: '' });
@@ -53,7 +56,7 @@ export default function ManageClass() {
 
         <Button variant="secondary" label={t('fees.staff.manage')} onPress={() => router.push(`/seller/${orgId}/school/fees/${classId}` as never)} />
         <SectionTitle>{t('school.staff.enroll')}</SectionTitle>
-        <TextField label={t('school.staff.handle')} value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} />
+        <PersonField label={t('school.staff.handle')} placeholder={t('pp.choose')} value={handle.trim() ? { handle: handle.trim(), displayName: person?.displayName ?? handle.trim(), avatarUrl: person?.avatarUrl } : null} onChange={(x) => { setPerson(x); setHandle(x?.handle ?? ''); }} />
         <Chips
           scroll={false}
           options={(['student', 'parent', 'teacher'] as SchoolRole[]).map((r) => ({ value: r, label: t(`school.role.${r}` as const) }))}

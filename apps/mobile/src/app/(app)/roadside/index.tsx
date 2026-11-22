@@ -109,7 +109,7 @@ export default function RoadsideHome() {
       </Text>
       <Text muted>{t('roadside.intro')}</Text>
 
-      <Chips<RoadsideKind> options={KINDS.map((k) => ({ value: k, label: t(`roadside.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} />
+      <View style={{ marginHorizontal: -spacing.lg }}><Chips<RoadsideKind> options={KINDS.map((k) => ({ value: k, label: t(`roadside.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} /></View>
       <PlaceRow label={t('roadside.position')} point={point} icon="radio-button-on" onPress={() => setPicking(true)} />
       <TextField label={t('roadside.vehicle')} value={vehicle} onChangeText={setVehicle} maxLength={60} />
       <TextField label={t('roadside.note')} value={note} onChangeText={setNote} maxLength={200} multiline />

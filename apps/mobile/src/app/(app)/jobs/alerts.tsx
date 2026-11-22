@@ -72,7 +72,7 @@ export default function JobAlerts() {
         ))}
         <TextField label={t('jobs.alerts.q')} value={q} onChangeText={setQ} maxLength={100} autoCapitalize="none" />
         <TextField label={t('jobs.alerts.city')} value={city} onChangeText={setCity} maxLength={80} />
-        <Chips
+        <Chips flush
           options={[{ value: '' as const, label: t('jobs.alerts.anyContract') }, ...CONTRACT_TYPES.map((c) => ({ value: c, label: t(contractKey(c)) }))]}
           value={contract}
           onChange={(v) => setContract(v === contract ? '' : v)}

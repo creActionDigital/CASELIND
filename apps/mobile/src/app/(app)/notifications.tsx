@@ -165,7 +165,7 @@ export default function NotificationCenter() {
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {header}
       <View style={styles.top}>
-        <Text variant="small" muted style={styles.flex}>
+        <Text variant="small" muted numberOfLines={1} style={styles.flex}>
           {unread > 0 ? t('notifications.unreadCount', { n: unread }) : t('ma.notif.upToDate')}
         </Text>
         {unread > 0 ? <Button label={t('notifications.readAll')} variant="ghost" loading={readAll.isPending} onPress={() => readAll.mutate()} style={styles.barBtn} /> : null}
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg },
   pad: { padding: spacing.xl },
   top: { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.lg, paddingRight: spacing.sm, minHeight: 44 },
-  barBtn: { paddingHorizontal: spacing.md },
+  barBtn: { paddingHorizontal: spacing.md, flexShrink: 0, minHeight: 44 },
   filters: { alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   section: { marginTop: spacing.lg, marginBottom: spacing.sm, letterSpacing: 0.6 },
   card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, overflow: 'hidden' },

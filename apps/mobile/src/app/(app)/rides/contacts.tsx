@@ -1,3 +1,4 @@
+import { PersonField } from '../../../components/PersonField';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -19,7 +20,6 @@ export default function TrustedContacts() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: rideKeys.contacts, queryFn: fetchContacts, retry: false });
   const [handles, setHandles] = useState<string[] | null>(null);
-  const [draft, setDraft] = useState('');
   const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,12 +43,11 @@ export default function TrustedContacts() {
 
   if (q.isPending || handles === null) return q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : <Loading />;
 
-  function add() {
-    const h = draft.trim().replace(/^@/, '');
-    if (!h || handles!.some((x) => x.toLowerCase() === h.toLowerCase())) return setDraft('');
+  function add(handle: string) {
+    const h = handle;
+    if (!h || handles!.some((x) => x.toLowerCase() === h.toLowerCase())) return;
     if (handles!.length >= MAX_CONTACTS) return setError(t('mobility.contacts.limit'));
     setHandles([...handles!, h]);
-    setDraft('');
     setError(null);
     setInfo(null);
   }
@@ -56,9 +55,9 @@ export default function TrustedContacts() {
   return (
     <Screen>
       <Stack.Screen options={{ title: t('mobility.contacts.title') }} />
-      <Text muted>{t('mobility.contacts.intro')}</Text>
+      <Text muted style={{ marginBottom: spacing.sm }}>{t('mobility.contacts.intro')}</Text>
       {handles.length === 0 ? (
-        <Text muted>{t('mobility.contacts.empty')}</Text>
+        <Text muted style={{ marginBottom: spacing.lg }}>{t('mobility.contacts.empty')}</Text>
       ) : (
         <View style={{ gap: spacing.sm }}>
           {handles.map((h) => (
@@ -78,8 +77,7 @@ export default function TrustedContacts() {
       )}
       {handles.length < MAX_CONTACTS ? (
         <>
-          <TextField label={t('mobility.contacts.handle')} value={draft} onChangeText={setDraft} autoCapitalize="none" autoCorrect={false} maxLength={40} onSubmitEditing={add} />
-          <Button variant="secondary" label={t('mobility.contacts.add')} disabled={!draft.trim()} onPress={add} />
+          <PersonField value={null} placeholder={t('mobility.contacts.add')} exclude={handles} onChange={(x) => x && add(x.handle)} />
         </>
       ) : (
         <Text variant="small" muted>

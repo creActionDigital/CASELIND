@@ -43,7 +43,7 @@ export default function LeaveToHandle() {
       {title}
       <Screen edges={['bottom']}>
         <View style={{ gap: spacing.md }}>
-          <Chips options={STATUSES.map((s) => ({ value: s, label: t(`hr.leave.status.${s}` as MessageKey) }))} value={status} onChange={setStatus} />
+          <Chips flush options={STATUSES.map((s) => ({ value: s, label: t(`hr.leave.status.${s}` as MessageKey) }))} value={status} onChange={setStatus} />
           {info ? <Text color={colors.danger} accessibilityLiveRegion="polite">{info}</Text> : null}
           {list.data.items.length === 0 ? <Text muted>{t('hr.leave.empty')}</Text> : null}
           {list.data.items.map((l) => (

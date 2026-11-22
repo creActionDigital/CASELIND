@@ -1,12 +1,14 @@
 import {
   courierDeliverySchema,
   deliveryDetailSchema,
+  deliveryListSchema,
   deliveryViewSchema,
   deliveryZoneListSchema,
   deliveryZoneSchema,
   myDeliveryListSchema,
   orgMemberListSchema,
   type CreateDeliveryZoneRequest,
+  type DeliveryStatus,
   type UpdateDeliveryZoneRequest,
 } from '@caselind/contracts';
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +38,10 @@ export const patchZone = (orgId: string, id: string, body: UpdateDeliveryZoneReq
   api.request(`/orgs/${orgId}/delivery-zones/${id}`, { method: 'PATCH', body, schema: deliveryZoneSchema });
 export const fetchOrgDelivery = (orgId: string, id: string) =>
   api.request(`/orgs/${orgId}/deliveries/${id}`, { schema: deliveryDetailSchema });
+export const fetchOrgDeliveries = (orgId: string, status: DeliveryStatus | undefined, cursor?: string) =>
+  api.request(`/orgs/${orgId}/deliveries`, { query: { status, limit: 20, cursor }, schema: deliveryListSchema });
+export const setOrgDeliveryStatus = (orgId: string, id: string, status: 'failed' | 'returned', reason: string) =>
+  api.request(`/orgs/${orgId}/deliveries/${id}/status`, { method: 'POST', body: { status, reason }, schema: deliveryDetailSchema });
 export const assignCourier = (orgId: string, id: string, courierUserId: string) =>
   api.request(`/orgs/${orgId}/deliveries/${id}/assign`, { method: 'POST', body: { courierUserId }, schema: deliveryDetailSchema });
 export const resetProof = (orgId: string, id: string) =>

@@ -17,7 +17,9 @@ import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
 import { uuidv4 } from '../../../lib/uuid';
-import { imageMime, uploadDocument, uploadMessageImage } from '../../../media/upload';
+import { imageMime, uploadDocument, uploadMessageImage, uploadVoice } from '../../../media/upload';
+import { useVoiceRecorder } from '../../../messaging/useVoiceRecorder';
+import { formatDuration, isAudioMime } from '../../../messaging/voice-logic';
 import { documentMime } from '../../../messaging/file-logic';
 import { locationBody } from '../../../messaging/module-d-logic';
 import { setPin } from '../../../messaging/module-d-api';
@@ -252,8 +254,8 @@ export default function ChatRoom() {
         let mediaId: string | undefined;
         if (m.kind === 'media') {
           if (!m.localUri) throw new Error('no local file');
-          const docMime = m.localName ? documentMime(m.localMime, m.localName) : null;
-          mediaId = docMime ? await uploadDocument(m.localUri, docMime, m.localName!) : await uploadMessageImage(m.localUri, imageMime(m.localMime, m.localUri));
+          const docMime = isAudioMime(m.localMime) ? null : m.localName ? documentMime(m.localMime, m.localName) : null;
+          mediaId = isAudioMime(m.localMime) ? await uploadVoice(m.localUri, m.localDuration ?? 1) : docMime ? await uploadDocument(m.localUri, docMime, m.localName!) : await uploadMessageImage(m.localUri, imageMime(m.localMime, m.localUri));
         }
         const server: Message = await postMessage(id, {
           clientId: m.clientId!,
@@ -403,6 +405,17 @@ export default function ChatRoom() {
       setNotice(err instanceof ApiRequestError && err.detail<string>('reason') === 'pin_limit' ? t('md.pin.limit') : errorMessage(err, t, locale));
     }
   }
+  function sendVoice(uri: string, seconds: number) {
+    const msg = buildOptimisticMessage({ conversationId: id, senderId: myId, clientId: uuidv4(), kind: 'media', replyToId: replyTo?.id, localUri: uri, localMime: 'audio/mp4', localDuration: seconds });
+    setReplyTo(null);
+    setOutbox((o) => outboxAdd(o, msg));
+    void deliver(msg);
+  }
+  const voice = useVoiceRecorder(({ uri, seconds }) => sendVoice(uri, seconds));
+  useEffect(() => {
+    if (voice.error) setNotice(t(`chat.voice.${voice.error}`));
+  }, [voice.error, t]);
+
   async function attachDocument() {
     setNotice(null);
     try {
@@ -691,6 +704,15 @@ export default function ChatRoom() {
       ) : (
         <>
         <View style={styles.composer}>
+          {voice.phase !== 'idle' ? (
+            <View style={[styles.field, styles.recBar, { backgroundColor: cc.field, borderColor: colors.border }]} accessibilityLiveRegion="polite" accessibilityLabel={t('chat.voice.recording')}>
+              {voice.phase === 'locked' ? <IconButton icon="trash-outline" label={t('chat.voice.cancel')} onPress={voice.cancel} color={colors.danger} /> : <View style={[styles.recDot, { backgroundColor: colors.danger }]} />}
+              <Text style={styles.recTime}>{formatDuration(voice.elapsed)}</Text>
+              <Text variant="caption" muted numberOfLines={1} style={styles.flex}>
+                {voice.phase === 'holding' ? `‹ ${t('chat.voice.slide')}` : t('chat.voice.recording')}
+              </Text>
+            </View>
+          ) : (
           <View style={[styles.field, { backgroundColor: cc.field, borderColor: colors.border }]}>
             <IconButton icon="add" label={t('chat.attach.open')} onPress={() => setAttachOpen(true)} color={colors.textMuted} />
             <TextInput
@@ -708,6 +730,20 @@ export default function ChatRoom() {
               style={[styles.input, typography.body, { color: colors.text }]}
             />
           </View>
+          )}
+          {!text.trim() && voice.phase === 'idle' ? (
+            <View accessible accessibilityRole="button" accessibilityLabel={t('chat.voice.mic')} {...voice.panHandlers} style={[styles.sendBtn, { backgroundColor: colors.action }]}>
+              <Ionicons name="mic" size={22} color="#FFFFFF" />
+            </View>
+          ) : !text.trim() && voice.phase === 'holding' ? (
+            <View {...voice.panHandlers} style={[styles.sendBtn, styles.micHot, { backgroundColor: colors.action }]}>
+              <Ionicons name="mic" size={26} color="#FFFFFF" />
+            </View>
+          ) : !text.trim() ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={t('chat.voice.send')} onPress={voice.send} style={[styles.sendBtn, { backgroundColor: colors.action }]}>
+              <Ionicons name="send" size={20} color="#FFFFFF" />
+            </Pressable>
+          ) : (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('chat.send')}
@@ -724,6 +760,7 @@ export default function ChatRoom() {
           >
             <Ionicons name="send" size={20} color="#FFFFFF" />
           </Pressable>
+          )}
         </View>
         {text.length > BODY_MAX - 500 ? (
           <Text variant="caption" muted style={styles.count}>
@@ -941,6 +978,10 @@ const styles = StyleSheet.create({
   reply: { flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   input: { flex: 1, minHeight: TOUCH, maxHeight: 140, paddingVertical: spacing.sm },
+  recBar: { userSelect: 'none', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, minHeight: TOUCH + 4 },
+  recDot: { width: 10, height: 10, borderRadius: 5 },
+  recTime: { fontWeight: '700' },
+  micHot: { transform: [{ scale: 1.25 }] },
   sendBtn: { width: TOUCH + 4, height: TOUCH + 4, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   sched: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginVertical: 2, padding: spacing.sm, borderWidth: 1, borderRadius: radius.md },
   count: { textAlign: 'right', marginTop: 2 },

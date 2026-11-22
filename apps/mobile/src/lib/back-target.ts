@@ -5,7 +5,7 @@
  * `ROUTES` = écrans de src/app/(app) en forme d'URL ; back-target.test.ts vérifie qu'elle suit les fichiers.
  */
 export const ROUTES = [
-  '/about', '/ui-kit', '/appearance', '/discover', '/help', '/permissions', '/setup-profile', '/support', '/security/biometrics',
+  '/about', '/blocked', '/stories-archive', '/ui-kit', '/appearance', '/discover', '/help', '/permissions', '/setup-profile', '/support', '/security/biometrics',
   '/', '/admin', '/admin/ai', '/admin/ads', '/admin/analytics', '/admin/announcements', '/admin/appeals', '/admin/approvals', '/admin/audit', '/admin/boosts',
   '/admin/commissions', '/admin/disputes', '/admin/flags', '/admin/games', '/admin/governance', '/admin/help', '/admin/health', '/admin/kyc', '/admin/ledger',
   '/admin/miniapp-versions', '/admin/miniapps', '/admin/mobility', '/admin/moderation', '/admin/sanctions', '/admin/settings', '/admin/subscriptions', '/admin/wallet-alerts',
@@ -37,7 +37,7 @@ export const ROUTES = [
   '/seller/[orgId]/reviews', '/seller/[orgId]/sales', '/seller/[orgId]/team', '/seller/[orgId]/school', '/seller/[orgId]/school/[classId]',
   '/seller/[orgId]/school/fees/[classId]', '/seller/[orgId]/school/guardians', '/seller/[orgId]/school/scholarships', '/seller/[orgId]/services',
   '/seller/[orgId]/stock', '/seller/[orgId]/updates', '/seller/[orgId]/vitrine', '/seller/[orgId]/wallet', '/seller/[orgId]/webhooks',
-  '/seller/[orgId]/zones', '/seller/[orgId]/zones/[zoneId]', '/seller/new', '/services', '/services/[id]', '/sessions', '/shop', '/store/[slug]',
+  '/seller/[orgId]/deliveries', '/seller/[orgId]/zones', '/seller/[orgId]/zones/[zoneId]', '/seller/new', '/services', '/services/[id]', '/sessions', '/shop', '/store/[slug]',
   '/story/[userId]', '/story/new', '/u/[handle]', '/user/[userId]', '/user/[userId]/followers', '/user/[userId]/following', '/wallet', '/wallet/alerts',
   '/wallet/cards', '/wallet/convert', '/wallet/limits', '/wallet/qr', '/wallet/receipts', '/wallet/finance', '/wallet/manage', '/wallet/pin', '/wallet/receive', '/wallet/requests', '/wallet/savings', '/wallet/scheduled',
   '/wallet/send', '/wallet/split', '/wallet/topup', '/wishlist', '/work',

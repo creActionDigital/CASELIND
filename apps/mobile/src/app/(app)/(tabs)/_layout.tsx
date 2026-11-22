@@ -6,7 +6,8 @@ export default function TabsLayout() {
   return (
     <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ header: () => <AppHeader /> }}>
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="maps" />
+      {/* Carte plein écran à la Uber : sa barre de recherche flottante remplace l'en-tête global. */}
+      <Tabs.Screen name="maps" options={{ headerShown: false }} />
       {/* Espace social et marketplace, plein écran : sans en-tête global. */}
       <Tabs.Screen name="hub" options={{ headerShown: false }} />
       {/* La messagerie a son propre en-tête « Discussions » (référence chat.jpeg). */}

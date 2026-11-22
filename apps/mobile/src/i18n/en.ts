@@ -5,6 +5,7 @@ import { inventoryEn } from '../business/inventory/messages';
 import type { MessageKey } from './fr';
 import { aiEn } from '../ai/messages';
 import { walletUiEn } from '../wallet/messages';
+import { peopleEn } from '../people/messages';
 import { servicesEn } from '../services/messages';
 import { listingsEn } from '../listings/messages';
 import { jobsEn } from '../jobs/messages';
@@ -38,8 +39,10 @@ import { assistEn } from '../ai/assist-messages';
 import { moduleDEn } from '../messaging/messages-d';
 import { courierEn } from '../courier/messages';
 import { moduleBEn } from '../hub/messages-b';
+import { menuEn } from '../menu/messages';
 import { promotionsEn } from '../promotions/messages';
 import { privacyEn } from '../privacy/messages';
+import { blocksEn } from '../privacy/blocks-messages';
 import { maEn } from '../onboarding/messages-a';
 import { adminOpsEn } from '../admin-ops/messages';
 import { returnsEn } from '../returns/messages';
@@ -503,6 +506,20 @@ export const en: Record<MessageKey, string> = {
   'chat.attach.position': 'Location',
   'chat.attach.files': 'Document',
   'chat.document': 'Document',
+  "chat.voice": "Voice message",
+  "chat.voice.mic": "Hold to record a voice message",
+  "chat.voice.play": "Play voice message",
+  "chat.voice.pause": "Pause",
+  "chat.voice.seek": "Position in the voice message",
+  "chat.voice.speed": "Playback speed {rate}",
+  "chat.voice.error": "Cannot play",
+  "chat.voice.slide": "Slide to cancel",
+  "chat.voice.cancel": "Cancel recording",
+  "chat.voice.send": "Send voice message",
+  "chat.voice.recording": "Recording",
+  "chat.voice.denied": "Microphone access denied. Allow it in settings to send voice messages.",
+  "chat.voice.unsupported": "Voice recording is not available in this browser.",
+  "chat.voice.failed": "Recording failed. Try again.",
   'chat.file.unsupported': "Unsupported format. Send a PDF, Word, Excel or PowerPoint file.",
   'chat.file.openError': "Could not open this file. Try again.",
   'chat.attach.contacts': 'Contacts',
@@ -831,6 +848,7 @@ export const en: Record<MessageKey, string> = {
   'seller.kind.hotel': 'Hotel',
   'seller.kind.pharmacy': 'Pharmacy',
   'seller.kind.fuel_station': 'Fuel station',
+  'seller.kind.bank': 'Bank / ATM',
   'seller.kind.school': 'School',
   'seller.kind.hospital': 'Hospital',
   'seller.kind.services': 'Services',
@@ -1376,8 +1394,10 @@ export const en: Record<MessageKey, string> = {
   ...moduleDEn,
   ...courierEn,
   ...moduleBEn,
+  ...menuEn,
   ...promotionsEn,
   ...privacyEn,
+  ...blocksEn,
   ...maEn,
   ...adminOpsEn,
   ...returnsEn,
@@ -1398,6 +1418,7 @@ export const en: Record<MessageKey, string> = {
   ...proofEn,
   ...aiEn,
   ...walletUiEn,
+  ...peopleEn,
   ...mobilityEn,
   ...businessEn,
   ...hrEn,

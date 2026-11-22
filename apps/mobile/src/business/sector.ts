@@ -10,6 +10,7 @@ const CORE: Record<OrgKind, readonly string[]> = {
   hotel: ['/rentals', '/services', '/documents', '/customers', '/qr'],
   pharmacy: ['/products', '/stock', '/batches', '/inventory', '/pos'],
   fuel_station: ['/pos', '/stock', '/inventory', '/qr', '/purchasing'],
+  bank: ['/customers', '/documents', '/qr'],
   school: ['/school', '/hr', '/documents', '/customers', '/qr'],
   hospital: ['/services', '/hr', '/documents', '/stock', '/inventory'],
   services: ['/services', '/documents', '/customers', '/jobs', '/qr'],

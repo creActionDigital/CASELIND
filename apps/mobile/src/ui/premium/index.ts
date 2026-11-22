@@ -9,6 +9,7 @@ export { PressableScale } from './PressableScale';
 export { ProgressBar } from './ProgressBar';
 export { PromoBanner, type Promo } from './PromoBanner';
 export { SectionHeader } from './SectionHeader';
+export { ServiceGrid, type ServiceItem } from './ServiceGrid';
 export { ServiceTile } from './ServiceTile';
 export { Skeleton, SkeletonList } from './Skeleton';
 export { StatCard } from './StatCard';

@@ -7,7 +7,7 @@ import { clKeys, fetchLives, startLive } from '../calllive/api';
 import { errorMessage } from '../lib/errors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n';
-import { brandColor, glass, onMedia, radius, TAB_BAR_SPACE, TOUCH } from '../theme/tokens';
+import { brandAccent, fonts, glass, onMedia, radius, TAB_BAR_SPACE, TOUCH } from '../theme/tokens';
 import { Text } from '../ui';
 
 /** Onglet Live : lives en cours (chat et compteur réels ; la vidéo attend un serveur média) et lancement d'un live. */
@@ -83,7 +83,7 @@ export function LivePane() {
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: '#14141B' },
   center: { textAlign: 'center' },
-  input: { alignSelf: 'stretch', minHeight: TOUCH, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: glass.dark, borderWidth: 1, borderColor: glass.border, color: onMedia },
+  input: { alignSelf: 'stretch', fontFamily: fonts.regular, minHeight: TOUCH, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: glass.dark, borderWidth: 1, borderColor: glass.border, color: onMedia },
   flex: { flex: 1 },
   start: {
     flexDirection: 'row',
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     minHeight: TOUCH,
     paddingHorizontal: 22,
     borderRadius: radius.pill,
-    backgroundColor: brandColor,
+    backgroundColor: brandAccent,
   },
   soon: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: '#FACC15' },
   card: {

@@ -59,11 +59,11 @@ export default function Services() {
           <TextField label={t('services.search')} value={text} onChangeText={setText} returnKeyType="search" autoCapitalize="none" />
         </View>
       </View>
-      <ChipRow>
+      <View style={styles.pad}><ChipRow>
         {[{ id: '', name: t('services.all') }, ...(categories.data?.items ?? [])].map((c) => (
           <Chip key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(c.id === categoryId ? '' : c.id)} />
         ))}
-      </ChipRow>
+      </ChipRow></View>
       <View style={styles.originRow}>
         <Text variant="small" muted>
           {t('services.near.label')}
@@ -75,14 +75,14 @@ export default function Services() {
             setOrigin({ point: GOMA_CENTER, device: false });
             setLocError(null);
           }}
-          style={styles.originBtn}
+          style={[styles.originBtn, { flex: 0.8 }]}
         />
         <Button
           variant={origin.device ? 'primary' : 'secondary'}
           label={locating ? t('services.near.locating') : t('services.near.device')}
           loading={locating}
           onPress={locate}
-          style={styles.originBtn}
+          style={[styles.originBtn, { flex: 1.2 }]}
         />
       </View>
       {locError ? (

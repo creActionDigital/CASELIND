@@ -12,6 +12,7 @@ import { normalizePhone, slugify, validateShop } from '../../../seller/shop-form
 import { Chips, sellerErrorMessage } from '../../../seller/ui';
 import { useTheme } from '../../../theme/use-theme';
 import { Button, Screen, Text, TextField } from '../../../ui';
+import { spacing } from '../../../theme/tokens';
 
 const KINDS: OrgKind[] = ['restaurant', 'hotel', 'pharmacy', 'hospital', 'school', 'services', 'shop', 'fuel_station', 'other'];
 
@@ -63,7 +64,7 @@ export default function AddPlace() {
   return (
     <Screen>
       <Stack.Screen options={{ title: t('mb.add.title') }} />
-      <Text muted>{t('mb.add.intro')}</Text>
+      <Text muted style={{ marginBottom: spacing.md }}>{t('mb.add.intro')}</Text>
       <TextField label={t('seller.form.name')} value={name} onChangeText={setName} maxLength={120} error={submitted && errors.name ? t('seller.form.nameRequired') : null} />
       <Chips scroll={false} options={KINDS.map((k) => ({ value: k, label: t(`seller.kind.${k}` as MessageKey) }))} value={kind} onChange={setKind} />
       <TextField label={t('seller.form.city')} value={city} onChangeText={setCity} maxLength={120} />

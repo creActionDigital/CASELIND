@@ -1,4 +1,4 @@
-import { childClassListSchema, childFeeListSchema, myChildListSchema, myGuardianshipListSchema, schoolGuardianListSchema, schoolGuardianSchema, type CreateGuardianRequest } from '@caselind/contracts';
+import { childClassListSchema, childFeeListSchema, myChildListSchema, myGuardianshipListSchema, myStudentGuardianListSchema, schoolGuardianListSchema, schoolGuardianSchema, type CreateGuardianRequest } from '@caselind/contracts';
 import { api } from '../auth/auth-context';
 
 export const guardianKeys = {
@@ -19,3 +19,6 @@ export const answerGuardianship = (id: string, answer: 'accept' | 'decline') => 
 export const fetchChildren = () => api.request('/me/school/children', { schema: myChildListSchema });
 export const fetchChildFees = (studentId: string) => api.request(`/me/school/children/${studentId}/fees`, { schema: childFeeListSchema });
 export const fetchChildClasses = (studentId: string) => api.request(`/me/school/children/${studentId}/classes`, { schema: childClassListSchema });
+
+export const fetchMyParents = () => api.request('/me/school/guardians', { schema: myStudentGuardianListSchema });
+export const endMyParentLink = (id: string) => api.request(`/me/school/guardians/${id}`, { method: 'DELETE' });

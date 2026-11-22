@@ -7,8 +7,7 @@ import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useI18n } from '../../../../../i18n';
 import { uuidv4 } from '../../../../../lib/uuid';
 import { imageMime, uploadProductImage } from '../../../../../media/upload';
-import { getDevicePosition } from '../../../../../places/device-location';
-import { GOMA_CENTER, roundCoordinate } from '../../../../../places/geo';
+import { PlacePicker } from '../../../../../places/PlacePicker';
 import { minorToDecimalString } from '../../../../../seller/money';
 import { Chips, Loading, SectionTitle } from '../../../../../seller/ui';
 import { archiveOffer, createOffer, fetchOwnOffer, fetchServiceCategories, svcKeys, updateOffer, type Scope } from '../../../../../services/api';
@@ -77,7 +76,8 @@ function OfferForm({ scope, id, initial }: { scope: Scope; id: string | null; in
   const [errors, setErrors] = useState<OfferErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pickError, setPickError] = useState(false);
-  const [locating, setLocating] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [posLabel, setPosLabel] = useState('');
   const needsPosition = scope === 'me';
   const set = (patch: Partial<OfferDraft>) => setD((cur) => ({ ...cur, ...patch }));
   const err = (f: keyof OfferErrors) => (errors[f] ? t(errors[f]!) : null);
@@ -100,13 +100,6 @@ function OfferForm({ scope, id, initial }: { scope: Scope; id: string | null; in
     } catch {
       setPickError(true);
     }
-  }
-
-  async function useDevicePosition() {
-    setLocating(true);
-    const r = await getDevicePosition();
-    setLocating(false);
-    if (r.ok) set({ lat: String(roundCoordinate(r.position.lat)), lng: String(roundCoordinate(r.position.lng)) });
   }
 
   const save = useMutation({
@@ -153,12 +146,12 @@ function OfferForm({ scope, id, initial }: { scope: Scope; id: string | null; in
 
       <Text variant="bodyStrong">{t('services.pro.offer.category')}</Text>
       <View style={{ marginHorizontal: -spacing.lg }}>
-        <Chips options={(categories.data?.items ?? []).map((c) => ({ value: c.id, label: c.name }))} value={d.categoryId} onChange={(v) => set({ categoryId: v })} />
+        <Chips flush options={(categories.data?.items ?? []).map((c) => ({ value: c.id, label: c.name }))} value={d.categoryId} onChange={(v) => set({ categoryId: v })} />
       </View>
       {err('categoryId') ? <Text variant="small" color={colors.danger}>{err('categoryId')}</Text> : null}
 
       <SectionTitle>{t('services.pro.offer.priceKind')}</SectionTitle>
-      <Chips
+      <Chips flush
         scroll={false}
         options={[
           { value: 'fixed', label: t('services.pro.offer.fixed') },
@@ -193,23 +186,26 @@ function OfferForm({ scope, id, initial }: { scope: Scope; id: string | null; in
           {t('services.pro.offer.orgPosition')}
         </Text>
       ) : null}
-      <View style={styles.row}>
-        <Button variant="secondary" label={t('services.pro.offer.useDevice')} loading={locating} onPress={useDevicePosition} style={{ flex: 1 }} />
-        <Button
-          variant="secondary"
-          label={t('services.pro.offer.useGoma')}
-          onPress={() => set({ lat: String(GOMA_CENTER.lat), lng: String(GOMA_CENTER.lng) })}
-          style={{ flex: 1 }}
-        />
-      </View>
-      <View style={[styles.row, { marginTop: spacing.md }]}>
-        <View style={{ flex: 1 }}>
-          <TextField label={t('services.pro.offer.lat')} value={d.lat} onChangeText={(v) => set({ lat: v })} keyboardType="numbers-and-punctuation" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <TextField label={t('services.pro.offer.lng')} value={d.lng} onChangeText={(v) => set({ lng: v })} keyboardType="numbers-and-punctuation" />
-        </View>
-      </View>
+      <Button
+        variant="secondary"
+        label={d.lat && d.lng ? t('mobility.place.change') : t('mobility.place.pick')}
+        onPress={() => setPicking(true)}
+        style={{ marginBottom: spacing.sm }}
+      />
+      {d.lat && d.lng ? (
+        <Text variant="small" muted style={{ marginBottom: spacing.sm }}>
+          {t('mobility.place.chosen', { label: posLabel || t('mobility.place.mapPoint') })}
+        </Text>
+      ) : null}
+      <PlacePicker
+        visible={picking}
+        onClose={() => setPicking(false)}
+        onPick={(p) => {
+          setPicking(false);
+          set({ lat: String(p.lat), lng: String(p.lng) });
+          setPosLabel(p.label ?? '');
+        }}
+      />
       {err('position') ? <Text variant="small" color={colors.danger} style={{ marginBottom: spacing.md }}>{err('position')}</Text> : null}
 
       <SectionTitle>{t('services.pro.offer.photos')}</SectionTitle>

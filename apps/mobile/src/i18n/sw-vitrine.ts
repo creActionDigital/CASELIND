@@ -86,6 +86,7 @@ export const swVitrine: Partial<Record<MessageKey, string>> = {
   'vitrine.public.kind.hotel': 'Hoteli',
   'vitrine.public.kind.pharmacy': 'Famasia',
   'vitrine.public.kind.fuel_station': 'Kituo cha mafuta',
+  'vitrine.public.kind.bank': 'Benki / ATM',
   'vitrine.public.kind.school': 'Shule',
   'vitrine.public.kind.hospital': 'Kituo cha afya',
   'vitrine.public.kind.services': 'Huduma',

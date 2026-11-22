@@ -184,7 +184,7 @@ function Stats({ appId }: { appId: string }) {
   return (
     <>
       <SectionTitle>{t('miniapps.dev.stats')}</SectionTitle>
-      <Chips<string>
+      <Chips<string> flush
         value={String(days)}
         onChange={(v) => setDays(Number(v) as Days)}
         options={[7, 30, 90].map((d) => ({ value: String(d), label: t('miniapps.dev.stats.days', { days: d }) }))}

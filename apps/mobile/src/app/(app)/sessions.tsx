@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { z } from 'zod';
 import { api } from '../../auth/auth-context';
+import { blockKeys, fetchSecurityEvents } from '../../privacy/api';
 import { useI18n } from '../../i18n';
 import { radius, spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/use-theme';
@@ -18,6 +19,7 @@ export default function Sessions() {
     queryKey: ['sessions'],
     queryFn: () => api.request('/auth/sessions', { schema: listSchema }),
   });
+  const events = useQuery({ queryKey: blockKeys.events, queryFn: fetchSecurityEvents });
   const revoke = useMutation({
     mutationFn: (id: string) => api.request(`/auth/sessions/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
@@ -39,10 +41,11 @@ export default function Sessions() {
               <View key={s.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text variant="bodyStrong">{name}</Text>
-                  <Text variant="small" muted>
-                    {s.platform}
-                    {s.ip ? ` · ${s.ip}` : ''}
-                  </Text>
+                  {[s.platform !== 'other' ? s.platform : null, s.ip].filter(Boolean).length ? (
+                    <Text variant="small" muted>
+                      {[s.platform !== 'other' ? s.platform : null, s.ip].filter(Boolean).join(' · ')}
+                    </Text>
+                  ) : null}
                   <Text variant="small" muted>
                     {t('sessions.lastUsed', { date: new Date(s.lastUsedAt).toLocaleString(locale) })}
                   </Text>
@@ -62,6 +65,14 @@ export default function Sessions() {
             );
           })}
           {revoke.isError ? <ErrorState error={revoke.error} /> : null}
+          <Text variant="bodyStrong" style={{ marginTop: spacing.md }}>{t('secev.title')}</Text>
+          {events.data && events.data.items.length === 0 ? <Text variant="small" muted>{t('secev.empty')}</Text> : null}
+          {events.data?.items.slice(0, 10).map((ev) => (
+            <View key={ev.id} style={{ gap: 2 }}>
+              <Text>{ev.action.replace(/[._]/g, ' ')}</Text>
+              <Text variant="small" muted>{[new Date(ev.occurredAt).toLocaleString(locale), ev.ip].filter(Boolean).join(' · ')}</Text>
+            </View>
+          ))}
         </View>
       )}
     </Screen>

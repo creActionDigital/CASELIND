@@ -87,6 +87,7 @@ export default function Privacy() {
       </View>
       <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
         <Button variant="secondary" label={t('privacy.myConsents')} onPress={() => router.push('/consents')} />
+        <Button variant="secondary" label={t('blocks.manage')} onPress={() => router.push('/blocked')} />
         <Button variant="secondary" label={t('privacy.myData')} onPress={() => router.push('/my-data')} />
       </View>
     </Screen>

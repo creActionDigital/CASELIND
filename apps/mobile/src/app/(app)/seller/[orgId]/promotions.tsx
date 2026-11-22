@@ -103,19 +103,19 @@ export default function SellerPromotions() {
           <SectionTitle>{t('seller.promo.new')}</SectionTitle>
           <Text variant="bodyStrong">{t('seller.promo.pickProduct')}</Text>
           {productItems.length === 0 ? <Text muted>{t('seller.promo.noProducts')}</Text> : null}
-          <Chips options={productItems.map((p) => ({ value: p.id, label: p.title }))} value={form.productId || null} onChange={(id) => pickProduct(productItems.find((p) => p.id === id)!)} />
+          <Chips flush options={productItems.map((p) => ({ value: p.id, label: p.title }))} value={form.productId || null} onChange={(id) => pickProduct(productItems.find((p) => p.id === id)!)} />
           {products.hasNextPage ? <Button variant="ghost" label={t('story.viewer.more')} loading={products.isFetchingNextPage} onPress={() => products.fetchNextPage()} /> : null}
           {picked && picked.variants.filter((v) => v.active).length > 1 ? (
             <>
               <Text variant="bodyStrong">{t('seller.promo.variant')}</Text>
-              <Chips
+              <Chips flush
                 options={[{ value: '', label: t('seller.promo.wholeProduct') }, ...picked.variants.filter((v) => v.active).map((v) => ({ value: v.id, label: variantLabel(v) }))]}
                 value={form.variantId}
                 onChange={pickVariant}
               />
             </>
           ) : null}
-          <Chips
+          <Chips flush
             options={(['percent', 'fixed_price'] as const).map((k) => ({ value: k, label: t(`seller.promo.kind.${k}` as MessageKey) }))}
             value={form.kind}
             onChange={(kind) => set({ kind, value: '' })}

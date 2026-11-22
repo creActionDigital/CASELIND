@@ -30,9 +30,11 @@ export const createListingAlert = (body: CreateListingAlertRequest) => api.reque
 export const deleteListingAlert = (id: string) => api.request(`/me/listing-alerts/${id}`, { method: 'DELETE' });
 export const requestVisit = (listingId: string, body: CreateVisitRequest) => api.request(`/listings/${listingId}/visits`, { method: 'POST', body, schema: listingVisitSchema });
 export const fetchVisits = () => api.request('/me/visits', { schema: listingVisitListSchema });
+export const fetchVisit = (id: string) => api.request(`/visits/${id}`, { schema: listingVisitSchema });
 export const answerVisit = (id: string, action: 'confirm' | 'decline' | 'cancel', body: ConfirmVisitRequest = {}) => api.request(`/visits/${id}/${action}`, { method: 'POST', body, schema: listingVisitSchema });
 export const makeOffer = (listingId: string, body: CreateOfferRequest) => api.request(`/listings/${listingId}/offers`, { method: 'POST', body, schema: listingOfferSchema });
 export const fetchOffers = () => api.request('/me/offers', { schema: listingOfferListSchema });
+export const fetchOffer = (id: string) => api.request(`/offers/${id}`, { schema: listingOfferSchema });
 export const answerOffer = (id: string, action: 'accept' | 'decline' | 'counter' | 'cancel', amountMinor?: number) =>
   api.request(`/offers/${id}/${action}`, { method: 'POST', body: action === 'counter' ? { amountMinor } : {}, schema: listingOfferSchema });
 export const fetchCompare = (ids: string[]) => api.request('/listings/compare', { query: { ids: ids.join(',') }, schema: compareListingsResponseSchema });

@@ -53,11 +53,13 @@ export default function Freelance() {
         header={
           <View style={styles.pad}>
             <TextField label={t('freelance.search')} value={text} onChangeText={setText} returnKeyType="search" autoCapitalize="none" />
-            <Chips
-              options={[{ value: 'all' as const, label: t('freelance.all') }, ...CATEGORY_VALUES.map((c) => ({ value: c, label: t(categoryKey(c)) }))]}
-              value={category}
-              onChange={setCategory}
-            />
+            <View style={styles.bleedChips}>
+              <Chips
+                options={[{ value: 'all' as const, label: t('freelance.all') }, ...CATEGORY_VALUES.map((c) => ({ value: c, label: t(categoryKey(c)) }))]}
+                value={category}
+                onChange={setCategory}
+              />
+            </View>
           </View>
         }
         renderItem={({ item }) => (
@@ -79,7 +81,8 @@ export default function Freelance() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  bleedChips: { marginHorizontal: -spacing.lg },
   pad: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   actions: { flexDirection: 'row' },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, gap: spacing.xs },
+  card: { gap: spacing.xs },
 });

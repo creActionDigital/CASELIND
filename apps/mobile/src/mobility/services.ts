@@ -22,6 +22,7 @@ export const TRANSPORT_SERVICES: readonly TransportService[] = [
 
 /** Raccourcis d'espaces (historique, livraisons, chauffeur, livreur). */
 export const TRANSPORT_SPACES: readonly { key: MessageKey; href: string }[] = [
+  { key: 'mobility.link.places', href: '/rides/places' },
   { key: 'mb.transport.history', href: '/rides/history' },
   { key: 'mb.transport.deliveries', href: '/deliveries' },
   { key: 'mb.transport.driver', href: '/rides/driver' },

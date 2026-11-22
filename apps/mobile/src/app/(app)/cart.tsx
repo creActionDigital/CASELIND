@@ -14,7 +14,15 @@ import { useTheme } from '../../theme/use-theme';
 import { AuthImage, EmptyState, ErrorState, Text } from '../../ui';
 import { PressableScale } from '../../ui/premium';
 import { safeBack } from '../../lib/back-target';
-import { Steps } from '../../shop/Steps';
+
+/** « option: unique, couleur: noir » → « noir » (les valeurs seules, sans l'axe ni la valeur « unique »). */
+function shortVariant(label?: string | null): string {
+  return (label ?? '')
+    .split(',')
+    .map((x) => x.split(':').pop()!.trim())
+    .filter((x) => x && !/^(unique|default)$/i.test(x))
+    .join(' · ');
+}
 
 export default function Cart() {
   const { colors } = useTheme();
@@ -64,7 +72,6 @@ export default function Cart() {
         <View style={styles.round} />
       </View>
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Steps current={0} />
         {setItem.isError ? (
           <Text color={colors.danger} accessibilityLiveRegion="polite">
             {errorMessage(setItem.error, t, locale)}
@@ -93,22 +100,24 @@ export default function Cart() {
 
         {data.groups.map((g) => (
           <View key={`${g.orgId}-${g.currency}`} style={{ gap: spacing.sm }}>
-            <Pressable accessibilityRole="button" accessibilityLabel={g.orgName} onPress={() => router.push({ pathname: '/store/[slug]', params: { slug: g.orgSlug } })} style={styles.groupHead}>
-              <Text variant="bodyStrong" numberOfLines={1} style={styles.flex}>
-                {g.orgName}
-              </Text>
-              <Text variant="caption" muted>
-                {g.currency}
-              </Text>
-            </Pressable>
+            {data.groups.length > 1 ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={g.orgName} onPress={() => router.push({ pathname: '/store/[slug]', params: { slug: g.orgSlug } })} style={styles.groupHead}>
+                <Text numberOfLines={1} style={[styles.shopName, { color: colors.text }]}>
+                  {g.orgName}
+                </Text>
+                <Text variant="caption" muted>
+                  {g.currency}
+                </Text>
+              </Pressable>
+            ) : null}
             {g.lines.map((l) => (
               <View key={l.variantId} style={[styles.card, styles.line, { backgroundColor: colors.surface }]}>
                 <Pressable accessibilityRole="button" accessibilityLabel={l.title} onPress={() => router.push({ pathname: '/product/[productId]', params: { productId: l.productId } })}>
-                  <AuthImage contentUrl={mediaContentUrl(l.imageAssetId)} label={l.title} style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]} />
+                  <AuthImage contentUrl={mediaContentUrl(l.imageAssetId)} label={l.title} contentFit="contain" style={[styles.thumb, { backgroundColor: colors.surfaceAlt }]} />
                 </Pressable>
                 <View style={styles.flex}>
                   <View style={styles.nameRow}>
-                    <Text variant="bodyStrong" numberOfLines={2} style={styles.flex}>
+                    <Text numberOfLines={2} style={[styles.lineName, { color: colors.text }]}>
                       {l.title}
                     </Text>
                     <Pressable accessibilityRole="button" accessibilityLabel={t('cart.deleteLine', { title: l.title })} onPress={() => setItem.mutate({ variantId: l.variantId, quantity: 0 })} hitSlop={8} style={styles.trash}>
@@ -116,11 +125,11 @@ export default function Cart() {
                     </Pressable>
                   </View>
                   <Text variant="small" muted numberOfLines={1}>
-                    {l.variantLabel || g.orgName}
+                    {shortVariant(l.variantLabel) || g.orgName}
                   </Text>
                   <View style={styles.lineFoot}>
                     <View>
-                      <Text variant="bodyStrong">{formatMoney(l.lineTotalMinor, g.currency, locale)}</Text>
+                      <Text style={[styles.linePrice, { color: colors.text }]}>{formatMoney(l.lineTotalMinor, g.currency, locale)}</Text>
                       {l.compareAtPriceMinor ? (
                         <Text variant="caption" muted style={{ textDecorationLine: 'line-through' }}>
                           {formatMoney(l.compareAtPriceMinor * l.quantity, g.currency, locale)}
@@ -144,9 +153,11 @@ export default function Cart() {
             ))}
           </View>
         ))}
-        <Text variant="small" muted>
-          {t('cart.perStore')}
-        </Text>
+        {data.groups.length > 1 ? (
+          <Text variant="small" muted>
+            {t('cart.perStore')}
+          </Text>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.panel, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.sm }]}>
@@ -163,7 +174,7 @@ export default function Cart() {
             style={[styles.promoInput, { color: colors.text }]}
           />
           <PressableScale accessibilityLabel={t('mc.mk.apply')} disabled={!promo.trim()} onPress={() => setApplied(promo.trim())} style={[styles.apply, { opacity: promo.trim() ? 1 : 0.5 }]}>
-            <Text color={onMedia} style={styles.big}>
+            <Text color={brandAccent} style={styles.applyTxt}>
               {t('mc.mk.apply')}
             </Text>
           </PressableScale>
@@ -176,12 +187,12 @@ export default function Cart() {
         {totals.map((x) => (
           <View key={x.currency} style={{ gap: spacing.xs }}>
             <View style={styles.subtotal}>
-              <Text muted>{t('cart.subtotal')}</Text>
-              <Text variant="bodyStrong">{formatMoney(x.totalMinor, x.currency, locale)}</Text>
+              <Text muted style={styles.sumLabel}>{t('cart.subtotal')}</Text>
+              <Text style={[styles.sumValue, { color: colors.text }]}>{formatMoney(x.totalMinor, x.currency, locale)}</Text>
             </View>
             <View style={[styles.subtotal, styles.totalRow, { borderTopColor: colors.border }]}>
-              <Text variant="bodyStrong">{t('cart.total')}</Text>
-              <Text variant="title">{formatMoney(x.totalMinor, x.currency, locale)}</Text>
+              <Text style={[styles.sumLabel, { color: colors.text }]}>{t('cart.total')}</Text>
+              <Text style={[styles.totalValue, { color: colors.text }]}>{formatMoney(x.totalMinor, x.currency, locale)}</Text>
             </View>
           </View>
         ))}
@@ -191,7 +202,7 @@ export default function Cart() {
           onPress={() => (applied ? router.push({ pathname: '/checkout', params: { coupon: applied } }) : router.push('/checkout'))}
           style={[styles.checkout, { opacity: ready ? 1 : 0.5 }]}
         >
-          <Text color={onMedia} style={styles.big}>
+          <Text color={onMedia} style={styles.checkoutTxt}>
             {t('cart.checkout')}
           </Text>
         </PressableScale>
@@ -213,7 +224,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   trash: { minWidth: TOUCH - 8, minHeight: 32, alignItems: 'flex-end', justifyContent: 'center' },
   lineFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
-  thumb: { width: 84, height: 84, borderRadius: radius.lg },
+  thumb: { width: 76, height: 76, borderRadius: radius.md },
   pill: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill },
   pillBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   qty: { minWidth: 22, textAlign: 'center' },
@@ -223,7 +234,15 @@ const styles = StyleSheet.create({
   panel: { borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.md },
   promo: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingLeft: spacing.lg, paddingRight: spacing.xs, minHeight: 56 },
   promoInput: { flex: 1, minHeight: TOUCH, fontFamily: fonts.regular, fontSize: 16 },
-  apply: { minHeight: 44, paddingHorizontal: spacing.lg, borderRadius: radius.pill, backgroundColor: brandAccent, alignItems: 'center', justifyContent: 'center' },
+  apply: { minHeight: 44, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
+  applyTxt: { fontFamily: fonts.semibold, fontWeight: '600', fontSize: 18, lineHeight: 24 },
+  shopName: { flex: 1, fontFamily: fonts.semibold, fontWeight: '600', fontSize: 16, lineHeight: 22 },
+  lineName: { flex: 1, fontFamily: fonts.semibold, fontWeight: '600', fontSize: 17, lineHeight: 24 },
+  linePrice: { fontFamily: fonts.bold, fontWeight: '700', fontSize: 16, lineHeight: 22 },
+  sumLabel: { fontFamily: fonts.regular, fontSize: 17, lineHeight: 24 },
+  sumValue: { fontFamily: fonts.semibold, fontWeight: '600', fontSize: 19, lineHeight: 26 },
+  totalValue: { fontFamily: fonts.semibold, fontWeight: '600', fontSize: 22, lineHeight: 30 },
+  checkoutTxt: { fontFamily: fonts.medium, fontWeight: '500', fontSize: 20, lineHeight: 26 },
   checkout: { minHeight: 60, borderRadius: radius.pill, backgroundColor: brandAccent, alignItems: 'center', justifyContent: 'center' },
   big: { fontSize: 18, lineHeight: 24, fontWeight: '700', fontFamily: fonts.bold },
 });

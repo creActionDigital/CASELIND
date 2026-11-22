@@ -41,6 +41,7 @@ export const cancelRequest = (id: string) => api.request(`/wallet/requests/${id}
 
 // Paiements partagés
 export const fetchSplitBills = (cursor?: string) => api.request('/wallet/split-bills', { query: { limit: 20, cursor }, schema: splitBillListSchema });
+export const fetchSplitBill = (id: string) => api.request(`/wallet/split-bills/${id}`, { schema: splitBillSchema });
 export const createSplitBill = (body: CreateSplitBill) => api.request('/wallet/split-bills', { method: 'POST', body, schema: splitBillSchema });
 export const cancelSplitBill = (id: string) => api.request(`/wallet/split-bills/${id}/cancel`, { method: 'POST', schema: splitBillSchema });
 

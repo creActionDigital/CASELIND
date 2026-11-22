@@ -27,6 +27,18 @@ export function splitHashtags(text: string): TextPart[] {
   return parts;
 }
 
+/** Le début de hashtag en cours de frappe en fin de texte (sans le #), ou null. */
+export function typingHashtag(text: string): string | null {
+  const m = /(?<![\p{L}\p{N}_/&#])#([\p{L}\p{N}_]{1,40})$/u.exec(text);
+  return m ? m[1]! : null;
+}
+
+/** Remplace le hashtag en cours de frappe par le tag choisi, suivi d'un espace. */
+export function completeHashtag(text: string, tag: string): string {
+  const cur = typingHashtag(text);
+  return cur === null ? text : `${text.slice(0, text.length - cur.length)}${tag.replace(/^#/, '')} `;
+}
+
 // ---- impressions -----------------------------------------------------------------------------
 
 /** Durée minimale d'affichage avant de compter une impression. */

@@ -42,11 +42,14 @@ export function Chips<T extends string>({
   value,
   onChange,
   scroll = true,
+  flush = false,
 }: {
   options: readonly { value: T; label: string }[];
   value: T | null;
   onChange: (v: T) => void;
   scroll?: boolean;
+  /** Sans marge latérale propre : à utiliser dans un conteneur déjà rempli. */
+  flush?: boolean;
 }) {
   const { colors } = useTheme();
   const row = options.map((o) => {
@@ -68,7 +71,7 @@ export function Chips<T extends string>({
   });
   if (!scroll) return <View style={styles.chipWrap}>{row}</View>;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={[styles.chipRow, flush && { paddingHorizontal: 0 }]}>
       {row}
     </ScrollView>
   );
@@ -196,6 +199,7 @@ export function sellerErrorMessage(err: unknown, t: (k: MessageKey, p?: Record<s
 
 const styles = StyleSheet.create({
   card: { borderRadius: radius.md, padding: spacing.lg, gap: spacing.xs },
+  chipScroll: { flexGrow: 0 },
   chipRow: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   chip: {

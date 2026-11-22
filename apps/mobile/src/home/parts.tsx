@@ -7,24 +7,6 @@ import { brandColor, onMedia, radius, shadow, spacing, TOUCH } from '../theme/to
 import { useTheme } from '../theme/use-theme';
 import { Text } from '../ui';
 
-/** Bandeau d'accueil : aplat de marque (pas de dégradé) avec formes décoratives originales. */
-export function HomeBanner({ name }: { name: string }) {
-  const { t } = useI18n();
-  const first = name.trim().split(/\s+/)[0] ?? '';
-  return (
-    <View style={styles.banner} accessible accessibilityRole="header" accessibilityLabel={t('home.greeting', { name: first })}>
-      <View style={[styles.blob, styles.blobA]} />
-      <View style={[styles.blob, styles.blobB]} />
-      <Text variant="title" color={onMedia} style={styles.greet}>
-        {t('home.greeting', { name: first })}
-      </Text>
-      <Text variant="small" color={onMedia} style={styles.sub}>
-        {t('home.greetingSub')}
-      </Text>
-    </View>
-  );
-}
-
 /** Titre de section avec lien « Voir plus » à droite (cible ≥ 44 pt). */
 export function SectionHeader({ title, actionLabel, actionA11y, onAction }: { title: string; actionLabel?: string; actionA11y?: string; onAction?: () => void }) {
   const { colors } = useTheme();

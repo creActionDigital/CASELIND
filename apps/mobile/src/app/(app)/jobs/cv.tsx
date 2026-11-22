@@ -5,7 +5,8 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
-import { deleteJobProfile, fetchMyJobProfile, jobKeys, saveJobProfile } from '../../../jobs/api';
+import { deleteJobProfile, fetchMyJobProfile, jobKeys, saveJobProfile, setCvFile } from '../../../jobs/api';
+import { pickAndUpload } from '../../../media/pick-upload';
 import { radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
 import { Button, ErrorState, Screen, Text, TextField } from '../../../ui';
@@ -62,6 +63,23 @@ export default function JobCv() {
     onError: (e) => setError(errorMessage(e, t, locale)),
   });
 
+  const attach = useMutation({
+    mutationFn: async (remove: boolean) => {
+      if (remove) return setCvFile(null);
+      const id = await pickAndUpload('cv');
+      if (id === null) return null;
+      if (id === 'unsupported') throw new Error('unsupported');
+      return setCvFile(id);
+    },
+    onSuccess: (r) => {
+      if (r) {
+        setError(null);
+        void qc.invalidateQueries({ queryKey: jobKeys.profile });
+      }
+    },
+    onError: (e) => setError(e instanceof Error && e.message === 'unsupported' ? t('jobs.cv.pdfOnly') : e instanceof ApiRequestError && e.status === 409 ? t('jobs.cv.saveFirst') : errorMessage(e, t, locale)),
+  });
+
   if (q.isPending) {
     return (
       <Screen edges={['bottom']}>
@@ -104,6 +122,10 @@ export default function JobCv() {
         ) : null}
         {saved ? <Text variant="small">{t('common.saved')}</Text> : null}
         <Button label={t('jobs.cv.save')} loading={save.isPending} disabled={headline.trim().length < 2} onPress={() => save.mutate()} />
+        <Text variant="bodyStrong">{t('jobs.cv.file')}</Text>
+        <Text variant="small" muted>{q.data.cvFile ? t('jobs.cv.fileAttached', { kb: Math.max(1, Math.round(q.data.cvFile.sizeBytes / 1024)) }) : t('jobs.cv.fileNone')}</Text>
+        <Button variant="secondary" label={t(q.data.cvFile ? 'jobs.cv.fileReplace' : 'jobs.cv.fileAdd')} loading={attach.isPending && attach.variables === false} disabled={!q.data.profile} onPress={() => attach.mutate(false)} />
+        {q.data.cvFile ? <Button variant="ghost" label={t('jobs.cv.fileRemove')} loading={attach.isPending && attach.variables === true} onPress={() => attach.mutate(true)} /> : null}
         {q.data.profile ? <Button variant="danger" label={t('jobs.cv.delete')} loading={remove.isPending} onPress={() => remove.mutate()} /> : null}
       </View>
     </Screen>

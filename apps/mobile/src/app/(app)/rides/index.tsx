@@ -1,14 +1,14 @@
 import type { RidePoint, RideVehicle } from '@caselind/contracts';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { formatDistance, GOMA_CENTER } from '../../../places/geo';
 import { TileMap } from '../../../places/TileMap';
 import { checkRideSchedule, formatFareRange, isLiveRide } from '../../../mobility/logic';
-import { createRide, estimateRide, fetchMyRides, rideKeys } from '../../../mobility/api';
+import { createRide, estimateRide, fetchFavorites, fetchMyRides, rideKeys } from '../../../mobility/api';
 import { mobilityErrorMessage } from '../../../mobility/errors';
 import { PlaceSheet } from '../../../mobility/ui';
 import { formatDateField, formatTimeField, parseLocalDateTime } from '../../../messaging/extras-logic';
@@ -26,6 +26,7 @@ export default function RidesHome() {
   const { colors } = useTheme();
   const { t, locale } = useI18n();
   const router = useRouter();
+  const dest = useLocalSearchParams<{ destLat?: string; destLng?: string; destLabel?: string }>();
   const [points, setPoints] = useState<Record<Slot, RidePoint | null>>({ pickup: null, stop: null, dropoff: null });
   const [showStop, setShowStop] = useState(false);
   const [editing, setEditing] = useState<Slot | null>(null);
@@ -35,6 +36,19 @@ export default function RidesHome() {
   const [time, setTime] = useState('');
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const favorites = useQuery({ queryKey: rideKeys.favorites, queryFn: fetchFavorites, retry: false });
+
+  // Destination préremplie (depuis la carte : « Commander une course vers ce lieu »).
+  useEffect(() => {
+    const lat = Number(dest.destLat);
+    const lng = Number(dest.destLng);
+    if (dest.destLat && dest.destLng && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      setPoints((cur) => ({ ...cur, dropoff: { lat, lng, label: (dest.destLabel ?? '').slice(0, 160) || t('mobility.dropoff') } }));
+      setPlanning(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- appliqué une fois par destination reçue.
+  }, [dest.destLat, dest.destLng, dest.destLabel]);
 
   useEffect(() => {
     const d = new Date(Date.now() + 3600_000);
@@ -83,13 +97,31 @@ export default function RidesHome() {
   ];
 
 
+  const home = !planning && !points.dropoff;
+  const goPlan = (dropoff: RidePoint) => {
+    setPoints((cur) => ({ ...cur, dropoff }));
+    setPlanning(true);
+  };
+  const suggestions: { key: MessageKey; icon: 'car-outline' | 'bicycle-outline' | 'key-outline' | 'people-outline' | 'construct-outline'; go: () => void }[] = [
+    { key: 'mobility.sug.ride', icon: 'car-outline', go: () => setEditing('dropoff') },
+    { key: 'mobility.sug.moto', icon: 'bicycle-outline', go: () => { setVehicle('moto'); setEditing('dropoff'); } },
+    { key: 'mobility.sug.rental', icon: 'key-outline', go: () => router.push('/rentals') },
+    { key: 'mobility.sug.carpool', icon: 'people-outline', go: () => router.push('/carpool') },
+    { key: 'mobility.sug.roadside', icon: 'construct-outline', go: () => router.push('/roadside') },
+  ];
+
   return (
-    <Screen>
+    <View style={styles.root}>
+    <Screen bottomSpace={home ? 0 : 88}>
       <Stack.Screen options={{ title: t('mobility.title') }} />
-      <Text variant="title" accessibilityRole="header">
-        {t('mobility.order.title')}
-      </Text>
-      <Text muted>{t('mobility.order.intro')}</Text>
+      {home ? null : (
+        <>
+          <Text variant="title" accessibilityRole="header">
+            {t('mobility.order.title')}
+          </Text>
+          <Text muted>{t('mobility.order.intro')}</Text>
+        </>
+      )}
 
       {liveRide ? (
         <Card
@@ -109,6 +141,76 @@ export default function RidesHome() {
         </Card>
       ) : null}
 
+      {home ? (
+        <>
+          <View style={styles.whereRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mobility.where')}
+              onPress={() => setEditing('dropoff')}
+              style={[styles.pill, { backgroundColor: colors.surface, borderColor: colors.border, flex: 1 }]}
+            >
+              <Ionicons name="search" size={20} color={colors.primary} />
+              <Text variant="bodyStrong" color={colors.textMuted}>
+                {t('mobility.where')}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t(when === 'now' ? 'mobility.when.now' : 'mobility.when.later')}
+              onPress={() => setWhen(when === 'now' ? 'later' : 'now')}
+              style={[styles.pill, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoft }]}
+            >
+              <Ionicons name="time-outline" size={18} color={colors.primary} />
+              <Text variant="small" color={colors.primary} style={{ fontWeight: '700' }}>
+                {t(when === 'now' ? 'mobility.when.now' : 'mobility.when.later')}
+              </Text>
+            </Pressable>
+          </View>
+          {favorites.data && favorites.data.items.length > 0 ? (
+            <View style={{ gap: spacing.xs }}>
+              <SectionTitle>{t('mobility.saved')}</SectionTitle>
+              {favorites.data.items.map((f) => (
+                <Pressable
+                  key={f.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${f.label}, ${f.address}`}
+                  onPress={() => goPlan({ lat: f.lat, lng: f.lng, label: f.label })}
+                  style={[styles.place, { backgroundColor: colors.surface }]}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: colors.primarySoft }]}>
+                    <Ionicons name={f.kind === 'home' ? 'home-outline' : f.kind === 'work' ? 'briefcase-outline' : 'location-outline'} size={22} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyStrong" numberOfLines={1}>
+                      {f.label}
+                    </Text>
+                    <Text variant="small" muted numberOfLines={1}>
+                      {f.address}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Button variant="ghost" label={t('mobility.places.add')} onPress={() => router.push('/rides/places')} />
+          )}
+          <SectionTitle>{t('mobility.suggestions')}</SectionTitle>
+          <View style={styles.tiles}>
+            {suggestions.map((x) => (
+              <Pressable key={x.key} accessibilityRole="button" accessibilityLabel={t(x.key)} onPress={x.go} style={styles.tile}>
+                <View style={[styles.iconBox, styles.tileIcon, { backgroundColor: colors.surface }]}>
+                  <Ionicons name={x.icon} size={26} color={colors.primary} />
+                </View>
+                <Text variant="caption" numberOfLines={1} style={{ textAlign: 'center', fontSize: 11 }}>
+                  {t(x.key)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : (
+        <>
       <TileMap
         style={styles.map}
         fit={mapPoints.length > 0 ? mapPoints : [GOMA_CENTER]}
@@ -157,7 +259,7 @@ export default function RidesHome() {
         )}
       </View>
 
-      <SectionTitle>{t('mobility.estimate.title')}</SectionTitle>
+      <SectionTitle>{t('mobility.pickVehicle')}</SectionTitle>
       {!route ? (
         <Text muted>{t('mobility.estimate.pick')}</Text>
       ) : estimate.isError ? (
@@ -185,18 +287,21 @@ export default function RidesHome() {
                   onPress={() => setVehicle(v)}
                   style={[styles.option, { backgroundColor: selected ? colors.primarySoft : colors.surface, borderColor: selected ? colors.primary : colors.border }]}
                 >
-                  <Ionicons name={v === 'moto' ? 'bicycle-outline' : 'car-outline'} size={26} color={colors.primary} />
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyStrong">{t(`mobility.vehicle.${v}` as MessageKey)}</Text>
+                  <View style={[styles.iconBox, { backgroundColor: colors.background }]}>
+                    <Ionicons name={v === 'moto' ? 'bicycle-outline' : 'car-outline'} size={26} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <View style={styles.line}>
+                      <Text variant="bodyStrong" style={{ flex: 1 }}>{t(`mobility.vehicle.${v}` as MessageKey)}</Text>
+                      <Text variant="caption" muted>
+                        {t('mobility.etaMin', { min: estimate.data!.durationMin })}
+                      </Text>
+                    </View>
                     <Text variant="small" muted>
                       {t(`mobility.vehicle.${v}.body` as MessageKey)}
                     </Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text variant="bodyStrong">{range}</Text>
-                    <Text variant="caption" muted>
-                      {t('mobility.estimated')}
-                    </Text>
+                    <Text variant="bodyStrong" color={colors.primary}>{range}</Text>
+                    <Text variant="caption" muted>{t('mobility.estimated')}</Text>
                   </View>
                 </Pressable>
               );
@@ -236,12 +341,8 @@ export default function RidesHome() {
           {error}
         </Text>
       ) : null}
-      <Button
-        label={t(when === 'now' ? 'mobility.order.now' : 'mobility.order.schedule')}
-        disabled={!route || !estimate.data}
-        loading={order.isPending}
-        onPress={submit}
-      />
+        </>
+      )}
 
       <View style={{ gap: spacing.xs, marginTop: spacing.lg }}>
         <Button variant="secondary" label={t('mobility.link.history')} onPress={() => router.push('/rides/history')} />
@@ -254,15 +355,35 @@ export default function RidesHome() {
         visible={editing !== null}
         onClose={() => setEditing(null)}
         onPick={(p) => {
-          if (editing) setPoints((cur) => ({ ...cur, [editing]: p }));
+          if (editing === 'dropoff') goPlan(p);
+          else if (editing) setPoints((cur) => ({ ...cur, [editing]: p }));
           setEditing(null);
         }}
       />
     </Screen>
+    {home ? null : (
+      <View style={[styles.bar, { backgroundColor: colors.background, borderColor: colors.border }]}>
+        <Button
+        label={t(when === 'now' ? 'mobility.order.now' : 'mobility.order.schedule')}
+        disabled={!route || !estimate.data}
+        loading={order.isPending}
+        onPress={submit}
+      />
+      </View>
+    )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
+  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth },
+  whereRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  pill: { minHeight: TOUCH + 4, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.lg },
+  iconBox: { width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  tiles: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
+  tile: { flex: 1, alignItems: 'center', gap: spacing.xs, minHeight: TOUCH },
+  tileIcon: { width: 56, height: 56, borderRadius: radius.lg },
   map: { height: 220, borderRadius: radius.lg, marginTop: spacing.md },
   line: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   place: { minHeight: TOUCH + 12, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderRadius: radius.md, padding: spacing.md },

@@ -36,3 +36,5 @@ export const tipPost = (postId: string, body: PaidBody) => api.request(`/posts/$
 export const tipUser = (userId: string, body: PaidBody) => api.request(`/users/${userId}/tips`, { method: 'POST', body, schema: tipResponseSchema });
 export const boostPost = (postId: string, body: { clientId: string; days: number; budgetMinor: number; currency: string; pin: string }) =>
   api.request(`/posts/${postId}/boost`, { method: 'POST', body, schema: boostResponseSchema });
+
+export const fetchHashtagSuggestions = (q: string) => api.request('/hashtags/suggest', { query: { q }, schema: hashtagListSchema });

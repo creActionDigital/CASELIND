@@ -100,7 +100,7 @@ export default function MyInterviews() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   error: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, gap: spacing.xs },
+  card: { gap: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   actions: { gap: spacing.xs, marginTop: spacing.sm },
 });

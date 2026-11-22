@@ -1,3 +1,5 @@
+import { PersonField } from '../../../../components/PersonField';
+import type { Person } from '../../../../people/logic';
 import type { OrgMember, OrgRole } from '@caselind/contracts';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
@@ -26,6 +28,7 @@ export default function SellerTeam() {
   const allowed = canViewTeam(role);
   const roleOptions = (list: readonly OrgRole[]) => list.map((r) => ({ value: r, label: t(`seller.role.${r}` as MessageKey) }));
   const [handle, setHandle] = useState('');
+  const [person, setPerson] = useState<Person | null>(null);
   const [inviteRole, setInviteRole] = useState<OrgRole>('employee');
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -80,9 +83,9 @@ export default function SellerTeam() {
       {mine.length > 0 ? (
         <View style={styles.col}>
           <SectionTitle>{t('mc.team.invite')}</SectionTitle>
-          <TextField label={t('mc.team.handle')} value={handle} onChangeText={setHandle} autoCapitalize="none" autoCorrect={false} maxLength={30} />
+          <PersonField label={t('mc.team.handle')} placeholder={t('pp.choose')} value={handle ? { handle, displayName: person?.displayName ?? handle, avatarUrl: person?.avatarUrl } : null} onChange={(x) => { setPerson(x); setHandle(x?.handle ?? ''); }} />
           <Text variant="small" muted>{t('mc.team.role')}</Text>
-          <Chips options={roleOptions(mine)} value={inviteRole} onChange={setInviteRole} />
+          <Chips flush options={roleOptions(mine)} value={inviteRole} onChange={setInviteRole} />
           <Button label={t('mc.team.send')} loading={invite.isPending} disabled={handle.trim().length < 3} onPress={() => invite.mutate()} />
         </View>
       ) : null}
@@ -129,7 +132,7 @@ export default function SellerTeam() {
             {editable ? (
               <View style={styles.col}>
                 {editing === item.userId ? (
-                  <Chips options={roleOptions(mine)} value={item.role} onChange={(r) => change.mutate({ userId: item.userId, role: r })} />
+                  <Chips flush options={roleOptions(mine)} value={item.role} onChange={(r) => change.mutate({ userId: item.userId, role: r })} />
                 ) : (
                   <Button variant="secondary" label={t('mc.team.changeRole', { name: item.displayName })} onPress={() => setEditing(item.userId)} />
                 )}

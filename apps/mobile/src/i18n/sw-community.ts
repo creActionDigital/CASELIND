@@ -176,6 +176,8 @@ export const swCommunity: Partial<Record<MessageKey, string>> = {
   'admin.empty': 'Hakuna matokeo.',
   'admin.status.active': 'Inatumika',
   'admin.status.suspended': 'Imesimamishwa',
+  'admin.status.pending_verification': 'Inasubiri uthibitisho',
+  'admin.status.deleted': 'Imefutwa',
   'admin.verif.verified': 'Imethibitishwa',
   'admin.verif.pending': 'Inasubiri',
   'admin.verif.unverified': 'Haijathibitishwa',

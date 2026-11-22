@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { eduKeys, fetchCourse, fetchQuiz, saveExam, saveLessons, saveQuiz } from '../../../../education/api';
+import { eduKeys, fetchCourse, fetchQuiz, saveExam, saveLessons, saveQuiz, setLessonFiles } from '../../../../education/api';
 import { correctIndex, educationErrorKey, parseOptions } from '../../../../education/logic';
+import { pickAndUpload } from '../../../../media/pick-upload';
 import { useI18n } from '../../../../i18n';
 import { ApiRequestError } from '../../../../lib/api';
 import { errorMessage } from '../../../../lib/errors';
@@ -60,6 +61,22 @@ export default function EditCourse() {
     setSaved(which);
     void qc.invalidateQueries({ queryKey: eduKeys.all });
   };
+  const files = useMutation({
+    mutationFn: async (v: { lessonId: string; keep: string[]; add: boolean }) => {
+      let ids = v.keep;
+      if (v.add) {
+        const id = await pickAndUpload('lesson');
+        if (id === null) return null;
+        if (id === 'unsupported') throw new Error('unsupported');
+        ids = [...ids, id];
+      }
+      return setLessonFiles(courseId, v.lessonId, ids);
+    },
+    onSuccess: (r) => {
+      if (r) done('lessons');
+    },
+    onError: (e) => (e instanceof Error && e.message === 'unsupported' ? setError(t('education.fileUnsupported')) : fail(e)),
+  });
   const saveL = useMutation({
     mutationFn: () => saveLessons(courseId, { lessons: (lessons ?? []).map((l) => ({ title: l.title.trim(), content: l.content.trim() })) }),
     onSuccess: () => done('lessons'),
@@ -122,6 +139,17 @@ export default function EditCourse() {
           <View key={i} style={[styles.card, { backgroundColor: colors.surface }]}>
             <TextField label={`${i + 1}. ${t('education.lessonTitle')}`} value={l.title} onChangeText={(v) => setLesson(i, { title: v })} maxLength={120} />
             <TextField label={t('education.lessonContent')} value={l.content} onChangeText={(v) => setLesson(i, { content: v })} multiline maxLength={8000} />
+            {(() => {
+              const sl = course.data?.lessons[i];
+              if (!sl || sl.title !== l.title.trim()) return null;
+              return (
+                <View style={{ gap: spacing.sm }}>
+                  <Text variant="small" muted>{t('education.lessonFiles', { n: sl.files.length })}</Text>
+                  {sl.files.length < 3 ? <Button variant="secondary" label={t('education.addFile')} loading={files.isPending} onPress={() => files.mutate({ lessonId: sl.id, keep: sl.files.map((f) => f.id), add: true })} /> : null}
+                  {sl.files.length > 0 ? <Button variant="ghost" label={t('education.removeFiles')} onPress={() => files.mutate({ lessonId: sl.id, keep: [], add: false })} /> : null}
+                </View>
+              );
+            })()}
             <Button variant="ghost" label={t('education.removeLesson')} onPress={() => setLessons((cur) => (cur ?? []).filter((_, k) => k !== i))} />
           </View>
         ))}

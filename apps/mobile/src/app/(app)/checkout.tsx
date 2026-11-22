@@ -1,7 +1,7 @@
 import type { DeliverySpeed, DeliveryZone, Fulfillment } from '@caselind/contracts';
 import { Steps } from '../../shop/Steps';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -13,7 +13,7 @@ import { addressRequired, expressSupplement, feeFor, plannedTotals, totalsByCurr
 import { useI18n, type MessageKey } from '../../i18n';
 import { uuidv4 } from '../../lib/uuid';
 import { loadAddress, saveAddress, type SavedAddress } from '../../shop/address-store';
-import { checkout } from '../../shop/api';
+import { checkout, fetchPaymentMethods } from '../../shop/api';
 import { canCheckout } from '../../shop/cart-logic';
 import { couponErrorCode, couponErrorKey, stockConflict, type StockConflict } from '../../shop/errors';
 import { formatMoney } from '../../shop/format';
@@ -36,6 +36,9 @@ export default function Checkout() {
   // Clé d'idempotence conservée pour les nouvelles tentatives de cette commande.
   const clientId = useRef(uuidv4());
 
+  // Moyens acceptés par le serveur ; en attendant la réponse (ou en cas d'échec) le paiement à la livraison reste proposé.
+  const methods = useQuery({ queryKey: ['payment-methods'], queryFn: fetchPaymentMethods });
+  const payMethod = methods.data?.methods[0] ?? 'cash_on_delivery';
   const [form, setForm] = useState<SavedAddress>(EMPTY);
   const [coupons, setCoupons] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Partial<Record<keyof SavedAddress, string>>>({});
@@ -67,7 +70,7 @@ export default function Checkout() {
     mutationFn: () =>
       checkout({
         clientId: clientId.current,
-        paymentMethod: 'cash_on_delivery',
+        paymentMethod: payMethod,
         fulfillment: mode,
         speed: mode === 'delivery' ? speed : 'standard',
         ...(mode === 'delivery' && slotOn ? { scheduledFor: slotIso! } : {}),
@@ -295,6 +298,7 @@ export default function Checkout() {
         <Text variant="heading" accessibilityRole="header">
           {t('checkout.payment')}
         </Text>
+        {payMethod === 'cash_on_delivery' ? (
         <View style={[styles.card, styles.codCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
           <Ionicons name="cash-outline" size={26} color={colors.primary} />
           <View style={styles.flex}>
@@ -305,6 +309,7 @@ export default function Checkout() {
           </View>
           <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
         </View>
+        ) : null}
 
         <Text variant="heading" accessibilityRole="header">
           {t('checkout.summary')}

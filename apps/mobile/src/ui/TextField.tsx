@@ -85,7 +85,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   focused: { borderWidth: 1.5 },
-  input: { flex: 1, minHeight: TOUCH, paddingVertical: spacing.sm },
+  // outlineStyle : le contour de focus du navigateur fait doublon avec la bordure du champ (web seulement).
+  input: { flex: 1, minHeight: TOUCH, paddingVertical: spacing.sm, ...({ outlineStyle: 'none' } as object) },
   toggle: { minHeight: TOUCH, minWidth: TOUCH, justifyContent: 'center', alignItems: 'center', paddingLeft: spacing.sm },
   msg: { marginTop: spacing.xs },
 });

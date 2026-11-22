@@ -72,6 +72,6 @@ export default function MyApplications() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   error: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, gap: spacing.xs },
+  card: { gap: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

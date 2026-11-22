@@ -1,6 +1,6 @@
 import type { Review } from '@caselind/contracts';
 import { Ionicons } from '@expo/vector-icons';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -12,10 +12,12 @@ import { shareMessage } from '../../../lib/share';
 import { useToggleWish } from '../../../promotions/hooks';
 import { PromoBadge, PromoCountdown, PromoPrice } from '../../../promotions/parts';
 import { openReport } from '../../../report/open-report';
-import { fetchCategories, fetchProduct, fetchProducts, fetchReviews, fetchStore } from '../../../shop/api';
+import { fetchCategories, fetchProduct, fetchProducts, fetchReviews, fetchStore, deleteReview } from '../../../shop/api';
+import { useAuth } from '../../../auth/auth-context';
+import { alertConfirm } from '../../../lib/confirm';
 import { ContactSeller } from '../../../shop/ContactSeller';
 import { GalleryViewer } from '../../../shop/GalleryViewer';
-import { similarProducts } from '../../../shop/market-logic';
+import { similarProducts, splitDescription } from '../../../shop/market-logic';
 import { ProductCard } from '../../../shop/ProductGrid';
 import { toggleCompareProductId, useCompareProductIds } from '../../../shop/compare-store';
 import { quantityOf } from '../../../shop/cart-logic';
@@ -68,7 +70,6 @@ export default function ProductScreen() {
   const [qty, setQty] = useState(1);
   const [page, setPage] = useState(0);
   const [tab, setTab] = useState<'description' | 'specs' | 'reviews'>('description');
-  const [expanded, setExpanded] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
@@ -101,8 +102,9 @@ export default function ProductScreen() {
   const price = variant ?? p.variants.find((v) => v.inStock) ?? p.variants[0];
   const summary = reviews.data?.pages[0]?.summary;
   const reviewItems = reviews.data?.pages.flatMap((pg) => pg.items) ?? [];
-  const longDescription = (p.description?.length ?? 0) > 180;
-  const heroH = Math.round(width * 0.95);
+  const heroH = Math.round(width * 1.0);
+  const heroBox = { width, height: heroH, paddingTop: insets.top + 64, paddingBottom: 56, paddingHorizontal: 36 };
+  const { text: descText, specs: descSpecs } = splitDescription(p.description);
   const category = categories.data?.items.find((c) => c.id === p.categoryId)?.name;
 
   function add(thenCheckout = false) {
@@ -141,31 +143,24 @@ export default function ProductScreen() {
               getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
               onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
               renderItem={({ item, index }) => (
-                <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('mc.gallery.open')} onPress={() => { setPage(index); setGallery(true); }}>
+                <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('mc.gallery.open')} onPress={() => { setPage(index); setGallery(true); }} style={heroBox}>
                   <AuthImage
                     contentUrl={item.contentUrl}
                     label={t('product.photo', { n: index + 1, total: p.media.length })}
-                    style={{ width, height: heroH, borderRadius: 0, backgroundColor: 'transparent' }}
+                    contentFit="contain"
+                    style={styles.heroImg}
                   />
                 </Pressable>
               )}
             />
           ) : (
-            <AuthImage contentUrl={p.coverUrl} label={p.title} style={{ width, height: heroH, borderRadius: 0, backgroundColor: 'transparent' }} />
+            <View style={heroBox}>
+              <AuthImage contentUrl={p.coverUrl} label={p.title} contentFit="contain" style={styles.heroImg} />
+            </View>
           )}
           <View style={[styles.topBar, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
             <RoundButton icon="chevron-back" label={t('product.back')} onPress={() => safeBack(router, '/shop')} />
             <View style={styles.topRight}>
-              <RoundButton
-                icon="git-compare-outline"
-                label={t('cmp.button')}
-                pressed={compareIds.includes(p.id)}
-                onPress={() => {
-                  const next = toggleCompareProductId(p.id);
-                  if (next.length >= 2 && next.includes(p.id)) router.push('/product/compare');
-                  else if (next.includes(p.id)) setNotice({ text: t('cmp.added'), ok: true });
-                }}
-              />
               <RoundButton icon="share-outline" label={t('product.share')} onPress={() => void shareMessage({ message: p.title }, t('share.copied'))} />
               <RoundButton
                 icon={p.wished ? 'heart' : 'heart-outline'}
@@ -189,28 +184,32 @@ export default function ProductScreen() {
         </View>
 
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>
+            {p.title}
+          </Text>
+          {price ? (
+            price.compareAtPriceMinor && price.compareAtPriceMinor > price.priceMinor ? (
+              <PromoPrice priceMinor={price.priceMinor} compareAtMinor={price.compareAtPriceMinor} currency={price.currency} variant="title" />
+            ) : (
+              <Text style={[styles.price, { color: colors.text }]}>{formatMoney(price.priceMinor, price.currency, locale)}</Text>
+            )
+          ) : null}
+          {price ? <PromoBadge priceMinor={price.priceMinor} compareAtMinor={price.compareAtPriceMinor} /> : null}
           <View style={styles.titleRow}>
-            <View style={styles.flex}>
-              <Text variant="title" accessibilityRole="header">
-                {p.title}
-              </Text>
-              {price ? <PromoPrice priceMinor={price.priceMinor} compareAtMinor={price.compareAtPriceMinor} currency={price.currency} variant="title" /> : null}
-              {price ? <PromoBadge priceMinor={price.priceMinor} compareAtMinor={price.compareAtPriceMinor} /> : null}
-              {summary && summary.ratingCount > 0 ? (
-                <View style={styles.avgRow} accessible accessibilityLabel={t('product.ratingA11y', { avg: (summary.averageRating ?? 0).toFixed(1), n: summary.ratingCount })}>
-                  <View style={styles.ratePill}>
-                    <Ionicons name="star" size={12} color="#1D1D1F" />
-                    <Text variant="caption" color="#1D1D1F" style={{ fontWeight: '700' }}>
-                      {(summary.averageRating ?? 0).toFixed(1)}
-                    </Text>
-                  </View>
-                  <Text variant="caption" muted>
-                    {t('mc.mk.reviewsN', { n: summary.ratingCount })}
-                  </Text>
+            {summary && summary.ratingCount > 0 ? (
+              <View style={styles.avgRow} accessible accessibilityLabel={t('product.ratingA11y', { avg: (summary.averageRating ?? 0).toFixed(1), n: summary.ratingCount })}>
+                <View style={styles.ratePill}>
+                  <Ionicons name="star" size={12} color={onMedia} />
+                  <Text style={[styles.rateTxt, { color: onMedia }]}>{(summary.averageRating ?? 0).toFixed(1)}</Text>
                 </View>
-              ) : null}
-            </View>
-            <Text variant="small" style={styles.sellerTxt} numberOfLines={2}>
+                <Text variant="caption" muted>
+                  {t('mc.mk.reviewsN', { n: summary.ratingCount })}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.flex} />
+            )}
+            <Text numberOfLines={2} style={[styles.sellerTxt, { color: colors.text }]}>
               {t('mc.mk.seller', { name: p.org.name })}
             </Text>
           </View>
@@ -226,10 +225,7 @@ export default function ProductScreen() {
 
           {axes.map((axis) => (
             <View key={axis.name} style={styles.group}>
-              <Text variant="heading">
-                {axis.name}
-                {selection[axis.name] ? ` : ${selection[axis.name]}` : ''}
-              </Text>
+              <Text style={[styles.axisTitle, { color: colors.text }]}>{axis.name.charAt(0).toUpperCase() + axis.name.slice(1)}</Text>
               <AxisPicker
                 axis={axis}
                 selected={selection[axis.name]}
@@ -256,7 +252,7 @@ export default function ProductScreen() {
                 onPress={() => setTab(k)}
                 style={[styles.tab, { backgroundColor: tab === k ? brandAccent : 'transparent' }]}
               >
-                <Text variant="small" color={tab === k ? '#1D1D1F' : colors.text} numberOfLines={1} style={{ fontWeight: tab === k ? '700' : '500' }}>
+                <Text color={tab === k ? onMedia : colors.text} numberOfLines={1} style={styles.tabTxt}>
                   {k === 'description' ? t('product.description') : k === 'specs' ? t('mc.mk.specs') : t('product.reviews')}
                 </Text>
               </Pressable>
@@ -264,24 +260,17 @@ export default function ProductScreen() {
           </View>
 
           {tab === 'description' ? (
-            p.description ? (
-              <View style={styles.group}>
-                <Text numberOfLines={expanded ? undefined : 4} muted>
-                  {p.description}
-                </Text>
-                {longDescription ? (
-                  <Pressable accessibilityRole="button" onPress={() => setExpanded((v) => !v)} style={styles.link}>
-                    <Text style={{ fontWeight: '600' }}>{expanded ? t('product.less') : t('product.more')}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
+            descText ? (
+              <Text muted style={styles.desc}>
+                {descText}
+              </Text>
             ) : (
               <Text muted>{t('mc.mk.noSpecs')}</Text>
             )
           ) : null}
           {tab === 'specs' ? (
             <View style={styles.group}>
-              {[...(category ? [[t('mc.home.categories'), category]] : []), [t('product.shop'), p.org.name], ...axes.map((x) => [x.name, x.values.join(', ')])].map(([k, v]) => (
+              {[...(category ? [[t('mc.home.categories'), category]] : []), ...descSpecs, [t('product.shop'), p.org.name], ...axes.map((x) => [x.name, x.values.join(', ')])].map(([k, v]) => (
                 <View key={k} style={[styles.spec, { borderBottomColor: colors.border }]}>
                   <Text variant="small" muted style={styles.flex}>
                     {k}
@@ -331,6 +320,7 @@ export default function ProductScreen() {
           </View>
           ) : null}
 
+          <View style={[styles.lower, { borderTopColor: colors.border }]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('product.buy')}
@@ -341,6 +331,20 @@ export default function ProductScreen() {
           >
             <Ionicons name="bag-handle-outline" size={20} color={colors.text} />
             <Text variant="bodyStrong">{t('product.buy')}</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: compareIds.includes(p.id) }}
+            onPress={() => {
+              const next = toggleCompareProductId(p.id);
+              if (next.length >= 2 && next.includes(p.id)) router.push('/product/compare');
+              else if (next.includes(p.id)) setNotice({ text: t('cmp.added'), ok: true });
+            }}
+            style={[styles.buyNow, { borderColor: colors.border }]}
+          >
+            <Ionicons name="git-compare-outline" size={20} color={compareIds.includes(p.id) ? brandAccent : colors.text} />
+            <Text variant="bodyStrong">{t('cmp.button')}</Text>
           </Pressable>
 
           <View style={[styles.seller, { backgroundColor: colors.surfaceAlt }]}>
@@ -387,7 +391,7 @@ export default function ProductScreen() {
               </ScrollView>
             </View>
           ) : null}
-
+          </View>
         </View>
       </ScrollView>
 
@@ -456,6 +460,13 @@ function RoundButton({ icon, label, onPress, disabled, pressed: on }: { icon: 'c
 function ReviewRow({ review }: { review: Review }) {
   const { colors } = useTheme();
   const { t } = useI18n();
+  const { me } = useAuth();
+  const router = useRouter();
+  const qc = useQueryClient();
+  const del = useMutation({
+    mutationFn: () => deleteReview(review.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: shopKeys.reviews(review.productId) }),
+  });
   return (
     <View style={[styles.review, { borderTopColor: colors.border }]}>
       <View style={styles.reviewHead}>
@@ -479,6 +490,26 @@ function ReviewRow({ review }: { review: Review }) {
           <Text variant="small">{review.reply.body}</Text>
         </View>
       ) : null}
+      {me?.id === review.author.userId ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('rev.edit')}
+          onPress={() => router.push({ pathname: '/review/new', params: { productId: review.productId, reviewId: review.id, r: String(review.rating), b: review.body ?? '' } })}
+          style={styles.link}
+        >
+          <Text variant="small" color={colors.primary}>{t('rev.edit')}</Text>
+        </Pressable>
+      ) : null}
+      {me?.id === review.author.userId ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('rev.delete')}
+          onPress={() => alertConfirm(t('rev.deleteConfirm'), undefined, [{ text: t('common.cancel'), style: 'cancel' }, { text: t('rev.delete'), style: 'destructive', onPress: () => del.mutate() }])}
+          style={styles.link}
+        >
+          <Text variant="small" color={colors.danger}>{t('rev.delete')}</Text>
+        </Pressable>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('product.report')}
@@ -501,10 +532,18 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   topBar: { position: 'absolute', left: spacing.lg, right: spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
   round: { width: TOUCH, height: TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  dots: { position: 'absolute', bottom: spacing.xl + spacing.sm, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dots: { position: 'absolute', bottom: radius.xxl + spacing.lg, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 4 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   ratePill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: brandAccent },
-  sellerTxt: { maxWidth: 120, textAlign: 'right', fontWeight: '600', marginTop: spacing.sm },
+  rateTxt: { fontFamily: fonts.semibold, fontWeight: '600', fontSize: 12, lineHeight: 18 },
+  sellerTxt: { maxWidth: 190, textAlign: 'right', fontFamily: fonts.medium, fontWeight: '500', fontSize: 14, lineHeight: 20 },
+  heroImg: { flex: 1, backgroundColor: 'transparent' },
+  title: { fontFamily: fonts.semibold, fontWeight: '600', fontSize: 24, lineHeight: 32 },
+  price: { fontFamily: fonts.bold, fontWeight: '700', fontSize: 22, lineHeight: 30 },
+  axisTitle: { fontFamily: fonts.semibold, fontWeight: '600', fontSize: 20, lineHeight: 28 },
+  tabTxt: { fontFamily: fonts.medium, fontWeight: '500', fontSize: 14, lineHeight: 20 },
+  desc: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 22 },
+  lower: { gap: spacing.md, marginTop: spacing.xl, paddingTop: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth },
   tabs: { flexDirection: 'row', gap: spacing.xs },
   tab: { flex: 1, minHeight: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs },
   spec: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
@@ -515,15 +554,15 @@ const styles = StyleSheet.create({
   qtyTxt: { minWidth: 20, textAlign: 'center' },
   addCart: { flex: 1, minHeight: 56, borderRadius: radius.pill, backgroundColor: brandAccent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
   addLabel: { fontSize: 18, lineHeight: 24, fontWeight: '700', fontFamily: fonts.bold },
-  sheet: { marginTop: -radius.xxl, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  sheet: { marginTop: -radius.xxl, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, padding: spacing.xl, gap: spacing.md },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   topRight: { flexDirection: 'row', gap: spacing.sm },
   promoLine: { gap: 2 },
   priceCol: { alignItems: 'flex-end', gap: 2 },
   link: { minHeight: TOUCH, justifyContent: 'center' },
   seller: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.xl, minHeight: TOUCH + 20 },
   visit: { minHeight: TOUCH, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
-  avgRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
+  avgRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   distRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   distLabel: { width: 14, textAlign: 'right' },
   distCount: { width: 28 },

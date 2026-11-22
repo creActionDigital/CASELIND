@@ -80,7 +80,9 @@ export default function MyAppointments() {
             <Text variant="small" muted>
               {new Date(item.startsAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}
             </Text>
-            <Badge tone="neutral" label={t(`health.appt.${item.status}`)} />
+            <View style={styles.badgeBox}>
+              <Badge tone="neutral" label={t(`health.appt.${item.status}`)} />
+            </View>
             {item.reason ? <Text variant="small">{item.reason}</Text> : null}
             {item.hasPrescription ? <Text variant="small">{t('health.appt.hasRx')}</Text> : null}
             {item.status === 'requested' || item.status === 'confirmed' ? (
@@ -100,6 +102,7 @@ export default function MyAppointments() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { padding: spacing.lg, gap: spacing.sm },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, gap: spacing.xs },
+  card: { gap: spacing.xs },
+  badgeBox: { alignSelf: 'flex-start' },
   rx: { borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
 });

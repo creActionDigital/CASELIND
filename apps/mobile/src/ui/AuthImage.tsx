@@ -14,10 +14,11 @@ interface Props {
   localUri?: string;
   label: string;
   style?: StyleProp<ViewStyle>;
+  contentFit?: 'cover' | 'contain';
 }
 
 /** Image protégée : téléchargement authentifié mis en cache, puis affichage. */
-export function AuthImage({ contentUrl, localUri, label, style }: Props) {
+export function AuthImage({ contentUrl, localUri, label, style, contentFit = 'cover' }: Props) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const [uri, setUri] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function AuthImage({ contentUrl, localUri, label, style }: Props) {
   return (
     <View style={[styles.box, { backgroundColor: colors.surfaceAlt }, style]}>
       {shown ? (
-        <Image source={{ uri: shown }} accessibilityLabel={label} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <Image source={{ uri: shown }} accessibilityLabel={label} style={StyleSheet.absoluteFill} contentFit={contentFit} />
       ) : !contentUrl ? (
         // No image at all (e.g. a shop without a logo): show initials instead of an endless spinner.
         <Text variant="bodyStrong" color={colors.primary} accessibilityLabel={label}>

@@ -1,3 +1,5 @@
+import { PeopleField } from '../../../components/PersonField';
+import type { Person } from '../../../people/logic';
 import type { ConversationMember, ConversationRole } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -31,7 +33,6 @@ export default function GroupInfo() {
 
   const [title, setTitle] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
-  const [handle, setHandle] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState<ConversationMember | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -76,14 +77,12 @@ export default function GroupInfo() {
   const titleValue = title ?? c.title ?? '';
   const announcementValue = announcement ?? c.announcement ?? '';
 
-  async function addMember() {
-    const h = handle.trim();
-    if (!h) return;
+  async function addMembers(list: Person[]) {
+    if (list.length === 0) return;
     setError(null);
     try {
-      const user = await lookupHandle(h);
-      await api.request(`/conversations/${id}/members`, { method: 'POST', body: { userIds: [user.id] } });
-      setHandle('');
+      const userIds = await Promise.all(list.map(async (x) => x.id ?? (await lookupHandle(x.handle)).id));
+      await api.request(`/conversations/${id}/members`, { method: 'POST', body: { userIds } });
       refresh();
     } catch (err) {
       setError(explain(err));
@@ -139,20 +138,7 @@ export default function GroupInfo() {
         {t('group.members', { n: c.memberCount })}
       </Text>
       {canManage ? (
-        <View style={styles.add}>
-          <View style={styles.flex}>
-            <TextField
-              label={t('group.addMember')}
-              hint={t('chat.new.handleHint')}
-              value={handle}
-              onChangeText={setHandle}
-              autoCapitalize="none"
-              autoCorrect={false}
-              onSubmitEditing={addMember}
-            />
-          </View>
-          <Button label={t('group.add')} onPress={addMember} style={styles.addBtn} />
-        </View>
+        <PeopleField label={t('group.addMember')} value={[]} onChange={(l) => void addMembers(l)} exclude={members.data.items.map((m) => m.handle)} />
       ) : null}
 
       {members.data.items.map((m) => (

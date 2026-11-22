@@ -112,9 +112,9 @@ export default function NewPurchaseOrder() {
         <View style={{ gap: spacing.md }}>
           <Text variant="bodyStrong">{t('biz.po.supplier')}</Text>
           {activeSuppliers.length === 0 ? <Text muted>{t('biz.po.noSupplier')}</Text> : null}
-          <Chips options={activeSuppliers.map((s) => ({ value: s.id, label: s.name }))} value={supplierId || null} onChange={setSupplierId} />
+          <Chips flush options={activeSuppliers.map((s) => ({ value: s.id, label: s.name }))} value={supplierId || null} onChange={setSupplierId} />
           <Text variant="bodyStrong">{t('biz.po.currency')}</Text>
-          <Chips options={SELLER_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency} onChange={changeCurrency} scroll={false} />
+          <Chips flush options={SELLER_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency} onChange={changeCurrency} scroll={false} />
           <TextField label={t('biz.po.expected')} value={expectedOn} onChangeText={setExpectedOn} autoCapitalize="none" maxLength={10} />
           <TextField label={t('biz.po.note')} value={note} onChangeText={setNote} maxLength={500} />
 
@@ -132,12 +132,12 @@ export default function NewPurchaseOrder() {
           {products.isPending ? <Loading /> : null}
           {products.isError ? <ErrorState error={products.error} onRetry={() => products.refetch()} /> : null}
           {products.isSuccess && productItems.length === 0 ? <Text muted>{t('biz.po.noCatalogue')}</Text> : null}
-          <Chips options={productItems.map((p) => ({ value: p.id, label: p.title }))} value={productId || null} onChange={(id) => { setProductId(id); set({ variantId: '', description: '' }); }} />
+          <Chips flush options={productItems.map((p) => ({ value: p.id, label: p.title }))} value={productId || null} onChange={(id) => { setProductId(id); set({ variantId: '', description: '' }); }} />
           {products.hasNextPage ? <Button variant="ghost" label={t('story.viewer.more')} loading={products.isFetchingNextPage} onPress={() => products.fetchNextPage()} /> : null}
           {picked ? (
             <>
               <Text variant="bodyStrong">{t('biz.po.pickVariant')}</Text>
-              <Chips
+              <Chips flush
                 options={picked.variants.filter((v) => v.active && v.currency === currency).map((v) => ({ value: v.id, label: Object.values(v.options).join(' / ') || v.sku }))}
                 value={line.variantId || null}
                 onChange={(id) => {

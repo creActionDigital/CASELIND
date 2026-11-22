@@ -46,7 +46,9 @@ export default function HealthDirectory() {
             <Text variant="small" muted>
               {item.specialty || t(proKindKey(item.kind))} · {item.city}
             </Text>
-            <Badge tone="neutral" label={t(proKindKey(item.kind))} />
+            <View style={styles.badgeBox}>
+              <Badge tone="neutral" label={t(proKindKey(item.kind))} />
+            </View>
             {item.bio ? <Text variant="small">{item.bio}</Text> : null}
           </Card>
         )}
@@ -60,5 +62,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingTop: spacing.sm, gap: spacing.sm },
   pad: { paddingHorizontal: spacing.lg },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, gap: spacing.xs },
+  card: { gap: spacing.xs },
+  badgeBox: { alignSelf: 'flex-start' },
 });

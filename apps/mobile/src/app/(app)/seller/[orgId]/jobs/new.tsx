@@ -87,10 +87,10 @@ export default function NewJob() {
         <TextField label={t('jobs.org.field.title')} value={title} onChangeText={setTitle} maxLength={120} />
         <TextField label={t('jobs.org.field.description')} value={description} onChangeText={setDescription} multiline maxLength={4000} />
         <TextField label={t('jobs.org.field.city')} value={city} onChangeText={setCity} maxLength={80} />
-        <Chips options={CONTRACT_TYPES.map((c) => ({ value: c, label: t(contractKey(c)) }))} value={contract} onChange={setContract} />
+        <Chips flush options={CONTRACT_TYPES.map((c) => ({ value: c, label: t(contractKey(c)) }))} value={contract} onChange={setContract} />
         <TextField label={t('jobs.org.field.salaryMin')} value={min} onChangeText={setMin} keyboardType="decimal-pad" />
         <TextField label={t('jobs.org.field.salaryMax')} value={max} onChangeText={setMax} keyboardType="decimal-pad" />
-        <Chips options={WALLET_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency} onChange={setCurrency} scroll={false} />
+        <Chips flush options={WALLET_CURRENCIES.map((c) => ({ value: c, label: c }))} value={currency} onChange={setCurrency} scroll={false} />
         {error ? (
           <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">
             {error}

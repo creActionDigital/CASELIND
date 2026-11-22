@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useI18n } from '../../i18n';
-import { brandColor, fonts, glass, onMedia, TOUCH } from '../../theme/tokens';
+import { brandAccent, fonts, glass, onMedia, TOUCH } from '../../theme/tokens';
 
 interface Props {
   onSend: (text: string) => void;
@@ -52,7 +52,7 @@ function Round({ icon, label, onPress, solid }: { icon: RoundIcon; label: string
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [styles.round, solid && { backgroundColor: brandColor }, { opacity: pressed ? 0.7 : 1 }]}
+      style={({ pressed }) => [styles.round, solid && { backgroundColor: brandAccent }, { opacity: pressed ? 0.7 : 1 }]}
     >
       <Ionicons name={icon} size={22} color={onMedia} />
     </Pressable>

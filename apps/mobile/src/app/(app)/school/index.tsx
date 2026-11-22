@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { ScrollView } from 'react-native';
 import { useI18n } from '../../../i18n';
 import { fetchMyClasses, schk } from '../../../school/api';
+import { endMyParentLink, fetchMyParents } from '../../../school/guardians-api';
+import { alertConfirm } from '../../../lib/confirm';
 import { Card, Loading } from '../../../seller/ui';
 import { spacing } from '../../../theme/tokens';
 import { Badge, Button, ErrorState, Text } from '../../../ui';
@@ -12,6 +14,9 @@ export default function MyClasses() {
   const { t } = useI18n();
   const router = useRouter();
   const q = useQuery({ queryKey: schk.mine, queryFn: fetchMyClasses });
+  const qc = useQueryClient();
+  const parents = useQuery({ queryKey: ['school', 'my-parents'], queryFn: fetchMyParents });
+  const endLink = useMutation({ mutationFn: endMyParentLink, onSuccess: () => qc.invalidateQueries({ queryKey: ['school', 'my-parents'] }) });
   return (
     <>
       <Stack.Screen options={{ title: t('school.title') }} />
@@ -31,6 +36,19 @@ export default function MyClasses() {
               {c.yearLabel ? ` · ${c.yearLabel}` : ''}
             </Text>
             <Badge tone="neutral" label={t(`school.role.${c.role}` as const)} />
+          </Card>
+        ))}
+        {parents.data && parents.data.items.length > 0 ? <Text variant="bodyStrong">{t('school.parents.title')}</Text> : null}
+        {parents.data?.items.map((p) => (
+          <Card key={p.id} label={p.guardianDisplayName}>
+            <Text variant="bodyStrong">{p.guardianDisplayName}</Text>
+            <Text variant="small" muted>{`${p.schoolName} · ${p.relation}`}</Text>
+            <Button
+              variant="ghost"
+              label={t('school.parents.end')}
+              loading={endLink.isPending && endLink.variables === p.id}
+              onPress={() => alertConfirm(t('school.parents.endConfirm', { name: p.guardianDisplayName }), undefined, [{ text: t('common.cancel'), style: 'cancel' }, { text: t('school.parents.end'), style: 'destructive', onPress: () => endLink.mutate(p.id) }])}
+            />
           </Card>
         ))}
       </ScrollView>

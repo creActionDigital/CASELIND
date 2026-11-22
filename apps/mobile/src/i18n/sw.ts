@@ -1,6 +1,7 @@
 import type { MessageKey } from './fr';
 import { swChatWallet } from './sw-chat-wallet';
 import { swCommerce } from './sw-commerce';
+import { placesSw } from '../places/messages';
 import { swSocial } from './sw-social';
 import { swModuleB } from './sw-module-b';
 import { swBusiness } from './sw-business';
@@ -11,9 +12,11 @@ import { swHealth } from './sw-health';
 import { swListingsJobs } from './sw-listings-jobs';
 import { swMobility } from './sw-mobility';
 import { swSecurity } from './sw-security';
+import { blocksSw } from '../privacy/blocks-messages';
 import { swSeller } from './sw-seller';
 import { swServices } from './sw-services';
 import { swVitrine } from './sw-vitrine';
+import { peopleSw } from '../people/messages';
 import { swAiActions } from './sw-ai-actions';
 import { swWalletFinance2 } from './sw-wallet-finance-2';
 import { swAdmin2 } from './sw-admin-2';
@@ -24,6 +27,7 @@ import { swMiniapps2 } from './sw-miniapps-2';
 import { swShopPrivacy2 } from './sw-shop-privacy-2';
 import { swModuleA } from './sw-module-a';
 import { swModuleC } from './sw-module-c';
+import { swMenu } from './sw-menu';
 import { swMobilityExtra2 } from './sw-mobility-extra-2';
 import { swAdminOps3 } from './sw-admin-ops-3';
 import { swMiniapps3 } from './sw-miniapps-3';
@@ -91,6 +95,7 @@ export const sw: Partial<Record<MessageKey, string>> = {
   'language.sw': 'Kiswahili',
   ...swCommerce,
   ...swSocial,
+  ...placesSw,
   ...swModuleB,
   ...swChatWallet,
   ...swBusiness,
@@ -101,9 +106,11 @@ export const sw: Partial<Record<MessageKey, string>> = {
   ...swListingsJobs,
   ...swMobility,
   ...swSecurity,
+  ...blocksSw,
   ...swSeller,
   ...swServices,
   ...swVitrine,
+  ...peopleSw,
   ...swAiActions,
   ...swWalletFinance2,
   ...swAdmin2,
@@ -114,6 +121,7 @@ export const sw: Partial<Record<MessageKey, string>> = {
   ...swShopPrivacy2,
   ...swModuleA,
   ...swModuleC,
+  ...swMenu,
   ...swMobilityExtra2,
   ...swAdminOps3,
   ...swMiniapps3,

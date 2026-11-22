@@ -64,7 +64,7 @@ export function conversationTitle(c: Pick<Conversation, 'kind' | 'title' | 'peer
 export function messagePreview(m: Message, t: T, name: (userId: string | null) => string = () => '…'): string {
   if (m.recalled) return t('chat.recalled');
   if (m.kind === 'system' && m.systemEvent) return systemText(m.systemEvent, name, t);
-  if (m.kind === 'media') return t('chat.photo');
+  if (m.kind === 'media') return m.media?.mime?.startsWith('audio/') ? t('chat.voice') : t('chat.photo');
   if (m.kind === 'poll') return t('social.poll.preview', { question: m.body ?? '' });
   return m.body ?? '';
 }

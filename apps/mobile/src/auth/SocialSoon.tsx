@@ -30,11 +30,11 @@ export function SocialSoon() {
           style={[styles.btn, { borderColor: colors.border, backgroundColor: colors.surfaceAlt, opacity: 0.6 }]}
         >
           <Ionicons name={p.icon} size={20} color={colors.textMuted} />
-          <Text muted style={{ flex: 1 }}>
+          <Text variant="small" muted style={{ flex: 1 }} numberOfLines={1}>
             {t('ma.social.continue', { name: p.key })}
           </Text>
           <Text variant="caption" muted>
-            {t('ma.soonAvailable')}
+            {t('ma.more.soon')}
           </Text>
         </View>
       ))}

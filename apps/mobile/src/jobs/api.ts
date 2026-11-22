@@ -70,3 +70,5 @@ export const fetchOrgInterviews = (orgId: string, applicationId: string) => api.
 export const proposeInterview = (orgId: string, applicationId: string, body: { startsAt: string; durationMin: number; location: string }) =>
   api.request(`/orgs/${orgId}/job-applications/${applicationId}/interviews`, { method: 'POST', body, schema: interviewSchema });
 export const cancelOrgInterview = (orgId: string, id: string) => api.request(`/orgs/${orgId}/job-interviews/${id}/cancel`, { method: 'POST', schema: interviewSchema });
+
+export const setCvFile = (assetId: string | null) => api.request('/me/job-profile/cv', { method: 'PUT', body: { assetId }, schema: myJobProfileSchema });

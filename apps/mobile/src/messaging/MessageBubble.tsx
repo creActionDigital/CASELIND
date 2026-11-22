@@ -3,12 +3,14 @@ import { memo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { splitMentions } from '../ai/assist-logic';
 import { useI18n } from '../i18n';
-import { radius, spacing, TOUCH } from '../theme/tokens';
+import { fonts, radius, spacing, TOUCH } from '../theme/tokens';
 import { chatColors } from './chat-theme';
 import { useTheme } from '../theme/use-theme';
 import { AuthImage, Text } from '../ui';
 import { messagePreview, systemText } from './api';
 import { fileKind, formatFileSize, isDocumentMime } from './file-logic';
+import { VoiceBubble } from './VoiceBubble';
+import { isAudioMime } from './voice-logic';
 import { parseLocation } from './module-d-logic';
 import { openMessageFile } from './open-file';
 import { PollCard } from './PollCard';
@@ -94,7 +96,7 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
   const statusLabel = status ? t(`chat.status.${status}`) : '';
   const fwd = m.forwarded && !m.recalled;
   const expiry = m.expiresAt && !m.recalled ? new Date(m.expiresAt).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' }) : '';
-  const summary = m.recalled ? t('chat.recalled') : m.kind === 'media' ? (m.media?.fileName || m.localName ? t('chat.document') : t('chat.photo')) : m.kind === 'poll' ? t('social.poll.preview', { question: m.body ?? '' }) : (m.body ?? '');
+  const summary = m.recalled ? t('chat.recalled') : m.kind === 'media' ? (isAudioMime(m.media?.mime ?? m.localMime) ? t('chat.voice') : m.media?.fileName || m.localName ? t('chat.document') : t('chat.photo')) : m.kind === 'poll' ? t('social.poll.preview', { question: m.body ?? '' }) : (m.body ?? '');
 
   return (
     <View style={[styles.wrap, mine ? styles.right : styles.left]}>
@@ -132,6 +134,8 @@ function Bubble({ message: m, mine, senderName, status, replyTo, name, onLongPre
           </Text>
         ) : m.kind === 'poll' && m.poll ? (
           <PollCard message={{ ...m, poll: m.poll }} mine={mine} fg={fg} />
+        ) : m.kind === 'media' && isAudioMime(m.media?.mime ?? m.localMime) ? (
+          <VoiceBubble message={m} fg={fg} sub={sub} />
         ) : m.kind === 'media' && isDocumentMime(m.media?.mime ?? (m.localName ? (m.localMime ?? 'application/octet-stream') : null)) ? (
           <FileCard message={m} fg={fg} sub={sub} />
         ) : m.kind === 'media' ? (
@@ -235,7 +239,7 @@ const styles = StyleSheet.create({
   fwd: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   quote: { borderLeftWidth: 3, borderRadius: radius.sm, padding: spacing.xs },
   italic: { fontStyle: 'italic' },
-  mention: { fontWeight: '700' },
+  mention: { fontWeight: '700', fontFamily: fonts.bold },
   translation: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   link: { fontWeight: '600', textDecorationLine: 'underline' },
   image: { width: 220, height: 220 },

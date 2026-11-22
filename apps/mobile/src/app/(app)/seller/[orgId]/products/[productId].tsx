@@ -8,6 +8,7 @@ import { useI18n, type MessageKey } from '../../../../../i18n';
 import { ApiRequestError } from '../../../../../lib/api';
 import { uuidv4 } from '../../../../../lib/uuid';
 import { imageMime, uploadProductImage } from '../../../../../media/upload';
+import { draftDescription, factsFromText } from '../../../../../seller/ai-description';
 import { archiveProduct, createProduct, fetchCategories, fetchProduct, patchProduct, sk, useMembership } from '../../../../../seller/api';
 import { minorToDecimalString, SELLER_CURRENCIES } from '../../../../../seller/money';
 import { can } from '../../../../../seller/permissions';
@@ -66,6 +67,16 @@ function Editor({ orgId, product }: { orgId: string; product?: Product }) {
 
   const [title, setTitle] = useState(product?.title ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const draft = useMutation({
+    mutationFn: () => draftDescription(orgId, title, factsFromText(description)),
+    onSuccess: (r) => {
+      setDescription(r.description);
+      setAiNote(t('seller.product.aiDone'));
+    },
+    onError: (e) => setAiNote(sellerErrorMessage(e, t, locale)),
+  });
+  const aiReady = title.trim().length >= 2 && factsFromText(description).length > 0;
   const [categoryId, setCategoryId] = useState<string | null>(product?.categoryId ?? null);
   const [photos, setPhotos] = useState<Photo[]>(
     () => product?.media.map((m) => ({ key: m.id, id: m.id, contentUrl: m.contentUrl, state: 'ready' as const })) ?? [],
@@ -205,6 +216,19 @@ function Editor({ orgId, product }: { orgId: string; product?: Product }) {
         multiline
         maxLength={5000}
       />
+      <Button
+        variant="secondary"
+        label={t('seller.product.aiDraft')}
+        loading={draft.isPending}
+        disabled={!aiReady}
+        onPress={() => {
+          setAiNote(null);
+          draft.mutate();
+        }}
+      />
+      <Text variant="small" muted accessibilityLiveRegion="polite">
+        {aiNote ?? t('seller.product.aiHint')}
+      </Text>
 
       <Text variant="small" style={styles.label}>
         {t('seller.product.category')}

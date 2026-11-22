@@ -10,12 +10,13 @@ import { SheetModal } from '../../../components/SheetModal';
 import { useI18n } from '../../../i18n';
 import { errorMessage } from '../../../lib/errors';
 import { openReport } from '../../../report/open-report';
-import { deleteStory, fetchStoryFeed, fetchStoryViewers, markStoryViewed } from '../../../stories/api';
+import { fetchProfile } from '../../../social/api';
+import { deleteStory, fetchStoryFeed, fetchUserStories, fetchStoryViewers, markStoryViewed } from '../../../stories/api';
 import { storyKeys } from '../../../stories/keys';
 import { orderStoryGroups } from '../../../stories/order';
 import { next, previous, startPosition, STORY_DURATION_MS, type ViewerPos, type ViewerResult } from '../../../stories/viewer-machine';
 import { dark, radius, spacing, TOUCH } from '../../../theme/tokens';
-import { Avatar, AuthImage, Button, EmptyState, ErrorState, IconButton, Text } from '../../../ui';
+import { Avatar, AuthImage, Button, ErrorState, IconButton, Text } from '../../../ui';
 import { ActivityIndicator } from 'react-native';
 
 /** Visionneuse de stories (plein écran, fond noir) : enchaîne les auteurs de la barre. */
@@ -31,12 +32,22 @@ export default function StoryViewer() {
   // Ordre figé à l'ouverture : marquer une story « vue » ne doit pas réordonner la lecture en cours.
   const [groups, setGroups] = useState<StoryGroup[] | null>(null);
   const [pos, setPos] = useState<ViewerPos | null>(null);
+  // Une personne absente de la barre (ouverte depuis son profil) : ses statuts visibles viennent de GET /users/{id}/stories.
+  const inFeed = feed.data?.items.some((g) => g.author.userId === userId) ?? false;
+  const extra = useQuery({
+    queryKey: ['user-stories', userId],
+    enabled: feed.data !== undefined && !inFeed,
+    queryFn: async (): Promise<StoryGroup | null> => {
+      const [s, p] = await Promise.all([fetchUserStories(userId), fetchProfile(userId)]);
+      return s.items.length === 0 ? null : { author: { userId, handle: p.handle, displayName: p.displayName, avatarUrl: p.avatarUrl }, stories: s.items, hasUnseen: s.items.some((x) => !x.seen) };
+    },
+  });
   useEffect(() => {
-    if (groups || !feed.data) return;
-    const ordered = orderStoryGroups(feed.data.items, me?.id);
+    if (groups || !feed.data || (!inFeed && extra.isPending)) return;
+    const ordered = orderStoryGroups(extra.data ? [...feed.data.items, extra.data] : feed.data.items, me?.id);
     setGroups(ordered);
     setPos(startPosition(ordered, userId));
-  }, [feed.data, groups, me?.id, userId]);
+  }, [feed.data, groups, me?.id, userId, inFeed, extra.isPending, extra.data]);
 
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
@@ -202,7 +213,11 @@ export default function StoryViewer() {
   } else if (!story) {
     body = (
       <View style={styles.center}>
-        <EmptyState icon="aperture-outline" title={t('story.viewer.emptyTitle')} body={t('story.viewer.emptyBody')} actionLabel={t('common.close')} onAction={close} />
+        <View style={{ alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl }}>
+          <Text variant="heading" color={dark.text} style={{ textAlign: 'center' }}>{t('story.viewer.emptyTitle')}</Text>
+          <Text color={dark.text} style={{ textAlign: 'center', opacity: 0.75 }}>{t('story.viewer.emptyBody')}</Text>
+          <Button label={t('common.close')} variant="secondary" onPress={close} />
+        </View>
       </View>
     );
   } else {

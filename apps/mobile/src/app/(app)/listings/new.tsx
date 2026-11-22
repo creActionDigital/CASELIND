@@ -109,7 +109,7 @@ export default function NewListing() {
       <Stack.Screen options={{ title: t('listings.new') }} />
       <View style={styles.form}>
         <Text variant="bodyStrong">{t('listings.field.kind')}</Text>
-        <Chips options={LISTING_KINDS.map((k) => ({ value: k, label: t(kindKey(k)) }))} value={kind} onChange={setKind} />
+        <Chips flush options={LISTING_KINDS.map((k) => ({ value: k, label: t(kindKey(k)) }))} value={kind} onChange={setKind} />
         <TextField label={t('listings.field.title')} value={title} onChangeText={setTitle} maxLength={120} />
         <TextField label={t('listings.field.description')} value={description} onChangeText={setDescription} multiline maxLength={2000} />
         {hasPrice(kind) ? (

@@ -1,7 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { PeopleField, PersonField } from '../components/PersonField';
 import { SheetModal } from '../components/SheetModal';
+import type { Person } from '../people/logic';
 import { useI18n } from '../i18n';
 import { errorMessage } from '../lib/errors';
 import { spacing } from '../theme/tokens';
@@ -22,9 +24,9 @@ export function NewConversationSheet({ visible, onClose, onCreated }: Props) {
   const { colors } = useTheme();
   const qc = useQueryClient();
   const [mode, setMode] = useState<'direct' | 'group'>('direct');
-  const [handle, setHandle] = useState('');
+  const [person, setPerson] = useState<Person | null>(null);
   const [title, setTitle] = useState('');
-  const [handles, setHandles] = useState('');
+  const [members, setMembers] = useState<Person[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,26 +46,17 @@ export function NewConversationSheet({ visible, onClose, onCreated }: Props) {
     try {
       let conversationId: string;
       if (mode === 'direct') {
-        if (!handle.trim()) return setError(t('field.required'));
-        const user = await lookupHandle(handle);
-        conversationId = (await createDirect(user.id)).id;
+        if (!person) return setError(t('field.required'));
+        conversationId = (await createDirect(person.id ?? (await lookupHandle(person.handle)).id)).id;
       } else {
         if (!title.trim()) return setError(t('field.required'));
-        const names = [...new Set(handles.split(/[\s,;]+/).map((h) => h.replace(/^@/, '')).filter(Boolean))];
-        const ids: string[] = [];
-        for (const h of names) {
-          try {
-            ids.push((await lookupHandle(h)).id);
-          } catch (err) {
-            return setError(`@${h} : ${explain(err)}`);
-          }
-        }
+        const ids = await Promise.all(members.map(async (m) => m.id ?? (await lookupHandle(m.handle)).id));
         conversationId = (await createGroup(title.trim(), ids)).id;
       }
       void qc.invalidateQueries({ queryKey: qk.conversationsAll });
-      setHandle('');
+      setPerson(null);
       setTitle('');
-      setHandles('');
+      setMembers([]);
       onClose();
       onCreated(conversationId);
     } catch (err) {
@@ -94,27 +87,11 @@ export function NewConversationSheet({ visible, onClose, onCreated }: Props) {
           />
         </View>
         {mode === 'direct' ? (
-          <TextField
-            label={t('chat.new.handle')}
-            hint={t('chat.new.handleHint')}
-            value={handle}
-            onChangeText={setHandle}
-            autoCapitalize="none"
-            autoCorrect={false}
-            onSubmitEditing={submit}
-            returnKeyType="go"
-          />
+          <PersonField label={t('chat.new.handle')} value={person} onChange={setPerson} />
         ) : (
           <>
             <TextField label={t('chat.new.groupTitle')} value={title} onChangeText={setTitle} maxLength={100} />
-            <TextField
-              label={t('chat.new.groupHandles')}
-              hint={t('chat.new.groupHandlesHint')}
-              value={handles}
-              onChangeText={setHandles}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+            <PeopleField label={t('chat.new.groupHandles')} value={members} onChange={setMembers} />
           </>
         )}
         {error ? (

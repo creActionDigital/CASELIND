@@ -59,11 +59,13 @@ function Directory() {
   return (
     <>
       <TextField label={t('miniapps.search')} value={q} onChangeText={setQ} autoCapitalize="none" />
+      <View style={{ marginHorizontal: -spacing.lg }}>
       <Chips<string>
         value={category}
         onChange={setCategory}
         options={[{ value: '', label: t('md.apps.catAll') }, ...MINIAPP_CATEGORIES.map((c) => ({ value: c as string, label: t(`md.apps.cat.${c}` as MessageKey) }))]}
       />
+      </View>
       {list.isPending ? <SkeletonList rows={3} label={t('common.loading')} /> : null}
       {list.isError ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : null}
       {list.data && items.length === 0 ? <Text muted>{t('miniapps.empty')}</Text> : null}

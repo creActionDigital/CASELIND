@@ -1,12 +1,13 @@
 import type { ListingOffer } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { mergeDeepItem } from '../../../lib/deep-item';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
-import { answerOffer, fetchOffers, listingKeys } from '../../../listings/api';
+import { answerOffer, fetchOffer, fetchOffers, listingKeys } from '../../../listings/api';
 import { offerErrorKey } from '../../../listings/logic';
 import { ContactSeller } from '../../../shop/ContactSeller';
 import { formatMoney, parseMajorToMinor } from '../../../shop/format';
@@ -22,6 +23,9 @@ export default function Offers() {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const list = useQuery({ queryKey: listingKeys.offers, queryFn: fetchOffers });
+  const { id: deepId } = useLocalSearchParams<{ id?: string }>();
+  const one = useQuery({ queryKey: [...listingKeys.offers, deepId], queryFn: () => fetchOffer(deepId!), enabled: !!deepId });
+  const offers = list.data ? mergeDeepItem(list.data.items, one.data) : [];
   const [counters, setCounters] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const act = useMutation({
@@ -72,8 +76,8 @@ export default function Offers() {
             {error}
           </Text>
         ) : null}
-        {list.data.items.length === 0 ? <Text muted>{t('listings.offer.empty')}</Text> : null}
-        {list.data.items.map((o) => {
+        {offers.length === 0 ? <Text muted>{t('listings.offer.empty')}</Text> : null}
+        {offers.map((o) => {
           const myTurn = o.role === 'owner' ? o.status === 'offered' : o.status === 'countered';
           return (
             <View key={o.id} style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -86,7 +90,7 @@ export default function Offers() {
               ) : null}
               <Text variant="bodyStrong">{t('listings.offer.offered', { price: money(o.offerMinor, o) })}</Text>
               {o.counterMinor !== null ? <Text variant="bodyStrong">{t('listings.offer.countered', { price: money(o.counterMinor, o) })}</Text> : null}
-              <Badge tone={o.status === 'accepted' ? 'primary' : 'neutral'} label={t(`listings.offer.status.${o.status}` as 'listings.offer.status.offered')} />
+              <View style={{ alignSelf: 'flex-start' }}><Badge tone={o.status === 'accepted' ? 'primary' : 'neutral'} label={t(`listings.offer.status.${o.status}` as 'listings.offer.status.offered')} /></View>
               {o.message ? <Text>{o.message}</Text> : null}
               {myTurn ? (
                 <>

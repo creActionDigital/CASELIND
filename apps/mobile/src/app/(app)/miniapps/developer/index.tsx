@@ -24,7 +24,7 @@ export default function DeveloperHome() {
         {q.data?.items.map((a) => (
           <Card key={a.id} label={a.name} onPress={() => router.push(`/miniapps/developer/${a.id}` as never)}>
             <Text variant="bodyStrong">{a.name}</Text>
-            <Badge tone={a.status === 'published' ? 'accent' : 'neutral'} label={t(`miniapps.dev.status.${a.status}` as MessageKey)} />
+            <View style={{ alignSelf: 'flex-start' }}><Badge tone={a.status === 'published' ? 'accent' : 'neutral'} label={t(`miniapps.dev.status.${a.status}` as MessageKey)} /></View>
             <Text variant="small" muted>{a.currentVersion ? t('miniapps.dev.version', { version: a.currentVersion }) : t('miniapps.dev.noVersion')}</Text>
           </Card>
         ))}

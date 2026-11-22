@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SheetModal } from '../../components/SheetModal';
 import { useI18n } from '../../i18n';
-import { FlashStrip } from '../../promotions/FlashStrip';
 import { fetchCategories, fetchProducts, type ShopFilters } from '../../shop/api';
 import { parseMajorToMinor } from '../../shop/format';
 import { shopKeys } from '../../shop/hooks';
@@ -91,19 +90,10 @@ export default function Shop() {
       <SponsoredStrip placement="marketplace" />
       <ShopBanner />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel={t('shop.categories')}>
-        <CategoryRound all label={t('shop.all')} selected={!categoryId} onPress={() => setCategoryId(undefined)} />
         {categories.data?.items.map((c) => (
           <CategoryRound key={c.id} label={c.name} selected={categoryId === c.id} onPress={() => setCategoryId(categoryId === c.id ? undefined : c.id)} />
         ))}
       </ScrollView>
-      {!q && !categoryId ? (
-        <Pressable accessibilityRole="link" onPress={() => router.push('/deals')} style={styles.seeAll}>
-          <Text variant="small" color={colors.primary} style={{ fontWeight: '600' }}>
-            {t('mc.home.deals')}
-          </Text>
-        </Pressable>
-      ) : null}
-      <FlashStrip hideFlash />
       <View style={styles.sectionRow}>
         <Text variant="title" accessibilityRole="header" style={styles.sectionTitle}>
           {t('mc.mk.forYou')}
@@ -162,9 +152,9 @@ const styles = StyleSheet.create({
   search: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 56, paddingLeft: spacing.lg, paddingRight: spacing.xs, borderRadius: radius.pill },
   input: { flex: 1, minHeight: TOUCH, fontFamily: fonts.regular, fontSize: 16 },
   filterBtn: { width: 48, height: 44, borderRadius: radius.pill, borderLeftWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
-  chips: { gap: spacing.sm, paddingBottom: spacing.xs },
+  chips: { gap: spacing.md, paddingBottom: spacing.xs },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { fontSize: 22, lineHeight: 28, flex: 1 },
+  sectionTitle: { fontFamily: fonts.semibold, fontWeight: '600', fontSize: 20, lineHeight: 28, flex: 1 },
   seeAll: { minHeight: TOUCH, justifyContent: 'center' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   priceRow: { flexDirection: 'row', gap: spacing.md },

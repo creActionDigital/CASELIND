@@ -65,6 +65,7 @@ export default function MissionDetail() {
   if (q.isPending) {
     return (
       <Screen edges={['bottom']}>
+        <Stack.Screen options={{ title: t('freelance.title') }} />
         <ActivityIndicator color={colors.primary} accessibilityLabel={t('common.loading')} />
       </Screen>
     );
@@ -72,6 +73,7 @@ export default function MissionDetail() {
   if (q.isError || !m) {
     return (
       <Screen edges={['bottom']}>
+        <Stack.Screen options={{ title: t('freelance.title') }} />
         <ErrorState error={q.error} onRetry={() => q.refetch()} />
       </Screen>
     );

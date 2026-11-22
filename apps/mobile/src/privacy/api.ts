@@ -1,7 +1,9 @@
 import {
   accountConsentsSchema,
+  blockListSchema,
   consentHistorySchema,
   deletionRequestResponseSchema,
+  securityEventSchema,
   userConsentSchema,
   type ConsentKind,
 } from '@caselind/contracts';
@@ -19,3 +21,8 @@ export const setConsent = (kind: ConsentKind, granted: boolean) =>
 export const fetchExport = () => api.request('/me/export', { schema: z.record(z.string(), z.unknown()) });
 export const requestDeletion = (password: string) =>
   api.request('/me/deletion-request', { method: 'POST', body: { password }, schema: deletionRequestResponseSchema });
+
+export const blockKeys = { list: ['blocks'] as const, events: ['security-events'] as const };
+export const fetchBlocks = () => api.request('/blocks', { query: { limit: 200 }, schema: blockListSchema });
+export const setBlocked = (userId: string, blocked: boolean) => api.request(`/blocks/${userId}`, { method: blocked ? 'PUT' : 'DELETE' });
+export const fetchSecurityEvents = () => api.request('/me/security-events', { schema: z.object({ items: z.array(securityEventSchema) }) });

@@ -18,18 +18,32 @@ const ACTIONS: { key: MessageKey; icon: Icon }[] = [
   { key: 'publish.product', icon: 'pricetag-outline' },
   { key: 'publish.live', icon: 'radio-outline' },
   { key: 'publish.listing', icon: 'megaphone-outline' },
+  { key: 'mb.create.album', icon: 'images-outline' },
+  { key: 'mb.create.event', icon: 'calendar-outline' },
+  { key: 'mb.create.poll', icon: 'stats-chart-outline' },
+  { key: 'mb.create.location', icon: 'location-outline' },
+  { key: 'mb.create.service', icon: 'construct-outline' },
+  { key: 'mb.create.job', icon: 'briefcase-outline' },
 ];
 
-/** Actions déjà actives : touche -> route. Les autres restent « bientôt ». */
+/** Actions actives : touche -> route (le live est géré par le hub via onLive). Les autres restent « bientôt ». */
 const ROUTES: Partial<Record<MessageKey, string>> = {
   'scan.action': '/scan',
   'publish.story': '/story/new',
   'publish.post': '/compose?mode=post',
   'publish.video': '/compose?mode=video',
+  'publish.product': '/seller',
+  'publish.listing': '/listings/new',
+  'mb.create.album': '/compose?mode=album',
+  'mb.create.event': '/compose?mode=event',
+  'mb.create.poll': '/compose?mode=poll',
+  'mb.create.location': '/compose?mode=location',
+  'mb.create.service': '/provider/me',
+  'mb.create.job': '/seller',
 };
 
-/** Feuille « + Publier » : toutes les actions sont annoncées « bientôt » (backend social non livré). */
-export function PublishSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+/** Feuille « + Publier » du hub (pages Live, Vidéos, Posts, Produits) : chaque type de publication, au plus près des contenus. */
+export function PublishSheet({ visible, onClose, onLive }: { visible: boolean; onClose: () => void; onLive?: () => void }) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const router = useRouter();
@@ -43,14 +57,15 @@ export function PublishSheet({ visible, onClose }: { visible: boolean; onClose: 
       </Text>
       <View style={styles.grid}>
         {ACTIONS.map((a) =>
-          ROUTES[a.key] ? (
+          ROUTES[a.key] || (a.key === 'publish.live' && onLive) ? (
             <Pressable
               key={a.key}
               accessibilityRole="button"
               accessibilityLabel={t(a.key)}
               onPress={() => {
                 onClose();
-                router.push(ROUTES[a.key]!);
+                if (a.key === 'publish.live') onLive?.();
+                else router.push(ROUTES[a.key]! as never);
               }}
               style={[styles.tile, { backgroundColor: colors.primarySoft, opacity: 1 }]}
             >

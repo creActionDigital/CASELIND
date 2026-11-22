@@ -18,10 +18,16 @@ export default function Premium() {
     <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.pad}>
       <Stack.Screen options={{ title: t('mon.premium.title') }} />
       <SandboxBanner />
-      <Text variant="title" accessibilityRole="header">
-        {t('mon.premium.title')}
-      </Text>
-      <Text muted>{t('mon.premium.lead')}</Text>
+      <View style={{ alignItems: 'center', gap: spacing.sm, marginVertical: spacing.md }}>
+        <View style={{ width: 76, height: 76, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="shield" size={76} color={colors.primary} style={{ position: 'absolute' }} />
+          <Ionicons name="star" size={30} color={colors.onPrimary} />
+        </View>
+        <Text variant="title" accessibilityRole="header" style={{ textAlign: 'center' }}>
+          {t('mon.premium.title')}
+        </Text>
+        <Text muted style={{ textAlign: 'center' }}>{t('mon.premium.lead')}</Text>
+      </View>
       <Card style={{ gap: spacing.sm }}>
         <Text variant="heading" accessibilityRole="header">
           {t('mon.premium.benefitsTitle')}

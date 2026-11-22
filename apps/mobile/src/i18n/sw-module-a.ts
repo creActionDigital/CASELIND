@@ -66,6 +66,7 @@ export const swModuleA: Partial<Record<MessageKey, string>> = {
   'ma.kind.hotel': 'Hoteli',
   'ma.kind.pharmacy': 'Duka la dawa',
   'ma.kind.fuel_station': 'Kituo cha mafuta',
+  'ma.kind.bank': 'Benki / ATM',
   'ma.kind.school': 'Shule',
   'ma.kind.hospital': 'Kituo cha afya',
   'ma.kind.services': 'Huduma',

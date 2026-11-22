@@ -15,6 +15,9 @@ export interface MapMarker {
   lng: number;
   label: string;
   selected?: boolean;
+  /** Pastille de catégorie : icône blanche sur fond coloré (sinon, repère classique). */
+  icon?: keyof typeof Ionicons.glyphMap;
+  color?: string;
 }
 
 interface Props {
@@ -31,6 +34,11 @@ interface Props {
   line?: readonly LatLng[];
   /** Un appui court sur la carte (sans déplacement) pose un point. */
   onPick?: (p: LatLng) => void;
+  /** Épingle fixe au centre de la carte (on déplace la carte) ; `onCenterChange` reçoit le centre après chaque déplacement. */
+  centerPin?: boolean;
+  onCenterChange?: (p: LatLng) => void;
+  /** Hauteur masquée en bas (feuille glissante) : le cadrage est centré sur la partie visible et les boutons la dépassent. */
+  bottomInset?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -38,19 +46,30 @@ interface Props {
  * Carte à tuiles (OpenStreetMap) sans module natif : tourne sur Android, iOS et web.
  * Un doigt déplace, deux doigts (ou la molette sur le web) et le double appui zooment, les boutons +/− aussi. Les tuiles viennent d'un serveur de tuiles (voir TILE_URL).
  */
-export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, line, onPick, style }: Props) {
+export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, line, onPick, centerPin, onCenterChange, bottomInset = 0, style }: Props) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<{ center: LatLng; zoom: number }>({ center: { lat: 0, lng: 0 }, zoom: 3 });
+  const [fitted, setFitted] = useState(false);
   const viewRef = useRef(view);
   viewRef.current = view;
 
   // Cadrage initial et à chaque nouvelle recherche (origine ou rayon).
   useEffect(() => {
-    if (size.w > 0 && size.h > 0) setView(fitPoints(fit, size.w, size.h));
+    if (size.w > 0 && size.h > 0) {
+      const f = fitPoints(fit, size.w, Math.max(120, size.h - bottomInset));
+      // Le centre de la carte descend de la moitié de la feuille : le cadrage reste centré sur la partie visible.
+      setView({ zoom: f.zoom, center: panCenter(f.center, f.zoom, 0, -bottomInset / 2) });
+      setFitted(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `fit` est recréé à chaque rendu : `fitKey` le résume.
   }, [fitKey, size.w > 0 && size.h > 0]);
+
+  useEffect(() => {
+    if (centerPin && size.w > 0) onCenterChange?.(view.center);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seul le centre compte.
+  }, [view.center, centerPin, size.w > 0]);
 
   const mapRef = useRef<ComponentRef<typeof View>>(null);
   const sizeRef = useRef(size);
@@ -126,7 +145,7 @@ export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, line, 
         }
       : {};
 
-  const tiles = useMemo(() => (size.w > 0 ? visibleTiles(view.center, view.zoom, size.w, size.h) : []), [view, size]);
+  const tiles = useMemo(() => (fitted && size.w > 0 ? visibleTiles(view.center, view.zoom, size.w, size.h) : []), [view, size]);
   const at = (p: LatLng) => toScreen(p, view.center, view.zoom, size.w, size.h);
   const zoomBy = (d: number) => setView((v) => ({ ...v, zoom: clampZoom(v.zoom + d) }));
   const onLayout = (e: LayoutChangeEvent) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height });
@@ -141,16 +160,21 @@ export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, line, 
           <Polyline points={linePoints(line, view.center, view.zoom, size.w, size.h)} fill="none" stroke={brandColor} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       ) : null}
-      {size.w > 0 ? markers.map((m) => <Pin key={m.id} marker={m} {...at(m)} onSelect={onSelect} color={colors.primary} />) : null}
+      {fitted && size.w > 0 ? markers.map((m) => <Pin key={m.id} marker={m} {...at(m)} onSelect={onSelect} color={colors.primary} />) : null}
       {size.w > 0 && user ? <View pointerEvents="none" style={[styles.user, { left: at(user).x - 9, top: at(user).y - 9 }]} /> : null}
-      <View style={styles.controls}>
+      {centerPin && size.w > 0 ? (
+        <View pointerEvents="none" style={[styles.pin, { left: size.w / 2 - 20, top: size.h / 2 - 40, width: 40, height: 40 }]}>
+          <Ionicons name="location" size={40} color={brandColor} />
+        </View>
+      ) : null}
+      <View style={[styles.controls, { bottom: spacing.md + bottomInset }]}>
         {onLocate ? <RoundButton icon="locate" label={t('places.locateMe')} onPress={onLocate} /> : null}
         <RoundButton icon="add" label={t('places.zoomIn')} onPress={() => zoomBy(1)} />
         <RoundButton icon="remove" label={t('places.zoomOut')} onPress={() => zoomBy(-1)} />
       </View>
-      <View pointerEvents="none" style={styles.attribution}>
+      <View pointerEvents="none" style={[styles.attribution, { bottom: 2 + bottomInset }]}>
         <Text variant="caption" style={{ color: '#333' }}>
-          © OpenStreetMap
+          © contributeurs OpenStreetMap (ODbL)
         </Text>
       </View>
     </View>
@@ -159,16 +183,22 @@ export function TileMap({ fit, fitKey, markers, user, onSelect, onLocate, line, 
 
 const Pin = memo(function Pin({ marker, x, y, color, onSelect }: { marker: MapMarker; x: number; y: number; color: string; onSelect?: (id: string) => void }) {
   const big = marker.selected;
-  const size = big ? 40 : 30;
+  const size = marker.icon ? (big ? 42 : 32) : big ? 40 : 30;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={marker.label}
       onPress={() => onSelect?.(marker.id)}
       hitSlop={8}
-      style={[styles.pin, { left: x - size / 2, top: y - size, width: size, height: size, zIndex: big ? 2 : 1 }]}
+      style={[styles.pin, { left: x - size / 2, top: marker.icon ? y - size / 2 : y - size, width: size, height: size, zIndex: big ? 2 : 1 }]}
     >
-      <Ionicons name="location" size={size} color={big ? '#111' : color} />
+      {marker.icon ? (
+        <View style={[styles.badge, { width: size, height: size, borderRadius: size / 2, backgroundColor: marker.color ?? color, borderWidth: big ? 3 : 2, borderColor: big ? '#111' : '#fff' }]}>
+          <Ionicons name={marker.icon} size={size * 0.52} color="#fff" />
+        </View>
+      ) : (
+        <Ionicons name="location" size={size} color={big ? '#111' : color} />
+      )}
     </Pressable>
   );
 });
@@ -191,6 +221,7 @@ const styles = StyleSheet.create({
   map: { overflow: 'hidden' },
   tile: { position: 'absolute', width: 256, height: 256 },
   pin: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
+  badge: { alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3 },
   user: { position: 'absolute', width: 18, height: 18, borderRadius: 9, backgroundColor: '#2563eb', borderWidth: 3, borderColor: '#fff' },
   controls: { position: 'absolute', right: spacing.md, bottom: spacing.md, gap: spacing.sm },
   round: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 3 },

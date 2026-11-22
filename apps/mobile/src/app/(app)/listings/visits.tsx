@@ -1,12 +1,13 @@
 import type { ListingVisit } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { mergeDeepItem } from '../../../lib/deep-item';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
 import { ApiRequestError } from '../../../lib/api';
 import { errorMessage } from '../../../lib/errors';
-import { answerVisit, fetchVisits, listingKeys } from '../../../listings/api';
+import { answerVisit, fetchVisit, fetchVisits, listingKeys } from '../../../listings/api';
 import { visitErrorKey } from '../../../listings/logic';
 import { brandColor, radius, spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/use-theme';
@@ -18,6 +19,9 @@ export default function Visits() {
   const { t, locale } = useI18n();
   const qc = useQueryClient();
   const list = useQuery({ queryKey: listingKeys.visits, queryFn: fetchVisits });
+  const { id: deepId } = useLocalSearchParams<{ id?: string }>();
+  const one = useQuery({ queryKey: [...listingKeys.visits, deepId], queryFn: () => fetchVisit(deepId!), enabled: !!deepId });
+  const visits = list.data ? mergeDeepItem(list.data.items, one.data) : [];
   const [places, setPlaces] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const act = useMutation({
@@ -63,13 +67,13 @@ export default function Visits() {
             {error}
           </Text>
         ) : null}
-        {list.data.items.length === 0 ? <Text muted>{t('listings.visit.empty')}</Text> : null}
-        {list.data.items.map((v) => (
+        {visits.length === 0 ? <Text muted>{t('listings.visit.empty')}</Text> : null}
+        {visits.map((v) => (
           <View key={v.id} style={[styles.card, { backgroundColor: colors.surface }]}>
             <Text variant="heading">{v.listingTitle}</Text>
             <Text muted>{t(v.role === 'owner' ? 'listings.visit.receivedFrom' : 'listings.visit.sentBy', { name: v.other.displayName })}</Text>
             <Text>{new Date(v.scheduledAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}</Text>
-            <Badge tone={v.status === 'confirmed' ? 'primary' : 'neutral'} label={t(`listings.visit.status.${v.status}` as 'listings.visit.status.requested')} />
+            <View style={{ alignSelf: 'flex-start' }}><Badge tone={v.status === 'confirmed' ? 'primary' : 'neutral'} label={t(`listings.visit.status.${v.status}` as 'listings.visit.status.requested')} /></View>
             {v.message ? <Text>{v.message}</Text> : null}
             {v.place ? <Text style={{ color: brandColor }}>{t('listings.visit.place', { place: v.place })}</Text> : null}
             {v.role === 'owner' && v.status === 'requested' ? (

@@ -37,7 +37,7 @@ export default function UiKit() {
           <FadeInView index={2} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <ServiceTile icon="qr-code-outline" label="Scanner" onPress={noop} />
             <ServiceTile icon="car-outline" label="Course" onPress={noop} />
-            <ServiceTile icon="bicycle-outline" label="Livraison" tint={brandAccent} onPress={noop} />
+            <ServiceTile icon="bicycle-outline" label="Livraison" tone="action" onPress={noop} />
             <ServiceTile icon="apps-outline" label="Mini-apps" badge={3} onPress={noop} />
           </FadeInView>
 
@@ -48,7 +48,7 @@ export default function UiKit() {
           ]} />
 
           <ChipRow>
-            {['all', 'food', 'tech', 'mode'].map((k) => <Chip key={k} label={k} selected={sel === k} onPress={() => setSel(k)} />)}
+            {[['all', 'Tous'], ['food', 'Repas'], ['tech', 'Tech'], ['mode', 'Mode']].map(([k, l]) => <Chip key={k} label={l} selected={sel === k} onPress={() => setSel(k)} />)}
           </ChipRow>
 
           <View style={{ flexDirection: 'row', gap: 12 }}>

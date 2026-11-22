@@ -6,6 +6,18 @@ export function similarProducts(items: readonly StorefrontProduct[], currentId: 
   return items.filter((p) => p.id !== currentId).slice(0, max);
 }
 
+/** Sépare la description d'un produit de ses caractéristiques (lignes « - Clé : valeur » sous un titre « Caractéristiques »). */
+export function splitDescription(desc: string | null | undefined): { text: string; specs: [string, string][] } {
+  const specs: [string, string][] = [];
+  const text: string[] = [];
+  for (const line of (desc ?? '').split('\n')) {
+    const m = /^\s*[-•]\s*([^:]{2,40}?)\s*:\s*(.+)$/.exec(line);
+    if (m) specs.push([m[1]!, m[2]!.trim()]);
+    else if (!/^\s*(caract[ée]ristiques|features|specifications|sifa)\s*:?\s*$/i.test(line)) text.push(line);
+  }
+  return { text: text.join('\n').trim(), specs };
+}
+
 export interface CategoryDraft {
   min: string;
   max: string;
@@ -24,7 +36,7 @@ export function priceBounds(d: CategoryDraft, locale = 'fr'): { minPrice?: numbe
 }
 
 /** Icône d'une catégorie d'après son nom (repli : étiquette). */
-export function categoryIcon(name: string): 'phone-portrait-outline' | 'shirt-outline' | 'home-outline' | 'sparkles-outline' | 'restaurant-outline' | 'football-outline' | 'car-outline' | 'cloud-download-outline' | 'pricetag-outline' {
+export function categoryIcon(name: string): 'phone-portrait-outline' | 'shirt-outline' | 'home-outline' | 'sparkles-outline' | 'restaurant-outline' | 'football-outline' | 'car-outline' | 'cloud-download-outline' | 'pricetag-outline' | 'medkit-outline' | 'happy-outline' | 'construct-outline' | 'book-outline' | 'diamond-outline' | 'leaf-outline' {
   const n = name.toLowerCase();
   if (/électro|electro|phone|informat|vifaa vya umeme/.test(n)) return 'phone-portrait-outline';
   if (/mode|fashion|vêt|vet|nguo/.test(n)) return 'shirt-outline';
@@ -34,5 +46,11 @@ export function categoryIcon(name: string): 'phone-portrait-outline' | 'shirt-ou
   if (/sport|michezo/.test(n)) return 'football-outline';
   if (/auto|voiture|car|gari/.test(n)) return 'car-outline';
   if (/num[ée]rique|digital|dijiti/.test(n)) return 'cloud-download-outline';
+  if (/sant[ée]|health|afya|pharma/.test(n)) return 'medkit-outline';
+  if (/b[ée]b[ée]|baby|enfant|watoto|mtoto/.test(n)) return 'happy-outline';
+  if (/service|huduma/.test(n)) return 'construct-outline';
+  if (/livre|book|vitabu|papeter/.test(n)) return 'book-outline';
+  if (/bijou|jewel|vito/.test(n)) return 'diamond-outline';
+  if (/jardin|garden|agri|bustani/.test(n)) return 'leaf-outline';
   return 'pricetag-outline';
 }

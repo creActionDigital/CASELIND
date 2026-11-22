@@ -85,7 +85,7 @@ export const swAdminOps3: Partial<Record<MessageKey, string>> = {
   'ops2.annStatus.draft': 'Rasimu',
   'ops2.annStatus.published': 'Limechapishwa',
   'ops2.annStatus.ended': 'Limeisha',
-  'ops2.annUser.title': 'Matangazo',
+  'ops2.annUser.title': 'Habari za CASELIND',
   'ops2.annUser.empty': 'Hakuna tangazo kwa sasa.',
   'ops2.settings.title': 'Mipangilio ya nchi na jiji',
   'ops2.settings.key': 'Mpangilio',

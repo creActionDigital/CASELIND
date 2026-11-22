@@ -1,6 +1,6 @@
 import type { StorefrontProduct } from '@caselind/contracts';
 import { describe, expect, it } from 'vitest';
-import { categoryIcon, priceBounds, similarProducts } from './market-logic';
+import { categoryIcon, priceBounds, similarProducts, splitDescription } from './market-logic';
 
 const p = (id: string) => ({ id }) as StorefrontProduct;
 
@@ -20,5 +20,14 @@ describe('market-logic', () => {
     expect(categoryIcon('Produits numériques')).toBe('cloud-download-outline');
     expect(categoryIcon('Automobile')).toBe('car-outline');
     expect(categoryIcon('Divers')).toBe('pricetag-outline');
+  });
+});
+
+describe('splitDescription', () => {
+  it('extrait les caractéristiques du texte', () => {
+    const r = splitDescription('Un sac solide.\n\nCaractéristiques\n- Matière : coton\n- Dimensions : 30 x 20 cm');
+    expect(r.text).toBe('Un sac solide.');
+    expect(r.specs).toEqual([['Matière', 'coton'], ['Dimensions', '30 x 20 cm']]);
+    expect(splitDescription(null)).toEqual({ text: '', specs: [] });
   });
 });

@@ -1,3 +1,5 @@
+import { PersonField } from '../../../../../components/PersonField';
+import type { Person } from '../../../../../people/logic';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -20,6 +22,7 @@ export default function SchoolGuardians() {
   const { orgId } = useLocalSearchParams<{ orgId: string }>();
   const [student, setStudent] = useState<string | null>(null);
   const [parent, setParent] = useState('');
+  const [person, setPerson] = useState<Person | null>(null);
   const [relation, setRelation] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +59,7 @@ export default function SchoolGuardians() {
         {classes.isError ? <ErrorState error={classes.error} onRetry={() => classes.refetch()} /> : null}
         {classes.data && !loadingStudents && students.length === 0 ? <Text muted>{t('guardians.staff.noStudents')}</Text> : null}
         <Chips scroll={false} options={students.map((s) => ({ value: s.handle, label: s.displayName }))} value={student} onChange={setStudent} />
-        <TextField label={t('guardians.staff.handle')} value={parent} onChangeText={setParent} autoCapitalize="none" autoCorrect={false} maxLength={41} />
+        <PersonField label={t('guardians.staff.handle')} placeholder={t('pp.choose')} value={parent.trim() ? { handle: parent.trim(), displayName: person?.displayName ?? parent.trim(), avatarUrl: person?.avatarUrl } : null} onChange={(x) => { setPerson(x); setParent(x?.handle ?? ''); }} />
         <TextField label={t('guardians.staff.relation')} value={relation} onChangeText={setRelation} maxLength={40} />
         {error ? (
           <Text variant="small" color={colors.danger} accessibilityLiveRegion="polite">

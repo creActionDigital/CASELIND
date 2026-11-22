@@ -11,7 +11,7 @@ import { PostsPane } from '../../../hub/PostsPane';
 import { ProductsPane } from '../../../hub/ProductsPane';
 import { VideosPane } from '../../../hub/VideosPane';
 import { useI18n } from '../../../i18n';
-import { brandColor, onMedia, TOUCH } from '../../../theme/tokens';
+import { brandAccent, brandColor, onMedia, TOUCH } from '../../../theme/tokens';
 import { Text } from '../../../ui';
 
 /** Onglet central « + » : Live · Vidéos · Posts · Produits, plein écran, onglets glissables ou touchables. */
@@ -65,7 +65,7 @@ export default function Hub() {
           </Text>
         </Pressable>
       </View>
-      <PublishSheet visible={publishing} onClose={() => setPublishing(false)} />
+      <PublishSheet visible={publishing} onClose={() => setPublishing(false)} onLive={() => select(0)} />
     </View>
   );
 }
@@ -80,6 +80,6 @@ const styles = StyleSheet.create({
     minHeight: TOUCH,
     paddingHorizontal: 18,
     borderRadius: 999,
-    backgroundColor: brandColor,
+    backgroundColor: brandAccent,
   },
 });

@@ -1,6 +1,9 @@
+import { PeopleField } from '../../../components/PersonField';
+import type { Person } from '../../../people/logic';
 import { SPLIT_PARTICIPANTS_MAX, SPLIT_TITLE_MAX } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { mergeDeepItem } from '../../../lib/deep-item';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useI18n } from '../../../i18n';
@@ -12,7 +15,7 @@ import { useTheme } from '../../../theme/use-theme';
 import { Chips } from '../../../seller/ui';
 import { Button, ErrorState, Screen, Text, TextField } from '../../../ui';
 import { parseWalletAmount, WALLET_CURRENCIES } from '../../../wallet/amount';
-import { cancelSplitBill, createSplitBill, fetchSplitBills, walletFinanceKeys } from '../../../wallet/finance/api';
+import { cancelSplitBill, createSplitBill, fetchSplitBill, fetchSplitBills, walletFinanceKeys } from '../../../wallet/finance/api';
 import { financeErrorMessage } from '../../../wallet/finance/errors';
 import { cleanHandle, customSplitPreview, equalSplitPreview } from '../../../wallet/finance/logic';
 import { Card, FinanceHeader } from '../../../wallet/finance/ui';
@@ -28,12 +31,12 @@ export default function WalletSplit() {
   const [currency, setCurrency] = useState<string>('USD');
   const [total, setTotal] = useState('');
   const [mode, setMode] = useState<Mode>('equal');
-  const [people, setPeople] = useState('');
+  const [people, setPeople] = useState<Person[]>([]);
   const [custom, setCustom] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const clientId = useRef<{ sig: string; id: string } | null>(null);
 
-  const handles = [...new Set(people.split(/[\s,;]+/).map(cleanHandle).filter(Boolean))];
+  const handles = [...new Set(people.map((x) => cleanHandle(x.handle)).filter(Boolean))];
   const parsedTotal = parseWalletAmount(total, currency);
   const totalMinor = 'minor' in parsedTotal ? parsedTotal.minor : null;
   const customMinor = handles.map((h) => {
@@ -48,6 +51,9 @@ export default function WalletSplit() {
         : customSplitPreview(totalMinor, customMinor);
 
   const bills = useQuery({ queryKey: walletFinanceKeys.split, queryFn: () => fetchSplitBills() });
+  const { id: deepId } = useLocalSearchParams<{ id?: string }>();
+  const one = useQuery({ queryKey: [...walletFinanceKeys.split, deepId], queryFn: () => fetchSplitBill(deepId!), enabled: !!deepId });
+  const billItems = bills.data ? mergeDeepItem(bills.data.items, one.data) : [];
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: walletFinanceKeys.split });
     void qc.invalidateQueries({ queryKey: walletFinanceKeys.requests });
@@ -70,7 +76,7 @@ export default function WalletSplit() {
       clientId.current = null;
       setTitle('');
       setTotal('');
-      setPeople('');
+      setPeople([]);
       setCustom({});
       setError(null);
       refresh();
@@ -114,7 +120,7 @@ export default function WalletSplit() {
             onChange={setMode}
             scroll={false}
           />
-          <TextField label={t('wf.split.participants')} value={people} onChangeText={setPeople} autoCapitalize="none" autoCorrect={false} />
+          <PeopleField label={t('wf.split.participants')} value={people} onChange={setPeople} max={SPLIT_PARTICIPANTS_MAX} />
           {mode === 'custom'
             ? handles.map((h) => (
                 <TextField key={h} label={t('wf.split.shareOf', { handle: h })} value={custom[h] ?? ''} onChangeText={(v) => setCustom((c) => ({ ...c, [h]: v }))} keyboardType="decimal-pad" placeholder="0,00" />
@@ -140,10 +146,10 @@ export default function WalletSplit() {
           <ActivityIndicator color={colors.primary} accessibilityLabel={t('common.loading')} />
         ) : bills.isError ? (
           <ErrorState error={bills.error} onRetry={() => bills.refetch()} />
-        ) : bills.data?.items.length === 0 ? (
+        ) : billItems.length === 0 ? (
           <Text muted>{t('wf.split.empty')}</Text>
         ) : (
-          bills.data?.items.map((b) => (
+          billItems.map((b) => (
             <Card key={b.id}>
               <Text variant="bodyStrong">{b.title}</Text>
               <Text>{formatMoney(b.totalMinor, b.currency, locale)}</Text>

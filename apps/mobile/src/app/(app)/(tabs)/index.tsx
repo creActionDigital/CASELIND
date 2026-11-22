@@ -6,11 +6,10 @@ import { useAuth } from '../../../auth/auth-context';
 import { useImpressionReporting } from '../../../creator/hooks';
 import { dedupeById } from '../../../creator/logic';
 import { mixFeed } from '../../../home/feed-mix';
-import { HomeShortcuts } from '../../../home/Shortcuts';
 import { discoverKeys, fetchPeople } from '../../../home/discover-api';
 import { PersonCard } from '../../../home/PersonCard';
 import { setPrefs, usePrefs } from '../../../prefs/store';
-import { HomeBanner, PromoCard, SectionHeader, VideoCard } from '../../../home/parts';
+import { PromoCard, SectionHeader, VideoCard } from '../../../home/parts';
 import { useI18n } from '../../../i18n';
 import { fetchRecentProducts } from '../../../shop/api';
 import { ProductCard } from '../../../shop/ProductGrid';
@@ -101,9 +100,32 @@ export default function Home() {
         }}
         ListHeaderComponent={
           <View>
-            <HomeBanner name={me?.displayName ?? ''} />
-            <HomeShortcuts />
             <StoriesBar />
+            {sectionProducts.length > 0 ? (
+              <View>
+                <SectionHeader
+                  title={t('home.products')}
+                  actionLabel={t('home.seeMore')}
+                  actionA11y={t('home.seeMoreA11y')}
+                  onAction={() => router.push('/shop')}
+                />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productsScroll}>
+                  {sectionProducts.map((p) => (
+                    <ProductCard key={p.id} product={p} width={164} />
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+            {people.data && people.data.items.length > 0 ? (
+              <View>
+                <SectionHeader title={t('ma.discover.people')} actionLabel={t('home.seeMore')} actionA11y={t('home.seeMoreA11y')} onAction={() => router.push('/discover' as never)} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productsScroll}>
+                  {people.data.items.map((p) => (
+                    <PersonCard key={p.userId} person={p} width={150} />
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
             <View style={styles.tabs} accessibilityRole="tablist">
               {TABS.map((x) => {
                 const selected = scope === x.scope;
@@ -122,31 +144,6 @@ export default function Home() {
                 );
               })}
             </View>
-            {people.data && people.data.items.length > 0 ? (
-              <View>
-                <SectionHeader title={t('ma.discover.people')} actionLabel={t('home.seeMore')} actionA11y={t('home.seeMoreA11y')} onAction={() => router.push('/discover' as never)} />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productsScroll}>
-                  {people.data.items.map((p) => (
-                    <PersonCard key={p.userId} person={p} width={150} />
-                  ))}
-                </ScrollView>
-              </View>
-            ) : null}
-            {sectionProducts.length > 0 ? (
-              <View>
-                <SectionHeader
-                  title={t('home.products')}
-                  actionLabel={t('home.seeMore')}
-                  actionA11y={t('home.seeMoreA11y')}
-                  onAction={() => router.push('/shop')}
-                />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productsScroll}>
-                  {sectionProducts.map((p) => (
-                    <ProductCard key={p.id} product={p} width={164} />
-                  ))}
-                </ScrollView>
-              </View>
-            ) : null}
             {state === 'loading' ? <View style={styles.pad}><SkeletonList rows={3} label={t('common.loading')} /></View> : null}
             {state === 'error' ? <ErrorState error={feed.error} onRetry={() => feed.refetch()} /> : null}
             {state === 'empty' ? (

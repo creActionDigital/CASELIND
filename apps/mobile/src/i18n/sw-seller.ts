@@ -77,6 +77,7 @@ export const swSeller: Partial<Record<MessageKey, string>> = {
   'seller.kind.hotel': 'Hoteli',
   'seller.kind.pharmacy': 'Famasia',
   'seller.kind.fuel_station': 'Kituo cha mafuta',
+  'seller.kind.bank': 'Benki / ATM',
   'seller.kind.school': 'Shule',
   'seller.kind.hospital': 'Hospitali',
   'seller.kind.services': 'Huduma',

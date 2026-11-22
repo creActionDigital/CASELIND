@@ -34,6 +34,15 @@ export default function Listings() {
         <TextField label={t('listings.search')} value={text} onChangeText={setText} returnKeyType="search" autoCapitalize="none" />
       </View>
       <Chips
+        options={[
+          { value: '/listings/visits', label: t('listings.visit.mine') },
+          { value: '/listings/offers', label: t('listings.offer.mine') },
+          { value: '/listings/compare', label: t('listings.compare.title') },
+        ]}
+        value={null}
+        onChange={(r) => router.push(r as never)}
+      />
+      <Chips
         options={[{ value: '' as const, label: t('listings.all') }, ...LISTING_KINDS.map((k) => ({ value: k, label: t(kindKey(k)) }))]}
         value={kind}
         onChange={(v) => setKind(v === kind ? '' : v)}
@@ -49,9 +58,6 @@ export default function Listings() {
           headerRight: () => (
             <View style={styles.actions}>
               <IconButton icon="notifications-outline" label={t('listings.alerts')} onPress={() => router.push('/listings/alerts')} />
-              <IconButton icon="calendar-outline" label={t('listings.visit.mine')} onPress={() => router.push('/listings/visits')} />
-              <IconButton icon="pricetag-outline" label={t('listings.offer.mine')} onPress={() => router.push('/listings/offers')} />
-              <IconButton icon="git-compare-outline" label={t('listings.compare.title')} onPress={() => router.push('/listings/compare')} />
               <IconButton icon="albums-outline" label={t('listings.mine')} onPress={() => router.push('/listings/mine')} />
               <IconButton icon="add-circle-outline" label={t('listings.new')} onPress={() => router.push('/listings/new')} />
             </View>
@@ -85,7 +91,7 @@ export function ListingCard({ item, onPress }: { item: Listing; onPress: () => v
           <Text variant="small" muted numberOfLines={1}>
             {t(kindKey(item.kind))} · {item.city}
           </Text>
-          {item.status === 'closed' ? <Badge tone="neutral" label={t('listings.closed')} /> : null}
+          {item.status === 'closed' ? <View style={{ alignSelf: 'flex-start' }}><Badge tone="neutral" label={t('listings.closed')} /></View> : null}
         </View>
       </View>
     </Card>
@@ -97,7 +103,7 @@ const styles = StyleSheet.create({
   header: { paddingTop: spacing.sm },
   pad: { paddingHorizontal: spacing.lg },
   actions: { flexDirection: 'row' },
-  card: { marginHorizontal: spacing.lg, marginBottom: spacing.sm },
+  card: {},
   row: { flexDirection: 'row', gap: spacing.md },
   thumb: { width: 88, height: 88 },
 });

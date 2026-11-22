@@ -93,13 +93,13 @@ export default function NewMiniApp() {
         {owned.length > 1 ? (
           <>
             <SectionTitle>{t('miniapps.dev.org')}</SectionTitle>
-            <Chips value={orgId ?? owned[0]!.org.id} onChange={setOrgId} options={owned.map((m) => ({ value: m.org.id, label: m.org.name }))} />
+            <Chips flush value={orgId ?? owned[0]!.org.id} onChange={setOrgId} options={owned.map((m) => ({ value: m.org.id, label: m.org.name }))} />
           </>
         ) : null}
         <TextField label={t('miniapps.dev.new.name')} value={name} onChangeText={setName} maxLength={60} />
         <TextField label={t('miniapps.dev.new.description')} value={description} onChangeText={setDescription} multiline maxLength={500} />
         <Text variant="small" style={{ fontWeight: '600' }}>{t('md.apps.devCategory')}</Text>
-        <Chips<MiniAppCategory | ''>
+        <Chips<MiniAppCategory | ''> flush
           value={category}
           onChange={setCategory}
           options={[{ value: '', label: t('md.apps.catAll') }, ...MINIAPP_CATEGORIES.map((c) => ({ value: c, label: t(`md.apps.cat.${c}` as MessageKey) }))]}

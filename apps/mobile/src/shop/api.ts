@@ -1,4 +1,5 @@
 import {
+  paymentMethodListSchema,
   cartSchema,
   checkoutResponseSchema,
   orderDetailSchema,
@@ -48,6 +49,11 @@ export const fetchReviews = (productId: string, cursor?: string) =>
   api.request(`/products/${productId}/reviews`, { query: { limit: PAGE, cursor }, schema: reviewListSchema });
 export const createReview = (productId: string, body: { rating: number; body?: string }) =>
   api.request(`/products/${productId}/reviews`, { method: 'POST', body, schema: reviewSchema });
+
+export const fetchPaymentMethods = () => api.request('/payment-methods', { schema: paymentMethodListSchema });
+export const updateReview = (reviewId: string, body: { rating?: number; body?: string | null }) =>
+  api.request(`/reviews/${reviewId}`, { method: 'PATCH', body, schema: reviewSchema });
+export const deleteReview = (reviewId: string) => api.request(`/reviews/${reviewId}`, { method: 'DELETE' });
 
 /** Quelques produits récents pour l'Accueil. */
 export const fetchRecentProducts = (limit = 6) =>

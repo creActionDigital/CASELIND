@@ -56,7 +56,7 @@ export default function SellerProfitability() {
       {title}
       <Screen edges={['bottom']}>
         <View style={{ gap: spacing.md }}>
-          <Chips options={PERIOD_PRESETS.map((p) => ({ value: p, label: t(`biz.period.${p}` as MessageKey) }))} value={preset} onChange={setPreset} />
+          <Chips flush options={PERIOD_PRESETS.map((p) => ({ value: p, label: t(`biz.period.${p}` as MessageKey) }))} value={preset} onChange={setPreset} />
           <Text variant="small" muted>{`${from} → ${to}`}</Text>
           {q.isPending ? <Loading /> : null}
           {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : null}
