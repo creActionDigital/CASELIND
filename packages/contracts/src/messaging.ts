@@ -31,6 +31,8 @@ export const messageMediaSchema = z.object({
   contentUrl: z.string().nullable(),
   /** Sanitised original name of a document attachment. */
   fileName: z.string().nullable().optional(),
+  /** Voice message length in seconds. */
+  durationSec: z.number().int().nullable().optional(),
 });
 export type MessageMedia = z.infer<typeof messageMediaSchema>;
 

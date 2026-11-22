@@ -52,6 +52,7 @@ const PLACE_KINDS: [OrgKind, string[]][] = [
   ['pharmacy', ['pharmacie', 'pharmacies', 'pharmacy', 'pharmacies', 'duka la dawa', 'famasia']],
   ['hotel', ['hotel', 'hotels', 'hoteli', 'auberge', 'guesthouse', 'lodge']],
   ['fuel_station', ['station-service', 'station service', 'station essence', 'stations service', 'fuel station', 'gas station', 'petrol station', 'kituo cha mafuta']],
+  ['bank', ['banque', 'bank', 'distributeur', 'atm', 'guichet', 'benki']],
   ['school', ['ecole', 'ecoles', 'school', 'schools', 'shule', 'college', 'lycee']],
   ['hospital', ['hopital', 'hopitaux', 'clinique', 'cliniques', 'hospital', 'clinic', 'hospitali', 'zahanati']],
   ['shop', ['boutique', 'boutiques', 'magasin', 'magasins', 'shop', 'shops', 'store', 'duka', 'maduka']],

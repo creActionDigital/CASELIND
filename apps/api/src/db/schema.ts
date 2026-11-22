@@ -145,7 +145,7 @@ export const organizations = pgTable('organizations', {
   slug: citext('slug').notNull(),
   name: text('name').notNull(),
   kind: text('kind')
-    .$type<'shop' | 'restaurant' | 'hotel' | 'pharmacy' | 'fuel_station' | 'school' | 'hospital' | 'services' | 'warehouse' | 'other'>()
+    .$type<'shop' | 'restaurant' | 'hotel' | 'pharmacy' | 'fuel_station' | 'school' | 'hospital' | 'services' | 'warehouse' | 'bank' | 'other'>()
     .notNull(),
   description: text('description'),
   logoUrl: text('logo_url'),
@@ -210,6 +210,8 @@ export const mediaAssets = pgTable('media_assets', {
   sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
   /** Sanitised original name (documents sent in messages). */
   fileName: text('file_name'),
+  /** Voice messages: length in seconds. */
+  durationSec: integer('duration_sec'),
   sha256: text('sha256'),
   status: text('status').$type<'pending' | 'ready' | 'rejected'>().notNull().default('pending'),
   storageKey: text('storage_key').notNull(),

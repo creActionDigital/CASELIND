@@ -267,7 +267,7 @@ import { PrivacyService } from './privacy/privacy.service.js';
 import { AuthGuard } from './security/auth.guard.js';
 import { PasswordService } from './security/password.service.js';
 import { TokenService } from './security/token.service.js';
-import { UsersController } from './users/users.controller.js';
+import { MATCH_CONTACTS_HANDLER, UsersController } from './users/users.controller.js';
 import { UsersService } from './users/users.service.js';
 
 export interface AppModuleOptions {
@@ -394,6 +394,16 @@ export class AppModule {
                 ctx.getType() !== 'http' ||
                 ctx.getClass() !== SearchController ||
                 ![SEARCH_HANDLER, ...NATURAL_HANDLERS].includes(ctx.getHandler().name),
+            },
+            {
+              // Phone-book matching only (up to 500 numbers per call).
+              name: 'contactMatch',
+              ttl: 60_000,
+              limit: env.CONTACT_MATCH_RATE_LIMIT_PER_MINUTE,
+              skipIf: (ctx) =>
+                ctx.getType() !== 'http' ||
+                ctx.getClass() !== UsersController ||
+                ctx.getHandler().name !== MATCH_CONTACTS_HANDLER,
             },
             {
               // Lot 10: the OAuth token endpoint only (code exchange and refresh; secret and verifier guesses).

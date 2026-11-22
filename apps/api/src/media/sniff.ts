@@ -95,5 +95,5 @@ export function sniffMime(head: Uint8Array): MediaMime | null {
  * the generic ISO brands, so content detected as video/mp4 is accepted when declared audio/mp4.
  */
 export function matchesDeclared(detected: MediaMime, declared: MediaMime): boolean {
-  return detected === declared || (detected === 'video/mp4' && declared === 'audio/mp4');
+  return detected === declared || ((detected === 'video/mp4' && declared === 'audio/mp4') || (detected === 'video/webm' && declared === 'audio/webm'));
 }

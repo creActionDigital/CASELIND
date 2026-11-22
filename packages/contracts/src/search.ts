@@ -89,3 +89,11 @@ export const exportedSearchHistorySchema = z.object({
   scope: searchScopeSchema,
   createdAt: z.iso.datetime(),
 });
+
+/** POST /v1/users/match-contacts : phone-book numbers (E.164, never stored) -> discoverable CASELIND users. */
+export const matchContactsRequestSchema = z.object({
+  phones: z.array(z.string().regex(/^\+[1-9]\d{7,14}$/)).min(1).max(500),
+});
+export type MatchContactsRequest = z.infer<typeof matchContactsRequestSchema>;
+export const matchContactsResponseSchema = z.object({ items: z.array(searchUserHitSchema) });
+export type MatchContactsResponse = z.infer<typeof matchContactsResponseSchema>;

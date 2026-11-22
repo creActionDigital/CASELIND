@@ -93,7 +93,7 @@ import {
   userFlagsSchema,
   verifyOtpRequestSchema,
   callListSchema,
-  callSchema,
+  callSchema, iceServersSchema,
   createCallRequestSchema,
   liveListSchema,
   liveMessageListSchema,
@@ -371,6 +371,8 @@ import {
   searchHistorySettingsSchema,
   searchQuerySchema,
   searchResultSchema,
+  matchContactsRequestSchema,
+  matchContactsResponseSchema,
   setOrgLocationRequestSchema,
   updateOrgLocationRequestSchema,
 } from '@caselind/contracts';
@@ -1003,6 +1005,7 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'get', path: '/v1/me', summary: "The caller's account", tags: ['users'], auth: 'user', response: meSchema, status: 200 },
   { method: 'patch', path: '/v1/me', summary: "Update the caller's profile", tags: ['users'], auth: 'user', body: updateMeRequestSchema, response: meSchema, status: 200 },
   { method: 'get', path: '/v1/me/security-events', summary: "Recent security events on the caller's account", tags: ['users'], auth: 'user', response: itemsOf(securityEventSchema), status: 200 },
+  { method: 'post', path: '/v1/users/match-contacts', summary: 'Match phone-book numbers (E.164, 1 to 500, never stored) to active users who allow discovery by phone; blocked either way left out; id, handle, display name and avatar only; strict rate limit', tags: ['users'], auth: 'user', body: matchContactsRequestSchema, response: matchContactsResponseSchema, status: 200 },
   { method: 'get', path: '/v1/users/{handle}', summary: 'Public profile by handle or user id (404 when blocked either way)', tags: ['users'], auth: 'user', params: { handle: z.string() }, response: publicProfileSchema, status: 200 },
 
   // Feature flags
@@ -1031,6 +1034,7 @@ export const apiOperations: readonly ApiOperation[] = [
   { method: 'post', path: '/v1/calls/{id}/accept', summary: 'Answer a ringing call (callee only; not ringing 409 call_closed)', tags: ['calls'], auth: 'user', params: { id: z.uuid() }, response: callSchema, status: 200 },
   { method: 'post', path: '/v1/calls/{id}/decline', summary: 'Decline a ringing call (callee only)', tags: ['calls'], auth: 'user', params: { id: z.uuid() }, response: callSchema, status: 200 },
   { method: 'post', path: '/v1/calls/{id}/end', summary: 'Hang up: cancels a ringing call (caller) or ends an active one (either party)', tags: ['calls'], auth: 'user', params: { id: z.uuid() }, response: callSchema, status: 200 },
+  { method: 'get', path: '/v1/calls/ice-servers', summary: 'STUN/TURN servers for WebRTC from ICE_STUN_URLS / TURN_URLS / TURN_USERNAME / TURN_CREDENTIAL; defaults are public test relays (Google STUN, Metered Open Relay), NOT for production', tags: ['calls'], auth: 'user', response: iceServersSchema, status: 200 },
   { method: 'post', path: '/v1/calls/{id}/signal', summary: 'Relay an SDP offer/answer or ICE candidate to the other party as call.signal (never stored)', tags: ['calls'], auth: 'user', params: { id: z.uuid() }, body: signalRequestSchema, status: 204 },
   { method: 'post', path: '/v1/lives', summary: 'Start a live (one at a time per host: 409 already_live)', tags: ['live'], auth: 'user', body: startLiveRequestSchema, response: liveSchema, status: 201 },
   { method: 'get', path: '/v1/lives', summary: 'Lives in progress, newest first (hosts blocked either way are hidden)', tags: ['live'], auth: 'user', response: liveListSchema, status: 200 },

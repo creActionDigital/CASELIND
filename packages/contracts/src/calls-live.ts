@@ -32,6 +32,12 @@ export const signalRequestSchema = z.object({
 });
 export type SignalRequest = z.infer<typeof signalRequestSchema>;
 
+/** ICE servers (STUN/TURN) the client gives to RTCPeerConnection. */
+export const iceServersSchema = z.object({
+  iceServers: z.array(z.object({ urls: z.array(z.string()).min(1), username: z.string().optional(), credential: z.string().optional() })),
+});
+export type IceServers = z.infer<typeof iceServersSchema>;
+
 export const liveSchema = z.object({
   id: z.uuid(),
   hostId: z.uuid(),

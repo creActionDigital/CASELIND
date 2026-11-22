@@ -75,6 +75,11 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    /** WebRTC ICE (comma-separated URLs). Defaults are PUBLIC TEST relays (Google STUN, Metered Open Relay): NOT for production, set your own TURN. */
+    ICE_STUN_URLS: z.string().default('stun:stun.l.google.com:19302'),
+    TURN_URLS: z.string().default('turn:openrelay.metered.ca:80,turn:openrelay.metered.ca:443,turn:openrelay.metered.ca:443?transport=tcp'),
+    TURN_USERNAME: z.string().default('openrelayproject'),
+    TURN_CREDENTIAL: z.string().default('openrelayproject'),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
     /** Bearer token of GET /metrics (outside /v1). Unset = the route answers 404. */
     METRICS_TOKEN: z.string().min(16, 'METRICS_TOKEN must be at least 16 characters').optional(),
@@ -115,6 +120,8 @@ const envSchema = z
     REPORTS_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(10),
     /** Lot 7: per-client budget for GET /v1/search (each call runs up to four queries). */
     SEARCH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(60),
+    /** Phone-book matching (POST /v1/users/match-contacts): strict budget, each call looks up up to 500 numbers. */
+    CONTACT_MATCH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(10),
     /** Push provider: `log` only journals (nothing is delivered), `expo` calls the Expo Push API. */
     PUSH_PROVIDER: z.enum(['expo', 'log']).default('log'),
     EXPO_ACCESS_TOKEN: z.string().min(1).optional(),

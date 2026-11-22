@@ -29,6 +29,7 @@ interface CardRow {
   currency: string;
   in_stock: boolean;
   cover: string | null;
+  colors: string[] | null;
   org_id: string;
   org_slug: string;
   org_name: string;
@@ -161,6 +162,7 @@ export class StorefrontService {
       SELECT p.id, p.title, p.category_id, p.created_at, p.created_at::text AS ts,
              s.min_price, s.base_price, s.promo_label, s.promo_kind, s.promo_ends, s.currency, s.in_stock,
              (SELECT pm.media_id FROM product_media pm WHERE pm.product_id = p.id ORDER BY pm.position LIMIT 1) AS cover,
+             (SELECT array_agg(c.val) FROM (SELECT DISTINCT ON (lower(kv.value)) kv.value AS val FROM product_variants v2, jsonb_each_text(v2.options) kv WHERE v2.product_id = p.id AND v2.active AND kv.key ~* '^(couleur|colou?r|rangi)' ORDER BY lower(kv.value) LIMIT 4) c) AS colors,
              o.id AS org_id, o.slug AS org_slug, o.name AS org_name, o.logo_url AS org_logo_url
       FROM products p
       JOIN organizations o ON o.id = p.org_id
@@ -197,6 +199,7 @@ function toCard(r: CardRow): StorefrontProduct {
     promotion: r.promo_label && r.promo_kind && r.promo_ends ? { label: r.promo_label, endsAt: iso(r.promo_ends), kind: r.promo_kind } : null,
     currency: r.currency,
     inStock: r.in_stock,
+    colors: r.colors ?? [],
     org: { id: r.org_id, slug: r.org_slug, name: r.org_name, logoUrl: r.org_logo_url },
     createdAt: iso(r.created_at),
   };

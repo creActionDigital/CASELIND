@@ -598,3 +598,29 @@ describe('document messages', () => {
     await send(a, id, { kind: 'media', body: undefined, mediaId: exe.id }).expect(400);
   });
 });
+
+describe('voice messages', () => {
+  const WEBM = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x88, 0x42, 0x82, 0x84]), Buffer.from('webm'), Buffer.alloc(64)]);
+  const put = async (u: TU, mime: string, content: Buffer, durationSec?: number) => {
+    const up = await ctx.http.post('/v1/media/uploads').set(bearer(u.token)).send({ purpose: 'message', mime, sizeBytes: content.length, durationSec }).expect(201);
+    const r = await ctx.http.put(up.body.uploadUrl).set(bearer(u.token)).set('X-Upload-Token', up.body.uploadToken).set('Content-Type', 'application/octet-stream').send(content);
+    return { id: up.body.assetId as string, status: r.status };
+  };
+  it('sends a voice note with its duration: members read it, others do not; fake audio and bad durations are refused', async () => {
+    const [a, b, c] = [await user(), await user(), await user()];
+    const id = await direct(a, b);
+    const voice = await put(a, 'audio/webm', WEBM, 42);
+    expect(voice.status).toBe(200);
+    const msg = await send(a, id, { kind: 'media', body: undefined, mediaId: voice.id }).expect(201);
+    expect(msg.body.media).toMatchObject({ id: voice.id, mime: 'audio/webm', durationSec: 42 });
+    const list = await messagesOf(b, id).expect(200);
+    expect(list.body.items.find((m: { id: string }) => m.id === msg.body.id).media.durationSec).toBe(42);
+    await ctx.http.get(`/v1/media/${voice.id}/content`).set(bearer(b.token)).expect(200);
+    await ctx.http.get(`/v1/media/${voice.id}/content`).set(bearer(c.token)).expect(404);
+    const fake = await put(a, 'audio/mpeg', Buffer.from('MZ  not audio'), 5);
+    expect(fake.status).toBeGreaterThanOrEqual(400);
+    await send(a, id, { kind: 'media', body: undefined, mediaId: fake.id }).expect(400);
+    for (const durationSec of [0, 301]) await ctx.http.post('/v1/media/uploads').set(bearer(a.token)).send({ purpose: 'message', mime: 'audio/webm', sizeBytes: 100, durationSec }).expect(400);
+    await ctx.http.post('/v1/media/uploads').set(bearer(a.token)).send({ purpose: 'message', mime: 'application/pdf', sizeBytes: 100, durationSec: 5 }).expect(400);
+  });
+});

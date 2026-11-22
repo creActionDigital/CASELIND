@@ -20,6 +20,7 @@ export const orgKindSchema = z.enum([
   'hospital',
   'services',
   'warehouse',
+  'bank',
   'other',
 ]);
 export type OrgKind = z.infer<typeof orgKindSchema>;

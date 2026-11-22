@@ -54,6 +54,11 @@ export const placeSchema = z.object({
   city: z.string().nullable(),
   address: z.string().nullable(),
   verified: z.boolean(),
+  phone: z.string().nullable(),
+  // 'osm' for places imported from OpenStreetMap (ODbL attribution required).
+  source: z.enum(['osm']).nullable(),
+  // null when the opening hours are unknown.
+  openNow: z.boolean().nullable(),
   lat: latSchema,
   lng: lngSchema,
   label: z.string().nullable(),

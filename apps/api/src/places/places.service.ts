@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   ErrorCodes,
+  type OpeningHours,
   type OrgLocation,
   type Place,
   type PlaceList,
@@ -19,6 +20,18 @@ import { orgNotFound } from '../orgs/org.guard.js';
 const EARTH_RADIUS_KM = 6371.0088;
 const KM_PER_DEGREE = 111.32;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Goma is on Central Africa Time (UTC+2, no DST). shortcut: fixed offset, make it per-country when other cities launch. */
+const LOCAL_OFFSET_MIN = 120;
+const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+/** Open right now according to the weekly hours; null when the hours are unknown. */
+export function isOpenNow(hours: OpeningHours | null, now = new Date()): boolean | null {
+  if (!hours) return null;
+  const t = new Date(now.getTime() + LOCAL_OFFSET_MIN * 60_000);
+  const hm = `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`;
+  return (hours[DAYS[t.getUTCDay()]!] ?? []).some((iv) => iv.open <= hm && hm < iv.close);
+}
 
 const badCursor = () =>
   new AppError(400, ErrorCodes.validationFailed, 'Request validation failed', [{ path: 'cursor', message: 'invalid cursor' }]);
@@ -70,6 +83,9 @@ interface PlaceRow {
   city: string | null;
   address: string | null;
   verified: boolean;
+  phone: string | null;
+  source: 'osm' | null;
+  opening_hours: OpeningHours | null;
   lat: number;
   lng: number;
   location_label: string | null;
@@ -164,7 +180,7 @@ export class PlacesService {
     const res = await this.db.execute(sql`
       SELECT * FROM (
         SELECT o.id, o.slug::text AS slug, o.name, o.kind, o.logo_url, o.city, o.address,
-               (o.verification_status = 'verified') AS verified, o.lat, o.lng, o.location_label,
+               (o.verification_status = 'verified') AS verified, o.phone, o.source, o.opening_hours, o.lat, o.lng, o.location_label,
                ${dist} AS d, (${dist})::text AS d_text
         FROM organizations o
         WHERE ${sql.join(filters, sql` AND `)}
@@ -185,6 +201,9 @@ export class PlacesService {
         city: r.city,
         address: r.address,
         verified: r.verified,
+        phone: r.phone,
+        source: r.source,
+        openNow: isOpenNow(r.opening_hours),
         lat: r.lat,
         lng: r.lng,
         label: r.location_label,

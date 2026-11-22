@@ -200,6 +200,70 @@ const shop = await step('boutique alice', () => once('shop', async () => {
   return { orgId, variantIds: prods.map((p) => p.variants.map((v) => v.id)) };
 }));
 if (shop) {
+  // Descriptions, caractéristiques (lignes « - Clé : valeur » lues par l'onglet Détails) et variantes de couleur : idempotent (marqueur « Caractéristiques »).
+  await step('catalogue enrichi (descriptions, couleurs)', async () => {
+    const cats = await http('GET', '/catalog/categories', T('alice')).catch(() => ({ items: [] }));
+    const catId = (re) => (cats.items ?? []).find((c) => re.test(c.name))?.id;
+    const defs = {
+      'T-shirt coton': {
+        cat: /mode|fashion|v[êe]t/i,
+        text: "Un t-shirt simple et confortable pour tous les jours. Sa maille de coton respirante reste douce sur la peau, même par forte chaleur à Kinshasa. La coupe droite se porte seule ou sous une chemise. Il garde sa forme et ses couleurs après de nombreux lavages.",
+        specs: [['Matière', '100 % coton'], ['Coupe', 'Droite, unisexe'], ['Entretien', 'Lavage à 30 °C, sans sèche-linge']],
+        reuse: { M: { couleur: 'blanc', taille: 'M' }, L: { couleur: 'blanc', taille: 'L' } },
+        extra: [{ couleur: 'noir', taille: 'M' }, { couleur: 'noir', taille: 'L' }, { couleur: 'bleu', taille: 'M' }, { couleur: 'bleu', taille: 'L' }],
+      },
+      'Sac à dos': {
+        cat: /mode|fashion|v[êe]t/i,
+        text: "Un sac à dos robuste de 20 litres pour la ville, l'école ou le travail. Le tissu résiste à la pluie légère et à l'usure. Il compte un grand compartiment, une poche avant zippée et des bretelles rembourrées qui soulagent le dos. Pratique pour un ordinateur de 15 pouces.",
+        specs: [['Matière', 'Polyester renforcé, déperlant'], ['Capacité', '20 litres'], ['Dimensions', '45 x 30 x 15 cm'], ['Entretien', 'Nettoyage à l\'éponge humide']],
+        reuse: { bleu: { couleur: 'bleu' }, noir: { couleur: 'noir' } },
+        extra: [{ couleur: 'gris' }, { couleur: 'vert' }],
+      },
+      'Casquette': {
+        cat: /mode|fashion|v[êe]t/i,
+        text: "Une casquette légère pour se protéger du soleil. La visière courbée garde le visage à l'ombre et la sangle arrière se règle en un geste pour s'adapter à toutes les têtes. Le coton lavé est agréable dès le premier jour.",
+        specs: [['Matière', 'Coton lavé'], ['Taille', 'Unique, sangle réglable'], ['Entretien', 'Lavage à la main']],
+        reuse: { unique: { couleur: 'noir' } },
+        extra: [{ couleur: 'blanc' }, { couleur: 'bleu' }, { couleur: 'beige' }],
+      },
+      'Sandales cuir': {
+        cat: /mode|fashion|v[êe]t/i,
+        text: "Des sandales faites main par des artisans locaux. Le cuir véritable s'assouplit avec le temps et épouse le pied. La semelle antidérapante offre une bonne tenue sur les sols mouillés. Un modèle sobre qui accompagne aussi bien une tenue de ville qu'une journée au marché.",
+        specs: [['Matière', 'Cuir véritable, semelle en caoutchouc'], ['Fabrication', 'Artisanale, faite main'], ['Entretien', 'Essuyer avec un chiffon, cirer une fois par mois']],
+        reuse: { 40: { couleur: 'marron', pointure: '40' }, 42: { couleur: 'marron', pointure: '42' }, 44: { couleur: 'marron', pointure: '44' } },
+        extra: [{ couleur: 'noir', pointure: '40' }, { couleur: 'noir', pointure: '42' }, { couleur: 'noir', pointure: '44' }],
+      },
+    };
+    // Boutique « goma-market » (compte de bob) : mêmes enrichissements, sans changer les options existantes.
+    Object.assign(defs, {
+      'Pagne wax 6 yards': { text: "Un pagne en coton imprimé aux motifs vifs, tel qu'on le porte à Goma pour les fêtes comme au quotidien. Le tissu est dense, la couleur reste éclatante au lavage. Six yards suffisent pour une tenue complète : robe, ensemble ou chemise.", specs: [['Matière', '100 % coton'], ['Dimensions', '6 yards, soit environ 5,5 m'], ['Entretien', 'Lavage à froid, séchage à l’ombre']], merge: { couleur: 'orange' }, extra: [{ longueur: '6 yards', couleur: 'bleu' }, { longueur: '6 yards', couleur: 'jaune' }] },
+      'Baskets en toile': { text: "Des baskets légères pour la ville, avec une toile résistante et une semelle souple qui amortit la marche. Elles se lacent facilement et se marient avec presque toutes les tenues. Un modèle simple pensé pour durer.", specs: [['Matière', 'Toile de coton, semelle en caoutchouc'], ['Entretien', 'Brosse douce et eau savonneuse']], merge: { couleur: 'blanc' }, extra: [{ pointure: '42', couleur: 'noir' }, { pointure: '42', couleur: 'bleu' }] },
+      'Miel du Nyiragongo': { text: "Un miel naturel récolté par des apiculteurs autour de Goma, sur les pentes du volcan. Il est non chauffé et non coupé, au goût floral et légèrement fruité. Idéal sur du pain, dans une tisane ou pour remplacer le sucre.", specs: [['Contenance', '500 g'], ['Origine', 'Nord-Kivu, RDC'], ['Conservation', 'À l’abri de la lumière, jusqu’à 24 mois']] },
+      'Panier tressé de Goma': { text: "Un panier tressé à la main par des artisans de Goma. Les fibres naturelles sont solides et légèrement souples, avec deux anses renforcées. Il sert au marché, à la maison ou en décoration, et se patine joliment avec le temps.", specs: [['Matière', 'Fibres végétales naturelles'], ['Fabrication', 'Artisanale, tressé main'], ['Entretien', 'Dépoussiérer à sec']], merge: { couleur: 'beige' }, extra: [{ taille: 'M', couleur: 'marron' }] },
+      'Café arabica du Kivu': { text: "Un café de spécialité cultivé sur les rives du lac Kivu et torréfié à Goma. Les grains sont triés à la main, pour une tasse ronde aux notes de cacao et d'agrumes. Disponible en grains entiers, à moudre juste avant l'infusion.", specs: [['Variété', 'Arabica'], ['Torréfaction', 'Moyenne, en grains'], ['Conservation', 'Sachet fermé, au sec']] },
+    });
+    const goma = await http('GET', '/public/orgs/goma-market', T('bob')).catch(() => null);
+    for (const [org, tk] of [[shop.orgId, T('alice')], [goma?.id, T('bob')]]) {
+    if (!org) continue;
+    const list = await http('GET', `/orgs/${org}/products`, tk);
+    for (const row of list.items ?? list) {
+      const d = defs[row.title];
+      if (!d) continue;
+      const full = await http('GET', `/orgs/${org}/products/${row.id}`, tk);
+      if ((full.description ?? '').includes('Caractéristiques')) continue;
+      const base = full.variants[0];
+      const body = {
+        description: `${d.text}\n\nCaractéristiques\n${d.specs.map(([k, v]) => `- ${k} : ${v}`).join('\n')}`,
+        variants: [
+          ...full.variants.map((v) => ({ id: v.id, sku: v.sku, options: d.reuse?.[v.options.option] ?? { ...v.options, ...d.merge }, priceMinor: v.priceMinor, currency: v.currency, active: true, trackStock: v.trackStock })),
+          ...(d.extra ?? []).map((o) => ({ sku: `${row.title.slice(0, 3).toUpperCase()}-${Object.values(o).join('-')}`.toUpperCase(), options: o, priceMinor: base.priceMinor, currency: base.currency, stock: 25 })),
+        ],
+      };
+      if (!full.categoryId && d.cat && catId(d.cat)) body.categoryId = catId(d.cat);
+      await http('PATCH', `/orgs/${org}/products/${row.id}`, tk, body);
+    }
+    }
+  });
   await step('zone de livraison + coupon + fidélité', async () => {
     if (state.zone) return;
     await http('POST', `/orgs/${shop.orgId}/delivery-zones`, T('alice'), { name: 'Kinshasa centre', areas: ['Kinshasa', 'Gombe'], fees: { USD: 300 }, etaMinutes: 90 });
@@ -409,6 +473,42 @@ await step('mini-app approuvée + consentement de bob', async () => {
   const challenge = createHash('sha256').update(randomBytes(48).toString('base64url')).digest('base64url');
   await http('POST', '/oauth/authorize', T('bob'), { clientId: app.clientId, redirectUri: redirect, scopes: ['profile.basic'], state: 'state-' + randomUUID().slice(0, 12), codeChallenge: challenge });
   state.miniapp = { orgId: org.id, appId: app.id, clientId: app.clientId }; save();
+});
+
+// ---------- lieux de démonstration (carte) ----------
+// 40 lieux FICTIFS à Goma pour l'onglet Maps : slug « demo-gom-NN », description « Donnée de démonstration ». Idempotent (ON CONFLICT).
+await step('lieux de démonstration à Goma (40, 9 catégories)', async () => {
+  const H = (days, a, b) => Object.fromEntries(days.map((d) => [d, [{ open: a, close: b }]]));
+  const ALL = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const hours = {
+    shop: H(ALL.slice(0, 6), '08:00', '19:00'), restaurant: H(ALL, '10:00', '22:00'), fuel_station: H(ALL, '06:00', '22:00'),
+    pharmacy: H(ALL, '08:00', '20:00'), hospital: H(ALL, '00:00', '23:59'), hotel: H(ALL, '00:00', '23:59'),
+    school: H(ALL.slice(0, 5), '07:00', '16:00'), bank: { ...H(ALL.slice(0, 5), '08:00', '15:30'), sat: [{ open: '08:00', close: '12:00' }] },
+    services: H(ALL.slice(0, 6), '08:00', '17:00'),
+  };
+  // [catégorie, nom, rue, décalage lat, décalage lng] (en millièmes de degré autour du centre-ville)
+  const P = [
+    ['shop', 'Boutique Mama Neema', 'Avenue du Rond-Point', 2, 4], ['shop', 'Supermarché Kivu Frais', 'Avenue de la Frontière', -4, 12], ['shop', 'Quincaillerie Virunga', 'Route de Sake', 6, -8], ['shop', 'Mode Goma Style', 'Avenue Mont Goma', -2, 1], ['shop', 'Marché du Volcan', 'Quartier Birere', 9, 15],
+    ['restaurant', 'Chez Tantine Awa', 'Avenue du Lac', -6, -3], ['restaurant', 'Le Fournil du Kivu', 'Boulevard Kanyamuhanga', 3, 8], ['restaurant', 'Grill Nyiragongo', 'Avenue Président Mobutu', -1, 6], ['restaurant', 'Saveurs du Lac', 'Avenue de la Plage', -9, 2], ['restaurant', 'Pizzeria Casa Goma', 'Quartier Himbi', 5, -6], ['restaurant', 'Café Arabica', 'Avenue Butembo', 1, -1],
+    ['fuel_station', 'Station Kivu Énergie', 'Route de Gisenyi', 4, 17], ['fuel_station', 'Station Goma Centre', 'Avenue de l\'Aéroport', -3, -9], ['fuel_station', 'Station Virunga Fuel', 'Route de Sake', 8, -14], ['fuel_station', 'Station du Port', 'Avenue du Port', -8, 7],
+    ['pharmacy', 'Pharmacie du Centre', 'Avenue du Rond-Point', 0, 3], ['pharmacy', 'Pharmacie Espoir', 'Quartier Katindo', 7, 9], ['pharmacy', 'Pharmacie Lac Kivu', 'Avenue du Lac', -5, 0], ['pharmacy', 'Pharmacie Nyiragongo', 'Quartier Himbi', 4, -4], ['pharmacy', 'Pharmacie de la Paix', 'Quartier Mabanga', 11, 6],
+    ['hospital', 'Centre de santé Sainte Marie', 'Quartier Ndosho', 12, -10], ['hospital', 'Clinique du Lac', 'Avenue du Lac', -7, -5], ['hospital', 'Hôpital général de référence', 'Quartier Katindo', 8, 11], ['hospital', 'Polyclinique Mont Goma', 'Avenue Mont Goma', -1, 5],
+    ['hotel', 'Hôtel Lac Vue', 'Avenue de la Plage', -10, 4], ['hotel', 'Auberge du Volcan', 'Quartier Himbi', 6, -3], ['hotel', 'Résidence Kivu Palace', 'Avenue du Rond-Point', 1, 7], ['hotel', 'Lodge Virunga', 'Route de Sake', 10, -12],
+    ['school', 'École Primaire La Colombe', 'Quartier Katindo', 5, 13], ['school', 'Institut Mont Goma', 'Avenue Mont Goma', -3, 3], ['school', 'Lycée Les Cimes', 'Quartier Himbi', 9, -7], ['school', 'Collège Saint Joseph', 'Quartier Ndosho', 13, -6],
+    ['bank', 'Banque du Kivu (agence centre)', 'Avenue du Rond-Point', 1, 2], ['bank', 'Distributeur Goma Centre', 'Avenue de la Frontière', -2, 10], ['bank', 'Agence Virunga Bank', 'Boulevard Kanyamuhanga', 3, 5], ['bank', 'Distributeur Aéroport', 'Avenue de l\'Aéroport', -4, -11], ['bank', 'Caisse d\'épargne Lac', 'Avenue du Lac', -6, 1],
+    ['services', 'Atelier Couture Zawadi', 'Quartier Birere', 8, 14], ['services', 'Garage Auto Kivu', 'Route de Sake', 7, -10], ['services', 'Cybercafé et Imprimerie Net-Goma', 'Avenue Butembo', 0, -2],
+  ];
+  let created = 0;
+  for (const [i, [kind, name, street, dLat, dLng]] of P.entries()) {
+    const nn = String(i + 1).padStart(2, '0');
+    const r = await sql(
+      `INSERT INTO organizations (slug, name, kind, description, country, city, address, phone, opening_hours, visibility, status, verification_status, lat, lng, location_label)
+       VALUES ($1,$2,$3,'Donnée de démonstration : lieu fictif.', 'CD','Goma',$4,$5,$6::jsonb,'public','active',$7,$8,$9,$10) ON CONFLICT (slug) DO NOTHING RETURNING 1`,
+      [`demo-gom-${nn}`, name, kind, street, `+243990${String(10000 + i * 137).padStart(5, '0')}`, JSON.stringify(hours[kind]), i % 3 === 0 ? 'verified' : 'unverified', -1.6585 + dLat / 1000, 29.2205 + dLng / 1000, street],
+    );
+    created += r.length;
+  }
+  console.log(`  lieux de démonstration : ${created} créé(s), ${P.length - created} déjà présent(s)`);
 });
 
 // ---------- bilan ----------

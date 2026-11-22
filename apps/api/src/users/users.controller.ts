@@ -1,6 +1,9 @@
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import {
   handleSchema,
+  type MatchContactsRequest,
+  type MatchContactsResponse,
+  matchContactsRequestSchema,
   type Me,
   type PublicProfile,
   type SecurityEvent,
@@ -12,6 +15,8 @@ import { z } from 'zod';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
 import { UsersService } from './users.service.js';
+
+export const MATCH_CONTACTS_HANDLER = 'matchContacts';
 
 @Controller()
 export class UsersController {
@@ -34,6 +39,16 @@ export class UsersController {
   @Get('me/security-events')
   async securityEvents(@CurrentUser() user: AuthUser): Promise<{ items: SecurityEvent[] }> {
     return { items: await this.users.securityEvents(user.userId) };
+  }
+
+  /** Phone-book numbers (E.164) -> users who allow discovery by phone. Numbers are never stored. */
+  @Post('users/match-contacts')
+  @HttpCode(200)
+  matchContacts(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodPipe(matchContactsRequestSchema)) body: MatchContactsRequest,
+  ): Promise<MatchContactsResponse> {
+    return this.users.matchContacts(user.userId, body.phones);
   }
 
   /** `:handle` is a handle or a user id (the mobile profile screens open users by id). */

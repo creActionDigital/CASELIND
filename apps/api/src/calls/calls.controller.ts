@@ -1,6 +1,7 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, Post } from '@nestjs/common';
 import {
   type Call,
+  type IceServers,
   type CallList,
   type CreateCallRequest,
   type Live,
@@ -15,6 +16,7 @@ import {
   signalRequestSchema,
   startLiveRequestSchema,
 } from '@caselind/contracts';
+import { ENV, type Env } from '../config/env.js';
 import { ZodPipe } from '../common/zod.pipe.js';
 import { RequireFlag } from '../flags/flag.guard.js';
 import { type AuthUser, CurrentUser } from '../security/auth.guard.js';
@@ -25,7 +27,16 @@ import { LiveService } from './live.service.js';
 @Controller()
 @RequireFlag('calls')
 export class CallsController {
-  constructor(private readonly calls: CallsService) {}
+  constructor(private readonly calls: CallsService, @Inject(ENV) private readonly env: Env) {}
+
+  /** Declared before calls/:id routes; static path, no clash. */
+  @Get('calls/ice-servers')
+  iceServers(): IceServers {
+    const split = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean);
+    const turn = split(this.env.TURN_URLS);
+    const stun = split(this.env.ICE_STUN_URLS);
+    return { iceServers: [...(stun.length ? [{ urls: stun }] : []), ...(turn.length ? [{ urls: turn, username: this.env.TURN_USERNAME, credential: this.env.TURN_CREDENTIAL }] : [])] };
+  }
 
   @Post('conversations/:conversationId/calls')
   start(@CurrentUser() u: AuthUser, @Param('conversationId') cid: string, @Body(new ZodPipe(createCallRequestSchema)) b: CreateCallRequest): Promise<Call> {

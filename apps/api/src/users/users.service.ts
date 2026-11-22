@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { Me, PublicProfile, SecurityEvent, UpdateMeRequest } from '@caselind/contracts';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import type { MatchContactsResponse, Me, PublicProfile, SecurityEvent, UpdateMeRequest } from '@caselind/contracts';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import type { RequestMeta } from '../common/request-meta.js';
@@ -38,6 +38,18 @@ export class UsersService {
     const [u] = await this.db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!u) throw AppError.notFound('User not found');
     return toMe(u, await this.hasTotp(userId));
+  }
+
+  async matchContacts(viewerId: string, phones: string[]): Promise<MatchContactsResponse> {
+    const list = [...new Set(phones)];
+    const res = await this.db.execute(sql`
+      SELECT u.id, u.handle::text AS handle, u.display_name, u.avatar_url FROM users u
+      WHERE u.phone IN (${sql.join(list.map((p) => sql`${p}`), sql`, `)}) AND u.discoverable_by_phone AND u.status = 'active' AND u.id <> ${viewerId}::uuid
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b
+          WHERE (b.blocker_id = ${viewerId}::uuid AND b.blocked_id = u.id) OR (b.blocker_id = u.id AND b.blocked_id = ${viewerId}::uuid))
+      ORDER BY lower(u.display_name) LIMIT 500`);
+    const rows = res.rows as unknown as { id: string; handle: string; display_name: string; avatar_url: string | null }[];
+    return { items: rows.map((r) => ({ id: r.id, handle: r.handle, displayName: r.display_name, avatarUrl: r.avatar_url })) };
   }
 
   private async hasTotp(userId: string): Promise<boolean> {

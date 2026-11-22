@@ -33,6 +33,9 @@ export type MediaPurpose = z.infer<typeof mediaPurposeSchema>;
  * Every type the API accepts. The server detects the real type from the file's first bytes and
  * refuses anything else (SVG, HTML, executables...), whatever the client declares.
  */
+/** Longest voice message, in seconds. */
+export const VOICE_MAX_SECONDS = 300;
+
 export const mediaMimeSchema = z.enum([
   'image/jpeg',
   'image/png',
@@ -41,6 +44,7 @@ export const mediaMimeSchema = z.enum([
   'video/mp4',
   'video/webm',
   'audio/mp4',
+  'audio/webm',
   'audio/ogg',
   'audio/mpeg',
   'application/pdf',
@@ -64,7 +68,7 @@ export function mediaKindOf(mime: MediaMime): MediaKind {
 
 const IMAGES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 const VIDEOS = ['video/mp4', 'video/webm'] as const;
-const AUDIO = ['audio/mp4', 'audio/ogg', 'audio/mpeg'] as const;
+const AUDIO = ['audio/mp4', 'audio/webm', 'audio/ogg', 'audio/mpeg'] as const;
 const OFFICE = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -119,10 +123,16 @@ export const createUploadRequestSchema = z
     sizeBytes: z.number().int().positive(),
     /** Original file name (documents sent in messages); sanitised by the server. */
     fileName: z.string().max(255).optional(),
+    /** Voice messages: length in seconds (1 to 300), audio only. */
+    durationSec: z.number().int().min(1).max(VOICE_MAX_SECONDS).optional(),
   })
   .refine((v) => isMimeAllowedFor(v.purpose, v.mime), {
     path: ['mime'],
     message: 'this type is not accepted for this purpose',
+  })
+  .refine((v) => v.durationSec === undefined || (v.purpose === 'message' && v.mime.startsWith('audio/')), {
+    path: ['durationSec'],
+    message: 'only allowed for an audio message file',
   });
 export type CreateUploadRequest = z.infer<typeof createUploadRequestSchema>;
 

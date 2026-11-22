@@ -42,6 +42,19 @@ describe('calls', () => {
     expect((await get(a, '/v1/me/calls').expect(200)).body.items.map((c: { id: string }) => c.id)).toContain(call.id);
   });
 
+  it('serves ICE servers to a signed-in user and refuses signalling from a stranger', async () => {
+    const a = await user();
+    const b = await user();
+    const c = await user();
+    const ice = (await get(a, '/v1/calls/ice-servers').expect(200)).body;
+    expect(ice.iceServers[0].urls[0]).toMatch(/^stun:/);
+    expect(ice.iceServers[1]).toMatchObject({ username: expect.any(String), credential: expect.any(String) });
+    await ctx.http.get('/v1/calls/ice-servers').expect(401);
+    const call = (await post(a, `/v1/conversations/${await direct(a, b)}/calls`, { kind: 'audio' }).expect(201)).body;
+    await post(c, `/v1/calls/${call.id}/signal`, { type: 'ice', payload: '{}' }).expect(404);
+    await post(b, `/v1/calls/${call.id}/signal`, { type: 'ice', payload: '{}' }).expect(204);
+  });
+
   it('decline, cancel, busy, expiry and access rules', async () => {
     const a = await user();
     const b = await user();

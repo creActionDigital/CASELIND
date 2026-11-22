@@ -167,3 +167,19 @@ describe('reading the organisation location', () => {
     await ctx.http.get(url).expect(401);
   });
 });
+
+describe('banks, phone and open-now', () => {
+  it('lists a bank with its phone and openNow computed from the weekly hours', async () => {
+    const owner = await user();
+    const day = [{ open: '00:00', close: '23:59' }];
+    const week = { mon: day, tue: day, wed: day, thu: day, fri: day, sat: day, sun: day };
+    const open = await createOrg(owner, { kind: 'bank', phone: '+243990000001', openingHours: week });
+    const unknown = await createOrg(owner, { kind: 'bank' });
+    await ctx.http.post(`/v1/orgs/${open.id}/location`).set(bearer(owner.token)).send({ lat: -1.6601, lng: 29.2211 }).expect(201);
+    await ctx.http.post(`/v1/orgs/${unknown.id}/location`).set(bearer(owner.token)).send({ lat: -1.6602, lng: 29.2212 }).expect(201);
+    const res = await places(owner, `${around}&radiusKm=1&kind=bank&limit=100`).expect(200);
+    const byId = Object.fromEntries(res.body.items.map((i: { id: string }) => [i.id, i]));
+    expect(byId[open.id]).toMatchObject({ kind: 'bank', phone: '+243990000001', openNow: true });
+    expect(byId[unknown.id]).toMatchObject({ phone: null, openNow: null });
+  });
+});

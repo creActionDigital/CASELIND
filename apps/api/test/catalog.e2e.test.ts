@@ -256,6 +256,22 @@ describe('storefront', () => {
     await ctx.http.get(`/v1/products/${pub.id}`).expect(401);
   });
 
+  it('lists the colour options of the variants on the cards (max 4, colour keys only)', async () => {
+    const [owner, buyer] = [await user(), await user()];
+    const org = await createOrg(owner);
+    const p = await publishedProduct(owner, org.id, {
+      title: 'Colorful',
+      variants: ['noir', 'Noir', 'blanc', 'rouge', 'vert', 'jaune'].map((c, i) => variant({ sku: `COL-${i}`, options: { couleur: c, taille: 'M' } })),
+    });
+    const list = await storefront(buyer, `orgId=${org.id}`).expect(200);
+    const card = list.body.items.find((i: { id: string }) => i.id === p.id);
+    expect(card.colors).toHaveLength(4);
+    expect(card.colors).not.toContain('M');
+    const plain = await publishedProduct(owner, org.id, { title: 'Plain' });
+    const l2 = await storefront(buyer, `orgId=${org.id}`).expect(200);
+    expect(l2.body.items.find((i: { id: string }) => i.id === plain.id).colors).toEqual([]);
+  });
+
   it('filters by category, price, currency, org and search; sorts and paginates', async () => {
     const [owner, buyer] = [await user(), await user()];
     const org = await createOrg(owner);

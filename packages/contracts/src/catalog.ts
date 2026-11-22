@@ -159,6 +159,8 @@ export const storefrontProductSchema = z.object({
   promotion: promotionBadgeSchema.nullish(),
   currency: z.string(),
   inStock: z.boolean(),
+  /** Distinct colour option values of the active variants (max 4). */
+  colors: z.array(z.string()).max(4).optional(),
   org: storefrontOrgSchema,
   createdAt: z.string(),
 });
