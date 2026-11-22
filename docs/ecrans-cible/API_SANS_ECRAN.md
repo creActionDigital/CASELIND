@@ -9,24 +9,20 @@ Méthode : 823 routes du registre (`apps/api/src/openapi/registry.ts`) comparée
 | PUT /blocks/{userId} | `setBlocked` | Bouton « Bloquer » (+ « Signaler ») sur le profil d'une personne | Profil, 1 toucher |
 | GET /me/security-events | `fetchSecurityEvents` | Section « Activité de sécurité récente » de `/sessions` | Menu ⋯ > Sécurité > Sessions |
 | DELETE /reviews/{reviewId} | `deleteReview` | « Supprimer mon avis » sur ses propres avis (fiche produit > Avis) | 2 touchers |
-| PATCH /reviews/{reviewId} | `updateReview` | `/review/new` en mode édition | (chemin d'accès non revérifié) |
-| GET /me/stories/archive, GET /users/{userId}/stories | `fetchStoryArchive`, `fetchUserStories` | `/stories-archive`, `/story/[userId]` | (chemin d'accès non revérifié) |
-| GET /hashtags/suggest | `fetchHashtagSuggestions` | `compose.tsx` | (chemin d'accès non revérifié) |
-| GET /payment-methods | `fetchPaymentMethods` | `checkout.tsx` | (chemin d'accès non revérifié) |
-| POST /orgs/{orgId}/ai/product-description | `draftDescription` | Fiche produit vendeur | (chemin d'accès non revérifié) |
-| PUT /me/job-profile/cv | `setCvFile` | `/jobs/cv` | (chemin d'accès non revérifié) |
-| PUT /courses/{id}/lessons/{lessonId}/files | `setLessonFiles` | `education/edit/[id]` | (chemin d'accès non revérifié) |
-| DELETE /orgs/{orgId}/school/guardians/{id}, DELETE /me/school/guardians/{id} | `removeGuardian`, `endMyParentLink` | `seller/[orgId]/school/guardians`, `/school` | (chemin d'accès non revérifié) |
+| PATCH /reviews/{reviewId} | `updateReview` | `/review/new` en mode édition | Fiche produit > Avis > Modifier (`product/[productId]`) |
+| GET /me/stories/archive, GET /users/{userId}/stories | `fetchStoryArchive`, `fetchUserStories` | `/stories-archive`, `/story/[userId]` | Menu ⋯ (lien de `menu-logic`) |
+| GET /hashtags/suggest | `fetchHashtagSuggestions` | `compose.tsx` | Nouvelle publication (Vidéos ou feuille de publication) |
+| GET /payment-methods | `fetchPaymentMethods` | `checkout.tsx` | Panier ou fiche produit > Paiement |
+| POST /orgs/{orgId}/ai/product-description | `draftDescription` | Fiche produit vendeur | Tableau de bord vendeur > Produits > fiche (`seller/[orgId]/products/[productId]`) |
+| PUT /me/job-profile/cv | `setCvFile` | `/jobs/cv` | Emploi (liste ou fiche d'offre) > Mon CV |
+| PUT /courses/{id}/lessons/{lessonId}/files | `setLessonFiles` | `education/edit/[id]` | Éducation > cours > modifier |
+| DELETE /orgs/{orgId}/school/guardians/{id}, DELETE /me/school/guardians/{id} | `removeGuardian`, `endMyParentLink` | `seller/[orgId]/school/guardians`, `/school` | Parents : École > enfants > « Arrêter le suivi » ; école : tableau de bord vendeur > parents |
 | GET /orgs/{orgId}/deliveries, POST …/deliveries/{id}/status | — | `seller/[orgId]/deliveries` | Tableau de bord vendeur |
 
-Contrôle fait le 22/11/2026 : chaque fonction est appelée par un écran (recherche dans le code). Chargement des écrans `/maps`, `/blocked`, `/stories-archive`, `/sessions`, `/jobs/cv`, `/compose`, `/school` vérifié au navigateur en clair et en sombre, sans erreur. Les actions elles-mêmes (envoi du CV, pièces jointes de leçon, livraisons d'organisation, etc.) n'ont pas été rejouées une à une.
+Contrôle fait le 22/11/2026 : chaque fonction est appelée par un écran et chaque écran est atteint par un lien (recherche dans le code). Chargement au navigateur, en clair et en sombre et sans erreur : `/maps`, `/blocked`, `/stories-archive`, `/sessions`, `/jobs/cv`, `/compose`, `/school`, tableau de bord vendeur, livraisons et produits d'une boutique, menu Plus. Les actions elles-mêmes (envoi du CV, pièces jointes de leçon, retrait d'un lien parent) n'ont pas été rejouées une à une.
 
 ## Restantes
-| Route | Raison |
-|---|---|
-| GET /visits/{id}, GET /offers/{id}, GET /wallet/split-bills/{id} | Listes seulement ; détails sans valeur ajoutée (0,25 j chacun, faible priorité) |
-| POST /lives/{id}/signal | Signalisation WebRTC du direct : gros chantier, > 5 j (le module d'appel 1:1 `calllive/useRtcCall` peut servir de base) |
-| POST /media/uploads/{id}/token, PUT …/content, GET /media/{id}/content | Appelées via d'autres gabarits ; aucune action |
+Aucune route utilisateur restante. Faux positifs de l'audit : `GET /visits/{id}`, `GET /offers/{id}` et `GET /wallet/split-bills/{id}` sont déjà appelées par leurs écrans (`listings/visits`, `listings/offers`, `wallet/split`). `POST /lives/{id}/signal` est reliée par `calllive/useRtcLive` (direct vidéo, maillage de 8 spectateurs au plus ; au-delà il faut un serveur média). Les routes `/media/uploads/...` passent par d'autres gabarits.
 
 ## Accessibilité (≤ 3 touchers depuis l'accueil)
 Contrôle automatique de tous les écrans `src/app/(app)` hors admin : chaque écran est référencé par au moins un lien (menu ⋯, Plus, lien contextuel ou tableau de bord vendeur/prestataire en chemins relatifs `go('/…')`). Aucun écran orphelin. Liens contextuels déjà présents : commande → retour/réclamation, produit → boutique, portefeuille → reçus/limites, course → partage/contacts de confiance, profil → message/pourboire, profil → bloquer/signaler, Confidentialité → personnes bloquées.
