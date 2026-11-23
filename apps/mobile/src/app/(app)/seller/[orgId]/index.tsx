@@ -101,7 +101,7 @@ export default function SellerDashboard() {
           <Chips
             options={active.map((m) => ({ value: m.org.id, label: m.org.name }))}
             value={orgId}
-            onChange={(id) => router.replace({ pathname: '/seller/[orgId]', params: { orgId: id } })}
+            onChange={(id) => router.push({ pathname: '/seller/[orgId]', params: { orgId: id } })}
           />
         ) : null}
         <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>

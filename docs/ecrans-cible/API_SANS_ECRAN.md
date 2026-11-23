@@ -24,5 +24,18 @@ Contrôle fait le 22/11/2026 : chaque fonction est appelée par un écran et cha
 ## Restantes
 Aucune route utilisateur restante. Faux positifs de l'audit : `GET /visits/{id}`, `GET /offers/{id}` et `GET /wallet/split-bills/{id}` sont déjà appelées par leurs écrans (`listings/visits`, `listings/offers`, `wallet/split`). `POST /lives/{id}/signal` est reliée par `calllive/useRtcLive` (direct vidéo, maillage de 8 spectateurs au plus ; au-delà il faut un serveur média). Les routes `/media/uploads/...` passent par d'autres gabarits.
 
+## Deuxième passage (23/11/2026) : routes du registre complet
+Méthode : 824 routes comparées segment par segment aux chemins appelés par le mobile (les `/${action}` comptent comme jokers). 59 non retrouvées ; après vérification à la main, restaient réellement sans écran :
+
+| Route | Écran | Accès |
+|---|---|---|
+| POST /admin/ads/settle | Bouton « Clôturer les campagnes terminées » (`admin/ads`) | Administration > Publicités |
+| POST /admin/subscriptions/renew-due | Bouton « Renouveler les abonnements échus » (`admin/subscriptions`) | Administration > Abonnements |
+| GET /admin/ledger/accounts/{id}, POST …/freeze, …/unfreeze | « Consulter un compte » (`admin/ledger`), gel et dégel avec confirmation ; 202 si double validation | Administration > Registre |
+| POST /admin/games/tournaments | Formulaire « Ouvrir un tournoi » (`admin/games`) | Administration > Jeux |
+| GET /admin/kyc/submissions/{id} | Appelée à l'ouverture des justificatifs (`admin/kyc`) : lecture tracée côté serveur | Administration > KYC |
+| GET /rides/shared/{token} | `rides/shared/[token]` : trajet partagé en lecture seule ; le message de partage envoie un lien de l'application | Lien reçu d'un proche |
+
+Hors périmètre mobile, volontairement : `/auth/qr/session` (créée par le web, approuvée par le mobile), `/media/uploads/{id}/token|content` (appelées avec le jeton reçu de l'annonce), `/miniapp-api/*` et `/oauth/token` (API machine des mini-apps), `/health/*`, `/openapi.json`, `/config/public`.
 ## Accessibilité (≤ 3 touchers depuis l'accueil)
 Contrôle automatique de tous les écrans `src/app/(app)` hors admin : chaque écran est référencé par au moins un lien (menu ⋯, Plus, lien contextuel ou tableau de bord vendeur/prestataire en chemins relatifs `go('/…')`). Aucun écran orphelin. Liens contextuels déjà présents : commande → retour/réclamation, produit → boutique, portefeuille → reçus/limites, course → partage/contacts de confiance, profil → message/pourboire, profil → bloquer/signaler, Confidentialité → personnes bloquées.
