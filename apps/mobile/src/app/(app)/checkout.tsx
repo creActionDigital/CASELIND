@@ -180,7 +180,7 @@ export default function Checkout() {
     return (
       <View style={[styles.flex, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: t('checkout.title') }} />
-        <EmptyState icon="cart-outline" title={t('cart.emptyTitle')} body={t('cart.emptyBody')} actionLabel={t('checkout.editCart')} onAction={() => router.replace('/cart')} />
+        <EmptyState icon="cart-outline" title={t('cart.emptyTitle')} body={t('cart.emptyBody')} actionLabel={t('checkout.editCart')} onAction={() => router.dismissTo('/cart')} />
       </View>
     );
   }
@@ -195,7 +195,7 @@ export default function Checkout() {
         {conflict ? (
           <View style={[styles.card, { backgroundColor: colors.dangerSoft, borderColor: colors.danger }]} accessibilityLiveRegion="polite">
             <Text variant="bodyStrong">{t('checkout.conflictBanner')}</Text>
-            <Button variant="secondary" label={t('checkout.editCart')} onPress={() => router.replace('/cart')} />
+            <Button variant="secondary" label={t('checkout.editCart')} onPress={() => router.dismissTo('/cart')} />
           </View>
         ) : null}
 

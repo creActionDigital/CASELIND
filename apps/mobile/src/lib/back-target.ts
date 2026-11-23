@@ -24,7 +24,7 @@ export const ROUTES = [
   '/notification-preferences', '/notifications', '/orders', '/orders/[orderId]', '/pay', '/post/[postId]', '/premium', '/premium/history', '/premium/pro', '/privacy', '/product/[productId]',
   '/product/compare', '/profile', '/provider/[scope]', '/provider/[scope]/availability', '/provider/[scope]/offer/[id]', '/provider/[scope]/requests',
   '/provider/[scope]/reviews', '/rentals', '/rentals/[id]', '/rentals/mine', '/review/new', '/rides', '/rides/[rideId]', '/rides/contacts',
-  '/rides/driver', '/rides/history', '/rides/places', '/roadside', '/roadside/available', '/scan', '/scheduled', '/school', '/school/[classId]',
+  '/rides/driver', '/rides/history', '/rides/places', '/rides/shared/[token]', '/roadside', '/roadside/available', '/scan', '/scheduled', '/school', '/school/[classId]',
   '/school/children', '/school/fees', '/school/scholarships', '/school/scholarships/[id]', '/school/search', '/search', '/security/2fa',
   '/security/identifier', '/security/qr-approve', '/seller', '/seller/[orgId]', '/seller/[orgId]/batches', '/seller/[orgId]/campaigns',
   '/seller/[orgId]/commissions', '/seller/[orgId]/coupons', '/seller/[orgId]/coupons/new', '/seller/[orgId]/customers', '/seller/[orgId]/documents',

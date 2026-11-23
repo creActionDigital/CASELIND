@@ -1,5 +1,6 @@
 import { QUICK_MESSAGES, type CancelReason, type QuickMessageCode, type RideView } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createURL } from 'expo-linking';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Platform, View } from 'react-native';
@@ -7,7 +8,6 @@ import { SheetModal } from '../../../components/SheetModal';
 import { distanceKm } from '../../../delivery/logic';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { shareMessage } from '../../../lib/share';
-import { absoluteUrl } from '../../../lib/config';
 import { ApiRequestError } from '../../../lib/api';
 import {
   alertRide,
@@ -128,7 +128,7 @@ function RideBody({ ride, refetch }: { ride: RideView; refetch: () => void }) {
     mutationFn: () => shareRide(id),
     onMutate: () => setError(null),
     onSuccess: (s) => {
-      void shareMessage({ message: t('mobility.share.message', { link: absoluteUrl(s.path) }) }, t('share.copied'));
+      void shareMessage({ message: t('mobility.share.message', { link: createURL(`/rides/shared/${encodeURIComponent(s.token)}`) }) }, t('share.copied'));
       void qc.invalidateQueries({ queryKey: rideKeys.ride(id) });
     },
     onError: fail,

@@ -2,7 +2,7 @@ import type { AdminKycSubmission } from '@caselind/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { cck, decideKyc, fetchKyc } from '../../../admin/console-api';
+import { cck, decideKyc, fetchKyc, fetchKycSubmission } from '../../../admin/console-api';
 import { decisionNeedsReason, kycDecisions, type Decision } from '../../../admin/console-logic';
 import { AdminList, DecisionPanel, Denied, adminStyles, useCursorList, useHasRole, when } from '../../../admin/kit';
 import { useI18n, type MessageKey } from '../../../i18n';
@@ -33,7 +33,7 @@ function KycCard({ s }: { s: AdminKycSubmission }) {
       {s.decisionReason ? <Text variant="small" muted>{t('adm.kyc.reasonShown', { reason: s.decisionReason })}</Text> : null}
       {s.documents.length > 0 ? (
         <>
-          <Button variant="ghost" label={t(docs ? 'adm.kyc.hideDocs' : 'adm.kyc.docs', { n: s.documents.length })} onPress={() => setDocs(!docs)} />
+          <Button variant="ghost" label={t(docs ? 'adm.kyc.hideDocs' : 'adm.kyc.docs', { n: s.documents.length })} onPress={() => { if (!docs) void fetchKycSubmission(s.id).catch(() => undefined); setDocs(!docs); }} />
           {docs ? s.documents.map((d, i) => <AuthImage key={d.id} contentUrl={d.contentUrl} label={t('adm.kyc.doc', { n: i + 1 })} style={{ height: 220, width: '100%' }} />) : null}
         </>
       ) : null}

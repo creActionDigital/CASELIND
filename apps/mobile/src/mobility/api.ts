@@ -10,6 +10,7 @@ import {
   rideOffersSchema,
   rideReceiptSchema,
   rideShareSchema,
+  sharedRideSchema,
   rideViewSchema,
   trustedContactListSchema,
   type CancelReason,
@@ -43,6 +44,8 @@ export const fetchMyRides = (scope: 'active' | 'done' | 'all') => api.request('/
 export const fetchRide = (id: string) => api.request(`/rides/${id}`, { schema: rideViewSchema });
 export const fetchReceipt = (id: string) => api.request(`/rides/${id}/receipt`, { schema: rideReceiptSchema });
 export const cancelRide = (id: string, reason: CancelReason) => api.request(`/rides/${id}/cancel`, { method: 'POST', body: { reason }, schema: rideViewSchema });
+/** Vue en lecture seule d'un trajet partagé (route publique : valable tant qu'un chauffeur est en course). */
+export const fetchSharedRide = (token: string) => api.request(`/rides/shared/${encodeURIComponent(token)}`, { schema: sharedRideSchema });
 export const shareRide = (id: string) => api.request(`/rides/${id}/share`, { method: 'POST', body: {}, schema: rideShareSchema });
 export const alertRide = (id: string) => api.request(`/rides/${id}/alert`, { method: 'POST', body: {}, schema: rideAlertResultSchema });
 export const rateRide = (id: string, body: { rating: number; comment?: string }) => api.request(`/rides/${id}/rating`, { method: 'POST', body });

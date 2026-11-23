@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { fetchAdminAds, reviewAd } from '../../../ads/api';
 import { AD_STATUSES } from '../../../ads/logic';
-import { cck } from '../../../admin/console-api';
+import { cck, settleAds } from '../../../admin/console-api';
 import { AdminList, Denied, adminErrorMessage, adminStyles, useCursorList, useHasRole } from '../../../admin/kit';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { alertConfirm } from '../../../lib/confirm';
@@ -66,7 +66,17 @@ function AdCard({ c }: { c: AdminCampaign }) {
 
 /** Revue des campagnes publicitaires avant diffusion : approuver, ou refuser avec motif (le budget non dépensé est remboursé). */
 export default function AdminAds() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const qc = useQueryClient();
+  const [settled, setSettled] = useState<{ ok: boolean; text: string } | null>(null);
+  const settle = useMutation({
+    mutationFn: settleAds,
+    onSuccess: (r) => {
+      setSettled({ ok: true, text: t('adm.ads.settle.done', { n: r.settled }) });
+      void qc.invalidateQueries({ queryKey: cck.all });
+    },
+    onError: (e) => setSettled({ ok: false, text: adminErrorMessage(e, t, locale) }),
+  });
   const allowed = useHasRole(['admin', 'moderator']);
   const [status, setStatus] = useState<AdStatus>('pending');
   const query = useCursorList(['ads', status], (c) => fetchAdminAds(status, c), allowed);
@@ -77,7 +87,13 @@ export default function AdminAds() {
       query={query}
       keyExtractor={(c) => c.id}
       emptyTitle={t('adm.empty')}
-      header={<Chips value={status} onChange={setStatus} options={AD_STATUSES.map((s) => ({ value: s, label: t(`mon.ads.status.${s}` as MessageKey) }))} />}
+      header={
+        <View style={{ gap: 12 }}>
+          <Button variant="secondary" label={t('adm.ads.settle')} loading={settle.isPending} onPress={() => alertConfirm(t('adm.ads.settle'), t('adm.ads.settle'), [{ text: t('adm.cancel'), style: 'cancel' }, { text: t('adm.ads.settle'), onPress: () => settle.mutate() }])} />
+          {settled ? <Text variant="small" accessibilityLiveRegion="polite">{settled.text}</Text> : null}
+          <Chips value={status} onChange={setStatus} options={AD_STATUSES.map((s) => ({ value: s, label: t(`mon.ads.status.${s}` as MessageKey) }))} />
+        </View>
+      }
       renderItem={({ item }) => <AdCard c={item} />}
     />
   );

@@ -2,7 +2,7 @@ import type { AdminSubscription, SubscriptionPlan } from '@caselind/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { cck } from '../../../admin/console-api';
+import { cck, renewDueSubscriptions } from '../../../admin/console-api';
 import { AdminList, Denied, adminErrorMessage, adminStyles, useCursorList, useHasRole, when } from '../../../admin/kit';
 import { useI18n, type MessageKey } from '../../../i18n';
 import { alertConfirm } from '../../../lib/confirm';
@@ -86,7 +86,17 @@ function SubCard({ s }: { s: AdminSubscription }) {
 
 /** Abonnements : prix des plans (réglables), liste et annulation immédiate. */
 export default function AdminSubscriptions() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const qc = useQueryClient();
+  const [renewed, setRenewed] = useState<{ ok: boolean; text: string } | null>(null);
+  const renew = useMutation({
+    mutationFn: renewDueSubscriptions,
+    onSuccess: (r) => {
+      setRenewed({ ok: true, text: t('adm.subs.renew.done', { n: r.renewed }) });
+      void qc.invalidateQueries({ queryKey: cck.all });
+    },
+    onError: (e) => setRenewed({ ok: false, text: adminErrorMessage(e, t, locale) }),
+  });
   const allowed = useHasRole(['admin']);
   const [status, setStatus] = useState<'active' | 'expired'>('active');
   const plans = useQuery({ queryKey: ['admin-plans'], queryFn: fetchAdminPlans, enabled: allowed });
@@ -106,6 +116,8 @@ export default function AdminSubscriptions() {
           {(plans.data?.items ?? []).map((p) => (
             <PlanEditor key={`${p.code}-${p.priceUsdMinor}-${p.priceCdfMinor}`} plan={p} />
           ))}
+          <Button variant="secondary" label={t('adm.subs.renew')} loading={renew.isPending} onPress={() => alertConfirm(t('adm.subs.renew'), t('adm.subs.renew'), [{ text: t('adm.cancel'), style: 'cancel' }, { text: t('adm.subs.renew'), onPress: () => renew.mutate() }])} />
+          {renewed ? <Text variant="small" accessibilityLiveRegion="polite">{renewed.text}</Text> : null}
           <Chips value={status} onChange={setStatus} options={[{ value: 'active', label: t('mon.status.active') }, { value: 'expired', label: t('mon.status.expired') }]} />
         </View>
       }

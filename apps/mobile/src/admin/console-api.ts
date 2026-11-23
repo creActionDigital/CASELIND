@@ -5,12 +5,15 @@ import {
   adminGameQuestionListSchema,
   adminGameQuestionSchema,
   adminKycListSchema,
+  adminKycSubmissionSchema,
+  adminLedgerAccountSchema,
   adminProfessionalListSchema,
   featureFlagSchema,
   ledgerReconciliationSchema,
   miniappListSchema,
   moderationActionResultSchema,
   moderationReportGroupPageSchema,
+  tournamentSchema,
   type ReportTargetType,
 } from '@caselind/contracts';
 import { z } from 'zod';
@@ -82,3 +85,16 @@ export const setQuestionActive = (id: string, active: boolean) => api.request(`/
 // IA : modèles (admin)
 export const fetchAiModels = () => api.request('/admin/ai/models', { schema: adminAiModelListSchema });
 export const setAiModel = (id: string, enabled: boolean) => api.request(`/admin/ai/models/${encodeURIComponent(id)}`, { method: 'PATCH', body: { enabled }, schema: adminAiModelSchema });
+
+// Actions d'administration sans écran jusqu'ici (admin ; clôture des pubs : admin ou modérateur)
+export const settleAds = () => api.request('/admin/ads/settle', { method: 'POST', body: {}, schema: z.object({ settled: z.number().int() }) });
+export const renewDueSubscriptions = () => api.request('/admin/subscriptions/renew-due', { method: 'POST', body: {}, schema: z.object({ renewed: z.number().int() }) });
+/** Ouvre un tournoi (titre, début, fin en ISO 8601). */
+export const createTournament = (body: { title: string; startsAt: string; endsAt: string }) => api.request('/admin/games/tournaments', { method: 'POST', body, schema: tournamentSchema });
+/** Lecture d'une demande KYC : tracée côté serveur (kyc.viewed), à appeler quand l'admin ouvre les justificatifs. */
+export const fetchKycSubmission = (id: string) => api.request(`/admin/kyc/submissions/${id}`, { schema: adminKycSubmissionSchema });
+export const fetchLedgerAccount = (id: string) => api.request(`/admin/ledger/accounts/${id}`, { schema: adminLedgerAccountSchema });
+const pendingApprovalSchema = z.object({ approvalId: z.string(), status: z.literal('pending') });
+/** 200 : compte à jour ; 202 `{ approvalId, status: 'pending' }` quand la double validation est active. */
+export const setLedgerAccountFrozen = (id: string, frozen: boolean) =>
+  api.request(`/admin/ledger/accounts/${id}/${frozen ? 'freeze' : 'unfreeze'}`, { method: 'POST', body: {}, schema: z.union([adminLedgerAccountSchema, pendingApprovalSchema]) });
